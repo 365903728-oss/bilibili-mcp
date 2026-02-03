@@ -20,7 +20,23 @@ Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和�
 
 ## 安装
 
+### 方式一：从 npm 安装（推荐）
+
 ```bash
+# 方式 A：使用 npx 直接运行（无需安装）
+npx @xzxzzx/bilibili-mcp
+
+# 方式 B：全局安装
+npm install -g @xzxzzx/bilibili-mcp
+```
+
+### 方式二：从源码安装
+
+```bash
+# 克隆仓库
+git clone https://github.com/365903728-oss/bilibili-mcp.git
+cd bilibili-mcp
+
 # 安装依赖
 npm install
 
@@ -30,13 +46,40 @@ npm run build
 
 ## 使用
 
-### 方式一：作为 MCP 服务器
+### Claude Desktop 配置
 
-在 Claude Desktop 的配置文件中添加：
+在 Claude Desktop 的配置文件中添加 MCP 服务器：
 
 **macOS/Linux**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+#### 推荐配置（使用 npm）
+
+```json
+{
+  "mcpServers": {
+    "bilibili": {
+      "command": "npx",
+      "args": ["@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+
+#### 或使用全局安装版本
+
+```json
+{
+  "mcpServers": {
+    "bilibili": {
+      "command": "bilibili-mcp"
+    }
+  }
+}
+```
+
+#### 本地源码运行（仅开发）
 
 ```json
 {
