@@ -30,15 +30,15 @@
     "视频总结",
     "评论总结"
   ],
-  "author": "Your Name <your.email@example.com>",
+  "author": "365903728-oss",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/bilibili-mcp.git"
+    "url": "git+https://github.com/365903728-oss/bilibili-mcp.git"
   },
-  "homepage": "https://github.com/yourusername/bilibili-mcp#readme",
+  "homepage": "https://github.com/365903728-oss/bilibili-mcp#readme",
   "bugs": {
-    "url": "https://github.com/yourusername/bilibili-mcp/issues"
+    "url": "https://github.com/365903728-oss/bilibili-mcp/issues"
   },
   "engines": {
     "node": ">=18.0.0"
