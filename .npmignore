@@ -1,0 +1,27 @@
+# 源代码（只发布编译后的 dist）
+src/
+*.ts
+!*.d.ts
+
+# 配置文件
+tsconfig.json
+.editorconfig
+.prettierrc*
+
+# 开发文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 测试文件
+test/
+tests/
+*.test.ts
+*.spec.ts
+
+# 其他
+.git/
+.gitignore
+.npmignore
+.github/
