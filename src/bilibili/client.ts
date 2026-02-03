@@ -5,6 +5,48 @@ const BASE_URL = "https://api.bilibili.com";
 // WBI 缓存
 let cachedWBI: { imgKey: string; subKey: string; mixKey: string; expireTime: number } | null = null;
 
+// 请求限流 - 避免高频请求被 Bilibili 限制
+const RATE_LIMIT_MS = 500; // 请求间隔 500ms
+let lastRequestTime = 0;
+let pendingPromise: Promise<void> | null = null;
+
+/**
+ * 等待到下一个允许请求的时间
+ */
+async function waitForRateLimit(): Promise<void> {
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+
+  if (timeSinceLastRequest < RATE_LIMIT_MS) {
+    const waitTime = RATE_LIMIT_MS - timeSinceLastRequest;
+    await new Promise<void>((resolve) => setTimeout(resolve, waitTime));
+  }
+
+  lastRequestTime = Date.now();
+}
+
+/**
+ * 带限流的请求包装器
+ */
+async function throttledFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
+  // 等待上一个请求完成
+  if (pendingPromise) {
+    await pendingPromise;
+  }
+
+  // 创建新的请求
+  pendingPromise = (async () => {
+    await waitForRateLimit();
+  })();
+
+  try {
+    await pendingPromise;
+    return await fetchFn();
+  } finally {
+    pendingPromise = null;
+  }
+}
+
 /**
  * 生成 WBI 签名所需的混合密钥
  */
@@ -124,44 +166,46 @@ export async function fetchWithWBI(
   path: string,
   params: Record<string, string | number>
 ): Promise<unknown> {
-  try {
-    const { mixKey } = await getWBI();
+  return throttledFetch(async () => {
+    try {
+      const { mixKey } = await getWBI();
 
-    // 添加时间戳参数
-    params = { ...params, timestamp: Date.now() };
+      // 添加时间戳参数
+      params = { ...params, timestamp: Date.now() };
 
-    // 生成签名
-    const w_rid = generateWBISign(params, mixKey);
+      // 生成签名
+      const w_rid = generateWBISign(params, mixKey);
 
-    // 构建 URL
-    const url = new URL(path, BASE_URL);
-    Object.entries({ ...params, w_rid }).forEach(([key, value]) => {
-      url.searchParams.append(key, String(value));
-    });
+      // 构建 URL
+      const url = new URL(path, BASE_URL);
+      Object.entries({ ...params, w_rid }).forEach(([key, value]) => {
+        url.searchParams.append(key, String(value));
+      });
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://www.bilibili.com",
-        "Accept": "application/json",
-      },
-    });
+      const response = await fetch(url.toString(), {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": "https://www.bilibili.com",
+          "Accept": "application/json",
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.code !== 0) {
+        throw new Error(`API Error: ${data.message || "Unknown error"}`);
+      }
+
+      return data.data;
+    } catch (error) {
+      console.error(`Error fetching ${path}:`, error);
+      throw error;
     }
-
-    const data = await response.json();
-
-    if (data.code !== 0) {
-      throw new Error(`API Error: ${data.message || "Unknown error"}`);
-    }
-
-    return data.data;
-  } catch (error) {
-    console.error(`Error fetching ${path}:`, error);
-    throw error;
-  }
+  });
 }
 
 /**
@@ -171,37 +215,39 @@ export async function fetchWithoutWBI(
   path: string,
   params?: Record<string, string | number>
 ): Promise<unknown> {
-  try {
-    const url = new URL(path, BASE_URL);
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.append(key, String(value));
+  return throttledFetch(async () => {
+    try {
+      const url = new URL(path, BASE_URL);
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          url.searchParams.append(key, String(value));
+        });
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": "https://www.bilibili.com",
+          "Accept": "application/json",
+        },
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.code !== 0) {
+        throw new Error(`API Error: ${data.message || "Unknown error"}`);
+      }
+
+      return data.data;
+    } catch (error) {
+      console.error(`Error fetching ${path}:`, error);
+      throw error;
     }
-
-    const response = await fetch(url.toString(), {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://www.bilibili.com",
-        "Accept": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    if (data.code !== 0) {
-      throw new Error(`API Error: ${data.message || "Unknown error"}`);
-    }
-
-    return data.data;
-  } catch (error) {
-    console.error(`Error fetching ${path}:`, error);
-    throw error;
-  }
+  });
 }
 
 /**
@@ -248,26 +294,28 @@ export async function getSubtitleContent(url: string): Promise<{
     content: string;
   }>;
 }> {
-  try {
-    // 字幕 URL 可能是相对路径，需要补全
-    const fullUrl = url.startsWith("http") ? url : `https:${url}`;
+  return throttledFetch(async () => {
+    try {
+      // 字幕 URL 可能是相对路径，需要补全
+      const fullUrl = url.startsWith("http") ? url : `https:${url}`;
 
-    const response = await fetch(fullUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://www.bilibili.com",
-      },
-    });
+      const response = await fetch(fullUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": "https://www.bilibili.com",
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching subtitle content:", error);
+      throw error;
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error fetching subtitle content:", error);
-    throw error;
-  }
+  });
 }
 
 /**
