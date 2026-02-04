@@ -1,5 +1,6 @@
 # Bilibili MCP Tool
 用claude code(glm4,7模型)做的提取B站视频的MCP
+
 Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和视频评论。
 
 ## 功能特性
