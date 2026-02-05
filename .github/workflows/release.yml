@@ -1,4 +1,4 @@
-name: Release
+name: Release to npm
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   release:
-    name: Semantic Release
+    name: Publish to npm
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -17,24 +17,21 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
+      - name: Setup Node.js for OIDC
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          # 使用 OIDC 认证
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Configure npm for OIDC
-        run: echo "registry=https://registry.npmjs.org/" > .npmrc
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run semantic-release
-        run: npm run release
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --access public
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 完全不设置 NODE_AUTH_TOKEN，强制使用 OIDC
+          # 不设置 NODE_AUTH_TOKEN，让 setup-node 自动处理 OIDC
