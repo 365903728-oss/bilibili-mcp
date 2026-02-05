@@ -21,3 +21,10 @@ Thumbs.db
 # 临时文件
 *.tmp
 .cache/
+
+# Semantic Release
+.npmrc
+.env.*
+
+# Release notes
+CHANGELOG.md
