@@ -5,16 +5,6 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (e.g., 1.0.0)'
-        required: true
-        type: string
-      dry_run:
-        description: 'Dry run mode (only build, not publish)'
-        required: false
-        type: boolean
-        default: 'false'
 
 jobs:
   publish:
@@ -22,13 +12,10 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -39,57 +26,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify package version
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-          echo "Package version: $PACKAGE_VERSION"
-          echo "Tag version: $TAG_VERSION"
-          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
-            echo "❌ Package version ($PACKAGE_VERSION) doesn't match tag version ($TAG_VERSION)"
-            exit 1
-          else
-            echo "✅ Version match confirmed"
-          fi
-
       - name: Build
         run: npm run build
 
-      - name: Lint and type check (optional)
-        run: |
-          # 如果需要，可以添加 linting
-          echo "✅ Build completed successfully"
-
-      - name: Dry run (if enabled)
-        if: ${{ github.event.inputs.dry_run == 'true' }}
-        run: |
-          echo "🔍 Running dry run..."
-          npm pack --dry-run
-          echo "✅ Dry run completed successfully"
-
       - name: Publish to npm
-        if: ${{ github.event.inputs.dry_run != 'true' }}
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create Release
-        if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        run: |
-          # 使用 gh CLI 创建 release，因为 create-release@v1 已弃用
-          gh release create "${{ github.ref }}" \
-            --title "Release ${{ github.ref }}" \
-            --notes "🎉 Release ${{ github.ref }}
-
-## Changelog
-- Updated security features
-- Added request timeout handling
-- Improved type safety
-- Enhanced error handling
-- Added configuration management
-- Implemented unified logging
-
-## Installation
-\`\`\`
-npm install -g @xzxzzx/bilibili-mcp
-\`\`\`"
