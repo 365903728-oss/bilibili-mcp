@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - master
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
+    inputs:
+      otp:
+        description: 'OTP 验证码（如果需要）'
+        required: false
 
 jobs:
   release:
@@ -35,3 +39,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM }}
+          NPM_CONFIG_OTP: ${{ github.event.inputs.otp }}
