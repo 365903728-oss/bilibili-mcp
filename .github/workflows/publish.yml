@@ -35,8 +35,6 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-          # 确保设置 scope，因为这是一个 scoped package
-          scope: '@xzxzzx'
 
       - name: Install dependencies
         run: npm ci
