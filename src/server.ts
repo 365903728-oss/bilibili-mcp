@@ -7,6 +7,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { getVideoInfoWithSubtitle } from "./bilibili/subtitle.js";
 import { getVideoCommentsData } from "./bilibili/comments.js";
+import { getPreferredLanguage, isValidLanguage } from "./config.js";
 
 // 创建 MCP 服务器实例
 export const server = new Server(
@@ -84,7 +85,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error("Missing required parameter: bvid_or_url");
         }
 
-        const result = await getVideoInfoWithSubtitle(bvidOrUrl, preferredLang);
+        // 验证并规范化语言参数
+        const normalizedLang = getPreferredLanguage(preferredLang);
+
+        const result = await getVideoInfoWithSubtitle(bvidOrUrl, normalizedLang);
 
         return {
           content: [

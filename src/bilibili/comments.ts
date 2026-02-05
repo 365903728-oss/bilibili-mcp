@@ -1,14 +1,9 @@
 // 评论处理逻辑
 import { getVideoInfo, getVideoComments } from "./client.js";
+import { Comment, ProcessedComment, CommentsResponse, CommentDetailLevel } from "./types.js";
 
 export interface CommentData {
-  comments: Array<{
-    author: string;
-    content: string;
-    likes: number;
-    has_timestamp: boolean;
-    timestamp?: string;
-  }>;
+  comments: ProcessedComment[];
   summary: {
     total_comments: number;
     comments_with_timestamp: number;
@@ -54,15 +49,9 @@ function extractTimestamp(text: string): string | null {
  * 处理单条评论
  */
 function processComment(
-  comment: any,
+  comment: Comment,
   includeReplies: boolean = false
-): {
-  author: string;
-  content: string;
-  likes: number;
-  has_timestamp: boolean;
-  timestamp?: string;
-} {
+): ProcessedComment {
   const author = comment.member?.uname || "匿名用户";
   const rawContent = comment.content?.message || "";
   const filteredContent = filterEmojis(rawContent);
@@ -83,7 +72,7 @@ function processComment(
  */
 export async function getVideoCommentsData(
   bvidOrUrl: string,
-  detailLevel: "brief" | "detailed" = "brief"
+  detailLevel: CommentDetailLevel = "brief"
 ): Promise<CommentData> {
   try {
     const bvid = extractBVId(bvidOrUrl);
@@ -96,7 +85,7 @@ export async function getVideoCommentsData(
     const commentCount = detailLevel === "brief" ? 10 : 50;
 
     // 获取评论
-    const commentsData = await getVideoComments(cid, 1, commentCount);
+    const commentsData = await getVideoComments(cid, 1, commentCount) as CommentsResponse;
 
     const rawComments = commentsData?.replies || [];
 
@@ -105,7 +94,7 @@ export async function getVideoCommentsData(
 
     // 如果是详细模式，添加高赞回复
     if (detailLevel === "detailed") {
-      const replies: any[] = [];
+      const replies: Comment[] = [];
       for (const comment of rawComments) {
         if (comment.replies && comment.replies.length > 0) {
           // 取前3条高赞回复

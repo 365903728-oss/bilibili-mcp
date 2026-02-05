@@ -1,12 +1,17 @@
 // B站 API 客户端，包含 WBI 签名逻辑
+import { config } from '../config.js';
+import { BilibiliAPIError, NetworkError, TimeoutError } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 
-const BASE_URL = "https://api.bilibili.com";
+const BASE_URL = config.baseUrl;
 
 // WBI 缓存
 let cachedWBI: { imgKey: string; subKey: string; mixKey: string; expireTime: number } | null = null;
+const CACHE_EXPIRATION_MS = config.wbiCacheExpirationMs;
 
 // 请求限流 - 避免高频请求被 Bilibili 限制
-const RATE_LIMIT_MS = 500; // 请求间隔 500ms
+const RATE_LIMIT_MS = config.rateLimitMs;
+const REQUEST_TIMEOUT_MS = config.requestTimeoutMs;
 let lastRequestTime = 0;
 let pendingPromise: Promise<void> | null = null;
 
@@ -41,7 +46,13 @@ async function throttledFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
 
   try {
     await pendingPromise;
-    return await fetchFn();
+
+    // 添加超时控制
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout')), REQUEST_TIMEOUT_MS);
+    });
+
+    return await Promise.race([fetchFn(), timeoutPromise]);
   } finally {
     pendingPromise = null;
   }
@@ -72,24 +83,32 @@ async function getWBI(): Promise<{ imgKey: string; subKey: string; mixKey: strin
     return { imgKey: cachedWBI.imgKey, subKey: cachedWBI.subKey, mixKey: cachedWBI.mixKey };
   }
 
+  // 缓存已过期，会创建新的
+
   try {
     // 获取 nav 数据中的 wbi_img 字段
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
     const navRes = await fetch(`${BASE_URL}/x/web-interface/nav`, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://www.bilibili.com",
+        "User-Agent": config.userAgent,
+        "Referer": config.referer,
       },
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!navRes.ok) {
-      throw new Error(`Failed to fetch WBI: ${navRes.status}`);
+      throw new NetworkError(`Failed to fetch WBI: ${navRes.status}`, undefined, `${BASE_URL}/x/web-interface/nav`);
     }
 
     const navData = await navRes.json();
     const wbiImg = navData.data?.wbi_img;
 
     if (!wbiImg) {
-      throw new Error("WBI image data not found");
+      throw new BilibiliAPIError("WBI image data not found", 'WBI_DATA_MISSING');
     }
 
     // 提取 img_key 和 sub_key
@@ -98,7 +117,7 @@ async function getWBI(): Promise<{ imgKey: string; subKey: string; mixKey: strin
     const subKeyMatch = wbiImg.sub_url?.match(/([^\/_]+)(?=\.jpg)/);
 
     if (!imgKeyMatch || !subKeyMatch) {
-      throw new Error("Failed to extract WBI keys");
+      throw new BilibiliAPIError("Failed to extract WBI keys", 'WBI_KEY_EXTRACT_FAILED');
     }
 
     const imgKey = imgKeyMatch[0];
@@ -115,8 +134,11 @@ async function getWBI(): Promise<{ imgKey: string; subKey: string; mixKey: strin
 
     return { imgKey, subKey, mixKey };
   } catch (error) {
-    console.error("Error getting WBI:", error);
-    throw error;
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new TimeoutError(`WBI request timeout: ${REQUEST_TIMEOUT_MS}ms`, REQUEST_TIMEOUT_MS);
+    }
+    logger.error("Error getting WBI", { error: error instanceof Error ? error.message : error }, { type: 'wbi-error' });
+    throw new NetworkError("Failed to fetch WBI", error instanceof Error ? error : undefined, `${BASE_URL}/x/web-interface/nav`);
   }
 }
 
@@ -182,22 +204,28 @@ export async function fetchWithWBI(
         url.searchParams.append(key, String(value));
       });
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
       const response = await fetch(url.toString(), {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Referer": "https://www.bilibili.com",
+          "User-Agent": config.userAgent,
+          "Referer": config.referer,
           "Accept": "application/json",
         },
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
       }
 
       const data = await response.json();
 
       if (data.code !== 0) {
-        throw new Error(`API Error: ${data.message || "Unknown error"}`);
+        throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
       }
 
       return data.data;
@@ -224,22 +252,28 @@ export async function fetchWithoutWBI(
         });
       }
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
       const response = await fetch(url.toString(), {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Referer": "https://www.bilibili.com",
+          "User-Agent": config.userAgent,
+          "Referer": config.referer,
           "Accept": "application/json",
         },
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
       }
 
       const data = await response.json();
 
       if (data.code !== 0) {
-        throw new Error(`API Error: ${data.message || "Unknown error"}`);
+        throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
       }
 
       return data.data;
@@ -299,15 +333,21 @@ export async function getSubtitleContent(url: string): Promise<{
       // 字幕 URL 可能是相对路径，需要补全
       const fullUrl = url.startsWith("http") ? url : `https:${url}`;
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
       const response = await fetch(fullUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Referer": "https://www.bilibili.com",
+          "User-Agent": config.userAgent,
+          "Referer": config.referer,
         },
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
       }
 
       return await response.json();
