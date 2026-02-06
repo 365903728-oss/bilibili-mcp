@@ -1,166 +1,93 @@
 /**
- * 统一错误处理定义
+ * 错误处理模块
+ * 提供详细的错误类型和错误处理功能
  */
 
-// Bilibili API 错误
-export class BilibiliAPIError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string = 'BILIBILI_API_ERROR',
-    public readonly statusCode?: number,
-    public readonly originalError?: any
-  ) {
+export class ValidationError extends Error {
+  constructor(message: string) {
     super(message);
-    this.name = 'BilibiliAPIError';
+    this.name = 'ValidationError';
   }
 }
 
-// 网络错误
+export class BVIdError extends ValidationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BVIdError';
+  }
+}
+
+export class InputLengthError extends ValidationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InputLengthError';
+  }
+}
+
+export class UnsafeInputError extends ValidationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnsafeInputError';
+  }
+}
+
 export class NetworkError extends Error {
   constructor(
     message: string,
-    public readonly originalError?: Error,
-    public readonly url?: string
+    public originalError?: Error,
+    public url?: string,
+    public statusCode?: number
   ) {
     super(message);
     this.name = 'NetworkError';
   }
 }
 
-// 超时错误
 export class TimeoutError extends Error {
-  constructor(
-    message: string = 'Request timeout',
-    public readonly timeoutMs?: number
-  ) {
+  constructor(message: string, public timeoutMs: number) {
     super(message);
     this.name = 'TimeoutError';
   }
 }
 
-// 验证错误
-export class ValidationError extends Error {
+export class BilibiliAPIError extends Error {
   constructor(
     message: string,
-    public readonly field?: string
+    public code: string,
+    public statusCode?: number,
+    public originalError?: any
   ) {
     super(message);
-    this.name = 'ValidationError';
+    this.name = 'BilibiliAPIError';
   }
 }
 
-// 配置错误
-export class ConfigError extends Error {
-  constructor(
-    message: string,
-    public readonly configKey?: string
-  ) {
-    super(message);
-    this.name = 'ConfigError';
-  }
-}
-
-// 工具错误
-export class ToolError extends Error {
-  constructor(
-    message: string,
-    public readonly toolName?: string,
-    public readonly originalError?: Error
-  ) {
-    super(message);
-    this.name = 'ToolError';
-  }
-}
-
-// 错误类型守卫
-export function isBilibiliAPIError(error: unknown): error is BilibiliAPIError {
-  return error instanceof BilibiliAPIError;
-}
-
-export function isNetworkError(error: unknown): error is NetworkError {
-  return error instanceof NetworkError;
-}
-
-export function isTimeoutError(error: unknown): error is TimeoutError {
-  return error instanceof TimeoutError;
-}
-
-export function isValidationError(error: unknown): error is ValidationError {
-  return error instanceof ValidationError;
-}
-
-export function isConfigError(error: unknown): error is ConfigError {
-  return error instanceof ConfigError;
-}
-
-export function isToolError(error: unknown): error is ToolError {
-  return error instanceof ToolError;
-}
-
-// 错误处理工具
-export class ErrorHandler {
-  /**
-   * 安全处理错误，返回标准化格式
-   */
-  static safeHandle(error: unknown): { error: boolean; message: string; code?: string; type?: string } {
-    if (error instanceof Error) {
-      return {
-        error: true,
-        message: error.message,
-        code: (error as any).code,
-        type: error.name
-      };
+/**
+ * 分类错误类型
+ */
+export function categorizeError(error: any): Error {
+  if (error instanceof Error) {
+    if (error.name === 'AbortError') {
+      return new TimeoutError('Request aborted due to timeout', 30000);
     }
-
-    return {
-      error: true,
-      message: 'Unknown error',
-      type: 'UnknownError'
-    };
-  }
-
-  /**
-   * 包装 Promise 错误
-   */
-  static async wrap<T>(
-    promise: Promise<T>,
-    errorMessage: string = 'Operation failed'
-  ): Promise<{ data: T; error?: never } | { error: true; message: string; data?: never }> {
-    try {
-      return { data: await promise };
-    } catch (error) {
-      const errorInfo = this.safeHandle(error);
-      return {
-        error: true,
-        message: `${errorMessage}: ${errorInfo.message}`
-      };
+    if (error.name === 'FetchError' || (error as any).code === 'ECONNRESET') {
+      return new NetworkError('Network error', error);
     }
   }
+  return error;
+}
 
-  /**
-   * 检查并重试异步函数
-   */
-  static async withRetry<T>(
-    fn: () => Promise<T>,
-    maxRetries: number = 3,
-    delayMs: number = 1000
-  ): Promise<T> {
-    let lastError: Error | undefined;
-
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        return await fn();
-      } catch (error) {
-        lastError = error as Error;
-        if (i < maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-      }
-    }
-
-    if (lastError) {
-      throw lastError;
-    }
-    throw new Error('Unknown error in retry operation');
+/**
+ * 安全地处理输入验证错误
+ */
+export function handleValidationError(error: unknown): never {
+  if (error instanceof ValidationError) {
+    throw error;
   }
+  
+  if (error instanceof Error) {
+    throw new ValidationError(`Validation failed: ${error.message}`);
+  }
+  
+  throw new ValidationError('Unknown validation error');
 }

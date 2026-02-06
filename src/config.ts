@@ -56,6 +56,10 @@ function loadConfigFromEnv(): Partial<Config> {
     envConfig.maxCacheSize = parseInt(process.env.BILIBILI_CACHE_SIZE, 10);
   }
 
+  if (process.env.USER_AGENT) {
+    envConfig.userAgent = process.env.USER_AGENT;
+  }
+
   return envConfig;
 }
 

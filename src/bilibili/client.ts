@@ -2,6 +2,8 @@
 import { config } from '../config.js';
 import { BilibiliAPIError, NetworkError, TimeoutError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
+import { retryManager, withRetry } from '../utils/retry.js';
+import { createHash } from 'crypto';
 
 const BASE_URL = config.baseUrl;
 
@@ -31,13 +33,22 @@ async function waitForRateLimit(): Promise<void> {
 }
 
 /**
- * 带限流的请求包装器
+ * 带限流和超时控制的请求包装器
+ * @param fetchFn - 执行 fetch 的函数，支持 AbortController
+ * @returns Promise<T>
  */
-async function throttledFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
+async function throttledFetch<T>(fetchFn: (controller: AbortController) => Promise<T>): Promise<T> {
   // 等待上一个请求完成
   if (pendingPromise) {
     await pendingPromise;
   }
+
+  // 创建 AbortController 用于超时控制
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    logger.error(`Request timeout after ${REQUEST_TIMEOUT_MS}ms`, {}, { type: 'request-timeout' });
+  }, REQUEST_TIMEOUT_MS);
 
   // 创建新的请求
   pendingPromise = (async () => {
@@ -46,16 +57,32 @@ async function throttledFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
 
   try {
     await pendingPromise;
-
-    // 添加超时控制
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), REQUEST_TIMEOUT_MS);
-    });
-
-    return await Promise.race([fetchFn(), timeoutPromise]);
+    return await fetchFn(controller);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new TimeoutError(`Request timeout: ${REQUEST_TIMEOUT_MS}ms`, REQUEST_TIMEOUT_MS);
+    }
+    throw error;
   } finally {
+    clearTimeout(timeoutId);
+    controller.abort(); // 确保 AbortController 被清理
     pendingPromise = null;
   }
+}
+
+/**
+ * 带重试机制的请求包装器
+ * @param fetchFn - 执行 fetch 的函数
+ * @returns Promise<T>
+ */
+async function retryableFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
+  return withRetry(() => fetchFn(), {
+    maxRetries: 3,
+    baseDelay: 1000,
+    maxDelay: 10000,
+    retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+    retryableErrorTypes: ['NetworkError', 'TimeoutError', 'AbortError']
+  });
 }
 
 /**
@@ -86,53 +113,57 @@ async function getWBI(): Promise<{ imgKey: string; subKey: string; mixKey: strin
   // 缓存已过期，会创建新的
 
   try {
-    // 获取 nav 数据中的 wbi_img 字段
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const result = await retryableFetch(async () => {
+      // 获取 nav 数据中的 wbi_img 字段
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    const navRes = await fetch(`${BASE_URL}/x/web-interface/nav`, {
-      headers: {
-        "User-Agent": config.userAgent,
-        "Referer": config.referer,
-      },
-      signal: controller.signal,
+      const navRes = await fetch(`${BASE_URL}/x/web-interface/nav`, {
+        headers: {
+          "User-Agent": config.userAgent,
+          "Referer": config.referer,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!navRes.ok) {
+        throw new NetworkError(`Failed to fetch WBI: ${navRes.status}`, undefined, `${BASE_URL}/x/web-interface/nav`);
+      }
+
+      const navData = await navRes.json();
+      const wbiImg = navData.data?.wbi_img;
+
+      if (!wbiImg) {
+        throw new BilibiliAPIError("WBI image data not found", 'WBI_DATA_MISSING');
+      }
+
+      // 提取 img_key 和 sub_key
+      // 格式类似: img_url: https://i0.hdslb.com/bfs/wbi/2608f8a68f3141d9_2.png
+      const imgKeyMatch = wbiImg.img_url?.match(/([^\/_]+)(?=\.[a-zA-Z]+$)/);
+      const subKeyMatch = wbiImg.sub_url?.match(/([^\/_]+)(?=\.[a-zA-Z]+$)/);
+
+      if (!imgKeyMatch || !subKeyMatch) {
+        throw new BilibiliAPIError("Failed to extract WBI keys", 'WBI_KEY_EXTRACT_FAILED');
+      }
+
+      const imgKey = imgKeyMatch[0];
+      const subKey = subKeyMatch[0];
+      const mixKey = getMixKey(imgKey, subKey);
+
+      // 缓存 WBI（1小时后过期）
+      cachedWBI = {
+        imgKey,
+        subKey,
+        mixKey,
+        expireTime: now + 60 * 60 * 1000,
+      };
+
+      return { imgKey, subKey, mixKey };
     });
 
-    clearTimeout(timeoutId);
-
-    if (!navRes.ok) {
-      throw new NetworkError(`Failed to fetch WBI: ${navRes.status}`, undefined, `${BASE_URL}/x/web-interface/nav`);
-    }
-
-    const navData = await navRes.json();
-    const wbiImg = navData.data?.wbi_img;
-
-    if (!wbiImg) {
-      throw new BilibiliAPIError("WBI image data not found", 'WBI_DATA_MISSING');
-    }
-
-    // 提取 img_key 和 sub_key
-    // 格式类似: img_url: https://i0.hdslb.com/bfs/wbi/2608f8a68f3141d9_2.jpg
-    const imgKeyMatch = wbiImg.img_url?.match(/([^\/_]+)(?=\.jpg)/);
-    const subKeyMatch = wbiImg.sub_url?.match(/([^\/_]+)(?=\.jpg)/);
-
-    if (!imgKeyMatch || !subKeyMatch) {
-      throw new BilibiliAPIError("Failed to extract WBI keys", 'WBI_KEY_EXTRACT_FAILED');
-    }
-
-    const imgKey = imgKeyMatch[0];
-    const subKey = subKeyMatch[0];
-    const mixKey = getMixKey(imgKey, subKey);
-
-    // 缓存 WBI（1小时后过期）
-    cachedWBI = {
-      imgKey,
-      subKey,
-      mixKey,
-      expireTime: now + 60 * 60 * 1000,
-    };
-
-    return { imgKey, subKey, mixKey };
+    return result;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new TimeoutError(`WBI request timeout: ${REQUEST_TIMEOUT_MS}ms`, REQUEST_TIMEOUT_MS);
@@ -159,26 +190,19 @@ function generateWBISign(params: Record<string, string | number>, mixKey: string
     .map(([key, value]) => `${key}=${value}`)
     .join("&");
 
-  // 计算 w_rid
+  // 计算 w_rid（使用 MD5 哈希）
   const strToSign = queryStr + mixKey;
-  const w_rid = simpleHash(strToSign);
+  const w_rid = md5Hash(strToSign);
 
   return w_rid;
 }
 
 /**
- * 简单哈希函数（模拟 B站的哈希算法）
+ * MD5 哈希函数 - 使用 Node.js crypto 模块
+ * 这是 B 站 WBI 签名算法真正需要的哈希函数
  */
-function simpleHash(str: string): string {
-  // 使用 Web Crypto API 的 MD5 或简单的自定义哈希
-  // 这里使用一个简化的实现
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash).toString(16).padStart(8, "0");
+function md5Hash(str: string): string {
+  return createHash('md5').update(str).digest('hex');
 }
 
 /**
@@ -188,51 +212,48 @@ export async function fetchWithWBI(
   path: string,
   params: Record<string, string | number>
 ): Promise<unknown> {
-  return throttledFetch(async () => {
-    try {
-      const { mixKey } = await getWBI();
+  return retryableFetch(async () => {
+    return throttledFetch(async (controller) => {
+      try {
+        const { mixKey } = await getWBI();
 
-      // 添加时间戳参数
-      params = { ...params, timestamp: Date.now() };
+        // 添加时间戳参数
+        params = { ...params, timestamp: Date.now() };
 
-      // 生成签名
-      const w_rid = generateWBISign(params, mixKey);
+        // 生成签名
+        const w_rid = generateWBISign(params, mixKey);
 
-      // 构建 URL
-      const url = new URL(path, BASE_URL);
-      Object.entries({ ...params, w_rid }).forEach(([key, value]) => {
-        url.searchParams.append(key, String(value));
-      });
+        // 构建 URL
+        const url = new URL(path, BASE_URL);
+        Object.entries({ ...params, w_rid }).forEach(([key, value]) => {
+          url.searchParams.append(key, String(value));
+        });
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const response = await fetch(url.toString(), {
+          headers: {
+            "User-Agent": config.userAgent,
+            "Referer": config.referer,
+            "Accept": "application/json",
+          },
+          signal: controller.signal,
+        });
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          "User-Agent": config.userAgent,
-          "Referer": config.referer,
-          "Accept": "application/json",
-        },
-        signal: controller.signal,
-      });
+        if (!response.ok) {
+          throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
+        }
 
-      clearTimeout(timeoutId);
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
+        if (data.code !== 0) {
+          throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
+        }
+
+        return data.data;
+      } catch (error) {
+        logger.error(`Error fetching ${path}`, { error: error instanceof Error ? error.message : error }, { type: 'fetch-error', path });
+        throw error;
       }
-
-      const data = await response.json();
-
-      if (data.code !== 0) {
-        throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
-      }
-
-      return data.data;
-    } catch (error) {
-      console.error(`Error fetching ${path}:`, error);
-      throw error;
-    }
+    });
   });
 }
 
@@ -243,44 +264,41 @@ export async function fetchWithoutWBI(
   path: string,
   params?: Record<string, string | number>
 ): Promise<unknown> {
-  return throttledFetch(async () => {
-    try {
-      const url = new URL(path, BASE_URL);
-      if (params) {
-        Object.entries(params).forEach(([key, value]) => {
-          url.searchParams.append(key, String(value));
+  return retryableFetch(async () => {
+    return throttledFetch(async (controller) => {
+      try {
+        const url = new URL(path, BASE_URL);
+        if (params) {
+          Object.entries(params).forEach(([key, value]) => {
+            url.searchParams.append(key, String(value));
+          });
+        }
+
+        const response = await fetch(url.toString(), {
+          headers: {
+            "User-Agent": config.userAgent,
+            "Referer": config.referer,
+            "Accept": "application/json",
+          },
+          signal: controller.signal,
         });
+
+        if (!response.ok) {
+          throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
+        }
+
+        const data = await response.json();
+
+        if (data.code !== 0) {
+          throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
+        }
+
+        return data.data;
+      } catch (error) {
+        logger.error(`Error fetching ${path}`, { error: error instanceof Error ? error.message : error }, { type: 'fetch-error', path });
+        throw error;
       }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-      const response = await fetch(url.toString(), {
-        headers: {
-          "User-Agent": config.userAgent,
-          "Referer": config.referer,
-          "Accept": "application/json",
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
-      }
-
-      const data = await response.json();
-
-      if (data.code !== 0) {
-        throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
-      }
-
-      return data.data;
-    } catch (error) {
-      console.error(`Error fetching ${path}:`, error);
-      throw error;
-    }
+    });
   });
 }
 
@@ -328,33 +346,30 @@ export async function getSubtitleContent(url: string): Promise<{
     content: string;
   }>;
 }> {
-  return throttledFetch(async () => {
-    try {
-      // 字幕 URL 可能是相对路径，需要补全
-      const fullUrl = url.startsWith("http") ? url : `https:${url}`;
+  return retryableFetch(async () => {
+    return throttledFetch(async (controller) => {
+      try {
+        // 字幕 URL 可能是相对路径，需要补全
+        const fullUrl = url.startsWith("http") ? url : `https:${url}`;
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const response = await fetch(fullUrl, {
+          headers: {
+            "User-Agent": config.userAgent,
+            "Referer": config.referer,
+          },
+          signal: controller.signal,
+        });
 
-      const response = await fetch(fullUrl, {
-        headers: {
-          "User-Agent": config.userAgent,
-          "Referer": config.referer,
-        },
-        signal: controller.signal,
-      });
+        if (!response.ok) {
+          throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
+        }
 
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
+        return await response.json();
+      } catch (error) {
+        logger.error("Error fetching subtitle content", { error: error instanceof Error ? error.message : error }, { type: 'subtitle-error', url });
+        throw error;
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching subtitle content:", error);
-      throw error;
-    }
+    });
   });
 }
 

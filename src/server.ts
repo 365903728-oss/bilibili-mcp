@@ -8,6 +8,9 @@ import {
 import { getVideoInfoWithSubtitle } from "./bilibili/subtitle.js";
 import { getVideoCommentsData } from "./bilibili/comments.js";
 import { getPreferredLanguage, isValidLanguage } from "./config.js";
+import { validateBVInput, validateLanguage, validateDetailLevel } from "./utils/validation.js";
+import { sanitizeBVInput } from "./utils/sanitization.js";
+import { handleValidationError } from "./utils/errors.js";
 
 // 创建 MCP 服务器实例
 export const server = new Server(
@@ -81,8 +84,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const bvidOrUrl = args?.bvid_or_url as string;
         const preferredLang = args?.preferred_lang as string | undefined;
 
-        if (!bvidOrUrl) {
-          throw new Error("Missing required parameter: bvid_or_url");
+        // 输入验证
+        try {
+          validateBVInput(bvidOrUrl);
+          validateLanguage(preferredLang);
+          // 清理输入
+          const sanitizedInput = sanitizeBVInput(bvidOrUrl);
+        } catch (error) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: true,
+                message: error instanceof Error ? error.message : "Invalid input",
+                code: "VALIDATION_ERROR"
+              }, null, 2)
+            }],
+            isError: true
+          };
         }
 
         // 验证并规范化语言参数
@@ -104,8 +123,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const bvidOrUrl = args?.bvid_or_url as string;
         const detailLevel = (args?.detail_level as "brief" | "detailed") || "brief";
 
-        if (!bvidOrUrl) {
-          throw new Error("Missing required parameter: bvid_or_url");
+        // 输入验证
+        try {
+          validateBVInput(bvidOrUrl);
+          validateDetailLevel(detailLevel);
+          // 清理输入
+          const sanitizedInput = sanitizeBVInput(bvidOrUrl);
+        } catch (error) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: true,
+                message: error instanceof Error ? error.message : "Invalid input",
+                code: "VALIDATION_ERROR"
+              }, null, 2)
+            }],
+            isError: true
+          };
         }
 
         const result = await getVideoCommentsData(bvidOrUrl, detailLevel);
@@ -124,7 +159,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
-    console.error(`Error executing tool ${name}:`, error);
+    console.error(`Error processing tool ${name}:`, error);
     return {
       content: [
         {

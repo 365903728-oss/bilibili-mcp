@@ -1,5 +1,7 @@
 // 字幕处理逻辑
 import { getVideoInfo, getVideoSubtitle, getSubtitleContent } from "./client.js";
+import { extractBVId } from "../utils/bvid.js";
+import { cacheManager } from "../utils/cache.js";
 
 export interface SubtitleData {
   data_source: "subtitle" | "description";
@@ -16,17 +18,7 @@ export interface SubtitleData {
  */
 const LANGUAGE_PRIORITY = ["zh-Hans", "zh-CN", "zh-Hant", "en"];
 
-/**
- * 从 BV 号或 URL 中提取 BV 号
- */
-function extractBVId(input: string): string {
-  // 匹配 BV 号格式：BV1xx4x1x7xx 或类似格式
-  const match = input.match(/(BV[a-zA-Z0-9]{10})/);
-  if (!match) {
-    throw new Error("Invalid Bilibili video ID or URL");
-  }
-  return match[1];
-}
+
 
 /**
  * 选择最佳字幕语言
@@ -85,6 +77,18 @@ export async function getVideoInfoWithSubtitle(
 ): Promise<SubtitleData> {
   try {
     const bvid = extractBVId(bvidOrUrl);
+    
+    // 生成缓存键
+    const cacheKey = cacheManager.generateKey('video', bvid, preferredLang);
+    
+    // 尝试从缓存获取
+    const cachedData = cacheManager.getVideoInfo(cacheKey);
+    if (cachedData) {
+      console.log(`Cache hit for video ${bvid}`);
+      return cachedData;
+    }
+
+    console.log(`Cache miss for video ${bvid}, fetching from API`);
 
     // 获取视频基本信息
     const videoData = await getVideoInfo(bvid);
@@ -101,7 +105,7 @@ export async function getVideoInfoWithSubtitle(
       if (!subtitleData?.subtitle?.subtitles || subtitleData.subtitle.subtitles.length === 0) {
         // 没有字幕，使用简介作为降级方案
         console.error(`No subtitles available for video ${bvid}`);
-        return {
+        const result: SubtitleData = {
           data_source: "description",
           video_info: {
             title,
@@ -109,13 +113,16 @@ export async function getVideoInfoWithSubtitle(
             tags,
           },
         };
+        // 存入缓存
+        cacheManager.setVideoInfo(cacheKey, result);
+        return result;
       }
 
       // 选择最佳字幕
       const bestSubtitle = selectBestSubtitle(subtitleData.subtitle.subtitles, preferredLang);
 
       if (!bestSubtitle) {
-        return {
+        const result: SubtitleData = {
           data_source: "description",
           video_info: {
             title,
@@ -123,13 +130,16 @@ export async function getVideoInfoWithSubtitle(
             tags,
           },
         };
+        // 存入缓存
+        cacheManager.setVideoInfo(cacheKey, result);
+        return result;
       }
 
       // 获取字幕内容
       const subtitleContent = await getSubtitleContent(bestSubtitle.subtitle_url);
 
       if (!subtitleContent?.body || subtitleContent.body.length === 0) {
-        return {
+        const result: SubtitleData = {
           data_source: "description",
           video_info: {
             title,
@@ -137,12 +147,15 @@ export async function getVideoInfoWithSubtitle(
             tags,
           },
         };
+        // 存入缓存
+        cacheManager.setVideoInfo(cacheKey, result);
+        return result;
       }
 
       // 合并字幕文本
       const subtitleText = mergeSubtitleText(subtitleContent.body);
 
-      return {
+      const result: SubtitleData = {
         data_source: "subtitle",
         video_info: {
           title,
@@ -151,10 +164,13 @@ export async function getVideoInfoWithSubtitle(
           subtitle_text: subtitleText,
         },
       };
+      // 存入缓存
+      cacheManager.setVideoInfo(cacheKey, result);
+      return result;
     } catch (error) {
       // 获取字幕失败，使用简介作为降级方案
       console.error(`Failed to fetch subtitles for video ${bvid}, using description as fallback:`, error);
-      return {
+      const result: SubtitleData = {
         data_source: "description",
         video_info: {
           title,
@@ -162,6 +178,9 @@ export async function getVideoInfoWithSubtitle(
           tags,
         },
       };
+      // 存入缓存
+      cacheManager.setVideoInfo(cacheKey, result);
+      return result;
     }
   } catch (error) {
     console.error("Error getting video info with subtitle:", error);

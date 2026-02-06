@@ -1,6 +1,8 @@
 // 评论处理逻辑
 import { getVideoInfo, getVideoComments } from "./client.js";
 import { Comment, ProcessedComment, CommentsResponse, CommentDetailLevel } from "./types.js";
+import { extractBVId } from "../utils/bvid.js";
+import { cacheManager } from "../utils/cache.js";
 
 export interface CommentData {
   comments: ProcessedComment[];
@@ -10,16 +12,7 @@ export interface CommentData {
   };
 }
 
-/**
- * 从 BV 号或 URL 中提取 BV 号
- */
-function extractBVId(input: string): string {
-  const match = input.match(/(BV[a-zA-Z0-9]{10})/);
-  if (!match) {
-    throw new Error("Invalid Bilibili video ID or URL");
-  }
-  return match[1];
-}
+
 
 /**
  * 过滤表情占位符（如 [doge]）
@@ -76,6 +69,18 @@ export async function getVideoCommentsData(
 ): Promise<CommentData> {
   try {
     const bvid = extractBVId(bvidOrUrl);
+    
+    // 生成缓存键
+    const cacheKey = cacheManager.generateKey('comments', bvid, detailLevel);
+    
+    // 尝试从缓存获取
+    const cachedData = cacheManager.getCommentInfo(cacheKey);
+    if (cachedData) {
+      console.log(`Cache hit for comments ${bvid}`);
+      return cachedData;
+    }
+
+    console.log(`Cache miss for comments ${bvid}, fetching from API`);
 
     // 获取视频基本信息以获取 CID
     const videoData = await getVideoInfo(bvid);
@@ -116,13 +121,18 @@ export async function getVideoCommentsData(
     // 统计
     const commentsWithTimestamp = processedComments.filter((c) => c.has_timestamp).length;
 
-    return {
+    const result: CommentData = {
       comments: processedComments,
       summary: {
         total_comments: processedComments.length,
         comments_with_timestamp: commentsWithTimestamp,
       },
     };
+
+    // 存入缓存
+    cacheManager.setCommentInfo(cacheKey, result);
+    
+    return result;
   } catch (error) {
     console.error("Error getting video comments:", error);
     throw error;
