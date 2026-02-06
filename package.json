@@ -40,7 +40,7 @@
     "评论总结"
   ],
   "author": "xzxzzx",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/365903728-oss/bilibili-mcp.git"
@@ -53,7 +53,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4"
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "quick-lru": "^7.3.0"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",
