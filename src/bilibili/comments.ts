@@ -3,6 +3,7 @@ import { getVideoInfo, getVideoComments } from "./client.js";
 import { Comment, ProcessedComment, CommentsResponse, CommentDetailLevel } from "./types.js";
 import { extractBVId } from "../utils/bvid.js";
 import { cacheManager } from "../utils/cache.js";
+import { CommentsDisabledError } from "../utils/errors.js";
 
 export interface CommentData {
   comments: ProcessedComment[];
@@ -65,14 +66,16 @@ function processComment(
  */
 export async function getVideoCommentsData(
   bvidOrUrl: string,
-  detailLevel: CommentDetailLevel = "brief"
+  detailLevel: CommentDetailLevel = "brief",
+  sort: number = 1, // 0按时间，1按热度
+  includeReplies: boolean = true
 ): Promise<CommentData> {
+  const bvid = extractBVId(bvidOrUrl);
+  
+  // 生成缓存键
+  const cacheKey = cacheManager.generateKey('comments', bvid, detailLevel, sort.toString(), includeReplies.toString());
+  
   try {
-    const bvid = extractBVId(bvidOrUrl);
-    
-    // 生成缓存键
-    const cacheKey = cacheManager.generateKey('comments', bvid, detailLevel);
-    
     // 尝试从缓存获取
     const cachedData = cacheManager.getCommentInfo(cacheKey);
     if (cachedData) {
@@ -87,18 +90,18 @@ export async function getVideoCommentsData(
     const cid = videoData.cid;
 
     // 根据详情级别确定评论数量
-    const commentCount = detailLevel === "brief" ? 10 : 50;
+    const commentCount = detailLevel === "brief" ? 10 : 20;
 
     // 获取评论
-    const commentsData = await getVideoComments(cid, 1, commentCount) as CommentsResponse;
+    const commentsData = await getVideoComments(bvidOrUrl, 1, commentCount, sort, includeReplies) as CommentsResponse;
 
     const rawComments = commentsData?.replies || [];
 
     // 处理评论
-    let processedComments = rawComments.map((comment) => processComment(comment));
+    let processedComments = rawComments.map((comment) => processComment(comment, includeReplies));
 
-    // 如果是详细模式，添加高赞回复
-    if (detailLevel === "detailed") {
+    // 如果是详细模式且包含回复，添加高赞回复
+    if (detailLevel === "detailed" && includeReplies) {
       const replies: Comment[] = [];
       for (const comment of rawComments) {
         if (comment.replies && comment.replies.length > 0) {
@@ -134,6 +137,19 @@ export async function getVideoCommentsData(
     
     return result;
   } catch (error) {
+    if (error instanceof CommentsDisabledError) {
+      console.warn(`Comments disabled for video ${bvid}`);
+      const result: CommentData = {
+        comments: [],
+        summary: {
+          total_comments: 0,
+          comments_with_timestamp: 0,
+        },
+      };
+      // 存入缓存
+      cacheManager.setCommentInfo(cacheKey, result);
+      return result;
+    }
     console.error("Error getting video comments:", error);
     throw error;
   }

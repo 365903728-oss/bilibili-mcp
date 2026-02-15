@@ -17,6 +17,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.claude/
 
 # 临时文件
 *.tmp
@@ -24,6 +25,8 @@ Thumbs.db
 
 # Semantic Release
 .npmrc
+.env
+.env.local
 .env.*
 
 # Release notes

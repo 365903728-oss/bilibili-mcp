@@ -2,6 +2,7 @@
 import { getVideoInfo, getVideoSubtitle, getSubtitleContent } from "./client.js";
 import { extractBVId } from "../utils/bvid.js";
 import { cacheManager } from "../utils/cache.js";
+import { PaidVideoError } from "../utils/errors.js";
 
 export interface SubtitleData {
   data_source: "subtitle" | "description";
@@ -10,13 +11,23 @@ export interface SubtitleData {
     description: string;
     tags: string[];
     subtitle_text?: string;
+    pubdate?: string;  // ISO 8601 格式的发布日期
+    pubdate_timestamp?: number;  // Unix 时间戳
   };
 }
 
 /**
  * 字幕语言优先级
  */
-const LANGUAGE_PRIORITY = ["zh-Hans", "zh-CN", "zh-Hant", "en"];
+const LANGUAGE_PRIORITY = ["zh-Hans", "ai-zh", "zh-CN", "zh-Hant", "en"];
+
+/**
+ * 将 Unix 时间戳转换为 ISO 8601 格式日期字符串
+ */
+function formatPublishDate(timestamp: number): string {
+  const date = new Date(timestamp * 1000); // B站返回的是秒级时间戳
+  return date.toISOString();
+}
 
 
 
@@ -91,12 +102,32 @@ export async function getVideoInfoWithSubtitle(
     console.log(`Cache miss for video ${bvid}, fetching from API`);
 
     // 获取视频基本信息
-    const videoData = await getVideoInfo(bvid);
+    const videoData = await getVideoInfo(bvid) as any;
 
     const title = videoData.title;
-    const description = videoData.desc;
+    const description = videoData.desc || "";
     const tags = extractTags(videoData);
     const cid = videoData.cid;
+    const pubdate = videoData.pubdate;  // Unix 时间戳（秒）
+    const formattedDate = pubdate ? formatPublishDate(pubdate) : undefined;
+
+    // 检测付费视频
+    if (videoData.need_login_subtitle || videoData.preview_toast?.includes("付费")) {
+      console.warn(`Video ${bvid} appears to be a paid video`);
+      const result: SubtitleData = {
+        data_source: "description",
+        video_info: {
+          title,
+          description: description || "该视频为付费内容，无法获取完整简介",
+          tags: tags.length > 0 ? tags : ["付费视频"],
+          pubdate: formattedDate,
+          pubdate_timestamp: pubdate,
+        },
+      };
+      // 存入缓存
+      cacheManager.setVideoInfo(cacheKey, result);
+      return result;
+    }
 
     // 尝试获取字幕
     try {
@@ -104,13 +135,15 @@ export async function getVideoInfoWithSubtitle(
 
       if (!subtitleData?.subtitle?.subtitles || subtitleData.subtitle.subtitles.length === 0) {
         // 没有字幕，使用简介作为降级方案
-        console.error(`No subtitles available for video ${bvid}`);
+        console.warn(`No subtitles available for video ${bvid}`);
         const result: SubtitleData = {
           data_source: "description",
           video_info: {
             title,
-            description,
-            tags,
+            description: description || "该视频没有可用的简介",
+            tags: tags.length > 0 ? tags : ["无标签"],
+            pubdate: formattedDate,
+            pubdate_timestamp: pubdate,
           },
         };
         // 存入缓存
@@ -126,8 +159,10 @@ export async function getVideoInfoWithSubtitle(
           data_source: "description",
           video_info: {
             title,
-            description,
-            tags,
+            description: description || "该视频没有可用的简介",
+            tags: tags.length > 0 ? tags : ["无标签"],
+            pubdate: formattedDate,
+            pubdate_timestamp: pubdate,
           },
         };
         // 存入缓存
@@ -143,8 +178,10 @@ export async function getVideoInfoWithSubtitle(
           data_source: "description",
           video_info: {
             title,
-            description,
-            tags,
+            description: description || "该视频没有可用的简介",
+            tags: tags.length > 0 ? tags : ["无标签"],
+            pubdate: formattedDate,
+            pubdate_timestamp: pubdate,
           },
         };
         // 存入缓存
@@ -162,6 +199,8 @@ export async function getVideoInfoWithSubtitle(
           description,
           tags,
           subtitle_text: subtitleText,
+          pubdate: formattedDate,
+          pubdate_timestamp: pubdate,
         },
       };
       // 存入缓存
@@ -169,13 +208,15 @@ export async function getVideoInfoWithSubtitle(
       return result;
     } catch (error) {
       // 获取字幕失败，使用简介作为降级方案
-      console.error(`Failed to fetch subtitles for video ${bvid}, using description as fallback:`, error);
+      console.warn(`Failed to fetch subtitles for video ${bvid}, using description as fallback:`, error);
       const result: SubtitleData = {
         data_source: "description",
         video_info: {
           title,
-          description,
-          tags,
+          description: description || "该视频没有可用的简介",
+          tags: tags.length > 0 ? tags : ["无标签"],
+          pubdate: formattedDate,
+          pubdate_timestamp: pubdate,
         },
       };
       // 存入缓存

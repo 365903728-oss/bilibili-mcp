@@ -54,6 +54,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "dotenv": "^17.2.4",
     "quick-lru": "^7.3.0"
   },
   "devDependencies": {

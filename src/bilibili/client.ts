@@ -1,8 +1,9 @@
 // B站 API 客户端，包含 WBI 签名逻辑
 import { config } from '../config.js';
-import { BilibiliAPIError, NetworkError, TimeoutError } from '../utils/errors.js';
+import { BilibiliAPIError, NetworkError, TimeoutError, PaidVideoError, CommentsDisabledError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { retryManager, withRetry } from '../utils/retry.js';
+import { credentialManager } from '../utils/credentials.js';
 import { createHash } from 'crypto';
 
 const BASE_URL = config.baseUrl;
@@ -210,7 +211,8 @@ function md5Hash(str: string): string {
  */
 export async function fetchWithWBI(
   path: string,
-  params: Record<string, string | number>
+  params: Record<string, string | number>,
+  additionalHeaders: Record<string, string> = {}
 ): Promise<unknown> {
   return retryableFetch(async () => {
     return throttledFetch(async (controller) => {
@@ -229,27 +231,91 @@ export async function fetchWithWBI(
           url.searchParams.append(key, String(value));
         });
 
+        const finalHeaders = {
+          "User-Agent": config.userAgent,
+          "Referer": additionalHeaders.Referer || config.referer,
+          "Accept": "application/json",
+          ...additionalHeaders,
+        };
+
+        // 构建安全的headers日志（隐藏敏感信息）
+        const safeHeaders: Record<string, string> = {};
+        Object.entries(finalHeaders).forEach(([key, value]) => {
+          if (key === 'Cookie') {
+            safeHeaders[key] = '***';
+          } else {
+            safeHeaders[key] = value;
+          }
+        });
+        
+        console.log('发送WBI请求:', {
+          url: url.toString(),
+          headers: safeHeaders
+        });
+
         const response = await fetch(url.toString(), {
-          headers: {
-            "User-Agent": config.userAgent,
-            "Referer": config.referer,
-            "Accept": "application/json",
-          },
+          headers: finalHeaders,
           signal: controller.signal,
         });
 
         if (!response.ok) {
-          throw new NetworkError(`HTTP ${response.status}: ${response.statusText}`, undefined, url.toString());
+          const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+          console.error('❌ WBI请求失败:', {
+            error: errorMsg,
+            url: url.toString(),
+            status: response.status,
+            statusText: response.statusText
+          });
+          throw new NetworkError(errorMsg, undefined, url.toString());
         }
 
         const data = await response.json();
 
         if (data.code !== 0) {
+          // 检测特定错误类型
+          if (data.code === -404 && data.message === '啥都木有') {
+            console.error('❌ 评论API返回错误:', {
+              code: data.code,
+              message: data.message,
+              url: url.toString(),
+              params
+            });
+            throw new CommentsDisabledError('该视频的评论功能已被禁用或限制访问');
+          }
+          if (data.code === -403) {
+            console.error('❌ 评论API返回权限错误:', {
+              code: data.code,
+              message: data.message,
+              url: url.toString(),
+              params
+            });
+            throw new PaidVideoError('该视频为付费内容，无法获取完整信息');
+          }
+          
+          console.error('❌ 评论API返回错误:', {
+            code: data.code,
+            message: data.message,
+            url: url.toString(),
+            params
+          });
           throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
         }
 
         return data.data;
       } catch (error) {
+        // 构建URL用于错误日志
+        const tempUrl = new URL(path, BASE_URL);
+        Object.entries(params).forEach(([key, value]) => {
+          tempUrl.searchParams.append(key, String(value));
+        });
+        
+        console.error('❌ WBI请求异常:', {
+          error: error instanceof Error ? error.message : String(error),
+          path,
+          params,
+          url: tempUrl.toString()
+        });
+        
         logger.error(`Error fetching ${path}`, { error: error instanceof Error ? error.message : error }, { type: 'fetch-error', path });
         throw error;
       }
@@ -262,7 +328,8 @@ export async function fetchWithWBI(
  */
 export async function fetchWithoutWBI(
   path: string,
-  params?: Record<string, string | number>
+  params?: Record<string, string | number>,
+  additionalHeaders: Record<string, string> = {}
 ): Promise<unknown> {
   return retryableFetch(async () => {
     return throttledFetch(async (controller) => {
@@ -279,6 +346,7 @@ export async function fetchWithoutWBI(
             "User-Agent": config.userAgent,
             "Referer": config.referer,
             "Accept": "application/json",
+            ...additionalHeaders,
           },
           signal: controller.signal,
         });
@@ -290,6 +358,13 @@ export async function fetchWithoutWBI(
         const data = await response.json();
 
         if (data.code !== 0) {
+          // 检测特定错误类型
+          if (data.code === -404 && data.message === '啥都木有') {
+            throw new CommentsDisabledError('该视频的评论功能已被禁用或限制访问');
+          }
+          if (data.code === -403) {
+            throw new PaidVideoError('该视频为付费内容，无法获取完整信息');
+          }
           throw new BilibiliAPIError(data.message || "Unknown error", 'API_ERROR', undefined, data);
         }
 
@@ -313,6 +388,7 @@ export async function getVideoInfo(bvid: string) {
     owner: { name: string; face: string };
     stat: { view: number; danmaku: number; reply: number; favorite: number; coin: number; share: number; like: number };
     cid: number;
+    aid: number;
     duration: number;
     pubdate: number;
     tag?: { tag_name: string }[];
@@ -323,7 +399,8 @@ export async function getVideoInfo(bvid: string) {
  * 获取视频字幕信息
  */
 export async function getVideoSubtitle(bvid: string, cid: number) {
-  return fetchWithWBI("/x/player/wbi/v2", { bvid, cid }) as Promise<{
+  const authHeaders = credentialManager.getAuthHeaders();
+  return fetchWithWBI("/x/player/wbi/v2", { bvid, cid }, authHeaders) as Promise<{
     subtitle: {
       subtitles: Array<{
         id: number;
@@ -352,10 +429,12 @@ export async function getSubtitleContent(url: string): Promise<{
         // 字幕 URL 可能是相对路径，需要补全
         const fullUrl = url.startsWith("http") ? url : `https:${url}`;
 
+        const authHeaders = credentialManager.getAuthHeaders();
         const response = await fetch(fullUrl, {
           headers: {
             "User-Agent": config.userAgent,
             "Referer": config.referer,
+            ...authHeaders,
           },
           signal: controller.signal,
         });
@@ -377,28 +456,132 @@ export async function getSubtitleContent(url: string): Promise<{
  * 获取视频评论
  */
 export async function getVideoComments(
-  oid: number,
+  videoUrlOrBvid: string,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  sort: number = 1, // 0按时间，1按热度
+  includeReplies: boolean = true
 ) {
-  return fetchWithoutWBI("/x/v2/reply", {
-    oid,
-    type: "1",
+  const authHeaders = credentialManager.getAuthHeaders();
+  
+  // 解析视频URL或bvid
+  let bvid: string;
+  let isBangumi = false;
+  
+  if (videoUrlOrBvid.includes('bilibili.com')) {
+    // 从URL中提取bvid
+    const url = new URL(videoUrlOrBvid);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    
+    if (pathParts.includes('bangumi')) {
+      isBangumi = true;
+    }
+    
+    // 提取bvid
+    const bvidMatch = videoUrlOrBvid.match(/BV[0-9A-Za-z]{10}/);
+    if (!bvidMatch) {
+      throw new Error('无法从URL中提取BV号');
+    }
+    bvid = bvidMatch[0];
+  } else {
+    // 直接使用bvid
+    bvid = videoUrlOrBvid;
+  }
+  
+  // 获取视频信息，获取aid和cid
+  const videoInfo = await getVideoInfo(bvid);
+  const oid = videoInfo.aid || videoInfo.cid; // 优先使用aid作为oid
+  
+  // 确定type
+  let type = "1"; // 默认视频类型
+  if (isBangumi) {
+    type = "2"; // 番剧类型
+  }
+  
+  // 构建标准Referer
+  const baseVideoUrl = `https://www.bilibili.com/video/${bvid}/`;
+  
+  // 构建评论API参数
+  const params = {
+    oid: Number(oid), // 确保oid是数字类型
+    type,
+    pn: page, // 页码
+    ps: Math.min(pageSize, 20), // 每页评论数，最大20
+    sort: sort.toString(), // 排序：0按时间，1按热度
     mode: "3", // 3表示按热度排序
-    pagination_str: JSON.stringify({ offset: "" }),
-  }) as Promise<{
-    replies: Array<{
-      rpid: number;
-      member: { uname: string; avatar: string };
-      content: { message: string };
-      like: number;
-      reply_control: { sub_reply_entry_text?: string; show_status?: number };
-      replies?: Array<{
-        member: { uname: string; avatar: string };
-        content: { message: string };
-        like: number;
-      }>;
-    }>;
-    page: { num: number; size: number };
-  }>;
+    _: Date.now() // 时间戳，防止缓存
+  };
+  
+  console.log('获取视频评论:', {
+    bvid,
+    oid: Number(oid),
+    type,
+    page,
+    pageSize,
+    sort,
+    includeReplies,
+    isBangumi
+  });
+  
+  // 构建自定义headers，包含标准Referer
+  const customHeaders = {
+    ...authHeaders,
+    "Referer": baseVideoUrl
+  };
+  
+  try {
+    // 尝试使用WBI评论API
+    const wbiPath = "/x/v2/reply/wbi/main";
+    console.log('尝试使用WBI评论API:', wbiPath, params);
+    
+    // 构建完整URL用于错误日志
+    const url = new URL(wbiPath, BASE_URL);
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.append(key, String(value));
+    });
+    
+    const mainResult = await fetchWithWBI(wbiPath, params, customHeaders);
+    return mainResult;
+  } catch (error) {
+    // 增强错误透传
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('❌ 评论API请求失败:', {
+      error: errorMsg,
+      bvid,
+      oid: Number(oid),
+      type,
+      params,
+      referer: baseVideoUrl
+    });
+    
+    // 尝试使用备用API
+    console.log('主评论API失败，尝试使用备用API:', errorMsg);
+    
+    // 尝试使用旧版评论API
+    const backupParams = {
+      oid: Number(oid),
+      type,
+      mode: "3",
+      pagination_str: JSON.stringify({ offset: "" }),
+      _: Date.now()
+    };
+    
+    console.log('尝试使用备用评论API:', '/x/v2/reply', backupParams);
+    
+    try {
+      const backupResult = await fetchWithWBI("/x/v2/reply", backupParams, customHeaders);
+      return backupResult;
+    } catch (backupError) {
+      const backupErrorMsg = backupError instanceof Error ? backupError.message : String(backupError);
+      console.error('❌ 备用评论API请求失败:', {
+        error: backupErrorMsg,
+        bvid,
+        oid: Number(oid),
+        type,
+        params: backupParams,
+        referer: baseVideoUrl
+      });
+      throw backupError;
+    }
+  }
 }

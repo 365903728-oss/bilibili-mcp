@@ -62,6 +62,27 @@ export class BilibiliAPIError extends Error {
   }
 }
 
+export class PaidVideoError extends Error {
+  constructor(message: string = '该视频为付费内容，无法获取完整信息') {
+    super(message);
+    this.name = 'PaidVideoError';
+  }
+}
+
+export class NoSubtitleError extends Error {
+  constructor(message: string = '该视频没有可用的字幕') {
+    super(message);
+    this.name = 'NoSubtitleError';
+  }
+}
+
+export class CommentsDisabledError extends Error {
+  constructor(message: string = '该视频的评论功能已被禁用或限制访问') {
+    super(message);
+    this.name = 'CommentsDisabledError';
+  }
+}
+
 /**
  * 分类错误类型
  */
