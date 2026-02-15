@@ -3,6 +3,8 @@
 
 Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和视频评论。(安装方式在下方)
 
+MCP工具包括两个tools,视频总结和评论获取
+
 ---
 
 ## 免责声明
