@@ -10,14 +10,24 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: read
+      id-token: write      # 必须：用于 OIDC 握手
+      contents: read       # 必须：用于读取代码
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org/'
+          # 注意：删除了 registry-url。OIDC 发布不需要它，
+          # 这样可以防止 setup-node 生成干扰身份验证的 .npmrc 文件。
+
+      - name: Install latest npm
+        run: npm install -g npm@latest # 确保 npm 版本 >= 11.5.1
+
       - run: npm ci
+
+      - name: Build project
+        run: npm run build # 先手动执行 build，消除 bin 文件不存在的预检警告
+
       - name: Publish to npm
         run: npm publish --provenance --access public
