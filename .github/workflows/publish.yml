@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,9 +20,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org/'
       - run: npm ci
       - run: npm run build
-      - name: Debug OIDC
-        run: |
-          echo "ACTIONS_ID_TOKEN_REQUEST_URL=$ACTIONS_ID_TOKEN_REQUEST_URL"
-          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN present: $(test -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" && echo 'yes' || echo 'no')"
-          npm whoami --registry https://registry.npmjs.org/
-      - run: npm publish --access public
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NPM_CONFIG_PROVENANCE: true
