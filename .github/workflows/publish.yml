@@ -15,8 +15,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
       - run: npm ci
       - run: npm run build
+      - name: Debug OIDC
+        run: |
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL=$ACTIONS_ID_TOKEN_REQUEST_URL"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN present: $(test -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" && echo 'yes' || echo 'no')"
+          npm whoami --registry https://registry.npmjs.org/
       - run: npm publish --access public
