@@ -85,6 +85,67 @@ npm install
 npm run build
 ```
 
+## 配置
+
+### ⚠️ 重要：环境变量配置
+
+**为了使用本工具的全部功能（特别是获取视频字幕内容），您需要配置 B 站的登录凭证。**
+
+#### 1. 获取 B 站 Cookie
+
+1. 打开浏览器，登录 [Bilibili](https://www.bilibili.com)
+2. 按 `F12` 打开开发者工具
+3. 切换到 `Network`（网络）标签
+4. 刷新页面，点击任意请求
+5. 在 `Headers`（请求头）中找到 `Cookie` 字段
+6. 复制以下三个值：
+   - `SESSDATA=...`
+   - `bili_jct=...`
+   - `DedeUserID=...`
+
+#### 2. 创建环境变量文件
+
+在项目根目录下创建 `.env` 文件：
+
+```bash
+# 复制示例文件
+cp .env.example .env
+```
+
+#### 3. 填入您的凭证
+
+编辑 `.env` 文件，填入您刚才复制的值：
+
+```env
+# B站SESSDATA（从浏览器Cookie中获取）
+BILIBILI_SESSDATA=你的_sessdata_值
+
+# B站bili_jct（从浏览器Cookie中获取）
+BILIBILI_BILI_JCT=你的_bili_jct_值
+
+# B站DedeUserID（从浏览器Cookie中获取）
+BILIBILI_DEDEUSERID=你的_dedeuserid_值
+```
+
+#### 4. 验证配置
+
+```bash
+# 检查环境变量是否正确加载
+npm run test:env
+```
+
+#### 🔒 安全提示
+
+- **.env 文件不会被提交到 Git** - 已添加到 `.gitignore`
+- **请勿分享您的 .env 文件或 Cookie 值**
+- Cookie 定期会过期，需要重新获取
+- 建议使用小号或测试账号的 Cookie
+
+### 不配置环境变量的影响
+
+- ✅ **仍可使用**：获取视频基本信息、评论
+- ❌ **无法使用**：获取视频字幕内容、部分需要登录的 API
+
 ## 使用
 
 ### Claude Desktop 配置
@@ -228,10 +289,12 @@ npm start
 
 ## 安全性
 
-- 仅使用 Bilibili 公开 API，无需登录
-- 不存储任何用户数据
-- 代码开源可审计
-- 错误输出使用 `console.error` 避免干扰 Stdio 协议
+- ✅ 使用 Bilibili 公开 API
+- ✅ 敏感信息（Cookie）通过环境变量配置，不会提交到代码仓库
+- ✅ 不存储任何用户数据
+- ✅ 代码开源可审计
+- ✅ 错误输出使用 `console.error` 避免干扰 Stdio 协议
+- ⚠️ 用户需自行配置 B 站 Cookie（存储在本地 .env 文件中）
 
 ## API 限流机制
 
