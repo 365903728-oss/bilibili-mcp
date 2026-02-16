@@ -1,6 +1,8 @@
 # Bilibili MCP Tool
 用claude code(glm4.7模型)做的总结B站视频的MCP
 
+[English](./README_EN.md)
+
 MCP工具包括两个tools,视频总结和评论获取
 
 Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和视频评论。支持在 Claude Code、Cursor、Trae 等多种 MCP 兼容平台上使用。
@@ -101,6 +103,21 @@ npm install -g @xzxzzx/bilibili-mcp
    - `BUVID3`：Bilibili 设备标识（可选）
 
 **注意**：这些变量通常可以从浏览器的开发者工具中获取（Cookie 存储）。
+
+#### 🔒 安全提示
+
+- **.env 文件不会被提交到 Git** - 已添加到 `.gitignore`
+
+- **请勿分享您的 .env 文件或 Cookie 值**
+
+- Cookie 定期会过期，需要重新获取
+
+  #### 🔒 安全提示
+
+  - **.env 文件不会被提交到 Git** - 已添加到 `.gitignore`
+  - **请勿分享您的 .env 文件或 Cookie 值**
+  - Cookie 定期会过期，需要重新获取
+  - 建议使用小号或测试账号的 Cookie
 
 ## 工具使用示例
 
