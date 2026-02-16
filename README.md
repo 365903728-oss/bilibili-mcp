@@ -26,9 +26,24 @@ Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和�
 
 ## 安装方式
 
-### 在 Claude Code 中安装
+### 方法一：通过 npm 直接安装（推荐）
 
-#### 方法一：通过配置文件安装
+最简单的安装方式是直接通过 npm 全局安装：
+
+```bash
+npm install -g @xzxzzx/bilibili-mcp
+```
+
+安装完成后，你可以：
+
+1. 检查是否安装成功：
+   ```bash
+   bilibili-mcp --help
+   ```
+
+2. 直接在 Claude Code 中使用，无需额外配置
+
+### 方法二：通过配置文件安装（适用于开发或自定义路径）
 
 1. 打开 Claude Code 配置文件（通常在 `~/.claude.json`）
 2. 在 `mcpServers` 部分添加以下配置（将路径替换为你的实际项目路径）：
@@ -45,7 +60,7 @@ Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和�
 3. 保存配置文件
 4. 重启 Claude Code 使配置生效
 
-#### 方法二：通过命令行安装
+### 方法三：通过命令行安装（适用于开发模式）
 
 1. 打开命令行工具（CMD 或 PowerShell）
 2. 进入项目目录（替换为你的实际路径）：
