@@ -67,10 +67,10 @@ MCP工具包括两个tools,视频总结和评论获取
 
 ```bash
 # 方式 A：使用 npx 直接运行（无需安装）
-npx @365903728-oss/bilibili-mcp
+npx @xzxzzx/bilibili-mcp
 
 # 方式 B：全局安装
-npm install -g @365903728-oss/bilibili-mcp
+npm install -g @xzxzzx/bilibili-mcp
 ```
 
 ### 方式二：从源码安装
@@ -165,7 +165,7 @@ npm run test:env
   "mcpServers": {
     "bilibili": {
       "command": "npx",
-      "args": ["@365903728-oss/bilibili-mcp"]
+      "args": ["@xzxzzx/bilibili-mcp"]
     }
   }
 }

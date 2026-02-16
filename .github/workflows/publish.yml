@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
-          scope: '@365903728-oss'  # 重要：添加 scope 配置
+          scope: '@xzxzzx'  # 重要：添加 scope 配置
 
       - name: Install latest npm
         run: npm install -g npm@latest # 确保 npm 版本 >= 11.5.1
