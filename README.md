@@ -261,6 +261,45 @@ npm run watch
 
 完整的许可证文本请参见 [LICENSE](./LICENSE) 文件。
 
+## 贡献与反馈
+
+### 报告问题
+
+如果您发现任何错误或有改进建议，请通过以下方式报告：
+
+1. 检查是否已存在类似问题
+2. 点击 [Issues](https://github.com/365903728-oss/bilibili-mcp/issues) 页面上的 "New issue" 按钮
+3. 选择适当的模板（Bug 报告或功能请求）
+4. 填写详细信息，包括：
+   - 遇到的问题描述
+   - 复现步骤
+   - 使用的操作系统和工具版本
+   - 任何相关的错误信息或截图
+
+### 提交 Pull Request
+
+我们欢迎社区贡献代码：
+
+1. Fork 项目
+2. 创建一个新分支
+3. 进行您的修改
+4. 测试您的修改
+5. 提交 Pull Request
+
+### 开发环境设置
+
+```bash
+# 克隆仓库
+git clone https://github.com/365903728-oss/bilibili-mcp.git
+
+# 安装依赖
+cd bilibili-mcp
+npm install
+
+# 启动开发服务器
+npm run watch
+```
+
 ---
 
 ## 免责声明

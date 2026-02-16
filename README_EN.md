@@ -247,6 +247,45 @@ This license means:
 
 For the full license text, please see [LICENSE](./LICENSE) file.
 
+## Contribution and Feedback
+
+### Reporting Issues
+
+If you find any bugs or have improvement suggestions, please report them through:
+
+1. Check if a similar issue already exists
+2. Click the "New issue" button on the [Issues](https://github.com/365903728-oss/bilibili-mcp/issues) page
+3. Select an appropriate template (Bug report or Feature request)
+4. Fill in the details including:
+   - Description of the issue
+   - Steps to reproduce
+   - Operating system and tool version used
+   - Any relevant error messages or screenshots
+
+### Submitting Pull Requests
+
+We welcome contributions from the community:
+
+1. Fork the project
+2. Create a new branch
+3. Make your changes
+4. Test your changes
+5. Submit a Pull Request
+
+### Development Environment Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/365903728-oss/bilibili-mcp.git
+
+# Install dependencies
+cd bilibili-mcp
+npm install
+
+# Start development server
+npm run watch
+```
+
 ---
 
 ## Disclaimer
