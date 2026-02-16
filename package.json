@@ -46,7 +46,7 @@
   "license": "GPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/365903728-oss/bilibili-mcp.git"
+    "url": "git+https://github.com/365903728-oss/bilibili-mcp.git"
   },
   "homepage": "https://github.com/365903728-oss/bilibili-mcp#readme",
   "bugs": {
