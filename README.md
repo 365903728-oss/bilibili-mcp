@@ -3,7 +3,7 @@
 
 MCP工具包括两个tools,视频总结和评论获取
 
-Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和视频评论。(安装方式在下方)
+Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和视频评论。支持在 Claude Code、Cursor、Trae 等多种 MCP 兼容平台上使用。
 
 
 ---
@@ -23,6 +23,22 @@ Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和�
 - 支持两种详细程度：
   - `brief`: 10 条热门评论
   - `detailed`: 50 条热门评论 + 高赞回复
+
+## 支持平台
+
+该 MCP 工具已在以下平台测试并验证可用：
+
+### ✅ Claude Code
+通过 Claude Code 的 MCP 功能直接调用
+
+### ✅ Cursor
+在 Cursor 中作为外部工具使用
+
+### ✅ Trae
+在 Trae 中配置为 MCP 服务器
+
+### ✅ 其他 MCP 兼容平台
+只要平台支持 Model Context Protocol 标准，理论上都可以使用
 
 ## 安装与使用
 
@@ -80,6 +96,7 @@ npm run build
 **MCP 是一种让 AI 模型能够与外部工具通信的协议**。这个工具可以让 AI 模型直接访问 Bilibili 的视频信息和评论，无需您手动复制粘贴。
 
 ### 谁需要这个工具？
+- 使用 Claude Code、Cursor、Trae 等 MCP 平台的用户
 - 需要总结 Bilibili 视频内容的用户
 - 需要获取视频热门评论的用户
 - 希望提高工作效率的内容创作者或研究者
