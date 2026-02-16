@@ -61,22 +61,31 @@ MCP工具包括两个tools,视频总结和评论获取
   - `brief`: 10 条热门评论
   - `detailed`: 50 条热门评论 + 高赞回复
 
-## 安装
+## 安装与使用
 
-### 方式一：从 npm 安装
+### 我该选择哪种安装方式？
 
-#### 方式 A：使用 npx 直接运行（最推荐，无需安装）
+如果您**不了解 MCP 工具**，请根据您的使用场景选择：
+
+#### 🎯 场景一：在 Claude Desktop 中使用（最常见）
+**推荐：方式 A 或方式 B**
+
+**首次使用**（最推荐，最简单）：
 ```bash
+# 无需安装，直接运行
 npx @xzxzzx/bilibili-mcp
 ```
 
-#### 方式 B：全局安装（一次安装，永久可用）
+**经常使用**（推荐）：
 ```bash
+# 全局安装，以后直接运行
 npm install -g @xzxzzx/bilibili-mcp
-bilibili-mcp  # 安装后直接运行命令
+bilibili-mcp  # 安装后直接运行
 ```
 
-#### 方式 C：本地安装（仅用于开发或特定场景）
+#### 🔧 场景二：作为开发工具使用（本地项目）
+**选择：方式 C**
+
 ```bash
 npm install @xzxzzx/bilibili-mcp
 
@@ -86,7 +95,8 @@ npx bilibili-mcp  # 通过 npx 运行
 ./node_modules/.bin/bilibili-mcp  # 直接运行本地二进制文件
 ```
 
-### 方式二：从源码安装
+#### 📦 场景三：从源码修改或贡献
+**选择：方式二（从源码安装）**
 
 ```bash
 # 克隆仓库
@@ -100,14 +110,81 @@ npm install
 npm run build
 ```
 
-## 配置
+## 什么是 Bilibili MCP 工具？
 
-### ⚠️ 重要：环境变量配置
+如果您是第一次听说 MCP（Model Context Protocol），简单来说：
+
+**MCP 是一种让 AI 模型（如 Claude）能够与外部工具通信的协议**。这个工具让 Claude Desktop 可以直接访问 Bilibili 的视频信息和评论，无需您手动复制粘贴。
+
+### 谁需要这个工具？
+- 使用 Claude Desktop 的用户
+- 需要总结 Bilibili 视频内容的用户
+- 需要获取视频热门评论的用户
+- 希望提高工作效率的内容创作者或研究者
+
+## 快速上手（Claude Desktop 用户）
+
+### 第一步：确保已安装 Node.js
+**这是使用本工具的前提条件**：
+1. 访问 [Node.js 官网](https://nodejs.org/) 下载并安装
+2. 验证安装成功：
+   ```bash
+   node -v
+   # 应该显示 v18.0.0 或更高版本
+   npm -v
+   ```
+
+### 第二步：配置 Claude Desktop
+在 Claude Desktop 的配置文件中添加 MCP 服务器配置：
+
+**Windows 用户**：
+配置文件位置：`%APPDATA%\Claude\claude_desktop_config.json`
+
+**macOS 用户**：
+配置文件位置：`~/Library/Application Support/Claude/claude_desktop_config.json`
+
+**推荐配置（使用 npx）**：
+```json
+{
+  "mcpServers": {
+    "bilibili": {
+      "command": "npx",
+      "args": ["@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+
+**或使用全局安装版本**：
+```json
+{
+  "mcpServers": {
+    "bilibili": {
+      "command": "bilibili-mcp"
+    }
+  }
+}
+```
+
+### 第三步：重启 Claude Desktop
+保存配置文件后，重启 Claude Desktop 即可使用。
+
+## 验证配置成功
+
+在 Claude Desktop 中尝试输入：
+```
+请帮我总结 BV1xx4x1x7xx 这个视频的内容
+```
+
+如果成功，您会看到视频信息和字幕摘要。
+
+### ⚠️ 重要：环境变量配置（可选但推荐）
 
 **为了使用本工具的全部功能（特别是获取视频字幕内容），您需要配置 B 站的登录凭证。**
 
-#### 1. 获取 B 站 Cookie
+如果不配置，您仍可使用基本功能（获取视频信息和评论），但**无法获取字幕内容**。
 
+#### 1. 获取 B 站 Cookie
 1. 打开浏览器，登录 [Bilibili](https://www.bilibili.com)
 2. 按 `F12` 打开开发者工具
 3. 切换到 `Network`（网络）标签
@@ -119,18 +196,14 @@ npm run build
    - `DedeUserID=...`
 
 #### 2. 创建环境变量文件
-
 在项目根目录下创建 `.env` 文件：
-
 ```bash
 # 复制示例文件
 cp .env.example .env
 ```
 
 #### 3. 填入您的凭证
-
 编辑 `.env` 文件，填入您刚才复制的值：
-
 ```env
 # B站SESSDATA（从浏览器Cookie中获取）
 BILIBILI_SESSDATA=你的_sessdata_值
@@ -143,14 +216,12 @@ BILIBILI_DEDEUSERID=你的_dedeuserid_值
 ```
 
 #### 4. 验证配置
-
 ```bash
 # 检查环境变量是否正确加载
 npm run test:env
 ```
 
 #### 🔒 安全提示
-
 - **.env 文件不会被提交到 Git** - 已添加到 `.gitignore`
 - **请勿分享您的 .env 文件或 Cookie 值**
 - Cookie 定期会过期，需要重新获取
@@ -161,64 +232,33 @@ npm run test:env
 - ✅ **仍可使用**：获取视频基本信息、评论
 - ❌ **无法使用**：获取视频字幕内容、部分需要登录的 API
 
-## 使用
+## 常见问题解答
 
-### Claude Desktop 配置
+### Q: 我需要安装什么软件才能使用？
+A: 只需要安装 Node.js（v18.0.0 或更高版本）即可。
 
-在 Claude Desktop 的配置文件中添加 MCP 服务器：
+### Q: 为什么我无法运行命令？
+A:
+1. 检查 Node.js 是否已正确安装：`node -v`
+2. 检查 npm 是否正常：`npm -v`
+3. 尝试以管理员身份运行命令提示符
 
-**macOS/Linux**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+### Q: 配置后 Claude Desktop 仍无法使用？
+A:
+1. 检查配置文件路径是否正确
+2. 确保配置格式符合 JSON 规范
+3. 重启 Claude Desktop
+4. 查看是否有错误信息输出
 
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-#### 推荐配置（使用 npm）
-
-```json
-{
-  "mcpServers": {
-    "bilibili": {
-      "command": "npx",
-      "args": ["@xzxzzx/bilibili-mcp"]
-    }
-  }
-}
-```
-
-#### 或使用全局安装版本
-
-```json
-{
-  "mcpServers": {
-    "bilibili": {
-      "command": "bilibili-mcp"
-    }
-  }
-}
-```
-
-#### 本地源码运行（仅开发）
-
-```json
-{
-  "mcpServers": {
-    "bilibili": {
-      "command": "node",
-      "args": ["C:\\Users\\ZX\\bilibili-mcp\\dist\\index.js"]
-    }
-  }
-}
-```
-
-### 方式二：直接运行
-
-```bash
-npm start
-```
+### Q: 获取字幕失败怎么办？
+A:
+1. 检查是否已配置环境变量
+2. 确认 Cookie 值是否过期
+3. 检查视频是否有字幕
 
 ## 工具使用示例
 
 ### 获取视频信息（含字幕）
-
 ```json
 {
   "name": "get_video_info",

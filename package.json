@@ -13,6 +13,7 @@
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:env": "node -e \"console.log('检查环境变量...'); console.log('BILIBILI_SESSDATA:', process.env.BILIBILI_SESSDATA ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_BILI_JCT:', process.env.BILIBILI_BILI_JCT ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_DEDEUSERID:', process.env.BILIBILI_DEDEUSERID ? '✅ 已配置' : '❌ 未配置');\"",
     "release": "semantic-release"
   },
   "config": {
