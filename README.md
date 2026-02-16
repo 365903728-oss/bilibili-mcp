@@ -1,7 +1,7 @@
 # Bilibili MCP Tool
 用claude code(glm4.7模型)做的总结B站视频的MCP
 
-[English](./README_EN.md)
+[English](./README_EN.md)(**Please read the README.md file**)
 
 MCP工具包括两个tools,视频总结和评论获取
 
