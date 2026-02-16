@@ -63,14 +63,27 @@ MCP工具包括两个tools,视频总结和评论获取
 
 ## 安装
 
-### 方式一：从 npm 安装（推荐）
+### 方式一：从 npm 安装
 
+#### 方式 A：使用 npx 直接运行（最推荐，无需安装）
 ```bash
-# 方式 A：使用 npx 直接运行（无需安装）
 npx @xzxzzx/bilibili-mcp
+```
 
-# 方式 B：全局安装
+#### 方式 B：全局安装（一次安装，永久可用）
+```bash
 npm install -g @xzxzzx/bilibili-mcp
+bilibili-mcp  # 安装后直接运行命令
+```
+
+#### 方式 C：本地安装（仅用于开发或特定场景）
+```bash
+npm install @xzxzzx/bilibili-mcp
+
+# 运行方式：
+npx bilibili-mcp  # 通过 npx 运行
+# 或
+./node_modules/.bin/bilibili-mcp  # 直接运行本地二进制文件
 ```
 
 ### 方式二：从源码安装
