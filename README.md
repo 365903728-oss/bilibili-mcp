@@ -41,7 +41,17 @@ npm install -g @xzxzzx/bilibili-mcp
    bilibili-mcp --help
    ```
 
-2. 直接在 Claude Code 中使用，无需额外配置
+2. 配置 Bilibili 凭证（首次使用时）：
+   ```bash
+   bilibili-mcp config
+   ```
+
+3. 检查配置状态：
+   ```bash
+   bilibili-mcp check
+   ```
+
+4. 直接在 Claude Code 中使用，无需额外配置
 
 ### 方法二：通过配置文件安装（适用于开发或自定义路径）
 
