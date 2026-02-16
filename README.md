@@ -24,183 +24,62 @@ Bilibili MCP (Model Context Protocol) 工具，用于总结 Bilibili 视频和�
   - `brief`: 10 条热门评论
   - `detailed`: 50 条热门评论 + 高赞回复
 
-## 支持平台
 
-该 MCP 工具已在以下平台测试并验证可用：
 
-### ✅ Claude Code
-通过 Claude Code 的 MCP 功能直接调用
 
-### ✅ Cursor
-在 Cursor 中作为外部工具使用
 
-### ✅ Trae
-在 Trae 中配置为 MCP 服务器
 
-### ✅ 其他 MCP 兼容平台
-只要平台支持 Model Context Protocol 标准，理论上都可以使用
 
-## 安装与使用
+## 安装方式
 
-### 我该选择哪种安装方式？
+### 在 Claude Code 中安装
 
-如果您**不了解 MCP 工具**，请根据您的使用场景选择：
+#### 方法一：通过配置文件安装
 
-#### 🎯 场景一：普通使用（最常见）
-**推荐：方式 A 或方式 B**
+1. 打开 Claude Code 配置文件（通常在 `~/.claude.json`）
+2. 在 `mcpServers` 部分添加以下配置：
 
-**首次使用**（最推荐，最简单）：
-```bash
-# 无需安装，直接运行
-npx @xzxzzx/bilibili-mcp
+```json
+{
+  "command": "cd C:\\Users\\ZX\\bilibili-mcp ; npm run watch",
+  "env": {},
+  "name": "bilibili-mcp",
+  "path": "C:\\Users\\ZX\\bilibili-mcp"
+}
 ```
 
-**经常使用**（推荐）：
-```bash
-# 全局安装，以后直接运行
-npm install -g @xzxzzx/bilibili-mcp
-bilibili-mcp  # 安装后直接运行
-```
+3. 保存配置文件
+4. 重启 Claude Code 使配置生效
 
-#### 🔧 场景二：作为开发工具使用（本地项目）
-**选择：方式 C**
+#### 方法二：通过命令行安装
 
-```bash
-npm install @xzxzzx/bilibili-mcp
-
-# 运行方式：
-npx bilibili-mcp  # 通过 npx 运行
-# 或
-./node_modules/.bin/bilibili-mcp  # 直接运行本地二进制文件
-```
-
-#### 📦 场景三：从源码修改或贡献
-**选择：方式二（从源码安装）**
-
-```bash
-# 克隆仓库
-git clone https://github.com/365903728-oss/bilibili-mcp.git
-cd bilibili-mcp
-
-# 安装依赖
-npm install
-
-# 构建
-npm run build
-```
-
-## 什么是 Bilibili MCP 工具？
-
-如果您是第一次听说 MCP（Model Context Protocol），简单来说：
-
-**MCP 是一种让 AI 模型能够与外部工具通信的协议**。这个工具可以让 AI 模型直接访问 Bilibili 的视频信息和评论，无需您手动复制粘贴。
-
-### 谁需要这个工具？
-- 使用 Claude Code、Cursor、Trae 等 MCP 平台的用户
-- 需要总结 Bilibili 视频内容的用户
-- 需要获取视频热门评论的用户
-- 希望提高工作效率的内容创作者或研究者
-
-## 快速上手
-
-### 第一步：确保已安装 Node.js
-**这是使用本工具的前提条件**：
-1. 访问 [Node.js 官网](https://nodejs.org/) 下载并安装
-2. 验证安装成功：
+1. 打开命令行工具（CMD 或 PowerShell）
+2. 进入项目目录：
    ```bash
-   node -v
-   # 应该显示 v18.0.0 或更高版本
-   npm -v
+   cd C:\Users\ZX\bilibili-mcp
    ```
+3. 安装依赖：
+   ```bash
+   npm install
+   ```
+4. 启动开发服务器：
+   ```bash
+   npm run watch
+   ```
+5. 在 Claude Code 中使用 `/mcp connect` 命令连接到该服务器
 
-### 第二步：安装工具
-根据您的使用场景选择合适的安装方式（参考前文）。
+### 环境变量配置
 
-### 第三步：运行工具
-- 使用 npx 直接运行：`npx @xzxzzx/bilibili-mcp`
-- 全局安装后运行：`bilibili-mcp`
+1. 复制 `.env.example` 文件为 `.env`：
+   ```bash
+   cp .env.example .env
+   ```
+2. 打开 `.env` 文件，根据需要配置以下变量：
+   - `BILI_JCT`：Bilibili 登录凭证（可选，用于获取评论）
+   - `SESSDATA`：Bilibili 会话数据（可选，用于获取评论）
+   - `BUVID3`：Bilibili 设备标识（可选）
 
-### 第四步：配置环境变量（可选）
-如果您需要获取视频字幕内容，需要配置 B 站登录凭证（参考前文）。
-
-## 验证配置成功
-
-直接运行工具，检查是否能够正常启动。如果看到以下信息，说明工具已正常运行：
-```
-本工具仅供技术研究使用，请确保您的访问行为符合平台规范
-Bilibili MCP server running on stdio
-```
-
-### ⚠️ 重要：环境变量配置（可选但推荐）
-
-**为了使用本工具的全部功能（特别是获取视频字幕内容），您需要配置 B 站的登录凭证。**
-
-如果不配置，您仍可使用基本功能（获取视频信息和评论），但**无法获取字幕内容**。
-
-#### 1. 获取 B 站 Cookie
-1. 打开浏览器，登录 [Bilibili](https://www.bilibili.com)
-2. 按 `F12` 打开开发者工具
-3. 切换到 `Network`（网络）标签
-4. 刷新页面，点击任意请求
-5. 在 `Headers`（请求头）中找到 `Cookie` 字段
-6. 复制以下三个值：
-   - `SESSDATA=...`
-   - `bili_jct=...`
-   - `DedeUserID=...`
-
-#### 2. 创建环境变量文件
-在项目根目录下创建 `.env` 文件：
-```bash
-# 复制示例文件
-cp .env.example .env
-```
-
-#### 3. 填入您的凭证
-编辑 `.env` 文件，填入您刚才复制的值：
-```env
-# B站SESSDATA（从浏览器Cookie中获取）
-BILIBILI_SESSDATA=你的_sessdata_值
-
-# B站bili_jct（从浏览器Cookie中获取）
-BILIBILI_BILI_JCT=你的_bili_jct_值
-
-# B站DedeUserID（从浏览器Cookie中获取）
-BILIBILI_DEDEUSERID=你的_dedeuserid_值
-```
-
-#### 4. 验证配置
-```bash
-# 检查环境变量是否正确加载
-npm run test:env
-```
-
-#### 🔒 安全提示
-- **.env 文件不会被提交到 Git** - 已添加到 `.gitignore`
-- **请勿分享您的 .env 文件或 Cookie 值**
-- Cookie 定期会过期，需要重新获取
-- 建议使用小号或测试账号的 Cookie
-
-### 不配置环境变量的影响
-
-- ✅ **仍可使用**：获取视频基本信息、评论
-- ❌ **无法使用**：获取视频字幕内容、部分需要登录的 API
-
-## 常见问题解答
-
-### Q: 我需要安装什么软件才能使用？
-A: 只需要安装 Node.js（v18.0.0 或更高版本）即可。
-
-### Q: 为什么我无法运行命令？
-A:
-1. 检查 Node.js 是否已正确安装：`node -v`
-2. 检查 npm 是否正常：`npm -v`
-3. 尝试以管理员身份运行命令提示符
-
-### Q: 获取字幕失败怎么办？
-A:
-1. 检查是否已配置环境变量
-2. 确认 Cookie 值是否过期
-3. 检查视频是否有字幕
+**注意**：这些变量通常可以从浏览器的开发者工具中获取（Cookie 存储）。
 
 ## 工具使用示例
 
