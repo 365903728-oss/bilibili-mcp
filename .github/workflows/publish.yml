@@ -17,9 +17,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          # 注意：删除了 registry-url。OIDC 发布不需要它，
-          # 这样可以防止 setup-node 生成干扰身份验证的 .npmrc 文件。
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
+          scope: '@365903728-oss'  # 重要：添加 scope 配置
 
       - name: Install latest npm
         run: npm install -g npm@latest # 确保 npm 版本 >= 11.5.1
@@ -27,7 +27,7 @@ jobs:
       - run: npm ci
 
       - name: Build project
-        run: npm run build # 先手动执行 build，消除 bin 文件不存在的预检警告
+        run: npm run build
 
       - name: Publish to npm
         run: npm publish --provenance --access public
