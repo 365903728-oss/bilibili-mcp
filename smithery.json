@@ -1,0 +1,159 @@
+{
+  "name": "bilibili-mcp",
+  "displayName": "Bilibili MCP - 视频总结与评论工具",
+  "description": "Bilibili (B站) MCP 工具，用于总结视频内容（含字幕）和获取热门评论。支持多语言字幕，智能过滤无意义评论，保留带时间戳的高质量评论。",
+  "version": "1.1.8",
+  "author": "xzxzzx",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/365903728-oss/bilibili-mcp.git"
+  },
+  "homepage": "https://github.com/365903728-oss/bilibili-mcp#readme",
+  "keywords": [
+    "bilibili",
+    "b站",
+    "video",
+    "subtitle",
+    "comments",
+    "chinese",
+    "视频总结",
+    "评论总结",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "runtime": {
+    "type": "node",
+    "command": "npx",
+    "args": ["@xzxzzx/bilibili-mcp"],
+    "env": {
+      "BILIBILI_SESSDATA": {
+        "description": "Bilibili SESSDATA Cookie（可选，用于获取评论）",
+        "required": false,
+        "secret": true
+      },
+      "BILIBILI_BILI_JCT": {
+        "description": "Bilibili bili_jct Cookie（可选，用于获取评论）",
+        "required": false,
+        "secret": true
+      },
+      "BILIBILI_DEDEUSERID": {
+        "description": "Bilibili DedeUserID Cookie（可选，用于获取评论）",
+        "required": false,
+        "secret": true
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "get_video_info",
+      "description": "获取 Bilibili 视频信息，优先返回字幕内容（CC/AI字幕），如无字幕则返回视频简介和标签。支持指定偏好语言。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bvid_or_url": {
+            "type": "string",
+            "description": "Bilibili 视频 BV 号或完整 URL"
+          },
+          "preferred_lang": {
+            "type": "string",
+            "description": "可选参数，指定偏好字幕语言代码，如 'zh-Hans', 'zh-Hant', 'en' 等。默认按 zh-Hans -> zh-Hant -> en 顺序选择。"
+          }
+        },
+        "required": ["bvid_or_url"]
+      },
+      "examples": [
+        {
+          "description": "获取视频信息（默认中文）",
+          "input": {
+            "bvid_or_url": "BV1xx4x1x7xx"
+          }
+        },
+        {
+          "description": "获取视频信息（指定英文字幕）",
+          "input": {
+            "bvid_or_url": "BV1xx4x1x7xx",
+            "preferred_lang": "en"
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_video_comments",
+      "description": "获取 Bilibili 视频热门评论。自动过滤表情占位符（如 [doge]），优先保留包含时间戳的评论（如 '05:20'）。支持 brief（10条）和 detailed（50条+回复）两种模式。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bvid_or_url": {
+            "type": "string",
+            "description": "Bilibili 视频 BV 号或完整 URL"
+          },
+          "detail_level": {
+            "type": "string",
+            "description": "评论详细程度：'brief' 获取前10条热门评论；'detailed' 获取前50条热门评论及其高赞回复",
+            "enum": ["brief", "detailed"]
+          }
+        },
+        "required": ["bvid_or_url"]
+      },
+      "examples": [
+        {
+          "description": "获取热门评论（简略模式）",
+          "input": {
+            "bvid_or_url": "BV1xx4x1x7xx",
+            "detail_level": "brief"
+          }
+        },
+        {
+          "description": "获取热门评论（详细模式）",
+          "input": {
+            "bvid_or_url": "BV1xx4x1x7xx",
+            "detail_level": "detailed"
+          }
+        }
+      ]
+    }
+  ],
+  "capabilities": {
+    "tools": true,
+    "resources": false,
+    "prompts": false
+  },
+  "categories": [
+    "video",
+    "social-media",
+    "chinese-content",
+    "entertainment"
+  ],
+  "features": [
+    "字幕提取（CC/AI字幕）",
+    "多语言字幕支持",
+    "智能评论过滤",
+    "时间戳评论优先",
+    "API 限流保护"
+  ],
+  "installation": {
+    "npm": {
+      "command": "npm install -g @xzxzzx/bilibili-mcp",
+      "description": "全局安装后可直接使用"
+    },
+    "config": {
+      "claude": {
+        "description": "在 Claude Desktop/Claude Code 配置文件中添加：",
+        "content": {
+          "mcpServers": {
+            "bilibili": {
+              "command": "bilibili-mcp"
+            }
+          }
+        }
+      }
+    }
+  },
+  "notes": {
+    "rate_limit": "内置 500ms 请求间隔限制，防止被 Bilibili API 限制",
+    "authentication": "部分功能需要 Bilibili Cookie（可选）",
+    "data_source": "使用 Bilibili 公开 API，遵守平台规范",
+    "disclaimer": "仅供个人学习研究使用，请遵守 Bilibili 服务协议"
+  }
+}
