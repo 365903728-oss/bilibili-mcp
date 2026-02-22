@@ -60,36 +60,86 @@ npm install -g @xzxzzx/bilibili-mcp
 #### 方法二：通过配置文件安装（适用于开发或自定义路径）
 
 1. 打开 Claude Code 配置文件（通常在 `~/.claude.json`）
-2. 在 `mcpServers` 部分添加以下配置（将路径替换为你的实际项目路径）：
+2. 在 `mcpServers` 部分添加以下配置：
 
+**使用 npx（推荐）：**
 ```json
 {
-  "command": "cd /path/to/bilibili-mcp ; npm run watch",
-  "env": {},
-  "name": "bilibili-mcp",
-  "path": "/path/to/bilibili-mcp"
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+
+**本地开发模式：**
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "node",
+      "args": ["/path/to/bilibili-mcp/dist/index.js"]
+    }
+  }
 }
 ```
 
 3. 保存配置文件
 4. 重启 Claude Code 使配置生效
 
-#### 方法三：通过命令行安装（适用于开发模式）
+#### 方法三：通过 CLI 命令安装（最简单）
 
-1. 打开命令行工具（CMD 或 PowerShell）
-2. 进入项目目录（替换为你的实际路径）：
-   ```bash
-   cd /path/to/bilibili-mcp
-   ```
-3. 安装依赖：
-   ```bash
-   npm install
-   ```
-4. 启动开发服务器：
-   ```bash
-   npm run watch
-   ```
-5. 在 Claude Code 中使用 `/mcp connect` 命令连接到该服务器
+直接运行以下命令：
+
+```bash
+claude mcp add bilibili-mcp npx -y @xzxzzx/bilibili-mcp
+```
+
+然后重启 Claude Code 即可。
+
+### OpenCode
+
+OpenCode 是一个开源的 AI 代码编辑器，同样支持 MCP 协议。
+
+#### 方法一：通过配置文件安装
+
+1. 创建或编辑 OpenCode 配置文件（位于 `~/.config/opencode/opencode.json`）
+2. 在 `mcp` 部分添加以下配置：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "bilibili-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "@xzxzzx/bilibili-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+3. 保存配置文件
+4. 重启 OpenCode 使配置生效
+
+#### 方法二：本地开发模式
+
+如果你想在本地开发模式下使用：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "bilibili-mcp": {
+      "type": "local",
+      "command": ["node", "/path/to/bilibili-mcp/dist/index.js"],
+      "enabled": true
+    }
+  }
+}
+```
 
 ### 环境变量配置
 

@@ -53,36 +53,86 @@ After installation:
 #### Method 2: Configuration File Installation (for development or custom paths)
 
 1. Open Claude Code configuration file (typically at `~/.claude.json`)
-2. Add the following configuration to the `mcpServers` section (replace path with your actual project path):
+2. Add the following configuration to the `mcpServers` section:
 
+**Using npx (Recommended):**
 ```json
 {
-  "command": "cd /path/to/bilibili-mcp ; npm run watch",
-  "env": {},
-  "name": "bilibili-mcp",
-  "path": "/path/to/bilibili-mcp"
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp"]
+    }
+  }
+}
+```
+
+**For local development:**
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "node",
+      "args": ["/path/to/bilibili-mcp/dist/index.js"]
+    }
+  }
 }
 ```
 
 3. Save the configuration file
 4. Restart Claude Code for changes to take effect
 
-#### Method 3: Command Line Installation (for development mode)
+#### Method 3: CLI Command Installation (Simplest)
 
-1. Open a command line tool (CMD or PowerShell)
-2. Navigate to your project directory (replace with your actual path):
-   ```bash
-   cd /path/to/bilibili-mcp
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-4. Start development server:
-   ```bash
-   npm run watch
-   ```
-5. Connect to the server in Claude Code using `/mcp connect` command
+Simply run the following command:
+
+```bash
+claude mcp add bilibili-mcp npx -y @xzxzzx/bilibili-mcp
+```
+
+Then restart Claude Code.
+
+### OpenCode
+
+OpenCode is an open-source AI code editor that also supports MCP protocol.
+
+#### Method 1: Configuration File Installation
+
+1. Create or edit the OpenCode configuration file (located at `~/.config/opencode/opencode.json`)
+2. Add the following configuration to the `mcp` section:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "bilibili-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "@xzxzzx/bilibili-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+3. Save the configuration file
+4. Restart OpenCode for changes to take effect
+
+#### Method 2: Local Development Mode
+
+For local development usage:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "bilibili-mcp": {
+      "type": "local",
+      "command": ["node", "/path/to/bilibili-mcp/dist/index.js"],
+      "enabled": true
+    }
+  }
+}
+```
 
 ### Environment Variables Configuration
 
