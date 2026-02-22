@@ -1,6 +1,6 @@
 {
   "name": "@xzxzzx/bilibili-mcp",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "Bilibili MCP tool for video and comment summarization",
   "type": "module",
   "main": "dist/index.js",
