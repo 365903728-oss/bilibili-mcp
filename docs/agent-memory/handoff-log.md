@@ -199,3 +199,11 @@
 - Owner: Codex executed the release after one Paseo-managed Claude Code `release-verifier` handoff.
 - Result: Release-preparation commit `ff5f8f4` was pushed, annotated tag `v1.7.1` triggered Actions run `29723831279`, and the trusted publish job passed install, 244 tests, build, and npm publication. npm latest is `1.7.1` with SLSA provenance; the published CLI help smoke passed; the GitHub Release is non-draft and non-prerelease.
 - Scope boundary: The generated `pending-learning-proposals.md` date change remained unstaged. No source, dependency, test, or workflow change was required during release execution.
+
+## 2026-07-25 Structured Transcript Output
+
+- Owner: Codex created `docs/structured-transcript-output-prd.md`, GitHub Issue #16, and the file-backed Codex-to-Claude handoff.
+- Objective: Add an exact `get_video_transcript.outputSchema` and return the existing successful payload as `structuredContent` without changing legacy text, errors, other tools, Bilibili requests, dependencies, or release state.
+- Paseo result: Agent `b1a74bc2-d032-4ada-996b-48c5585f02dc` was launched with the live `providers.impl` value but stopped immediately because Claude Code was not logged in. It made no file changes, produced no Claude report, and was archived. Codex completed the same bounded handoff directly rather than fabricating a Claude report.
+- Review: Independent Standards and Spec reviews found no code, schema, security, scope, or smell defect. Their three workflow/test gaps were repaired by adding generic-error coverage, the required QA checklist, and accurate codemap entries.
+- Result: Focused tests pass 39/39, the full suite passes 290/290, build and package dry run pass, and credentialed SDK/Codex acceptance passes against `BV1vL411G7N7`. SDK 1.27.1 proves exact equality between parsed legacy text and `structuredContent`; Codex CLI 0.144.6 displays the legacy JSON without output-schema validation failure. The implementation was committed as `29f663a`; no version, changelog, release, or publication occurred.

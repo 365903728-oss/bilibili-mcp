@@ -199,3 +199,9 @@
 - Fact: The normal package build removes the guarded repository `dist` directory before TypeScript compilation.
 - Evidence: `package.json` uses a Node stdlib clean step before `tsc`; a sentinel and the deleted module's stale compiled files were absent after the build and from the 124-entry package dry run.
 - Impact: Deleted source modules no longer survive as publishable stale artifacts, without adding a cleanup dependency.
+
+## 2026-07-25
+
+- Fact: The current source implementation declares the existing `VideoTranscriptData` shape as `get_video_transcript.outputSchema` and returns the same successful result as both formatted JSON text and MCP `structuredContent`.
+- Evidence: `src/server/tool-schemas.ts`, `src/server/tool-handlers.ts`, the exact schema/text/error regressions in `tests/server-tools.test.ts` and `tests/server-handler-sanitization.test.ts`, and GitHub Issue #16.
+- Impact: Structured-output clients can consume transcript evidence directly while text-oriented clients keep the existing JSON representation; the other seven tools and all error results remain text-only. Credentialed SDK 1.27.1 and Codex CLI 0.144.6 acceptance passed against `BV1vL411G7N7`; the accepted implementation is commit `29f663a` on `master`, while npm publication remains unchanged.
