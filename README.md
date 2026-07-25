@@ -124,6 +124,7 @@ npx -y @xzxzzx/bilibili-mcp@latest check
 - 支持指定偏好语言（默认按 `zh-Hans` > `ai-zh` > `zh-CN` > `zh-Hant` > `en` 优先级选择）
 - 支持多P分集选择、时间戳输出和时间区间过滤
 - 支持可选关键词搜索：返回带上下文的时间戳匹配列表（大小写不敏感字面匹配）
+- 成功调用会同时返回向后兼容的格式化 JSON 文本和内容相同的 MCP `structuredContent`
 - 可选参数：
   - `preferred_lang`: 偏好字幕语言代码
   - `fallback_to_description`: 字幕不可用时是否降级为视频描述（默认 `false`）

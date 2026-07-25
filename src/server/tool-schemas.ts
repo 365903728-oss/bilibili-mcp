@@ -159,6 +159,43 @@ export const toolSchemas: Tool[] = [
       },
       required: ["bvid_or_url"],
     },
+    outputSchema: {
+      type: "object",
+      properties: {
+        bvid: { type: "string" },
+        data_source: {
+          type: "string",
+          enum: ["subtitle", "description"],
+        },
+        language: { type: "string" },
+        transcript: { type: "string" },
+        title: { type: "string" },
+        page: { type: "integer" },
+        query: { type: "string" },
+        total_matches: { type: "integer" },
+        returned_matches: { type: "integer" },
+        truncated: { type: "boolean" },
+        matches: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              start_seconds: { type: "number" },
+              end_seconds: { type: "number" },
+              content: { type: "string" },
+              context: { type: "string" },
+            },
+            required: [
+              "start_seconds",
+              "end_seconds",
+              "content",
+              "context",
+            ],
+          },
+        },
+      },
+      required: ["bvid", "data_source", "transcript", "title"],
+    },
   },
   {
     name: "get_video_metadata",

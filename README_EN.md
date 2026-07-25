@@ -123,6 +123,7 @@ After the MCP server is connected, if available, call get_credential_setup_instr
 - Returns clean subtitle text, joined by newlines.
 - Supports preferred language selection (defaults to `zh-Hans` > `ai-zh` > `zh-CN` > `zh-Hant` > `en` priority).
 - Supports multi-Part selection, timestamp output, time-range filtering, and optional keyword search.
+- Successful calls return both the backward-compatible formatted JSON text and the same data as MCP `structuredContent`.
 - Optional parameters:
   - `preferred_lang`: Preferred subtitle language code.
   - `fallback_to_description`: Fall back to video description if subtitles unavailable (default `false`).

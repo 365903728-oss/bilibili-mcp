@@ -156,7 +156,10 @@ export async function handleToolCall(name: string, args: ToolArgs) {
           endSeconds,
           searchOptions,
         );
-        return toTextContent(result);
+        return {
+          ...toTextContent(result),
+          structuredContent: result as unknown as Record<string, unknown>,
+        };
       } catch (error) {
         if (error instanceof NoSubtitleError) {
           return toErrorTextContent(

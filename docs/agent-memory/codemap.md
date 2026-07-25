@@ -11,7 +11,7 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
 
 ## MCP Tool Surface
 
-- `src/server/tool-schemas.ts`: MCP tool list and input schemas.
+- `src/server/tool-schemas.ts`: MCP tool list plus input and declared output schemas.
 - `src/server/tool-handlers.ts`: tool dispatch, input validation, sanitization, Bilibili API calls, and tool-specific recovery payloads.
 - `src/server/error-response.ts`: shared text-content and structured error response helpers.
 
@@ -56,11 +56,11 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 
 - `tests/mcp-server-smoke.test.ts`: stdio and MCP handler smoke coverage.
 - `tests/helpers/mcp.ts`: centralized test access to MCP request handlers.
-- `tests/server-tools.test.ts`: MCP tool behavior coverage.
+- `tests/server-tools.test.ts`: MCP tool discovery and public input/output schema coverage.
 - `tests/server-credential-tools.test.ts`: credential tool behavior and non-leak checks.
 - `tests/update-check.test.ts`: package update guidance behavior and registry-failure fallback.
 - `tests/server-error-next-steps.test.ts`: structured recovery guidance in tool errors.
-- `tests/server-handler-sanitization.test.ts`: handler-level sanitization checks.
+- `tests/server-handler-sanitization.test.ts`: handler-level sanitization and transcript structured-output contract checks.
 - `tests/credential-guidance.test.ts`: credential setup/status guidance.
 - `tests/bilibili-video-api.test.ts`: video/subtitle API safety and behavior checks.
 - `tests/bilibili-navigation.test.ts`: Part normalization, page resolution, ValidationError behavior, and preFetchedVideoData path.

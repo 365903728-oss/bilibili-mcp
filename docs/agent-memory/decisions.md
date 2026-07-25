@@ -1,5 +1,23 @@
 # Decisions
 
+## 2026-07-25
+
+- Decision: Keep `@xzxzzx/bilibili-mcp` Bilibili-native instead of expanding this repository into a cross-platform video MCP.
+- Reason: Generic platform adapters trade away Bilibili-specific depth while adding downloader, Cookie, anti-bot, ASR, privacy, and maintenance costs; this project's durable value is evidence grounded in Bilibili Videos, Parts, Chapters, subtitles, comments, and future Bilibili-native timeline signals.
+- Evidence: User confirmation during the `ask-matt` / `grill-with-docs` direction session and `docs/research/2026-07-25-cross-platform-video-content-mcp-landscape.md`.
+
+- Decision: Make a backward-compatible structured-evidence pilot for `get_video_transcript` the next development ticket before adding Bilibili search or changing the other seven tools.
+- Reason: The existing transcript path already has source, Part, time-range, match-count, and truncation data, so it can validate `outputSchema` and `structuredContent` without a new Bilibili endpoint or a broad migration.
+- Evidence: User confirmation during the `ask-matt` / `grill-with-docs` direction session and the Phase A recommendation in `docs/research/2026-07-25-cross-platform-video-content-mcp-landscape.md`.
+
+- Decision: Keep the structured-output pilot payload-identical to the existing `VideoTranscriptData`; add only an accurate `outputSchema` and the same object as `structuredContent`, while preserving `content[].text` unchanged.
+- Reason: This isolates MCP protocol compatibility from product behavior and avoids mixing unverified timestamp links, cursors, confidence fields, or new inputs into the pilot.
+- Evidence: User confirmation during the `ask-matt` / `grill-with-docs` direction session.
+
+- Decision: Accept the structured-output pilot with automated tests, build, stdio `tools/list` / `tools/call` smoke, and one real Codex-client call; record Claude Desktop and Cursor as untested rather than blocking the pilot.
+- Reason: The change exists to validate real MCP client compatibility, but testing every documented client would add disproportionate work before the single-tool pilot proves useful.
+- Evidence: User confirmation during the `ask-matt` / `grill-with-docs` direction session.
+
 ## 2026-07-20
 
 - Decision: Implement keyword search as a backward-compatible extension of `get_video_transcript` rather than a new MCP tool.

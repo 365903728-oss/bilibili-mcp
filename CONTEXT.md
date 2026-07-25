@@ -4,6 +4,10 @@ This context defines the language used when reading navigable video content thro
 
 ## Language
 
+**Bilibili-native**:
+The product boundary in which every public content capability operates on Bilibili Videos and Bilibili-origin evidence. Supporting another media platform belongs outside this product.
+_Avoid_: Universal video MCP, cross-platform media gateway
+
 **Video**:
 A Bilibili work identified by one BVID. A Video may contain one or more Parts.
 _Avoid_: Archive, post

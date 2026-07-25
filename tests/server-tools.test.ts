@@ -11,7 +11,11 @@ function getListToolsResult() {
   const handler = getMcpHandler<
     typeof fakeRequest,
     {
-      tools: Array<{ name: string; inputSchema: Record<string, unknown> }>;
+      tools: Array<{
+        name: string;
+        inputSchema: Record<string, unknown>;
+        outputSchema?: Record<string, unknown>;
+      }>;
     }
   >("tools/list");
 
@@ -26,6 +30,7 @@ describe("MCP tool list baseline", () => {
   });
   it("exposes all 8 tools", () => {
     const names = toolsResult.tools.map((t) => t.name);
+    expect(names).toHaveLength(8);
     expect(names).toContain("get_credential_setup_instructions");
     expect(names).toContain("check_bilibili_credentials");
     expect(names).toContain("check_mcp_update");
@@ -157,7 +162,11 @@ describe("MCP tool list baseline", () => {
   });
 
   describe("get_video_transcript schema", () => {
-    let schema: { name: string; inputSchema: Record<string, unknown> };
+    let schema: {
+      name: string;
+      inputSchema: Record<string, unknown>;
+      outputSchema?: Record<string, unknown>;
+    };
 
     it("is registered", () => {
       schema = toolsResult.tools.find(
@@ -234,6 +243,50 @@ describe("MCP tool list baseline", () => {
       expect(csProp.type).toBe("integer");
       expect(csProp.minimum).toBe(0);
       expect(csProp.maximum).toBe(5);
+    });
+
+    it("declares the complete structured transcript output", () => {
+      schema = toolsResult.tools.find(
+        (t) => t.name === "get_video_transcript",
+      )!;
+
+      expect(schema.outputSchema).toEqual({
+        type: "object",
+        properties: {
+          bvid: { type: "string" },
+          data_source: {
+            type: "string",
+            enum: ["subtitle", "description"],
+          },
+          language: { type: "string" },
+          transcript: { type: "string" },
+          title: { type: "string" },
+          page: { type: "integer" },
+          query: { type: "string" },
+          total_matches: { type: "integer" },
+          returned_matches: { type: "integer" },
+          truncated: { type: "boolean" },
+          matches: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                start_seconds: { type: "number" },
+                end_seconds: { type: "number" },
+                content: { type: "string" },
+                context: { type: "string" },
+              },
+              required: [
+                "start_seconds",
+                "end_seconds",
+                "content",
+                "context",
+              ],
+            },
+          },
+        },
+        required: ["bvid", "data_source", "transcript", "title"],
+      });
     });
   });
 
