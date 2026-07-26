@@ -231,3 +231,9 @@
 - Decision: Preserve the top-level video CID when no page is supplied and centralize page-to-CID validation in the shared navigation module.
 - Reason: Existing callers must retain the prior default Part, while explicit out-of-range pages need a structured validation error before any player/subtitle request.
 - Evidence: `resolvePartCid`, request-count/navigation regressions, and the MCP handler validation regression.
+
+## 2026-07-26
+
+- Decision: Refresh body-parser and fast-uri inside their existing compatible ranges, but do not override the MCP SDK's Hono 1.x dependency with Hono 2.
+- Reason: The compatible refresh clears three advisories without changing declarations or runtime support. Hono 2 fixes the remaining advisory but requires Node 20; the project supports Node 18 and does not import the vulnerable `serveStatic` path.
+- Evidence: GitHub Issue #19, official npm metadata, upstream MCP SDK Issues #2531/#2548, Node 18 official SDK stdio acceptance, and `docs/research/2026-07-26-v1.8.0-production-dependency-advisory-triage.md`.

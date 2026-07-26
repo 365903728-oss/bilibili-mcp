@@ -14,6 +14,9 @@
 - `get_video_transcript` 在原有格式化 JSON 文本基础上，对成功结果同步返回内容相同的 MCP `structuredContent`，并声明与完整现有结果一致的 `outputSchema`。旧文本格式保持不变，错误结果仍仅返回 `content + isError`，其他七个工具与 Bilibili 请求数量不变。（Issue #16）
 - 成功的 transcript 结果在根级新增 `source_url`，关键词搜索的每个 `Transcript Match` 新增 `timestamp_url`，可直接定位 Bilibili 视频/分集与字幕时刻。BVID 大小写保留不变。（Issue #17）
 
+### 安全
+- 在现有兼容范围内将锁文件中的 `body-parser` 刷新至 2.3.0、`fast-uri` 刷新至 3.1.4，清除三条生产依赖告警，不新增直接依赖或 override。保留 Node 18 支持；未使用的 Hono `serveStatic` 告警继续按上游修复进度跟踪。（Issue #19）
+
 ### 验证
 - 通过 299 项测试、TypeScript 构建、npm package dry-run、生产依赖告警审计与可达性分诊，以及凭据模式扫描。
 

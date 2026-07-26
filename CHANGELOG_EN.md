@@ -14,6 +14,9 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 - `get_video_transcript` returns the same successful result as MCP `structuredContent` alongside the existing formatted JSON text, and declares an `outputSchema` matching the complete current result. The legacy text format is unchanged, error results remain text-only `content + isError`, and the other seven tools and Bilibili request count are unchanged. (Issue #16)
 - Successful transcript results now include a root-level `source_url`, and each keyword-search `Transcript Match` includes a `timestamp_url` that opens the exact Bilibili Video or Part and cited subtitle moment. BVID casing is preserved. (Issue #17)
 
+### Security
+- Refreshed the lockfile to `body-parser` 2.3.0 and `fast-uri` 3.1.4 within their existing compatible ranges, clearing three production advisories without a new direct dependency or override. Node 18 support remains; the unused Hono `serveStatic` advisory continues to track its upstream fix. (Issue #19)
+
 ### Verified
 - Passed 299 tests, TypeScript build, npm package dry-run, production dependency advisory audit and reachability triage, and credential-pattern scan.
 
