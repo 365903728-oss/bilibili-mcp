@@ -224,10 +224,14 @@
 - Evidence: The two package manifests, the Node 18.20.8 official SDK stdio acceptance, independent Issue #19 risk review, and GitHub Issue #20.
 - Impact: Do not claim the untested Node 18.0.0–18.14.0 range is verified. Resolve the public engine floor in its own bounded compatibility ticket rather than changing Issue #18/#19 scope.
 
-- Fact: v1.8.0 is the current npm and GitHub release.
+- Fact: v1.8.0 was the published baseline immediately before authenticated Video Discovery.
 - Evidence: Annotated tag `v1.8.0` at `4be845f`, successful Actions run `30193180970`, npm latest/provenance metadata for `@xzxzzx/bilibili-mcp@1.8.0`, exact-version CLI smoke, and the non-draft/non-prerelease GitHub Release.
-- Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.8.0` or `@latest`; future work starts from the v1.8.0 evidence contract while Issue #20 remains separate.
+- Impact: Retain this as historical release evidence; current install guidance uses the newer release recorded below.
 
 - Fact: The Issue #21 working tree adds `search_bilibili_videos` as the ninth MCP tool, providing authenticated, bounded, normal-Video discovery with exact structured/text output.
 - Evidence: `src/bilibili/search.ts`, tool schema/handler changes, 327 passing tests, the 128-file package dry run, official SDK 1.27.1 nine-tool discovery, and the real `BV1Eb411u7Fw` search-to-Part-4 timestamp workflow recorded in `docs/qa/2026-07-26-bilibili-video-search.md`.
-- Impact: An Agent can start from a topic and pass a returned BVID into existing evidence tools without pagination, AI re-ranking, or automatic subtitle/comment requests. The user authorized this verified work as the `v1.9.0` release candidate; publication remains pending until the release chain is externally verified.
+- Impact: An Agent can start from a topic and pass a returned BVID into existing evidence tools without pagination, AI re-ranking, or automatic subtitle/comment requests. This behavior is published in `v1.9.0`; Issue #21 is closed.
+
+- Fact: v1.9.0 is the current npm latest and GitHub Release.
+- Evidence: Commit `b77c3fc`, annotated tag `v1.9.0`, successful Actions run `30195477401`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, and the non-draft/non-prerelease GitHub Release.
+- Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.9.0` or `@latest`. Issue #20 remains a separate compatibility follow-up.

@@ -271,3 +271,10 @@ Remove or stop using:
 - The final release-verifier plus exact tag-SHA check kept two excluded dirty documents out of the immutable release.
 - The unchanged tag-triggered OIDC workflow passed install, 299 tests, build, and npm publication; live registry provenance and exact-version CLI checks closed the external delivery loop.
 - Keep tag, npm, Release, README-link, and project-memory updates as ordered gates. Do not pre-link a nonexistent Release or create the GitHub Release before npm publication succeeds.
+
+### 2026-07-26 Harness Eval: v1.9.0 publication
+
+- Direct Codex execution honored the user's explicit executor override while retaining the same ticket, file-backed contract, test, security, package, and release-verifier gates.
+- Explicit staged-file enumeration kept the review-gated learning proposal out of the 30-file immutable release commit; the unchanged trusted-publishing workflow passed without repair.
+- The post-publish CLI check initially produced a false alarm because same-repository `npm exec` resolved a global shim. Repeating it from an empty external directory and recording `where.exe` output distinguished harness contamination from a package defect before an unnecessary patch release.
+- Keep: direct-executor overrides, tag-SHA checks, live npm provenance, delayed README links, and isolated published-package CLI checks. Change: require the CLI smoke to run outside the checkout. Remove: no additional release layer.

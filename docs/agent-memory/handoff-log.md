@@ -236,4 +236,10 @@
 - Objective: Add one ninth `search_bilibili_videos` tool for mandatory-authenticated, first-page, normal-Video candidate discovery while preserving existing evidence tools and avoiding pagination, re-ranking, or automatic candidate content retrieval.
 - Review: Codex used failing-first Vitest, direct code review, and scoped secret scanning. The final regression set covers credential gates, exact request ownership, normalization, schema, dual output, text-only errors, and upstream-error propagation.
 - Result: Build, 327 tests, the 128-file package boundary, nine-tool official SDK discovery, and a real search-to-`BV1Eb411u7Fw`-to-timestamp workflow pass. The truthful execution report is `docs/agent-memory/handoffs/2026-07-26-bilibili-video-search-codex-report.md`; no Claude-authored report exists.
-- Scope boundary: Issue #21 remains open for human review. No commit, push, version, changelog, tag, release, npm publication, learning-proposal promotion, or Issue #20 change occurred.
+- Implementation-phase boundary: before the separate release authorization, no commit, push, version, changelog, tag, release, npm publication, learning-proposal promotion, or Issue #20 change occurred.
+
+## 2026-07-26 v1.9.0 Publication
+
+- Owner: Codex executed the user-authorized release directly; no Claude Code, Paseo, GLM, or Kimi implementation agent was used.
+- Result: Commit `b77c3fc` reached `master`; annotated tag `v1.9.0` triggered Actions run `30195477401`, which passed install, 327 tests, build, and npm trusted publication. npm latest is `1.9.0` with SLSA provenance, the isolated exact-package CLI version/help smoke passed, the GitHub Release is non-draft/non-prerelease, and Issue #21 is closed.
+- Scope boundary: The publish workflow and Issue #20 were unchanged. The pre-existing review-gated learning proposal remained unstaged and unpromoted.

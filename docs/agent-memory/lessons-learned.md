@@ -141,3 +141,9 @@
 - Lesson: Deleting a TypeScript source file is incomplete when `tsc` writes into an uncleared output directory used by `npm pack`.
 - Evidence: After deleting unused `src/bilibili/auth.ts`, the first build and package dry run still included four stale `dist/bilibili/auth.*` artifacts; a guarded clean-before-compile step reduced the package from 128 to 124 entries.
 - Future behavior: For source deletions, verify package contents as well as imports and compilation, and keep the build clean step portable rather than hard-coding a checkout path.
+
+## 2026-07-26
+
+- Lesson: An exact-version npm CLI smoke run from inside a repository with the same package name can resolve a globally installed shim instead of the requested temporary package.
+- Evidence: `npm exec --package=@xzxzzx/bilibili-mcp@1.9.0` run at the repository root found only the global binary and reported stale version `1.3.7`; the same command from a dedicated empty temporary directory resolved the `_npx` binary first and correctly reported `1.9.0`.
+- Future behavior: Run published-package CLI acceptance from an empty directory outside the checkout, record the resolved executable path, and only diagnose a package-version defect after that isolation gate.
