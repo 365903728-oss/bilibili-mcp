@@ -116,7 +116,7 @@ The inline Codex probe did not modify global MCP configuration.
 
 - Overall result: `pass`
 - Blocking issue: none.
-- Required security follow-up: rotate the Bilibili session because its Cookie values were shared in chat; configure the replacement from the system clipboard without pasting it into chat.
+- Required security follow-up: completed on 2026-07-26. A fresh MCP process verified the replacement session from `global_config` without displaying Cookie values.
 - Non-blocking caveats: Claude Desktop and Cursor are untested; dual return increases response size; Codex displayed the legacy text but did not separately expose structured content to the model.
 - Codemap update status: updated for declared output schemas and structured-output contract tests.
 - Research note: `docs/research/2026-07-25-cross-platform-video-content-mcp-landscape.md`.
