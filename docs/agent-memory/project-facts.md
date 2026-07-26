@@ -227,3 +227,7 @@
 - Fact: v1.8.0 is the current npm and GitHub release.
 - Evidence: Annotated tag `v1.8.0` at `4be845f`, successful Actions run `30193180970`, npm latest/provenance metadata for `@xzxzzx/bilibili-mcp@1.8.0`, exact-version CLI smoke, and the non-draft/non-prerelease GitHub Release.
 - Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.8.0` or `@latest`; future work starts from the v1.8.0 evidence contract while Issue #20 remains separate.
+
+- Fact: The Issue #21 working tree adds `search_bilibili_videos` as the ninth MCP tool, providing authenticated, bounded, normal-Video discovery with exact structured/text output.
+- Evidence: `src/bilibili/search.ts`, tool schema/handler changes, 327 passing tests, the 128-file package dry run, official SDK 1.27.1 nine-tool discovery, and the real `BV1Eb411u7Fw` search-to-Part-4 timestamp workflow recorded in `docs/qa/2026-07-26-bilibili-video-search.md`.
+- Impact: An Agent can start from a topic and pass a returned BVID into existing evidence tools without pagination, AI re-ranking, or automatic subtitle/comment requests. The user authorized this verified work as the `v1.9.0` release candidate; publication remains pending until the release chain is externally verified.

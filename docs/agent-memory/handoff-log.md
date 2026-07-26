@@ -229,3 +229,11 @@
 - Owner: Codex executed the user-authorized release after an independent read-only release-verifier returned GO.
 - Result: Annotated tag `v1.8.0` at `4be845f` triggered Actions run `30193180970`, which passed install, 299 tests, build, and npm trusted publication. npm latest is `1.8.0` with SLSA provenance; the exact-version CLI help smoke passed; the GitHub Release is non-draft/non-prerelease.
 - Scope boundary: The publish workflow was unchanged. The generated learning proposal and the prior structured-output QA follow-up remained outside the tag and release commits.
+
+## 2026-07-26 Bounded Authenticated Bilibili Video Discovery
+
+- Owner: Codex created GitHub Issue #21, the PRD, research note, QA checklist, and bounded Codex-to-Claude handoff. After failed provider attempts and the user's explicit correction, Codex implemented the same frozen contract directly without Claude Code, GLM, Kimi, or a Paseo implementation agent.
+- Objective: Add one ninth `search_bilibili_videos` tool for mandatory-authenticated, first-page, normal-Video candidate discovery while preserving existing evidence tools and avoiding pagination, re-ranking, or automatic candidate content retrieval.
+- Review: Codex used failing-first Vitest, direct code review, and scoped secret scanning. The final regression set covers credential gates, exact request ownership, normalization, schema, dual output, text-only errors, and upstream-error propagation.
+- Result: Build, 327 tests, the 128-file package boundary, nine-tool official SDK discovery, and a real search-to-`BV1Eb411u7Fw`-to-timestamp workflow pass. The truthful execution report is `docs/agent-memory/handoffs/2026-07-26-bilibili-video-search-codex-report.md`; no Claude-authored report exists.
+- Scope boundary: Issue #21 remains open for human review. No commit, push, version, changelog, tag, release, npm publication, learning-proposal promotion, or Issue #20 change occurred.

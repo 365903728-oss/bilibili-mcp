@@ -28,9 +28,9 @@ describe("MCP tool list baseline", () => {
   beforeAll(async () => {
     toolsResult = await getListToolsResult();
   });
-  it("exposes all 8 tools", () => {
+  it("exposes all 9 tools", () => {
     const names = toolsResult.tools.map((t) => t.name);
-    expect(names).toHaveLength(8);
+    expect(names).toHaveLength(9);
     expect(names).toContain("get_credential_setup_instructions");
     expect(names).toContain("check_bilibili_credentials");
     expect(names).toContain("check_mcp_update");
@@ -39,6 +39,7 @@ describe("MCP tool list baseline", () => {
     expect(names).toContain("get_video_transcript");
     expect(names).toContain("get_video_metadata");
     expect(names).toContain("get_video_chapters");
+    expect(names).toContain("search_bilibili_videos");
   });
 
   it("keeps the public tool order stable", () => {
@@ -51,6 +52,7 @@ describe("MCP tool list baseline", () => {
       "get_video_transcript",
       "get_video_metadata",
       "get_video_chapters",
+      "search_bilibili_videos",
     ]);
   });
 
@@ -71,6 +73,7 @@ describe("MCP tool list baseline", () => {
       get_video_transcript: ["bvid_or_url"],
       get_video_metadata: ["bvid_or_url"],
       get_video_chapters: ["bvid_or_url"],
+      search_bilibili_videos: ["query"],
     });
   });
 
@@ -376,6 +379,68 @@ describe("MCP tool list baseline", () => {
       expect(prop).toBeDefined();
       expect(prop.type).toBe("integer");
       expect(prop.minimum).toBe(1);
+    });
+  });
+
+  describe("search_bilibili_videos schema", () => {
+    it("declares the exact bounded input and structured candidate output", () => {
+      const schema = toolsResult.tools.find(
+        (tool) => tool.name === "search_bilibili_videos",
+      )!;
+
+      expect(schema).toBeDefined();
+      expect(schema.inputSchema).toEqual({
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            minLength: 1,
+            maxLength: 100,
+            description:
+              "Bilibili 视频搜索关键词。trim 后必须非空，最多 100 字符。",
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10,
+            description: "可选，候选视频数量。默认 5，最大 10。",
+          },
+        },
+        required: ["query"],
+      });
+      expect(schema.outputSchema).toEqual({
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          results: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                bvid: { type: "string" },
+                title: { type: "string" },
+                author: { type: "string" },
+                duration_seconds: { type: "integer" },
+                published_at: { type: "string" },
+                view_count: { type: "integer" },
+                description: { type: "string" },
+                source_url: { type: "string" },
+              },
+              required: [
+                "bvid",
+                "title",
+                "author",
+                "duration_seconds",
+                "published_at",
+                "view_count",
+                "description",
+                "source_url",
+              ],
+            },
+          },
+        },
+        required: ["query", "results"],
+      });
     });
   });
 });

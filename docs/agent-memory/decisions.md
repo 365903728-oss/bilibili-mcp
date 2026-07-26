@@ -2,6 +2,18 @@
 
 ## 2026-07-26
 
+- Decision: Add one bounded `search_bilibili_videos` Video Discovery entry before danmaku, creator navigation, or collection search.
+- Reason: The current evidence tools are deep only after a BVID is known. A video-only first-page candidate list closes that user-journey gap without turning the server into a broad Bilibili API wrapper or automatically crawling candidate evidence.
+- Evidence: User-confirmed `grill-with-docs` session, `docs/bilibili-video-search-prd.md`, first-party search contract research, and GitHub Issue #21.
+
+- Decision: Require a configured and actively logged-in local Bilibili credential before Video Discovery, with no anonymous or webpage fallback.
+- Reason: The current endpoint permits anonymous requests, but the user chose consistent authenticated behavior and existing bilingual credential recovery over silent access-mode changes; credential values remain local and are never returned.
+- Evidence: User-confirmed requirements and `docs/research/2026-07-26-bilibili-video-search-contract.md`.
+
+- Decision: Keep the first Video Discovery contract to a required query, a default-five/maximum-ten candidate limit, Bilibili comprehensive order, and identical structured/text output.
+- Reason: Candidate metadata is sufficient to feed existing evidence tools. Pagination, filters, re-ranking, automatic transcript/comment retrieval, and non-Video search would add requests and product surface before the entry workflow is proven.
+- Evidence: User-confirmed requirements, PRD, and GitHub Issue #21.
+
 - Decision: Add browser evidence links only to `get_video_transcript`: require a Part-aware `source_url` on successful results and a `timestamp_url` on each returned search match.
 - Reason: Transcript results already contain the validated BVID, resolved Part, and match start time, so both links can be derived locally with zero new Bilibili requests while keeping a single canonical source and exact evidence moment.
 - Evidence: `docs/transcript-evidence-links-prd.md`, `docs/research/2026-07-26-bilibili-timestamp-link-contract.md`, GitHub Issue #17, and live ordinary/multi-Part Playwright acceptance.

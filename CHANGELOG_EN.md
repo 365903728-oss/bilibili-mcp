@@ -8,6 +8,20 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.9.0] - 2026-07-26
+
+### Added
+- Added `search_bilibili_videos` to return normal Video candidates in Bilibili's platform relevance order. `limit` defaults to 5 and is capped at 10; each candidate includes its BVID, title, author, duration, publication time, view count, description, and source URL. (Issue #21)
+- Successful searches return both formatted JSON text and identical MCP `structuredContent`, so a candidate BVID can be passed directly to the existing transcript, metadata, chapter, and comment tools.
+
+### Security
+- Video search requires valid, logged-in Bilibili Cookie credentials and does not fall back to anonymous access. Credential failures retain the existing safe setup guidance without exposing Cookie values in responses or logs.
+
+### Verified
+- Passed 327 tests, TypeScript build, official MCP SDK 1.27.1 nine-tool stdio acceptance, a real search-to-transcript-timestamp workflow, npm package dry-run, and credential-pattern scan.
+
+---
+
 ## [1.8.0] - 2026-07-26
 
 ### Added

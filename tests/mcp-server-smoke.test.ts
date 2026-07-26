@@ -104,6 +104,7 @@ describe("MCP stdio entrypoint", () => {
       "get_video_transcript",
       "get_video_metadata",
       "get_video_chapters",
+      "search_bilibili_videos",
     ]);
   });
 

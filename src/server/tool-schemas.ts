@@ -236,4 +236,61 @@ export const toolSchemas: Tool[] = [
       required: ["bvid_or_url"],
     },
   },
+  {
+    name: "search_bilibili_videos",
+    description:
+      "按关键词搜索 Bilibili 视频，返回最多 10 个平台综合排序的候选元数据。不自动获取字幕、评论或重新排序。必须先配置并登录 Bilibili Cookie；如需帮助，请调用 get_credential_setup_instructions。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          minLength: 1,
+          maxLength: 100,
+          description:
+            "Bilibili 视频搜索关键词。trim 后必须非空，最多 100 字符。",
+        },
+        limit: {
+          type: "integer",
+          minimum: 1,
+          maximum: 10,
+          description: "可选，候选视频数量。默认 5，最大 10。",
+        },
+      },
+      required: ["query"],
+    },
+    outputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        results: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              bvid: { type: "string" },
+              title: { type: "string" },
+              author: { type: "string" },
+              duration_seconds: { type: "integer" },
+              published_at: { type: "string" },
+              view_count: { type: "integer" },
+              description: { type: "string" },
+              source_url: { type: "string" },
+            },
+            required: [
+              "bvid",
+              "title",
+              "author",
+              "duration_seconds",
+              "published_at",
+              "view_count",
+              "description",
+              "source_url",
+            ],
+          },
+        },
+      },
+      required: ["query", "results"],
+    },
+  },
 ];

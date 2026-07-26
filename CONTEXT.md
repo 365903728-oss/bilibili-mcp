@@ -8,6 +8,10 @@ This context defines the language used when reading navigable video content thro
 The product boundary in which every public content capability operates on Bilibili Videos and Bilibili-origin evidence. Supporting another media platform belongs outside this product.
 _Avoid_: Universal video MCP, cross-platform media gateway
 
+**Video Discovery**:
+A bounded Bilibili-native lookup that turns one topic query into a small ordered set of candidate Videos. It does not automatically retrieve evidence from those Videos or search creators, series, and collections.
+_Avoid_: Recommendation engine, cross-video research, global search
+
 **Video**:
 A Bilibili work identified by one BVID. A Video may contain one or more Parts.
 _Avoid_: Archive, post

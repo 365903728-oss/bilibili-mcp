@@ -168,6 +168,19 @@ export function validateQuery(query: unknown): void {
 }
 
 /**
+ * 验证视频搜索候选数量：整数 1-10
+ */
+export function validateSearchLimit(value: unknown): void {
+  if (value === undefined) return;
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error("limit must be an integer between 1 and 10");
+  }
+  if (value < 1 || value > 10) {
+    throw new Error("limit must be between 1 and 10");
+  }
+}
+
+/**
  * 验证 max_matches：整数 1-20
  */
 export function validateMaxMatches(value: unknown): void {

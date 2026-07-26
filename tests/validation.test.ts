@@ -11,6 +11,7 @@ import {
   validateMaxMatches,
   validatePage,
   validateQuery,
+  validateSearchLimit,
   validateTimestampRange,
 } from "../src/utils/validation.js";
 
@@ -262,6 +263,21 @@ describe("validateQuery", () => {
     [123 as unknown as string, "query must be a string"],
   ])("rejects %j", (value, message) => {
     expect(() => validateQuery(value)).toThrow(message);
+  });
+});
+
+describe("validateSearchLimit", () => {
+  it.each([undefined, 1, 5, 10])("accepts %j", (value) => {
+    expect(() => validateSearchLimit(value)).not.toThrow();
+  });
+
+  it.each([
+    [0, "limit must be between 1 and 10"],
+    [11, "limit must be between 1 and 10"],
+    [1.5, "limit must be an integer between 1 and 10"],
+    ["5" as unknown as number, "limit must be an integer between 1 and 10"],
+  ])("rejects %j", (value, message) => {
+    expect(() => validateSearchLimit(value)).toThrow(message);
   });
 });
 

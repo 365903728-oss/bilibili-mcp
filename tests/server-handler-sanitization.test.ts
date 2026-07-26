@@ -5,6 +5,7 @@ import { getMcpHandler } from "./helpers/mcp.js";
 const mockGetVideoMetadataData = vi.fn();
 const mockGetVideoChaptersData = vi.fn();
 const mockGetVideoTranscriptData = vi.fn();
+const mockSearchBilibiliVideos = vi.fn();
 
 vi.mock("../src/bilibili/subtitle.js", () => ({
   getVideoInfoWithSubtitle: vi.fn(),
@@ -18,6 +19,11 @@ vi.mock("../src/bilibili/metadata.js", () => ({
 
 vi.mock("../src/bilibili/chapters.js", () => ({
   getVideoChaptersData: (...args: unknown[]) => mockGetVideoChaptersData(...args),
+}));
+
+vi.mock("../src/bilibili/search.js", () => ({
+  searchBilibiliVideos: (...args: unknown[]) =>
+    mockSearchBilibiliVideos(...args),
 }));
 
 vi.mock("../src/bilibili/comments.js", () => ({
@@ -236,5 +242,92 @@ describe("handler validation and transcript output", () => {
     const text = JSON.parse(result.content[0].text);
     expect(text.code).toBe("VALIDATION_ERROR");
     expect(mockGetVideoChaptersData).not.toHaveBeenCalled();
+  });
+});
+
+describe("search handler validation and output", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ["missing query", {}],
+    ["empty query", { query: "   " }],
+    ["long query", { query: "a".repeat(101) }],
+    ["limit below range", { query: "MCP", limit: 0 }],
+    ["limit above range", { query: "MCP", limit: 11 }],
+    ["fractional limit", { query: "MCP", limit: 1.5 }],
+    ["string limit", { query: "MCP", limit: "5" }],
+  ])("search_bilibili_videos with %s returns VALIDATION_ERROR", async (_case, args) => {
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 7,
+      params: {
+        name: "search_bilibili_videos",
+        arguments: args,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("VALIDATION_ERROR");
+    expect(mockSearchBilibiliVideos).not.toHaveBeenCalled();
+  });
+
+  it("trims the query, applies the default limit, and returns identical dual output", async () => {
+    const fixture = {
+      query: "MCP",
+      results: [
+        {
+          bvid: "BV1T6PQzQErF",
+          title: "MCP introduction",
+          author: "Creator",
+          duration_seconds: 120,
+          published_at: "2026-07-26T00:00:00.000Z",
+          view_count: 100,
+          description: "Candidate only",
+          source_url: "https://www.bilibili.com/video/BV1T6PQzQErF/",
+        },
+      ],
+    };
+    mockSearchBilibiliVideos.mockResolvedValueOnce(fixture);
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 8,
+      params: {
+        name: "search_bilibili_videos",
+        arguments: { query: "  MCP  " },
+      },
+    });
+
+    expect(mockSearchBilibiliVideos).toHaveBeenCalledWith("MCP", 5);
+    expect(result.structuredContent).toEqual(fixture);
+    expect(result.content[0].text).toBe(JSON.stringify(fixture, null, 2));
+  });
+
+  it("keeps search failures text-only", async () => {
+    mockSearchBilibiliVideos.mockRejectedValueOnce(
+      new Error("Unexpected search failure"),
+    );
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 9,
+      params: {
+        name: "search_bilibili_videos",
+        arguments: { query: "MCP", limit: 3 },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("UNKNOWN_ERROR");
   });
 });

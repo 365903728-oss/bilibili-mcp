@@ -4,7 +4,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![npm downloads](https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
 
-MCP server that gives AI clients access to Bilibili video subtitles, transcripts, metadata, and popular comments.
+MCP server that lets AI clients search Bilibili videos and access subtitles, transcripts, metadata, and popular comments.
 
 View in [简体中文](https://github.com/XZXZZX-Ai/bilibili-mcp/blob/master/README.md) · 📜 [Changelog](https://github.com/XZXZZX-Ai/bilibili-mcp/blob/master/CHANGELOG_EN.md) · 📦 [npm](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp) · 🚀 [Release v1.8.0](https://github.com/XZXZZX-Ai/bilibili-mcp/releases/tag/v1.8.0)
 
@@ -85,8 +85,9 @@ After the MCP server is connected, if available, call get_credential_setup_instr
   - [3. Video Transcript (`get_video_transcript`)](#3-video-transcript-get_video_transcript)
   - [4. Video Metadata (`get_video_metadata`)](#4-video-metadata-get_video_metadata)
   - [5. Video Chapters (`get_video_chapters`)](#5-video-chapters-get_video_chapters)
-  - [6. Credential Helper Tools](#6-credential-helper-tools)
-  - [7. Behavior and Error Handling](#7-behavior-and-error-handling)
+  - [6. Video Discovery (`search_bilibili_videos`)](#6-video-discovery-search_bilibili_videos)
+  - [7. Credential Helper Tools](#7-credential-helper-tools)
+  - [8. Behavior and Error Handling](#8-behavior-and-error-handling)
 - [📋 Requirements](#-requirements)
 - [🚀 Client Setup](#-client-setup)
 - [⚙️ Credential Configuration](#-credential-configuration)
@@ -150,13 +151,19 @@ After the MCP server is connected, if available, call get_credential_setup_instr
 - Returns empty `chapters` array when no Chapters exist; never infers Chapters.
 - Accepts optional `page` parameter for multi-Part videos.
 
-### 6. Credential Helper Tools
+### 6. Video Discovery (`search_bilibili_videos`)
+
+- Returns normal Video candidates in Bilibili's comprehensive order; 5 by default and at most 10.
+- Candidate metadata is for selection and follow-up calls only; the tool does not fetch subtitles/comments or apply AI re-ranking.
+- Requires configured, logged-in Bilibili Cookies; success returns formatted JSON text plus identical MCP `structuredContent`.
+
+### 7. Credential Helper Tools
 
 - `get_credential_setup_instructions`: Returns safe setup commands for Bilibili Cookie configuration. AI agents installing this MCP can call this tool to guide users through setup.
 - `check_bilibili_credentials`: Checks whether credentials are configured and logged in without returning Cookie values. Returns next steps when credentials are missing or invalid.
 - `check_mcp_update`: Checks the local package version against npm latest and returns safe update guidance for `npx @latest` or global installs.
 
-### 7. Behavior and Error Handling
+### 8. Behavior and Error Handling
 
 - **Intelligent Cookie Expiration Detection**: Automatically verifies login status when subtitles are empty, distinguishing between "videos without subtitles" and "invalid credentials," and throwing a clear `COOKIE_EXPIRED` error to prevent silent degradation.
 
@@ -165,6 +172,7 @@ After the MCP server is connected, if available, call get_credential_setup_instr
 - Some public video metadata (`get_video_metadata`) may work without authentication.
 - Subtitles (`get_video_info`, `get_video_transcript`) may be unavailable, incomplete, or fail without authentication.
 - Comments (`get_video_comments`) may be incomplete, empty, or rate-limited without authentication.
+- Video discovery (`search_bilibili_videos`) requires configured, valid login credentials and never falls back to anonymous search.
 - Do not rely on cookie-less mode for reliable subtitle or comment access.
 
 #### Credential Sources
@@ -1249,6 +1257,7 @@ Do not share cookies with others. Do not paste them into public chats, issues, P
 
 | Goal | Recommended tool | What you get |
 |---|---|---|
+| Start from a topic without a video link | `search_bilibili_videos` | Up to 10 normal Video candidates with reusable BVIDs; no automatic subtitle or comment retrieval |
 | Summarize a video | `get_video_info` | Subtitles first; falls back to title, description, tags |
 | Get clean transcript text or locate keywords | `get_video_transcript` | Plain subtitle text, language, data source; supports timestamps, range filtering, and keyword search |
 | See structured metadata | `get_video_metadata` | Title, author, duration, publish date, tags, stats, multi-Part listing |
@@ -1306,6 +1315,24 @@ Request:
 ```
 
 Returns: `current_version`, `latest_version`, `update_available`, `recommended_mcp_config`, `update_commands`, and bilingual `notes_en` / `notes_zh`; never updates packages automatically.
+
+### `search_bilibili_videos`
+
+**Best for**: starting with a topic and finding a small candidate set on Bilibili.
+
+Request:
+
+```json
+{
+  "name": "search_bilibili_videos",
+  "arguments": {
+    "query": "MCP tutorial",
+    "limit": 5
+  }
+}
+```
+
+Returns: normal Video candidates in comprehensive order with `bvid`, title, author, duration, publish time, view count, bounded description, and source URL. Search requires valid logged-in credentials and never fetches candidate subtitles or comments automatically.
 
 ### `get_video_transcript`
 
@@ -1510,7 +1537,7 @@ This project is a crystal of AI-collaborative development, spanning from prototy
 
 1.  **Initial Generation**: Core architecture and base logic were rapidly built by **Claude Code** (powered by **GLM-4.7** model).
 2.  **Debugging & Optimization**: Bugs were fixed and features enhanced using **Claude** and **Gemini** models within the **Antigravity** environment, ensuring stable subtitle extraction and comment analysis.
-3.  **Iteration & Expansion**: **Codex** handles architectural decisions and planning, launching **Claude Code** via **Paseo** for implementation; now covers 30+ AI client MCP configurations, 8 MCP tools, and 299 unit tests.
+3.  **Iteration & Expansion**: **Codex** handles architecture, planning, and direct implementation, or launches **Claude Code** through **Paseo** when appropriate; the project now covers 30+ AI client MCP configurations, 9 MCP tools, and 327 unit tests.
 
 ---
 

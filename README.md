@@ -4,7 +4,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![npm downloads](https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg)](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp)
 
-Bilibili MCP server — 让 Claude、Cursor、Codex 等 AI 客户端直接读取 Bilibili 视频字幕、转录、元数据和热门评论的 MCP server。
+Bilibili MCP server — 让 Claude、Cursor、Codex 等 AI 客户端直接搜索 Bilibili 视频，并读取字幕、转录、元数据和热门评论的 MCP server。
 
 🌐 [English Documentation](https://github.com/XZXZZX-Ai/bilibili-mcp/blob/master/README_EN.md) · 📜 [更新日志](https://github.com/XZXZZX-Ai/bilibili-mcp/blob/master/CHANGELOG.md) · 📦 [npm](https://www.npmjs.com/package/@xzxzzx/bilibili-mcp) · 🚀 [Release v1.8.0](https://github.com/XZXZZX-Ai/bilibili-mcp/releases/tag/v1.8.0)
 
@@ -85,8 +85,9 @@ npx -y @xzxzzx/bilibili-mcp@latest check
   - [3. 视频转录 (`get_video_transcript`)](#3-视频转录-get_video_transcript)
   - [4. 视频元数据 (`get_video_metadata`)](#4-视频元数据-get_video_metadata)
   - [5. 视频章节 (`get_video_chapters`)](#5-视频章节-get_video_chapters)
-  - [6. 凭证助手工具](#6-凭证助手工具)
-  - [7. 行为说明与错误处理](#7-行为说明与错误处理)
+  - [6. 视频发现 (`search_bilibili_videos`)](#6-视频发现-search_bilibili_videos)
+  - [7. 凭证助手工具](#7-凭证助手工具)
+  - [8. 行为说明与错误处理](#8-行为说明与错误处理)
 - [📋 环境要求](#-环境要求)
 - [🚀 客户端接入方式](#-客户端接入方式)
 - [⚙️ 凭证配置](#️-凭证配置)
@@ -151,13 +152,19 @@ npx -y @xzxzzx/bilibili-mcp@latest check
 - 无章节时返回空列表（`chapters: []`），不推断章节
 - 可选参数 `page`：多P视频分集编号
 
-### 6. 凭证助手工具
+### 6. 视频发现 (`search_bilibili_videos`)
+
+- 按关键词返回 Bilibili 综合排序的普通视频候选；默认 5 条，最多 10 条。
+- 候选只包含可选择和传给现有工具的元数据，不自动获取字幕、评论，也不进行 AI 重排。
+- 必须先配置且登录 Bilibili Cookie；成功结果同时提供格式化 JSON 文本和内容相同的 MCP `structuredContent`。
+
+### 7. 凭证助手工具
 
 - `get_credential_setup_instructions`: 返回安全的 Bilibili Cookie 配置命令和说明。AI agent 安装此 MCP 后可调用此工具引导用户完成配置。
 - `check_bilibili_credentials`: 检查凭证是否已配置并处于登录状态，不返回任何 Cookie 值。配置缺失或失效时返回下一步操作指引。
 - `check_mcp_update`: 检查本地包版本与 npm latest 是否一致，并返回 `npx @latest` 或全局安装的安全更新指引。
 
-### 7. 行为说明与错误处理
+### 8. 行为说明与错误处理
 
 - **Cookie 过期智能检测**：当字幕获取为空时自动验证登录状态，区分“无字幕视频”与“凭证失效”，并抛出明确的 `COOKIE_EXPIRED` 错误，避免静默降级。
 
@@ -166,6 +173,7 @@ npx -y @xzxzzx/bilibili-mcp@latest check
 - 部分公开视频元数据（`get_video_metadata`）可能在未登录状态下工作。
 - 字幕（`get_video_info`、`get_video_transcript`）在未登录时可能无法获取、不完整或返回空结果。
 - 评论（`get_video_comments`）在未登录时可能不完整、被限流或返回空列表。
+- 视频发现（`search_bilibili_videos`）强制检查已配置且有效的登录凭证；不提供匿名降级。
 - 不建议依赖无 Cookie 模式获取字幕或评论。
 
 #### Cookie 凭据来源
@@ -1250,6 +1258,7 @@ BILIBILI_DEDEUSERID=<your_dedeuserid>
 
 | 目标 | 推荐工具 | 返回重点 |
 |---|---|---|
+| 只有主题，还没有视频链接 | `search_bilibili_videos` | 最多 10 个普通视频候选及可继续调用的 BVID；不自动抓取字幕或评论 |
 | 想让 AI 总结一个视频 | `get_video_info` | 字幕优先；无字幕时返回标题、简介、标签 |
 | 只想拿完整转录文本或关键词定位 | `get_video_transcript` | 纯字幕文本、语言、数据来源；支持时间戳、区间过滤和关键词搜索 |
 | 想查看标题、作者、播放量等结构化信息 | `get_video_metadata` | 标题、作者、时长、发布时间、标签、统计数据、多P分集列表（`pages`） |
@@ -1307,6 +1316,24 @@ BILIBILI_DEDEUSERID=<your_dedeuserid>
 ```
 
 返回内容：`current_version`、`latest_version`、`update_available`、`recommended_mcp_config`、`update_commands`，以及双语 `notes_en` / `notes_zh`；不会自动更新包。
+
+### `search_bilibili_videos`
+
+**适合**：只有一个主题，需要先在 Bilibili 内找到少量候选视频。
+
+请求示例：
+
+```json
+{
+  "name": "search_bilibili_videos",
+  "arguments": {
+    "query": "MCP 入门",
+    "limit": 5
+  }
+}
+```
+
+返回内容：综合排序的普通视频候选及其 `bvid`、标题、作者、时长、发布时间、播放量、简介片段和源链接。搜索需要有效登录凭证，且不会自动读取候选视频的字幕或评论。
 
 ### `get_video_transcript`
 
@@ -1514,7 +1541,7 @@ npm run watch
 
 1.  **初版生成**：由 **Claude Code** (搭载 **GLM-4.7** 模型) 快速搭建核心架构与基础逻辑。
 2.  **调试与优化**：在 **Antigravity** 环境下，利用 **Claude** 和 **Gemini** 模型进行深度的 Bug 修复与功能增强，确保了字幕提取与评论分析的稳定性。
-3.  **迭代与扩展**：由 **Codex** 进行架构决策与计划分解，通过 **Paseo** 启动 **Claude Code** 执行实现；目前覆盖 30+ AI 客户端的 MCP 接入配置、8 个 MCP 工具、299 个单元测试。
+3.  **迭代与扩展**：由 **Codex** 进行架构决策、计划分解和直接实现，或按任务通过 **Paseo** 启动 **Claude Code**；目前覆盖 30+ AI 客户端的 MCP 接入配置、9 个 MCP 工具、327 个单元测试。
 
 ---
 

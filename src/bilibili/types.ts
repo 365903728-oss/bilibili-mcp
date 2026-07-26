@@ -186,6 +186,24 @@ export interface VideoTranscriptData {
   matches?: TranscriptMatch[];
 }
 
+// Bilibili 视频搜索候选
+export interface VideoSearchCandidate {
+  bvid: string;
+  title: string;
+  author: string;
+  duration_seconds: number;
+  published_at: string;
+  view_count: number;
+  description: string;
+  source_url: string;
+}
+
+// 有界视频搜索结果
+export interface VideoSearchData {
+  query: string;
+  results: VideoSearchCandidate[];
+}
+
 // 内部搜索选项（仅供 getVideoTranscriptData 使用）
 export interface TranscriptSearchOptions {
   query: string;

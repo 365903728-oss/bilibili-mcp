@@ -2,6 +2,7 @@ import { getVideoChaptersData } from "../bilibili/chapters.js";
 import { getVideoCommentsData } from "../bilibili/comments.js";
 import { checkLoginStatus } from "../bilibili/http.js";
 import { getVideoMetadataData } from "../bilibili/metadata.js";
+import { searchBilibiliVideos } from "../bilibili/search.js";
 import {
   getVideoInfoWithSubtitle,
   getVideoTranscriptData,
@@ -26,6 +27,7 @@ import {
   validateMaxMatches,
   validatePage,
   validateQuery,
+  validateSearchLimit,
   validateTimestampRange,
 } from "../utils/validation.js";
 import {
@@ -204,6 +206,30 @@ export async function handleToolCall(name: string, args: ToolArgs) {
       const result = await getVideoChaptersData(sanitizedBvidOrUrl, page);
 
       return toTextContent(result);
+    }
+
+    case "search_bilibili_videos": {
+      const rawQuery = args?.query;
+      const rawLimit = args?.limit;
+
+      try {
+        if (rawQuery === undefined) {
+          throw new Error("query is required");
+        }
+        validateQuery(rawQuery);
+        validateSearchLimit(rawLimit);
+      } catch (error) {
+        return toErrorTextContent(buildValidationErrorPayload(error));
+      }
+
+      const query = (rawQuery as string).trim();
+      const limit = rawLimit === undefined ? 5 : (rawLimit as number);
+      const result = await searchBilibiliVideos(query, limit);
+
+      return {
+        ...toTextContent(result),
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
     }
 
     default:
