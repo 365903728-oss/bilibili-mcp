@@ -8,6 +8,17 @@
 
 ---
 
+## [1.8.0] - 2026-07-26
+
+### 新增
+- `get_video_transcript` 在原有格式化 JSON 文本基础上，对成功结果同步返回内容相同的 MCP `structuredContent`，并声明与完整现有结果一致的 `outputSchema`。旧文本格式保持不变，错误结果仍仅返回 `content + isError`，其他七个工具与 Bilibili 请求数量不变。（Issue #16）
+- 成功的 transcript 结果在根级新增 `source_url`，关键词搜索的每个 `Transcript Match` 新增 `timestamp_url`，可直接定位 Bilibili 视频/分集与字幕时刻。BVID 大小写保留不变。（Issue #17）
+
+### 验证
+- 通过 299 项测试、TypeScript 构建、npm package dry-run、生产依赖告警审计与可达性分诊，以及凭据模式扫描。
+
+---
+
 ## [1.7.2] - 2026-07-20
 
 ### 新增
