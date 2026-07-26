@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="380" viewBox="0 0 1200 380"
+     role="img" aria-labelledby="title desc">
+  <title id="title">Bilibili MCP</title>
+  <desc id="desc">搜索 Bilibili 视频、读取字幕，并返回可直达播放时刻的证据链接。</desc>
+
+  <rect width="1200" height="380" rx="28" fill="#090b10"/>
+  <path d="M0 206H1200" stroke="#232936"/>
+
+  <g id="title-block">
+    <text x="64" y="52" fill="#93a4b8"
+          font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+          font-size="18" letter-spacing="1.5">MODEL CONTEXT PROTOCOL · BILIBILI</text>
+    <text x="64" y="116" fill="#f8fafc"
+          font-family="Segoe UI, Microsoft YaHei, PingFang SC, sans-serif"
+          font-size="60" font-weight="700">Bilibili MCP</text>
+    <rect x="64" y="138" width="92" height="4" rx="2" fill="#fb7299"/>
+    <text x="64" y="178" fill="#b8c5d3"
+          font-family="Segoe UI, Microsoft YaHei, PingFang SC, sans-serif"
+          font-size="24">搜索 Bilibili，读取字幕，返回可直达的时间证据。</text>
+  </g>
+
+  <g id="status" transform="translate(852 54)">
+    <rect width="284" height="92" rx="18" fill="#11151d" stroke="#303746"/>
+    <circle cx="28" cy="30" r="6" fill="#22c55e"/>
+    <text x="46" y="31" dominant-baseline="middle" fill="#86efac"
+          font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+          font-size="18">MCP READY</text>
+    <path d="M24 50H260" stroke="#29303c"/>
+    <text x="142" y="70" dominant-baseline="middle" text-anchor="middle" fill="#93a4b8"
+          font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+          font-size="18">LOCAL STDIO · STRUCTURED</text>
+  </g>
+
+  <g id="evidence-strip" transform="translate(64 230)">
+    <g id="discover">
+      <rect width="300" height="112" rx="18" fill="#11151d" stroke="#303746"/>
+      <text x="22" y="28" dominant-baseline="middle" fill="#fb7299"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="18">01 · DISCOVER</text>
+      <text x="22" y="64" dominant-baseline="middle" fill="#f8fafc"
+            font-family="Segoe UI, Microsoft YaHei, PingFang SC, sans-serif"
+            font-size="24" font-weight="600">主题 → 视频候选</text>
+      <text x="22" y="94" dominant-baseline="middle" fill="#93a4b8"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="18">search_bilibili_videos</text>
+    </g>
+
+    <path d="M312 56H328M321 49L328 56L321 63"
+          fill="none" stroke="#fb7299" stroke-width="2"/>
+
+    <g id="locate" transform="translate(336 0)">
+      <rect width="300" height="112" rx="18" fill="#11151d" stroke="#00aeec"/>
+      <text x="22" y="28" dominant-baseline="middle" fill="#7dd3fc"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="18">02 · LOCATE</text>
+      <text x="22" y="64" dominant-baseline="middle" fill="#f8fafc"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="24">BV1Eb411u7Fw · P4</text>
+      <text x="22" y="94" dominant-baseline="middle" fill="#93a4b8"
+            font-family="Segoe UI, Microsoft YaHei, PingFang SC, sans-serif"
+            font-size="18">字幕查询：函数</text>
+    </g>
+
+    <path d="M648 56H664M657 49L664 56L657 63"
+          fill="none" stroke="#00aeec" stroke-width="2"/>
+
+    <g id="cite" transform="translate(672 0)">
+      <rect width="400" height="112" rx="18" fill="#0d2118" stroke="#237f50"/>
+      <text x="22" y="28" dominant-baseline="middle" fill="#86efac"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="18">03 · CITE</text>
+      <text x="22" y="64" dominant-baseline="middle" fill="#f8fafc"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="24">?p=4&amp;t=1.12</text>
+      <text x="22" y="94" dominant-baseline="middle" fill="#b8c5d3"
+            font-family="Segoe UI, Microsoft YaHei, PingFang SC, sans-serif"
+            font-size="18">字幕上下文 · 可直达播放时刻</text>
+      <circle cx="368" cy="28" r="7" fill="#22c55e"/>
+    </g>
+  </g>
+</svg>

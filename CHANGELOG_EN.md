@@ -8,6 +8,18 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.9.1] - 2026-07-26
+
+### Documentation
+- Reduced both READMEs to concise project homepages and centralized the Agent installation prompt, 33 client configurations, credential validation, runtime environment variables, and source setup in bilingual installation guides.
+- Moved complete tool parameters, call examples, error semantics, and request controls into bilingual tool references, and included these documents in the npm package.
+- Redrew both GitHub-safe SVG heroes with a stable single-title and three-step evidence layout, removing font-fallback and fixed-coordinate alignment failures.
+
+### Verified
+- Passed bilingual README audits, desktop and narrow SVG rendering, client and environment-variable coverage checks, credential-focused tests, npm package dry-run, link validation, and credential-pattern scanning.
+
+---
+
 ## [1.9.0] - 2026-07-26
 
 ### Added

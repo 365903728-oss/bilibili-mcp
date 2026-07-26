@@ -158,9 +158,9 @@
 - Evidence: annotated tag `v1.7.1`, Actions run `29723831279`, npm attestation metadata, and the non-draft GitHub Release.
 - Impact: npm latest and the current GitHub Release are `1.7.1`; later release work should start from this baseline.
 
-- Fact: Both READMEs now document `BILIBILI_CACHE_SIZE`, `USER_AGENT`, and the restart requirement for runtime tuning environment variables.
-- Evidence: `README.md` and `README_EN.md` API rate limiting sections, `src/config.ts` environment variable loading.
-- Impact: Users can discover all four runtime-tuning variables and the restart constraint from the README without reading source code.
+- Fact: The bilingual client setup guides document all five optional runtime variables, including `BILIBILI_CACHE_SIZE`, `USER_AGENT`, `BILIBILI_MCP_DEBUG`, and the restart requirement.
+- Evidence: `docs/client-setup.md`, `docs/client-setup.en.md`, and `src/config.ts` environment variable loading.
+- Impact: Users can discover request tuning and credential-redacted debug controls, plus the restart constraint, from the canonical installation guide without reading source code.
 
 ## 2026-07-20
 
@@ -235,3 +235,7 @@
 - Fact: v1.9.0 is the current npm latest and GitHub Release.
 - Evidence: Commit `b77c3fc`, annotated tag `v1.9.0`, successful Actions run `30195477401`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, and the non-draft/non-prerelease GitHub Release.
 - Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.9.0` or `@latest`. Issue #20 remains a separate compatibility follow-up.
+
+- Fact: Source version `1.9.1` is a documentation-only preparation that centralizes installation/configuration in bilingual guides and ships two GitHub-safe SVG heroes.
+- Evidence: Bilingual README/setup/tool-reference documents, package version consistency, 327 passing tests, build, 134-file package dry run, README/SVG audits, and credential-pattern scanning.
+- Impact: MCP tools and runtime behavior are unchanged. A source push alone does not change npm latest or create a GitHub Release; publication still requires the separate tag-driven workflow.

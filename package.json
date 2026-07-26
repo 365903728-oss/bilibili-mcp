@@ -1,6 +1,6 @@
 {
   "name": "@xzxzzx/bilibili-mcp",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "Bilibili MCP tool for video metadata, transcripts, subtitles, and comment summarization",
   "type": "module",
   "main": "dist/index.js",
@@ -21,6 +21,11 @@
   },
   "files": [
     "dist",
+    "assets/readme",
+    "docs/client-setup.md",
+    "docs/client-setup.en.md",
+    "docs/tool-reference.md",
+    "docs/tool-reference.en.md",
     "README.md",
     "README_EN.md",
     "LICENSE"

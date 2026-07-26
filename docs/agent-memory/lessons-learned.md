@@ -147,3 +147,11 @@
 - Lesson: An exact-version npm CLI smoke run from inside a repository with the same package name can resolve a globally installed shim instead of the requested temporary package.
 - Evidence: `npm exec --package=@xzxzzx/bilibili-mcp@1.9.0` run at the repository root found only the global binary and reported stale version `1.3.7`; the same command from a dedicated empty temporary directory resolved the `_npx` binary first and correctly reported `1.9.0`.
 - Future behavior: Run published-package CLI acceptance from an empty directory outside the checkout, record the resolved executable path, and only diagnose a package-version defect after that isolation gate.
+
+- Lesson: Agent-guided installation is a primary onboarding path, but installation and configuration need one authoritative home.
+- Evidence: The user first rejected hiding or deleting the Agent path, then explicitly chose the dedicated bilingual client setup guides as the complete source and asked the READMEs to link there without duplicating methods.
+- Future behavior: Keep the complete Agent prompt prominent in `docs/client-setup.md` and `docs/client-setup.en.md`; keep the READMEs concise and link to those guides. The prompt must require client identification, client-specific syntax, local-only credential entry, MCP reconnection, mandatory login validation with `check_bilibili_credentials`, and separate optional version checking.
+
+- Lesson: README SVG rows must not rely on fixed text-width offsets or share vertical space with overlapping modules.
+- Evidence: The first bilingual heroes split adjacent text with fixed `x` coordinates and placed a footer timeline inside the right proof card's vertical range, producing visible font-dependent spacing and structural overlap.
+- Future behavior: Keep titles as one text element, isolate proof modules on non-overlapping geometry, use system-font fallbacks, and inspect every full-width SVG at both 900px and 360px before acceptance.

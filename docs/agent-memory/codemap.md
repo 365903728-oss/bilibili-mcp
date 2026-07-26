@@ -89,7 +89,11 @@ Default verification:
 - `package.json`: npm metadata, binary mapping, scripts, dependencies, and publish file allowlist.
 - `package-lock.json`: npm lockfile; update through npm tooling, not manual edits.
 - `.github/workflows/publish.yml`: trusted-publishing npm release workflow for version tags.
-- `README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`: user-facing install, credential, usage, and release notes.
+- `README.md`, `README_EN.md`: concise bilingual landing pages with project value, tool selection, behavior and safety boundaries, plus prominent links to the canonical setup and tool references; they do not duplicate end-user installation or configuration methods.
+- `docs/client-setup.md`, `docs/client-setup.en.md`: canonical bilingual source for the Agent installation prompt, npm/global/source installation, all supported MCP client configurations, credential setup and login validation, and optional runtime configuration.
+- `docs/tool-reference.md`, `docs/tool-reference.en.md`: exhaustive bilingual tool behavior, examples, errors, and request-control reference.
+- `assets/readme/`: local bilingual README hero artwork shipped with the npm package.
+- `CHANGELOG.md`, `CHANGELOG_EN.md`: bilingual release notes.
 
 Before release-oriented work, verify local package state with `npm pack --dry-run`, live registry state with `npm view`, and remote release/Actions state with `gh` or GitHub tooling.
 

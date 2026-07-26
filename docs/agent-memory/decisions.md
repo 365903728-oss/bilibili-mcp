@@ -249,3 +249,7 @@
 - Decision: Refresh body-parser and fast-uri inside their existing compatible ranges, but do not override the MCP SDK's Hono 1.x dependency with Hono 2.
 - Reason: The compatible refresh clears three advisories without changing declarations or runtime support. Hono 2 fixes the remaining advisory but requires Node 20; the project supports Node 18 and does not import the vulnerable `serveStatic` path.
 - Evidence: GitHub Issue #19, official npm metadata, upstream MCP SDK Issues #2531/#2548, Node 18 official SDK stdio acceptance, and `docs/research/2026-07-26-v1.8.0-production-dependency-advisory-triage.md`.
+
+- Decision: Use `docs/client-setup.md` and `docs/client-setup.en.md` as the single complete source for end-user installation and configuration; the READMEs only provide prominent entry links.
+- Reason: Keeping Agent prompts, client-specific syntax, credential setup, validation, and runtime settings in one guide prevents drift while preserving a concise project homepage.
+- Evidence: The user explicitly selected this information architecture; the bilingual READMEs and client setup guides implement it.
