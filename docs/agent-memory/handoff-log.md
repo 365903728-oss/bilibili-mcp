@@ -207,3 +207,19 @@
 - Paseo result: Agent `b1a74bc2-d032-4ada-996b-48c5585f02dc` was launched with the live `providers.impl` value but stopped immediately because Claude Code was not logged in. It made no file changes, produced no Claude report, and was archived. Codex completed the same bounded handoff directly rather than fabricating a Claude report.
 - Review: Independent Standards and Spec reviews found no code, schema, security, scope, or smell defect. Their three workflow/test gaps were repaired by adding generic-error coverage, the required QA checklist, and accurate codemap entries.
 - Result: Focused tests pass 39/39, the full suite passes 290/290, build and package dry run pass, and credentialed SDK/Codex acceptance passes against `BV1vL411G7N7`. SDK 1.27.1 proves exact equality between parsed legacy text and `structuredContent`; Codex CLI 0.144.6 displays the legacy JSON without output-schema validation failure. The implementation was committed as `29f663a`; no version, changelog, release, or publication occurred.
+
+## 2026-07-26 v1.8.0 Source Preparation
+
+- Owner: Codex created GitHub Issue #18, two research records, and the bounded Codex-to-Claude handoff, then launched Paseo agent `069a39a6-c109-488a-a29f-c2db5303a851` with the user-selected `claude/glm-5.2[1m]`.
+- Objective: Prepare package/lock version `1.8.0`, bilingual release notes, README release links, QA, and Harness memory for the already-merged structured transcript output and evidence links without changing product behavior or publishing.
+- Paseo result: GLM completed the version and partial documentation edits, then hit the provider's five-hour HTTP 429 quota before README_EN, delegated reviews, verification, and the Claude report. Codex did not fabricate a Claude report or switch providers; it wrote `2026-07-26-v1.8.0-release-prep-codex-fallback-report.md` after inspecting the full log and completing only the same scope.
+- Review: Independent package-maintainer and release-verifier checklists found the release diff and package boundary correct. Codex separately triaged four newly reported production advisories as currently not actionable on the stdio-only, fixed-schema product path, while retaining them as explicit residual risk.
+- Result: Package parity, build, 299 tests, 124-file package dry run, official SDK stdio and credentialed ordinary/multi-Part transcript calls, UTF-8, secret-pattern, and diff checks passed. The GLM agent was archived. After explicit user authorization, commit `8cad77c` was pushed to `origin/master` and Issue #18 was closed. No tag, workflow dispatch, npm publication, or GitHub Release occurred.
+
+## 2026-07-26 Production Dependency Refresh
+
+- Owner: Codex researched and implemented GitHub Issue #19 after the user explicitly selected Codex because GLM had no remaining quota.
+- Objective: Clear the body-parser and fast-uri production advisories without adding direct dependencies, overrides, an SDK upgrade, or a Node support change.
+- Result: The lockfile now resolves body-parser 2.3.0, fast-uri 3.1.4, type-is 2.1.0, and two required nested content-type 2.0.0 copies. Build, 299 tests, current-Node and Node 18 official SDK stdio checks, credentialed ordinary/multi-Part calls, package, audit, UTF-8, secret, diff, and two independent review gates passed.
+- Residual: One underlying moderate Hono `serveStatic` advisory remains statically unreachable. Forcing patched Hono 2 would break Node 18 support, so upstream SDK Issues #2531/#2548 remain the correct owner.
+- Delivery: After explicit user authorization, commit `2c87750` was pushed separately to `origin/master` and Issue #19 was closed. Issue #20 tracks the root/package Node engine-floor mismatch found during review.

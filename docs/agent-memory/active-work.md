@@ -2,9 +2,9 @@
 
 Workflow: Matt Pocock skills with GitHub Issues, bounded Codex-to-Claude handoffs, and Paseo CLI execution.
 
-Active work: none. GitHub Issue #17, citation-ready `get_video_transcript` evidence links, is complete and closed.
+Active work: GitHub Issues #18 and #19 are delivered to `master` and closed. GitHub Issue #20 is the next untriaged compatibility follow-up.
 
-Status: Paseo ran the bounded implementation with `claude/glm-5.2[1m]`; focused and full tests, build, official SDK stdio calls, credentialed ordinary/multi-Part transcript calls, live Playwright navigation, package dry run, diff check, and two independent reviews passed. Commit `7a6f79d` is on `master` and `origin/master`, and Issue #17 is closed. Version `1.7.2` remains the published npm/GitHub release; no version, changelog, tag, or release change occurred.
+Status: Commits `8cad77c` (v1.8.0 source preparation) and `2c87750` (production dependency refresh) are on `origin/master`. Package/lock version is `1.8.0`; build and all 299 tests passed immediately before push. Three production advisories are cleared, while one underlying moderate Hono `serveStatic` advisory remains statically unreachable and awaits an upstream Node 18-compatible SDK fix. Version `1.7.2` remains the published npm/GitHub release, and the README links remain on that real release until v1.8.0 publication is separately authorized.
 
 Codex launches and reviews one bounded Claude Code implementation agent through Paseo. The user does not manually transfer prompts between Codex and Claude Code.
 

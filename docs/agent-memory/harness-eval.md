@@ -192,3 +192,76 @@ Remove or stop using:
 - The existing one-agent preparation plus Codex release gates caught a missing text-length guard before publication and kept the generated learning queue out of both commits.
 - Current official npm/GitHub checks confirmed the existing OIDC workflow needed no edit; the tag-triggered release passed without repair.
 - Keep the same bounded handoff and independent final verification. Do not add another release layer; report accuracy and scoped staging remain the useful controls.
+
+### 2026-07-26 Harness Eval: v1.8.0 source preparation
+
+#### Period
+
+- Start/End: 2026-07-26
+- Related task: GitHub Issue #18
+
+#### Signals
+
+Useful positive signals:
+
+- Commit-pinned source-learning and current official docs prevented an unnecessary semantic-release migration or GitHub Actions upgrade.
+- The explicit GLM override was honored even though Paseo's default implementation preference pointed elsewhere.
+- The handoff's narrow file list made the quota-interrupted GLM diff easy to attribute and complete without overlapping runtime work.
+- Independent package/release review confirmed version parity, unchanged dependency graph and entry points, and the 124-file publish boundary.
+- The production audit gate caught four new advisories; explicit source-to-sink triage separated installed vulnerability metadata from current product exploitability.
+- The SDK contract check caught a wrong harness expectation for tool order before it could be misreported as a product regression.
+
+Useful negative signals:
+
+- GLM's five-hour quota stopped the agent before README_EN, subagent reviews, verification, and the required Claude report.
+- The npm CLI's response-decoding failure made a nominal one-command audit gate insufficient; the official advisory payload and reachability conclusion needed separate evidence.
+- The release-preparation documentation layer is substantial for six bounded release-file edits, although most of the extra volume came from new security evidence and the provider failure.
+
+#### Keep / Change / Remove
+
+Keep:
+
+- One bounded Paseo implementation agent, user-selected provider override, file-backed handoff, independent Codex verification, official SDK acceptance, package inspection, and explicit generated-learning exclusion.
+- Current official documentation and commit-pinned source-learning before modifying a release mechanism.
+
+Change:
+
+- Treat a failed audit transport as an unresolved gate until the official advisory payload is recovered and triaged; never translate command failure into “zero vulnerabilities.”
+- When a provider quota stops a bounded agent, retain the provider choice, preserve its logs, use a clearly named top-level same-scope fallback report, and do not fabricate a provider-authored report.
+- Validate custom smoke-test expectations against existing contract tests before diagnosing product behavior.
+
+Remove or stop using:
+
+- Do not retry a quota-limited provider indefinitely or silently switch to another implementation model.
+
+#### Candidate Metrics
+
+- task-ticket uses: 1 GitHub Issue
+- research notes created: 2
+- QA checklists created: 1
+- independent read-only reviews: 2
+- production advisories caught before publication: 4
+- codemap checks unchanged: 1
+- provider failures requiring documented fallback: 1
+- generated learning proposals promoted: 0
+
+#### Memory Updates Needed
+
+- [x] `project-facts.md`
+- [x] `decisions.md`
+- [ ] `lessons-learned.md`
+- [x] `handoff-log.md`
+- [x] `verification-log.md`
+- [ ] `codemap.md` — checked unchanged
+- [ ] `harness-security.md` — checklist applied; no rule change required
+
+### 2026-07-26 Harness Eval: Issue #19 dependency remediation
+
+- The security gate prevented a misleading “zero vulnerabilities” claim and separated compatible lock refreshes from an unsafe Hono major override.
+- Two read-only Codex reviewers converged on the same minimal fix before mutation; no new test or abstraction was needed.
+- GLM produced no activity during bounded waits. After the user explicitly selected Codex, continuing directly avoided another artificial stop while preserving the provider decision in the report.
+- Node 18 Vitest failed for a development-tool reason; switching to the official SDK runtime boundary proved the supported user path without weakening the check.
+- Keep: ticket, bounded handoff, source-to-sink triage, package graph evidence, real stdio check, and explicit residual risk.
+- Change: when the user supplies a fallback executor, continue through the same handoff rather than ending at the provider boundary. Require reports to enumerate the complete lockfile closure, and keep README release links on the latest real Release until publication creates the new one.
+- Follow-up: Issue #20 records the pre-existing difference between the root Node `>=18.0.0` declaration and Hono's Node `>=18.14.1` floor.
+- Delivery: explicit Git authorization produced separate #18/#19 commits, preserving the reviewer's scope boundary; publication remained a distinct authorization gate.

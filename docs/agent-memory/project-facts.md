@@ -211,3 +211,15 @@
 - Fact: The source implementation adds a Part-aware `source_url` to every successful `get_video_transcript` result and a `timestamp_url` to every returned `Transcript Match`.
 - Evidence: Commit `7a6f79d`, `src/bilibili/subtitle.ts`, `src/bilibili/types.ts`, `src/server/tool-schemas.ts`, 299 passing tests, official SDK 1.27.1 credentialed calls, live Playwright checks, and `docs/qa/2026-07-26-transcript-evidence-links.md`.
 - Impact: Agents can open the exact Bilibili Video or Part and cited subtitle moment without reconstructing browser URLs. BVID casing is preserved, the other seven tools and all errors remain unchanged; Issue #17 is closed while npm publication remains at `1.7.2`.
+
+- Fact: `origin/master` contains the v1.8.0 source preparation and compatible dependency refresh without a runtime-source, test, direct-dependency, package-entry, Node-support, or publish-workflow change.
+- Evidence: Commits `8cad77c` and `2c87750`, the 299-test suite, Node 18 and current-Node official SDK stdio acceptance, build, 124-file package dry run, and `docs/qa/2026-07-26-v1.8.0-release-prep.md`.
+- Impact: Git delivery is complete. npm and the current GitHub Release remain `1.7.2` until publication receives separate authorization.
+
+- Fact: The v1.8.0 lockfile resolves `body-parser` 2.3.0 and `fast-uri` 3.1.4, clearing three production advisories; one underlying moderate Hono advisory remains.
+- Evidence: `npm ls`, `npm explain`, `npm audit --omit=dev --json`, upstream SDK Issues #2531/#2548, and the advisory research note.
+- Impact: Preserve Node 18 instead of forcing Hono 2. The residual `serveStatic` path is absent from the SDK and this stdio-only server; re-evaluate when upstream widens its dependency range or if an HTTP/static-file surface is introduced.
+
+- Fact: The root package declares Node `>=18.0.0`, while installed `@hono/node-server` 1.19.14 declares Node `>=18.14.1`; the verified shipped-runtime smoke used Node 18.20.8.
+- Evidence: The two package manifests, the Node 18.20.8 official SDK stdio acceptance, independent Issue #19 risk review, and GitHub Issue #20.
+- Impact: Do not claim the untested Node 18.0.0–18.14.0 range is verified. Resolve the public engine floor in its own bounded compatibility ticket rather than changing Issue #18/#19 scope.
