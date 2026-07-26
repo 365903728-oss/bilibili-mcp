@@ -4,7 +4,7 @@
 
 - Title: `get_video_transcript` citation-ready Bilibili links
 - Date: 2026-07-26
-- Version or commit: package `1.7.2`, base commit `d4b06e5d8f8c9dfd7b217286bd2705a95164bfe2`, uncommitted Issue #17 worktree
+- Version or commit: package `1.7.2`, source commit `7a6f79d454d07691f6212dd47bce39e9717e0b98`
 - Owner: Codex
 - Related ticket and PRD: GitHub Issue #17 and `docs/transcript-evidence-links-prd.md`
 - QA type: `MCP tool change`
@@ -88,6 +88,6 @@ Out of scope:
 - Overall result: `pass`
 - Blocking issues: none
 - Non-blocking caveats: Bilibili browser query behavior is external and should be refreshed under the research note's staleness conditions.
-- Tracker state: Issue #17 remains open with `ready-for-human`, pending explicit Git authorization.
+- Tracker state: Issue #17 is closed as completed after commit `7a6f79d` reached `origin/master`.
 - Codemap update status: checked; no module ownership or navigation change, so no update required.
 - Research note: `docs/research/2026-07-26-bilibili-timestamp-link-contract.md`

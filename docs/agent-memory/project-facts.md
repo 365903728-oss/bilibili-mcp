@@ -208,6 +208,6 @@
 
 ## 2026-07-26
 
-- Fact: The verified Issue #17 worktree adds a Part-aware `source_url` to every successful `get_video_transcript` result and a `timestamp_url` to every returned `Transcript Match`.
-- Evidence: `src/bilibili/subtitle.ts`, `src/bilibili/types.ts`, `src/server/tool-schemas.ts`, 299 passing tests, official SDK 1.27.1 credentialed calls, live Playwright checks, and `docs/qa/2026-07-26-transcript-evidence-links.md`.
-- Impact: Agents can open the exact Bilibili Video or Part and cited subtitle moment without reconstructing browser URLs. BVID casing is preserved, the other seven tools and all errors remain unchanged, and the local result is pending explicit Git authorization.
+- Fact: The source implementation adds a Part-aware `source_url` to every successful `get_video_transcript` result and a `timestamp_url` to every returned `Transcript Match`.
+- Evidence: Commit `7a6f79d`, `src/bilibili/subtitle.ts`, `src/bilibili/types.ts`, `src/server/tool-schemas.ts`, 299 passing tests, official SDK 1.27.1 credentialed calls, live Playwright checks, and `docs/qa/2026-07-26-transcript-evidence-links.md`.
+- Impact: Agents can open the exact Bilibili Video or Part and cited subtitle moment without reconstructing browser URLs. BVID casing is preserved, the other seven tools and all errors remain unchanged; Issue #17 is closed while npm publication remains at `1.7.2`.
