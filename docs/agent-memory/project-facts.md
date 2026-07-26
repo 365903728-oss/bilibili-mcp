@@ -232,10 +232,14 @@
 - Evidence: `src/bilibili/search.ts`, tool schema/handler changes, 327 passing tests, the 128-file package dry run, official SDK 1.27.1 nine-tool discovery, and the real `BV1Eb411u7Fw` search-to-Part-4 timestamp workflow recorded in `docs/qa/2026-07-26-bilibili-video-search.md`.
 - Impact: An Agent can start from a topic and pass a returned BVID into existing evidence tools without pagination, AI re-ranking, or automatic subtitle/comment requests. This behavior is published in `v1.9.0`; Issue #21 is closed.
 
-- Fact: v1.9.0 is the current npm latest and GitHub Release.
+- Fact: v1.9.0 was the published baseline immediately before the documentation-only v1.9.1 refresh.
 - Evidence: Commit `b77c3fc`, annotated tag `v1.9.0`, successful Actions run `30195477401`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, and the non-draft/non-prerelease GitHub Release.
-- Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.9.0` or `@latest`. Issue #20 remains a separate compatibility follow-up.
+- Impact: Retain this as historical release evidence; current install guidance uses the newer release recorded below. Issue #20 remains a separate compatibility follow-up.
 
 - Fact: Source version `1.9.1` is a documentation-only preparation that centralizes installation/configuration in bilingual guides and ships two GitHub-safe SVG heroes.
 - Evidence: Bilingual README/setup/tool-reference documents, package version consistency, 327 passing tests, build, 134-file package dry run, README/SVG audits, and credential-pattern scanning.
 - Impact: MCP tools and runtime behavior are unchanged. A source push alone does not change npm latest or create a GitHub Release; publication still requires the separate tag-driven workflow.
+
+- Fact: v1.9.1 is the current npm latest and GitHub Release.
+- Evidence: Annotated tag `v1.9.1` at `5cdd47b`, successful Actions run `30205162304`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, and the non-draft/non-prerelease GitHub Release.
+- Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.9.1` or `@latest`; all nine MCP tools and runtime behavior remain unchanged.

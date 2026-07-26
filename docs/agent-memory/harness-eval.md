@@ -278,3 +278,9 @@ Remove or stop using:
 - Explicit staged-file enumeration kept the review-gated learning proposal out of the 30-file immutable release commit; the unchanged trusted-publishing workflow passed without repair.
 - The post-publish CLI check initially produced a false alarm because same-repository `npm exec` resolved a global shim. Repeating it from an empty external directory and recording `where.exe` output distinguished harness contamination from a package defect before an unnecessary patch release.
 - Keep: direct-executor overrides, tag-SHA checks, live npm provenance, delayed README links, and isolated published-package CLI checks. Change: require the CLI smoke to run outside the checkout. Remove: no additional release layer.
+
+### 2026-07-26 Harness Eval: v1.9.1 publication
+
+- One read-only release-verifier plus exact tag-SHA, package, production-audit, and secret gates was sufficient for this documentation-only patch.
+- Current official npm/GitHub guidance confirmed the existing OIDC workflow remained valid; the tag-triggered run published with provenance without a workflow change.
+- The isolated published-package smoke avoided same-repository binary contamination. Keep the current release sequence; track newly disclosed development-tool advisories separately instead of broadening a documentation release.
