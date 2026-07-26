@@ -6,6 +6,7 @@ import { BilibiliAPIError, NoSubtitleError, PaidVideoError } from "../utils/erro
 import { logger, redactSecrets } from "../utils/logger.js";
 import type {
   BilibiliSubtitleItem,
+  PartInfo,
   SubtitleBodyItem,
   TranscriptMatch,
   TranscriptSearchOptions,
@@ -161,6 +162,7 @@ function searchTranscript(
   query: string,
   maxMatches: number,
   contextSegments: number,
+  sourceUrl: string,
 ): {
   matches: TranscriptMatch[];
   totalMatches: number;
@@ -193,11 +195,15 @@ function searchTranscript(
       contextIndices.add(j);
     }
 
+    const timestampUrl = new URL(sourceUrl);
+    timestampUrl.searchParams.set("t", String(hit.from));
+
     matches.push({
       start_seconds: hit.from,
       end_seconds: hit.to,
       content: hit.content,
       context: mergeSubtitleText(body.slice(start, end + 1), true),
+      timestamp_url: timestampUrl.toString(),
     });
   }
 
@@ -209,6 +215,23 @@ function searchTranscript(
     totalMatches,
     compactTranscript: mergeSubtitleText(compactBody, true),
   };
+}
+
+/**
+ * 构建 Part-aware Bilibili 浏览器源 URL。
+ * 单 P 视频不附加 `p`；多 P 视频附加 `p=<resolved page>`。
+ * 保留 extractBVId 返回的精确大小写。
+ */
+function buildTranscriptSourceUrl(
+  bvid: string,
+  pages: PartInfo[],
+  resolvedPage: number,
+): string {
+  const url = new URL(`https://www.bilibili.com/video/${bvid}/`);
+  if (pages.length > 1) {
+    url.searchParams.set("p", String(resolvedPage));
+  }
+  return url.toString();
 }
 
 /**
@@ -237,6 +260,8 @@ export async function getVideoTranscriptData(
   const { cid, pages, videoData } = await resolvePartCid(bvidOrUrl, page);
   const title = videoData.title;
   const description = videoData.desc || "";
+  const resolvedPage = page ?? matchPartIdentity(videoData.cid, pages, videoData.title).page;
+  const sourceUrl = buildTranscriptSourceUrl(bvid, pages, resolvedPage);
 
   // 获取字幕列表
   try {
@@ -258,7 +283,8 @@ export async function getVideoTranscriptData(
           data_source: "description",
           transcript: description,
           title,
-          page: page ?? matchPartIdentity(videoData.cid, pages, videoData.title).page,
+          source_url: sourceUrl,
+          page: resolvedPage,
         };
       }
       throw new NoSubtitleError(
@@ -283,7 +309,8 @@ export async function getVideoTranscriptData(
           data_source: "description",
           transcript: description,
           title,
-          page: page ?? matchPartIdentity(videoData.cid, pages, videoData.title).page,
+          source_url: sourceUrl,
+          page: resolvedPage,
         };
       }
       throw new NoSubtitleError(
@@ -307,7 +334,8 @@ export async function getVideoTranscriptData(
           data_source: "description",
           transcript: description,
           title,
-          page: page ?? matchPartIdentity(videoData.cid, pages, videoData.title).page,
+          source_url: sourceUrl,
+          page: resolvedPage,
         };
       }
       throw new NoSubtitleError(
@@ -315,7 +343,6 @@ export async function getVideoTranscriptData(
       );
     }
 
-    const resolvedPage = page ?? matchPartIdentity(videoData.cid, pages, videoData.title).page;
     const body = filterSegmentsByRange(subtitleContent.body, startSeconds, endSeconds);
 
     if (wantsSearch) {
@@ -325,6 +352,7 @@ export async function getVideoTranscriptData(
         query,
         max_matches,
         context_segments,
+        sourceUrl,
       );
 
       return {
@@ -333,6 +361,7 @@ export async function getVideoTranscriptData(
         language: bestSubtitle.lan,
         transcript: compactTranscript,
         title,
+        source_url: sourceUrl,
         page: resolvedPage,
         query,
         total_matches: totalMatches,
@@ -350,6 +379,7 @@ export async function getVideoTranscriptData(
       language: bestSubtitle.lan,
       transcript,
       title,
+      source_url: sourceUrl,
       page: resolvedPage,
     };
   } catch (error) {
@@ -369,7 +399,8 @@ export async function getVideoTranscriptData(
         data_source: "description",
         transcript: description,
         title,
-        page: page ?? matchPartIdentity(videoData.cid, pages, videoData.title).page,
+        source_url: sourceUrl,
+        page: resolvedPage,
       };
     }
     // Other errors: fallback to description if enabled, else rethrow
@@ -384,7 +415,8 @@ export async function getVideoTranscriptData(
         data_source: "description",
         transcript: description,
         title,
-        page: page ?? matchPartIdentity(videoData.cid, pages, videoData.title).page,
+        source_url: sourceUrl,
+        page: resolvedPage,
       };
     }
     throw error;

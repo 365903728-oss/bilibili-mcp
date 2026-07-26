@@ -137,6 +137,9 @@ npx -y @xzxzzx/bilibili-mcp@latest check
 - 默认不降级：无字幕时返回 `SUBTITLE_UNAVAILABLE` 错误
 - 时间戳/区间过滤/关键词搜索与描述降级不兼容：请求 timed 输出或搜索时不会静默降级
 - Cookie 失效时始终返回 `COOKIE_EXPIRED`，不静默降级
+- 证据链接：
+  - 成功结果根字段 `source_url`：指向当前选中 Part 的 Bilibili 浏览器源 URL（多 P 视频附加 `p=<page>`）
+  - 关键词搜索的每个 `matches[]` 项附带 `timestamp_url`：在 `source_url` 基础上叠加 `t=<start_seconds>`，直达命中字幕的播放时刻
 
 ### 4. 视频元数据 (`get_video_metadata`)
 - 返回视频标题、作者、时长、发布时间、描述、标签、播放/点赞/投币等统计信息

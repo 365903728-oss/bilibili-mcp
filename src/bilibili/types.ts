@@ -166,6 +166,7 @@ export interface TranscriptMatch {
   end_seconds: number;
   content: string;
   context: string;
+  timestamp_url: string;
 }
 
 // 视频转录数据类型
@@ -175,6 +176,7 @@ export interface VideoTranscriptData {
   language?: string;
   transcript: string;
   title: string;
+  source_url: string;
   page?: number;
   // search mode fields（仅当 query 存在时返回）
   query?: string;

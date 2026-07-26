@@ -2,9 +2,9 @@
 
 Workflow: Matt Pocock skills with GitHub Issues, bounded Codex-to-Claude handoffs, and Paseo CLI execution.
 
-Active work: none. GitHub Issue #16's backward-compatible `get_video_transcript` structured-output pilot is implemented in commit `29f663a`; the issue remains open with `ready-for-human` for tracker closure.
+Active work: GitHub Issue #17, citation-ready `get_video_transcript` evidence links. The Part-aware `source_url` and per-match `timestamp_url` implementation is complete and independently verified in the local worktree.
 
-Status: all planned gates pass. The stale ignored `.env` credential override was removed, a fresh process reports `source: global_config` and `logged_in: true`, SDK 1.27.1 proves exact legacy-text/structured-content equality for `BV1vL411G7N7`, and Codex CLI 0.144.6 displays the legacy JSON without output-schema failure. The exposed session still requires rotation, but product acceptance is complete and delivery to `origin/master` is authorized. Version `1.7.2` remains the published npm/GitHub release; no version or release action is authorized for Issue #16.
+Status: Paseo ran the bounded implementation with `claude/glm-5.2[1m]`; focused and full tests, build, official SDK stdio calls, credentialed ordinary/multi-Part transcript calls, live Playwright navigation, package dry run, diff check, and two independent reviews passed. Issue #17 remains open with `ready-for-human` pending explicit Git authorization. Version `1.7.2` remains the published npm/GitHub release; no commit, push, version, changelog, or release action is authorized.
 
 Codex launches and reviews one bounded Claude Code implementation agent through Paseo. The user does not manually transfer prompts between Codex and Claude Code.
 

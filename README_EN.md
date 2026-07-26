@@ -136,6 +136,9 @@ After the MCP server is connected, if available, call get_credential_setup_instr
 - By default, returns `SUBTITLE_UNAVAILABLE` error when no subtitles exist.
 - Timestamps/range filtering/keyword search is incompatible with description fallback.
 - Cookie expiration always returns `COOKIE_EXPIRED`, never silently falls back.
+- Evidence links:
+  - Root `source_url` on every successful result: browser URL of the selected Part (multi-Part videos append `p=<page>`).
+  - `timestamp_url` on each search `matches[]` item: same as `source_url` plus `t=<start_seconds>`, opening the player at the matched subtitle.
 
 ### 4. Video Metadata (`get_video_metadata`)
 - Returns video title, author, duration, publish date, description, tags, and stats (views, likes, coins, etc.).

@@ -107,6 +107,7 @@ describe("handler validation and transcript output", () => {
       transcript: "命中片段",
       title: "Structured transcript fixture",
       page: 2,
+      source_url: "https://www.bilibili.com/video/BV1T6PQzQErF/?p=2",
       query: "片段",
       total_matches: 2,
       returned_matches: 1,
@@ -117,6 +118,7 @@ describe("handler validation and transcript output", () => {
           end_seconds: 15,
           content: "命中片段",
           context: "前文 命中片段 后文",
+          timestamp_url: "https://www.bilibili.com/video/BV1T6PQzQErF/?p=2&t=12.5",
         },
       ],
     };

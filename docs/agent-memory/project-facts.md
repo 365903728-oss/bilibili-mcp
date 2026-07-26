@@ -205,3 +205,9 @@
 - Fact: The current source implementation declares the existing `VideoTranscriptData` shape as `get_video_transcript.outputSchema` and returns the same successful result as both formatted JSON text and MCP `structuredContent`.
 - Evidence: `src/server/tool-schemas.ts`, `src/server/tool-handlers.ts`, the exact schema/text/error regressions in `tests/server-tools.test.ts` and `tests/server-handler-sanitization.test.ts`, and GitHub Issue #16.
 - Impact: Structured-output clients can consume transcript evidence directly while text-oriented clients keep the existing JSON representation; the other seven tools and all error results remain text-only. Credentialed SDK 1.27.1 and Codex CLI 0.144.6 acceptance passed against `BV1vL411G7N7`; the accepted implementation is commit `29f663a` on `master`, while npm publication remains unchanged.
+
+## 2026-07-26
+
+- Fact: The verified Issue #17 worktree adds a Part-aware `source_url` to every successful `get_video_transcript` result and a `timestamp_url` to every returned `Transcript Match`.
+- Evidence: `src/bilibili/subtitle.ts`, `src/bilibili/types.ts`, `src/server/tool-schemas.ts`, 299 passing tests, official SDK 1.27.1 credentialed calls, live Playwright checks, and `docs/qa/2026-07-26-transcript-evidence-links.md`.
+- Impact: Agents can open the exact Bilibili Video or Part and cited subtitle moment without reconstructing browser URLs. BVID casing is preserved, the other seven tools and all errors remain unchanged, and the local result is pending explicit Git authorization.

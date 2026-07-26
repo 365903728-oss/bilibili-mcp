@@ -757,6 +757,131 @@ describe("getVideoTranscriptData - search rejects description fallback", () => {
   });
 });
 
+describe("getVideoTranscriptData - evidence links", () => {
+  it("builds ordinary source URL preserving exact BVID casing", async () => {
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.source_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/");
+  });
+
+  it("omits p query for single-Part videos", async () => {
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.source_url).not.toContain("?");
+  });
+
+  it("includes resolved p query for multi-Part videos", async () => {
+    mockResolvePartCid.mockResolvedValue({
+      cid: 77777,
+      videoData: defaultVideoData(),
+      pages: [
+        { page: 1, cid: 12345, title: "P1", duration: 120 },
+        { page: 2, cid: 77777, title: "P2", duration: 180 },
+      ],
+    });
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF", undefined, false, 2);
+
+    expect(result.source_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/?p=2");
+  });
+
+  it("resolves p from CID when page is omitted on a multi-Part video", async () => {
+    mockResolvePartCid.mockResolvedValue({
+      cid: 77777,
+      videoData: { title: "Test Video", desc: "Video description text", cid: 77777 },
+      pages: [
+        { page: 1, cid: 12345, title: "P1", duration: 120 },
+        { page: 2, cid: 77777, title: "P2", duration: 180 },
+      ],
+    });
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.source_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/?p=2");
+  });
+
+  it("adds exact decimal timestamp_url per search match", async () => {
+    mockGetSubtitleContent.mockResolvedValue(
+      makeFakeSubtitleContent([
+        { from: 12.5, to: 15, content: "target" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      undefined,
+      false,
+      undefined,
+      false,
+      undefined,
+      undefined,
+      searchOpts("target"),
+    );
+
+    expect(result.matches![0].timestamp_url).toBe(
+      "https://www.bilibili.com/video/BV1T6PQzQErF/?t=12.5",
+    );
+  });
+
+  it("timestamp_url inherits resolved p on a multi-Part search", async () => {
+    mockResolvePartCid.mockResolvedValue({
+      cid: 77777,
+      videoData: defaultVideoData(),
+      pages: [
+        { page: 1, cid: 12345, title: "P1", duration: 120 },
+        { page: 2, cid: 77777, title: "P2", duration: 180 },
+      ],
+    });
+    mockGetSubtitleContent.mockResolvedValue(
+      makeFakeSubtitleContent([
+        { from: 17, to: 19, content: "target" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      undefined,
+      false,
+      2,
+      false,
+      undefined,
+      undefined,
+      searchOpts("target"),
+    );
+
+    expect(result.matches![0].timestamp_url).toBe(
+      "https://www.bilibili.com/video/BV1T6PQzQErF/?p=2&t=17",
+    );
+  });
+
+  it("includes source_url on description fallback when subtitle list is empty", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(makeFakeSubtitles([]));
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF", undefined, true);
+
+    expect(result.data_source).toBe("description");
+    expect(result.source_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/");
+  });
+
+  it("includes source_url on description fallback when subtitle body is empty", async () => {
+    mockGetSubtitleContent.mockResolvedValue(makeFakeSubtitleContent([]));
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF", undefined, true);
+
+    expect(result.data_source).toBe("description");
+    expect(result.source_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/");
+  });
+
+  it("includes source_url on general-error description fallback", async () => {
+    mockGetVideoSubtitle.mockRejectedValue(new Error("Network down"));
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF", undefined, true);
+
+    expect(result.data_source).toBe("description");
+    expect(result.source_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/");
+  });
+});
+
 describe("getVideoTranscriptData - page selection", () => {
   it("calls resolvePartCid with the page number", async () => {
     await getVideoTranscriptData(

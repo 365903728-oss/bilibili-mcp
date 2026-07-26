@@ -1,5 +1,11 @@
 # Decisions
 
+## 2026-07-26
+
+- Decision: Add browser evidence links only to `get_video_transcript`: require a Part-aware `source_url` on successful results and a `timestamp_url` on each returned search match.
+- Reason: Transcript results already contain the validated BVID, resolved Part, and match start time, so both links can be derived locally with zero new Bilibili requests while keeping a single canonical source and exact evidence moment.
+- Evidence: `docs/transcript-evidence-links-prd.md`, `docs/research/2026-07-26-bilibili-timestamp-link-contract.md`, GitHub Issue #17, and live ordinary/multi-Part Playwright acceptance.
+
 ## 2026-07-25
 
 - Decision: Keep `@xzxzzx/bilibili-mcp` Bilibili-native instead of expanding this repository into a cross-platform video MCP.

@@ -32,6 +32,14 @@ _Avoid_: Semantic match, keyword occurrence
 The bounded neighboring Subtitle Segments returned before and after one Transcript Match. Context stays inside the requested Transcript Range.
 _Avoid_: Full transcript, Chapter
 
+**Source URL**:
+The canonical Bilibili browser URL for the selected Video Part. It preserves exact BVID casing and includes `p` only when Part identity must be explicit.
+_Avoid_: Download URL, subtitle URL
+
+**Timestamp URL**:
+A Source URL with `t` set to a Transcript Match's start time, opening that evidence in its selected Part.
+_Avoid_: Chapter link, inferred time
+
 **Chapter**:
 A named time interval supplied by Bilibili for one Part. Chapters are returned as provided and are never inferred by this server.
 _Avoid_: Subtitle Segment, AI chapter

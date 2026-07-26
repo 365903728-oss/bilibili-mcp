@@ -262,6 +262,7 @@ describe("MCP tool list baseline", () => {
           transcript: { type: "string" },
           title: { type: "string" },
           page: { type: "integer" },
+          source_url: { type: "string" },
           query: { type: "string" },
           total_matches: { type: "integer" },
           returned_matches: { type: "integer" },
@@ -275,17 +276,19 @@ describe("MCP tool list baseline", () => {
                 end_seconds: { type: "number" },
                 content: { type: "string" },
                 context: { type: "string" },
+                timestamp_url: { type: "string" },
               },
               required: [
                 "start_seconds",
                 "end_seconds",
                 "content",
                 "context",
+                "timestamp_url",
               ],
             },
           },
         },
-        required: ["bvid", "data_source", "transcript", "title"],
+        required: ["bvid", "data_source", "transcript", "title", "source_url"],
       });
     });
   });
