@@ -89,4 +89,4 @@ The current Vitest/Rolldown development toolchain cannot start on Node 18 becaus
 
 No commit, push, tag, workflow dispatch, npm publication, or GitHub Release was performed by this implementation.
 
-After explicit user authorization, the reviewed dependency change was delivered separately as commit `2c87750` on `origin/master`, and Issue #19 was closed. No tag, workflow dispatch, npm publication, or GitHub Release was performed.
+After explicit user authorization, the reviewed dependency change was delivered separately as commit `2c87750` on `origin/master`, and Issue #19 was closed. A later explicit publication authorization included it in annotated tag `v1.8.0`; Actions run `30193180970` published npm `1.8.0` with provenance and the GitHub Release was created.

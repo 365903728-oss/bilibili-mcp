@@ -1052,3 +1052,9 @@
 - Independent review: package and risk reviews passed after the complete lockfile closure and README publication ordering were corrected. Issue #20 records the separate Node engine-floor mismatch.
 - Completion audit: after the final build, a fresh official SDK client again listed eight tools, confirmed the exact transcript schema, observed only safe credential status fields, and passed ordinary plus multi-Part credentialed transcript calls with exact text/structured equality. An initial audit assertion omitted the contractually tested trailing URL slash; correcting the audit expectation made the unchanged product pass.
 - Git delivery: `8cad77c` and `2c87750` were pushed to `origin/master` after a fresh build and 299-test pass. Issues #18 and #19 were closed; no tag, workflow dispatch, npm publication, or GitHub Release occurred.
+
+## 2026-07-26 v1.8.0 Publication
+
+- Commands: release-verifier preflight; clean install; build; 299-test suite; production audit; 124-file package dry run; release-range secret scan; official SDK stdio smoke; annotated tag creation/push; Actions run watch; live npm metadata/provenance; exact-version CLI help; GitHub Release creation/inspection.
+- Result: Tag `v1.8.0` points to `4be845f`; Actions run `30193180970` succeeded. npm latest is `1.8.0`, integrity/shasum and SLSA provenance are present, the published CLI works, and the GitHub Release is non-draft/non-prerelease.
+- Caveat: Production audit still maps one unreachable Hono `serveStatic` advisory to two moderate nodes. GitHub Issue #20 separately tracks the pre-existing Node engine-floor mismatch. No workflow or runtime-source repair was needed.

@@ -265,3 +265,9 @@ Remove or stop using:
 - Change: when the user supplies a fallback executor, continue through the same handoff rather than ending at the provider boundary. Require reports to enumerate the complete lockfile closure, and keep README release links on the latest real Release until publication creates the new one.
 - Follow-up: Issue #20 records the pre-existing difference between the root Node `>=18.0.0` declaration and Hono's Node `>=18.14.1` floor.
 - Delivery: explicit Git authorization produced separate #18/#19 commits, preserving the reviewer's scope boundary; publication remained a distinct authorization gate.
+
+### 2026-07-26 Harness Eval: v1.8.0 publication
+
+- The final release-verifier plus exact tag-SHA check kept two excluded dirty documents out of the immutable release.
+- The unchanged tag-triggered OIDC workflow passed install, 299 tests, build, and npm publication; live registry provenance and exact-version CLI checks closed the external delivery loop.
+- Keep tag, npm, Release, README-link, and project-memory updates as ordered gates. Do not pre-link a nonexistent Release or create the GitHub Release before npm publication succeeds.

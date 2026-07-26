@@ -223,3 +223,7 @@
 - Fact: The root package declares Node `>=18.0.0`, while installed `@hono/node-server` 1.19.14 declares Node `>=18.14.1`; the verified shipped-runtime smoke used Node 18.20.8.
 - Evidence: The two package manifests, the Node 18.20.8 official SDK stdio acceptance, independent Issue #19 risk review, and GitHub Issue #20.
 - Impact: Do not claim the untested Node 18.0.0–18.14.0 range is verified. Resolve the public engine floor in its own bounded compatibility ticket rather than changing Issue #18/#19 scope.
+
+- Fact: v1.8.0 is the current npm and GitHub release.
+- Evidence: Annotated tag `v1.8.0` at `4be845f`, successful Actions run `30193180970`, npm latest/provenance metadata for `@xzxzzx/bilibili-mcp@1.8.0`, exact-version CLI smoke, and the non-draft/non-prerelease GitHub Release.
+- Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.8.0` or `@latest`; future work starts from the v1.8.0 evidence contract while Issue #20 remains separate.

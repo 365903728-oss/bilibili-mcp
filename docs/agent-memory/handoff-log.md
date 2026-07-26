@@ -223,3 +223,9 @@
 - Result: The lockfile now resolves body-parser 2.3.0, fast-uri 3.1.4, type-is 2.1.0, and two required nested content-type 2.0.0 copies. Build, 299 tests, current-Node and Node 18 official SDK stdio checks, credentialed ordinary/multi-Part calls, package, audit, UTF-8, secret, diff, and two independent review gates passed.
 - Residual: One underlying moderate Hono `serveStatic` advisory remains statically unreachable. Forcing patched Hono 2 would break Node 18 support, so upstream SDK Issues #2531/#2548 remain the correct owner.
 - Delivery: After explicit user authorization, commit `2c87750` was pushed separately to `origin/master` and Issue #19 was closed. Issue #20 tracks the root/package Node engine-floor mismatch found during review.
+
+## 2026-07-26 v1.8.0 Publication
+
+- Owner: Codex executed the user-authorized release after an independent read-only release-verifier returned GO.
+- Result: Annotated tag `v1.8.0` at `4be845f` triggered Actions run `30193180970`, which passed install, 299 tests, build, and npm trusted publication. npm latest is `1.8.0` with SLSA provenance; the exact-version CLI help smoke passed; the GitHub Release is non-draft/non-prerelease.
+- Scope boundary: The publish workflow was unchanged. The generated learning proposal and the prior structured-output QA follow-up remained outside the tag and release commits.
