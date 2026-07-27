@@ -254,10 +254,6 @@
 - Evidence: `encodeFavoritesCursor`/`decodeFavoritesCursor`, the zero-network malformed/non-canonical cursor regressions, stale-cursor regressions, and MCP `VALIDATION_ERROR` smoke coverage.
 - Impact: No Cookie, account ID, Folder title, or Video data is stored in the cursor. Traversal remains best-effort against live Bilibili state rather than snapshot-isolated.
 
-- Fact: The Favorites release candidate is not yet committed or published; npm latest remains `v1.9.1`.
-- Evidence: `git status --short`, source candidate version `1.10.0`, no local/remote `v1.10.0` tag, npm version-availability check, and the 138-entry package dry run.
-- Impact: Local verification proves the implementation, but installed users will not receive the tenth tool until the authorized commit and release chain completes.
-
-- Fact: Source package metadata is prepared as feature release `1.10.0`; the published npm/GitHub baseline remains `1.9.1` until the tag workflow completes.
-- Evidence: `package.json`, root package-lock entries, bilingual `1.10.0` changelog sections, README Favorites coverage, clean install/build, 405-test suite, 138-entry package dry run, and independent release-verifier approval.
-- Impact: The release candidate is ready for a scoped commit and tag. Do not describe `1.10.0` as published until npm and GitHub Release verification succeeds.
+- Fact: `v1.10.0` is the current npm latest and GitHub Release, publishing authenticated all-Favorites Video discovery as the tenth MCP tool.
+- Evidence: Release commit `7ff2257`, annotated tag `v1.10.0`, successful Actions run `30230653151`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, the non-draft/non-prerelease GitHub Release, and closed Issue #22.
+- Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.10.0` or `@latest`. The bilingual README describes the new capability; Issue #20 remains a separate compatibility follow-up.

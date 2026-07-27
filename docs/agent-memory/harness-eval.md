@@ -294,3 +294,11 @@ Remove or stop using:
 - Keep: one bounded implementation agent, explicit user-terminal provider semantics, GitHub Issue + handoff, redacted live SDK acceptance, independent two-axis review, and final package/privacy gates.
 - Change: capability reports must distinguish what Claude actually invoked from what Codex later supplied; test baselines must come from HEAD, and temporary live verifiers must fail closed before their evidence is accepted.
 - Remove: do not rely on provider configuration skills when the user says their terminal wrappers define reality; do not preserve account-backed smoke scripts after acceptance unless they are intentionally designed as maintained, privacy-safe tests.
+
+### 2026-07-27 Harness Eval: v1.10.0 publication
+
+- The independent read-only release verifier and explicit 38-file staging list kept the review-gated learning proposal out of the immutable release tag.
+- Current official npm/GitHub OIDC checks confirmed the existing trusted-publishing workflow remained valid; the tag-triggered run passed 405 tests, build, publication, provenance, and isolated published-package CLI gates without repair.
+- The bilingual README update shipped in the release commit, while the post-publication evidence remained a separate documentation commit.
+- Keep: exact staged-scope checks, tag-SHA verification, live npm provenance, isolated CLI smoke, and post-publish Issue closure.
+- Change: `actions/checkout@v4` and `actions/setup-node@v4` now emit a deprecated Node 20 action-runtime warning and were forced to Node 24. Refresh them in a separate bounded workflow-maintenance task; do not churn a successful immutable release.

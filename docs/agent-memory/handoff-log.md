@@ -257,4 +257,12 @@
 - Owner: Codex prepared the user-authorized feature release and used the project `release-verifier` read-only.
 - Scope: Promote the verified Favorites feature to package/lock/changelog version `1.10.0`, keep both READMEs current, preserve the existing OIDC workflow, and exclude the review-gated learning proposal.
 - Verification: Clean install, build, 25 files / 405 tests, 138-entry package boundary, production audit, official SDK ten-tool and real Favorites continuation acceptance, strict UTF-8/diff/secret scans, version/tag availability, and release-verifier review pass.
-- Boundary: Production audit retains two previously accepted moderate Hono/MCP SDK nodes with no high/critical production findings. No dependency or workflow change was introduced. Commit, push, tag, npm publication, GitHub Release, and Issue closure remain pending.
+- Boundary: Production audit retains two previously accepted moderate Hono/MCP SDK nodes with no high/critical production findings. No dependency or workflow change was introduced.
+
+## 2026-07-27 v1.10.0 Publication
+
+- Owner: Codex executed the user-authorized commit, push, tag, npm publication, GitHub Release, and Issue closure after the read-only release verifier returned no blocker.
+- Result: Release commit `7ff2257` reached `origin/master`; annotated tag `v1.10.0` triggered successful Actions run `30230653151`. npm latest is `1.10.0` with integrity, shasum, and SLSA provenance; the isolated exact-package CLI version/help smoke passed; the GitHub Release is public; and Issue #22 is closed.
+- README: `README.md` and `README_EN.md` publish the Favorites capability in the landing-page summary and tool reference.
+- Scope boundary: `pending-learning-proposals.md` remained unstaged and unpromoted, Issue #20 was unchanged, and no dependency or publish-workflow edit entered the release tag.
+- Follow-up: The successful run warned that the v4 checkout/setup-node actions target the deprecated Node 20 action runtime and were forced to Node 24. Refresh those action versions in a separate bounded workflow-maintenance task.
