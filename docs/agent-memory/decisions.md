@@ -253,3 +253,17 @@
 - Decision: Use `docs/client-setup.md` and `docs/client-setup.en.md` as the single complete source for end-user installation and configuration; the READMEs only provide prominent entry links.
 - Reason: Keeping Agent prompts, client-specific syntax, credential setup, validation, and runtime settings in one guide prevents drift while preserving a concise project homepage.
 - Evidence: The user explicitly selected this information architecture; the bilingual READMEs and client setup guides implement it.
+
+## 2026-07-27
+
+- Decision: Keep Issue #22 limited to read-only Favorites discovery and membership traversal.
+- Reason: The user only needs the MCP to expose all saved videos and their Folder context; once BVIDs are available, users or Agents can call existing subtitle/evidence tools and process the results however they choose.
+- Evidence: GitHub Issue #22, `docs/bilibili-favorites-discovery-prd.md`, and the accepted tool schema. There is no note generation, AI summarization, RAG, download, persistence, cache, or write operation.
+
+- Decision: Start Favorites discovery from the current authenticated identity, enumerate all created Folders automatically, and expose one fixed upstream page per stateless cursor call.
+- Reason: This removes the need for users to know Folder IDs while respecting Bilibili's observed 20-row resource-page limit and keeping each MCP call bounded.
+- Evidence: The nav → created/list-all → optional resource/list flow, exact request-count tests, and redacted official SDK continuation acceptance.
+
+- Decision: Preserve Favorite Membership rather than globally deduplicating BVIDs, and document traversal as live-state best effort rather than a snapshot.
+- Reason: The same Video can be intentionally saved in multiple Folders; Folder context is meaningful, while concurrent account changes can legitimately alter later pages.
+- Evidence: The two-Folder duplicate-BVID regression and bilingual tool-reference semantics.

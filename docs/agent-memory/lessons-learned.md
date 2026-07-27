@@ -155,3 +155,17 @@
 - Lesson: README SVG rows must not rely on fixed text-width offsets or share vertical space with overlapping modules.
 - Evidence: The first bilingual heroes split adjacent text with fixed `x` coordinates and placed a footer timeline inside the right proof card's vertical range, producing visible font-dependent spacing and structural overlap.
 - Future behavior: Keep titles as one text element, isolate proof modules on non-overlapping geometry, use system-font fallbacks, and inspect every full-width SVG at both 900px and 360px before acceptance.
+
+## 2026-07-27
+
+- Lesson: A normalized empty result is not the same as an empty upstream page.
+- Evidence: A non-empty Favorites `medias` page whose rows all failed normalization was initially treated as Folder exhaustion, so `has_more=true` skipped later valid pages.
+- Future behavior: Preserve raw page-exhaustion state separately from normalized output and regression-test an all-rejected non-empty page.
+
+- Lesson: Strict cursor validation must preserve both canonical encoding and the public error category through the real MCP boundary.
+- Evidence: Deep JSON/version failures initially escaped as plain errors, Node's permissive base64 decoder accepted a generated cursor with an ignored trailing sextet, and incrementing `Number.MAX_SAFE_INTEGER` could emit an undecodable next page.
+- Future behavior: Throw `ValidationError` for every decode failure, enforce canonical base64url round trips and safe-integer emission, and test malformed/overflow cursors through the public boundary.
+
+- Lesson: Debug logging can expose private identifiers even when credentials are correctly redacted.
+- Evidence: Shared HTTP debug output would have printed `up_mid`, `media_id`, and `folder_id` in params or URLs during Favorites traversal.
+- Future behavior: Treat account and private-container identifiers as sensitive in structured fields and query strings, and add redaction regressions whenever a new authenticated endpoint introduces identifier parameters.

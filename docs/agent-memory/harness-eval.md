@@ -284,3 +284,13 @@ Remove or stop using:
 - One read-only release-verifier plus exact tag-SHA, package, production-audit, and secret gates was sufficient for this documentation-only patch.
 - Current official npm/GitHub guidance confirmed the existing OIDC workflow remained valid; the tag-triggered run published with provenance without a workflow change.
 - The isolated published-package smoke avoided same-repository binary contamination. Keep the current release sequence; track newly disclosed development-tool advisories separately instead of broadening a documentation release.
+
+### 2026-07-27 Harness Eval: Issue #22 Favorites discovery
+
+- The user's actual `GLM`/`DeepSeek` terminal functions were more authoritative than two possibly stale configuration skills. Resolving those functions prevented another incorrect model assumption. GLM was used first and DeepSeek only after a real five-hour quota response.
+- The file-backed Issue #22 handoff kept the provider switch within one frozen scope and prevented note generation, RAG, persistence, or automatic subtitle work from entering the implementation.
+- Claude's first review and report missed multiple correctness/privacy gaps and misstated the baseline test count. Independent Standards/Spec review plus failing-first Codex regressions caught filtered-page data loss, error-category drift, stale cursors, permissive/overflowing cursor encoding, Folder-title contract drift, debug identifier leakage, and false coverage claims.
+- The initial account-backed smoke verifier could have produced a false green and was not a durable product artifact. Codex hardened it, reran the real SDK path, then removed it after recording only bounded aggregate evidence.
+- Keep: one bounded implementation agent, explicit user-terminal provider semantics, GitHub Issue + handoff, redacted live SDK acceptance, independent two-axis review, and final package/privacy gates.
+- Change: capability reports must distinguish what Claude actually invoked from what Codex later supplied; test baselines must come from HEAD, and temporary live verifiers must fail closed before their evidence is accepted.
+- Remove: do not rely on provider configuration skills when the user says their terminal wrappers define reality; do not preserve account-backed smoke scripts after acceptance unless they are intentionally designed as maintained, privacy-safe tests.

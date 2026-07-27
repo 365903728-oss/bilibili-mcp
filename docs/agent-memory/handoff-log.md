@@ -243,3 +243,18 @@
 - Owner: Codex executed the user-authorized release directly; no Claude Code, Paseo, GLM, or Kimi implementation agent was used.
 - Result: Commit `b77c3fc` reached `master`; annotated tag `v1.9.0` triggered Actions run `30195477401`, which passed install, 327 tests, build, and npm trusted publication. npm latest is `1.9.0` with SLSA provenance, the isolated exact-package CLI version/help smoke passed, the GitHub Release is non-draft/non-prerelease, and Issue #21 is closed.
 - Scope boundary: The publish workflow and Issue #20 were unchanged. The pre-existing review-gated learning proposal remained unstaged and unpromoted.
+
+## 2026-07-27 Authenticated Bilibili Favorites Discovery
+
+- Owner: Codex created GitHub Issue #22, the PRD, Bilibili API research note, commit-pinned Star-Owner source-learning note, and bounded Codex-to-Claude handoff.
+- Provider routing: Codex used the user's real `GLM` terminal semantics first. The GLM agent reached a confirmed five-hour quota response; only then did Codex switch to an explicit DeepSeek provider matching the user's `DeepSeek` terminal semantics. No repository model setting was added.
+- Implementation: Claude Code completed the main scoped change and returned `docs/agent-memory/handoffs/2026-07-27-bilibili-favorites-discovery-claude-report.md`. Codex did not edit overlapping files while the bounded implementation agent was active.
+- Review: Independent Standards/Spec review found filtered-page continuation loss, deep cursor error misclassification, stale-cursor behavior on an empty normalized Folder list, non-canonical base64 tolerance, debug identifier exposure, and several coverage/documentation gaps. Codex added failing-first regressions and repaired each issue within the frozen scope.
+- Result: The tenth MCP tool, 405-test suite, build, 138-entry package boundary, redacted official SDK first/continuation acceptance, diff integrity, and scoped privacy checks pass. The pre-existing learning-proposal modification remains untouched. No commit, push, PR, version bump, Issue closure, release, or publication occurred.
+
+## 2026-07-27 v1.10.0 Source Preparation
+
+- Owner: Codex prepared the user-authorized feature release and used the project `release-verifier` read-only.
+- Scope: Promote the verified Favorites feature to package/lock/changelog version `1.10.0`, keep both READMEs current, preserve the existing OIDC workflow, and exclude the review-gated learning proposal.
+- Verification: Clean install, build, 25 files / 405 tests, 138-entry package boundary, production audit, official SDK ten-tool and real Favorites continuation acceptance, strict UTF-8/diff/secret scans, version/tag availability, and release-verifier review pass.
+- Boundary: Production audit retains two previously accepted moderate Hono/MCP SDK nodes with no high/critical production findings. No dependency or workflow change was introduced. Commit, push, tag, npm publication, GitHub Release, and Issue closure remain pending.

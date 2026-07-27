@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  让 Codex、Claude、Cursor 等 AI 客户端直接搜索 Bilibili，并读取字幕、时间定位、元数据、章节与热门评论。
+  让 Codex、Claude、Cursor 等 AI 客户端直接搜索 Bilibili 或读取当前账号收藏夹，并获取字幕、时间定位、元数据、章节与热门评论。
 </p>
 
 <p align="center">
@@ -47,6 +47,7 @@ Agent 安装提示词、全部客户端配置位置、CLI / JSON / TOML 示例�
 | 目标 | 工具 | 返回重点 |
 |---|---|---|
 | 只有主题，还没有视频链接 | `search_bilibili_videos` | 最多 10 个普通视频候选及可继续调用的 BVID |
+| 从我的 Bilibili 收藏夹开始读取 | `list_bilibili_favorite_videos` | 当前账号下所有创建的收藏夹的分页视频；按 `next_cursor` 翻页直到结束 |
 | 获取纯字幕或定位关键词 | `get_video_transcript` | 转录文本、语言、时间戳、区间过滤、关键词上下文与证据链接 |
 | 让 AI 总结视频 | `get_video_info` | 字幕优先；无字幕时可返回标题、简介和标签 |
 | 查看结构化视频信息 | `get_video_metadata` | 标题、作者、时长、发布时间、标签、统计数据和多 P 列表 |
@@ -60,15 +61,16 @@ Agent 安装提示词、全部客户端配置位置、CLI / JSON / TOML 示例�
 
 ### 关键能力
 
-- **先发现、再阅读**：按主题搜索普通视频候选，再把返回的 BVID 交给字幕、元数据、章节或评论工具。
+- **先发现、再阅读**：按主题搜索普通视频候选，或从当前账号的收藏夹分页发现视频，再把返回的 BVID 交给字幕、元数据、章节或评论工具。
 - **可验证的字幕证据**：支持多 P、语言偏好、时间戳、时间区间和关键词上下文；命中项包含可直达播放时刻的 `timestamp_url`。
-- **结构化输出**：视频搜索和转录成功结果同时提供兼容文本与 MCP `structuredContent`。
+- **结构化输出**：视频搜索、视频转录和收藏夹分页的成功结果同时提供兼容文本与 MCP `structuredContent`。
 - **明确的失败语义**：区分凭证失效、无字幕、访问受限、限流、超时和其他 API 错误，并给出下一步建议。
 - **安全的凭证助手**：检查凭证状态时不返回 `SESSDATA`、`bili_jct`、`DedeUserID` 或完整 Cookie。
 
 ## 🧭 行为边界
 
 - 视频搜索要求已配置且有效的 Bilibili 登录 Cookie，不提供匿名降级。
+- 收藏夹发现要求已登录的当前账号身份，每次调用仅返回一个上游 20 条资源页；`next_cursor` 是无状态、版本化的不透明令牌，仅包含下一个 Folder 与页码，不会编码 Cookie、账号 ID、Folder 标题或视频数据。
 - `get_video_transcript` 默认在无字幕时返回 `SUBTITLE_UNAVAILABLE`；只有显式设置 `fallback_to_description: true` 才会退回简介。
 - 时间戳、区间过滤和关键词搜索不会静默退回简介，避免把描述误当作字幕证据。
 - 章节来自 Bilibili 创作者或平台数据；没有章节时返回空列表，不推断章节。

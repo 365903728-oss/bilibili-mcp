@@ -2,13 +2,14 @@
 
 [返回中文 README](../README.md) · [English](./tool-reference.en.md) · [客户端接入](./client-setup.md)
 
-本页保存 9 个 MCP 工具的详细行为、参数、示例、错误结构和运行时请求控制。安装与首次调用请先看项目 README。
+本页保存 10 个 MCP 工具的详细行为、参数、示例、错误结构和运行时请求控制。安装与首次调用请先看项目 README。
 
 ## 快速选择
 
 | 目标 | 推荐工具 | 返回重点 |
 |---|---|---|
 | 只有主题，还没有视频链接 | `search_bilibili_videos` | 最多 10 个普通视频候选及可继续调用的 BVID；不自动抓取字幕或评论 |
+| 从我的 Bilibili 收藏夹开始读取 | `list_bilibili_favorite_videos` | 当前账号所有创建的收藏夹的一页视频（最多 20 条），按 `next_cursor` 翻页直到结束；不读取字幕、评论或下载 |
 | 想让 AI 总结一个视频 | `get_video_info` | 字幕优先；无字幕时返回标题、简介、标签 |
 | 只想拿完整转录文本或关键词定位 | `get_video_transcript` | 纯字幕文本、语言、数据来源；支持时间戳、区间过滤和关键词搜索 |
 | 想查看标题、作者、播放量等结构化信息 | `get_video_metadata` | 标题、作者、时长、发布时间、标签、统计数据、多P分集列表（`pages`） |
@@ -76,13 +77,28 @@
 - 候选只包含可选择和传给现有工具的元数据，不自动获取字幕、评论，也不进行 AI 重排。
 - 必须先配置且登录 Bilibili Cookie；成功结果同时提供格式化 JSON 文本和内容相同的 MCP `structuredContent`。
 
-### 7. 凭证助手工具
+### 7. 收藏夹发现 (`list_bilibili_favorite_videos`)
+
+- 从当前已登录账号自动发现所有创建的收藏夹，逐 Folder 逐页返回其中的视频成员。
+- 每次调用最多返回上游一页（固定 20 条）；`next_cursor` 是不透明、无状态、版本化的 base64url 令牌，仅包含下一个 Folder 与页码。
+- 游标在所有网络请求前严格校验：类型、长度（1-256）、字符集（仅 base64url）、JSON 结构、版本、正整数 Folder ID 与页码。
+- 续读规则：当前 Folder 的 `has_more=true` 时游标指向同 Folder 下一页；上游返回空 `medias`（即使 `has_more=true`）或 `has_more=false` 时，游标指向下一个 Folder 的第 1 页；最后一个 Folder 的最后页省略 `next_cursor`。
+- 同一 BVID 出现在多个 Folder 中时，会在各自 Folder 上下文中各返回一次（“收藏成员关系”语义）；本 MCP 不做跨 Folder 去重。
+- `skipped_count` 报告上游返回但无法安全规范化的行数（如无效 BVID、空标题）；不会触发额外的替换请求。
+- 上游的 `media_count` 只是 Bilibili 报告的计数，可能高于当前可见或可调用的行数，结果只保证返回上游当前页面内容。
+- 遍历是对 Bilibili 当前实时状态的 best-effort 读取，不提供快照隔离；续读期间新增、删除或移动收藏成员可能导致顺序或可见结果变化。
+- 不持久化、不缓存、不下载、不抓取字幕/评论/章节/搜索结果；不会发起匿名降级请求。
+- 必须先配置且登录 Bilibili Cookie；成功结果同时提供格式化 JSON 文本和内容相同的 MCP `structuredContent`。
+- 可选参数：
+  - `cursor`: 上一次成功调用返回的不透明续读令牌。首次调用请省略。
+
+### 8. 凭证助手工具
 
 - `get_credential_setup_instructions`: 返回安全的 Bilibili Cookie 配置命令和说明。AI agent 安装此 MCP 后可调用此工具引导用户完成配置。
 - `check_bilibili_credentials`: 检查凭证是否已配置并处于登录状态，不返回任何 Cookie 值。配置缺失或失效时返回下一步操作指引。
 - `check_mcp_update`: 检查本地包版本与 npm latest 是否一致，并返回 `npx @latest` 或全局安装的安全更新指引。
 
-### 8. 行为说明与错误处理
+### 9. 行为说明与错误处理
 
 - **Cookie 过期智能检测**：当字幕获取为空时自动验证登录状态，区分“无字幕视频”与“凭证失效”，并抛出明确的 `COOKIE_EXPIRED` 错误，避免静默降级。
 
@@ -92,6 +108,7 @@
 - 字幕（`get_video_info`、`get_video_transcript`）在未登录时可能无法获取、不完整或返回空结果。
 - 评论（`get_video_comments`）在未登录时可能不完整、被限流或返回空列表。
 - 视频发现（`search_bilibili_videos`）强制检查已配置且有效的登录凭证；不提供匿名降级。
+- 收藏夹发现（`list_bilibili_favorite_videos`）必须从已登录的当前账号身份开始；不提供匿名降级，也不读取其他账号的公开收藏。
 - 不建议依赖无 Cookie 模式获取字幕或评论。
 
 #### Cookie 凭据来源
@@ -218,6 +235,34 @@
 ```
 
 返回内容：综合排序的普通视频候选及其 `bvid`、标题、作者、时长、发布时间、播放量、简介片段和源链接。搜索需要有效登录凭证，且不会自动读取候选视频的字幕或评论。
+
+### `list_bilibili_favorite_videos`
+
+**适合**：让 Agent 从你已登录的 Bilibili 账号开始读取全部创建的收藏夹中的视频。MCP 协议始终分页：每次调用返回上游一页（最多 20 条），Agent 按返回的 `next_cursor` 继续调用直到没有该字段为止。**不要假设一次响应包含整个账号的收藏。**
+
+请求示例（首次调用，不传 `cursor`）：
+
+```json
+{
+  "name": "list_bilibili_favorite_videos",
+  "arguments": {}
+}
+```
+
+返回内容：`folders_total`、`folder`（当前 Folder 的 `id`、`title`、`media_count`）、`page`、`videos[]`（每项含 `bvid`、`title`、`author`、`duration_seconds`、`published_at`、`favorited_at`、`source_url`）、`skipped_count`，以及可选的 `next_cursor`。账号无任何有效收藏夹时只返回 `folders_total: 0`、`videos: []`、`skipped_count: 0`。
+
+续读示例：
+
+```json
+{
+  "name": "list_bilibili_favorite_videos",
+  "arguments": {
+    "cursor": "<上一次响应中的 next_cursor>"
+  }
+}
+```
+
+> 上游返回空 `medias` 时，即使 `has_more=true`，本工具仍会把当前 Folder 视为已结束并跳到下一个 Folder 的第 1 页，避免游标循环。若游标对应的 Folder 已不再属于当前账号（例如被删除或转移），返回 `VALIDATION_ERROR` 并提示“restart without a cursor”。
 
 ### `get_video_transcript`
 

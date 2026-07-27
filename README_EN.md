@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  Search Bilibili from Codex, Claude, Cursor, and other AI clients, then retrieve transcripts, timestamps, metadata, chapters, and popular comments.
+  Search Bilibili or read the current account's Favorite Folders from Codex, Claude, Cursor, and other AI clients, then retrieve transcripts, timestamps, metadata, chapters, and popular comments.
 </p>
 
 <p align="center">
@@ -47,6 +47,7 @@ then find “tool call” in its transcript and give me a timestamp link.
 | Goal | Tool | What it returns |
 |---|---|---|
 | Start with a topic, not a video URL | `search_bilibili_videos` | Up to 10 normal-video candidates with reusable BVIDs |
+| Start from my Bilibili Favorites | `list_bilibili_favorite_videos` | One bounded page of videos from the current account's created Favorite Folders; follow `next_cursor` until it is absent |
 | Get a transcript or locate a keyword | `get_video_transcript` | Text, language, timestamps, range filters, keyword context, and evidence links |
 | Ask AI to summarize a video | `get_video_info` | Subtitles first; title, description, and tags when subtitles are unavailable |
 | Inspect structured video information | `get_video_metadata` | Title, creator, duration, publish time, tags, statistics, and multi-Part listing |
@@ -60,15 +61,16 @@ See the [tool reference](./docs/tool-reference.en.md) for complete parameters, J
 
 ### Key capabilities
 
-- **Discover, then inspect:** search by topic, then pass a returned BVID to transcript, metadata, chapter, or comment tools.
+- **Discover, then inspect:** search by topic, or page through the current account's Favorite Folders, then pass a returned BVID to transcript, metadata, chapter, or comment tools.
 - **Verifiable transcript evidence:** select a Part and language, include timestamps, filter time ranges, or search with bounded context; each match can include a direct `timestamp_url`.
-- **Structured output:** successful video search and transcript calls provide compatible text plus MCP `structuredContent`.
+- **Structured output:** successful video search, transcript, and Favorites-page calls provide compatible text plus MCP `structuredContent`.
 - **Explicit failures:** distinguish expired credentials, missing subtitles, access restrictions, rate limits, timeouts, and other API errors, with actionable recovery steps.
 - **Credential-safe helpers:** status checks never return `SESSDATA`, `bili_jct`, `DedeUserID`, or a complete Cookie.
 
 ## 🧭 Behavior boundaries
 
 - Video search requires a configured, valid Bilibili login Cookie and does not fall back to anonymous search.
+- Favorites discovery requires the current logged-in account identity, returns at most one upstream 20-row resource page per call, and the `next_cursor` is a stateless, versioned opaque token that encodes only the next Folder and page number — never Cookie values, account IDs, Folder titles, or Video data.
 - `get_video_transcript` returns `SUBTITLE_UNAVAILABLE` by default when no subtitle exists; it falls back to the description only when `fallback_to_description: true` is explicit.
 - Timestamp output, time-range filtering, and keyword search never silently fall back to a description.
 - Chapters come from Bilibili creator/platform data. The tool returns an empty list when no chapter data exists; it does not infer chapters.

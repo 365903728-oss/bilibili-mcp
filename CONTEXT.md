@@ -12,6 +12,22 @@ _Avoid_: Universal video MCP, cross-platform media gateway
 A bounded Bilibili-native lookup that turns one topic query into a small ordered set of candidate Videos. It does not automatically retrieve evidence from those Videos or search creators, series, and collections.
 _Avoid_: Recommendation engine, cross-video research, global search
 
+**Favorites Discovery**:
+A read-only, bounded traversal of Favorite Memberships belonging to the currently authenticated Bilibili account. It discovers saved Videos but does not retrieve their evidence, synchronize a database, or generate knowledge notes.
+_Avoid_: Favorites sync, knowledge base, batch transcript job
+
+**Favorite Folder**:
+A Bilibili Favorites container owned by the currently authenticated account.
+_Avoid_: Playlist URL, knowledge collection, Watch Later
+
+**Favorite Membership**:
+The relationship between one Video and one Favorite Folder. The same Video in two Favorite Folders represents two Favorite Memberships.
+_Avoid_: Unique Video, deduplicated result
+
+**Favorites Cursor**:
+An opaque continuation token that resumes a bounded Favorites Discovery traversal. It is not a Folder selector or account credential.
+_Avoid_: Folder ID, page URL, sync checkpoint
+
 **Video**:
 A Bilibili work identified by one BVID. A Video may contain one or more Parts.
 _Avoid_: Archive, post

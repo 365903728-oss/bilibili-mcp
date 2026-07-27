@@ -6,6 +6,7 @@ import {
   validateCommentSort,
   validateContextSegments,
   validateDetailLevel,
+  validateFavoritesCursor,
   validateLanguage,
   validateLength,
   validateMaxMatches,
@@ -333,6 +334,53 @@ describe("validateBoolean", () => {
   it("rejects number", () => {
     expect(() => validateBoolean(1, "flag")).toThrow(
       "flag must be a boolean",
+    );
+  });
+});
+
+describe("validateFavoritesCursor", () => {
+  it("does nothing when cursor is undefined", () => {
+    expect(() => validateFavoritesCursor(undefined)).not.toThrow();
+  });
+
+  it.each([
+    "A",
+    "A1",
+    `${"A".repeat(256)}`,
+    "abcDEF123-_",
+    "eyJ2ZXJzaW9uIjoxLCJmb2xkZXJfaWQiOjEsInBhZ2UiOjF9",
+  ])("accepts %j", (value) => {
+    expect(() => validateFavoritesCursor(value)).not.toThrow();
+  });
+
+  it.each([
+    ["number", 5],
+    ["object", {}],
+    ["null", null],
+  ])("rejects non-string cursor (%s)", (_case, value) => {
+    expect(() => validateFavoritesCursor(value)).toThrow(
+      "cursor must be a string",
+    );
+  });
+
+  it.each([
+    ["empty string", ""],
+    ["overlong string", `${"A".repeat(257)}`],
+  ])("rejects %s", (_case, value) => {
+    expect(() => validateFavoritesCursor(value)).toThrow(
+      "cursor length must be between 1 and 256",
+    );
+  });
+
+  it.each([
+    ["plus", "A+B"],
+    ["slash", "A/B"],
+    ["equals", "A=B"],
+    ["space", "A B"],
+    ["unicode", "Aé"],
+  ])("rejects non-base64url character (%s)", (_case, value) => {
+    expect(() => validateFavoritesCursor(value)).toThrow(
+      "cursor must contain only base64url characters",
     );
   });
 });

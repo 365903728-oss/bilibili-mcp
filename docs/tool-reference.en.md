@@ -2,13 +2,14 @@
 
 [Back to English README](../README_EN.md) · [简体中文](./tool-reference.md) · [Client setup](./client-setup.en.md)
 
-This page preserves detailed behavior, parameters, examples, error contracts, and runtime request controls for all nine MCP tools. Start with the project README for installation and the first successful call.
+This page preserves detailed behavior, parameters, examples, error contracts, and runtime request controls for all ten MCP tools. Start with the project README for installation and the first successful call.
 
 ## Quick selection
 
 | Goal | Recommended tool | What you get |
 |---|---|---|
 | Start from a topic without a video link | `search_bilibili_videos` | Up to 10 normal Video candidates with reusable BVIDs; no automatic subtitle or comment retrieval |
+| Start from my Bilibili Favorites | `list_bilibili_favorite_videos` | One bounded page of videos from the current account's created Favorite Folders (at most 20 rows); follow `next_cursor` until absent; no subtitles, comments, or downloads |
 | Summarize a video | `get_video_info` | Subtitles first; falls back to title, description, tags |
 | Get clean transcript text or locate keywords | `get_video_transcript` | Plain subtitle text, language, data source; supports timestamps, range filtering, and keyword search |
 | See structured metadata | `get_video_metadata` | Title, author, duration, publish date, tags, stats, multi-Part listing |
@@ -75,13 +76,28 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Candidate metadata is for selection and follow-up calls only; the tool does not fetch subtitles/comments or apply AI re-ranking.
 - Requires configured, logged-in Bilibili Cookies; success returns formatted JSON text plus identical MCP `structuredContent`.
 
-### 7. Credential Helper Tools
+### 7. Favorites Discovery (`list_bilibili_favorite_videos`)
+
+- Automatically discovers every created Favorite Folder of the currently logged-in account and walks Folder-by-Folder, page-by-page.
+- Each call returns at most one upstream resource page (fixed at 20 rows). `next_cursor` is an opaque, stateless, versioned base64url token that encodes only the next Folder ID and page number.
+- The cursor is strictly validated before any network request: type, length (1-256), charset (base64url only), JSON structure, supported version, positive safe-integer Folder ID, and positive safe-integer page.
+- Continuation rules: when the current Folder's `has_more=true`, the cursor points to the next page of the same Folder; when upstream returns an empty `medias` array (even if `has_more=true`) or when `has_more=false`, the cursor points to page 1 of the next Folder; the final Folder's terminal page omits `next_cursor`.
+- The same BVID in two Folders is returned once in each Folder context (Favorite Membership semantics); the MCP does not deduplicate across Folders.
+- `skipped_count` reports upstream rows that could not be safely normalized (for example, an invalid BVID or empty title); no replacement page is fetched.
+- Upstream `media_count` is Bilibili's reported count and may exceed the rows currently visible or callable; the response only promises the current upstream page.
+- Traversal is a best-effort read of Bilibili's live state, not a snapshot. Adding, removing, or moving memberships during continuation may change ordering or visible results.
+- No persistence, cache, download, transcript/comment/chapter/search fetch, or anonymous fallback.
+- Requires configured, logged-in Bilibili Cookies; success returns formatted JSON text plus identical MCP `structuredContent`.
+- Optional parameters:
+  - `cursor`: Opaque continuation token returned by the previous successful call. Omit on the first call.
+
+### 8. Credential Helper Tools
 
 - `get_credential_setup_instructions`: Returns safe setup commands for Bilibili Cookie configuration. AI agents installing this MCP can call this tool to guide users through setup.
 - `check_bilibili_credentials`: Checks whether credentials are configured and logged in without returning Cookie values. Returns next steps when credentials are missing or invalid.
 - `check_mcp_update`: Checks the local package version against npm latest and returns safe update guidance for `npx @latest` or global installs.
 
-### 8. Behavior and Error Handling
+### 9. Behavior and Error Handling
 
 - **Intelligent Cookie Expiration Detection**: Automatically verifies login status when subtitles are empty, distinguishing between "videos without subtitles" and "invalid credentials," and throwing a clear `COOKIE_EXPIRED` error to prevent silent degradation.
 
@@ -91,6 +107,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Subtitles (`get_video_info`, `get_video_transcript`) may be unavailable, incomplete, or fail without authentication.
 - Comments (`get_video_comments`) may be incomplete, empty, or rate-limited without authentication.
 - Video discovery (`search_bilibili_videos`) requires configured, valid login credentials and never falls back to anonymous search.
+- Favorites discovery (`list_bilibili_favorite_videos`) must start from the currently logged-in account identity; it never falls back to anonymous access and never reads another user's public Favorites.
 - Do not rely on cookie-less mode for reliable subtitle or comment access.
 
 #### Credential Sources
@@ -214,6 +231,34 @@ Request:
 ```
 
 Returns: normal Video candidates in comprehensive order with `bvid`, title, author, duration, publish time, view count, bounded description, and source URL. Search requires valid logged-in credentials and never fetches candidate subtitles or comments automatically.
+
+### `list_bilibili_favorite_videos`
+
+**Best for**: letting an Agent start from your already-logged-in Bilibili account and read every created Favorite Folder. The MCP protocol stays paginated: each call returns at most one upstream page of 20 rows, and the Agent follows the returned `next_cursor` until it is absent. **Do not assume a single response contains the full account's Favorites.**
+
+Request (first call, omit `cursor`):
+
+```json
+{
+  "name": "list_bilibili_favorite_videos",
+  "arguments": {}
+}
+```
+
+Returns: `folders_total`, `folder` (current Folder `id`, `title`, `media_count`), `page`, `videos[]` (each with `bvid`, `title`, `author`, `duration_seconds`, `published_at`, `favorited_at`, `source_url`), `skipped_count`, and optional `next_cursor`. An account with no valid created Folders returns only `folders_total: 0`, `videos: []`, `skipped_count: 0`.
+
+Continuation:
+
+```json
+{
+  "name": "list_bilibili_favorite_videos",
+  "arguments": {
+    "cursor": "<next_cursor from the previous response>"
+  }
+}
+```
+
+> When upstream returns an empty `medias` page, even with `has_more=true`, the tool treats the current Folder as complete and jumps to page 1 of the next Folder, preventing a cursor loop. If the cursor's Folder no longer belongs to the current account (deleted or transferred), the call returns `VALIDATION_ERROR` and instructs the caller to restart without a cursor.
 
 ### `get_video_transcript`
 

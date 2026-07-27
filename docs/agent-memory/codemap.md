@@ -19,7 +19,7 @@ Current tool families:
 
 - Credential setup, status, and package freshness: `get_credential_setup_instructions`, `check_bilibili_credentials`, `check_mcp_update`.
 - Video content: `get_video_info`, `get_video_transcript` (transcript and keyword search), `get_video_metadata`.
-- Video discovery: `search_bilibili_videos` (authenticated, bounded normal-Video candidates).
+- Video discovery: `search_bilibili_videos` (authenticated, bounded normal-Video candidates) and `list_bilibili_favorite_videos` (authenticated current-account Favorites traversal with a stateless opaque cursor; one upstream 20-row resource page per call).
 - Comments: `get_video_comments`.
 - Chapters: `get_video_chapters`.
 
@@ -37,6 +37,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `src/bilibili/metadata.ts`: metadata retrieval, shaping, and Part summaries.
 - `src/bilibili/chapters.ts`: Bilibili-provided Chapter (view_points) retrieval.
 - `src/bilibili/search.ts`: authenticated first-page Video search, defensive normalization, and candidate shaping.
+- `src/bilibili/favorites.ts`: authenticated current-account Favorites discovery. Stateless opaque base64url cursor encode/decode (versioned Folder ID + page only), strict canonical pre-network decoding and safe-integer emission, nav→created/list-all→at most one resource/list page per call, defensive Folder/Video normalization, and reported-count/skipped-count behavior.
 - `src/bilibili/comments-api.ts`: raw comments API access.
 - `src/bilibili/comments.ts`: comments retrieval, filtering, and response shaping.
 - `src/bilibili/types.ts`: shared Bilibili-facing types.
@@ -46,10 +47,10 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `src/utils/credentials.ts`: global credential storage and credential source detection.
 - `src/utils/credential-guidance.ts`: safe credential setup instructions, status payloads, and next-step generation.
 - `src/utils/error-guidance.ts`: unified structured MCP error payload mapper with bilingual recovery guidance and category/retry metadata.
-- `src/utils/validation.ts`: BV, language, detail-level, comment/search limits, sort, query, max_matches, and context_segments validation.
+- `src/utils/validation.ts`: BV, language, detail-level, comment/search limits, sort, query, max_matches, context_segments, and Favorites cursor (type/length/base64url charset) validation.
 - `src/utils/sanitization.ts`: BV/URL sanitization and output sanitization helpers.
 - `src/utils/errors.ts`: domain-specific error classes and codes.
-- `src/utils/logger.ts`: secret redaction and debug logging helpers.
+- `src/utils/logger.ts`: secret redaction and debug logging helpers, including query/field redaction for account and Favorite Folder identifiers.
 - `src/utils/retry.ts`: retry behavior with redacted retry logging.
 - `src/utils/cache.ts`: LRU cache wrapper using runtime `config.maxCacheSize` from `src/config.ts`.
 - `src/utils/update-check.ts`: npm latest package freshness check and safe update guidance for MCP clients and global installs.
@@ -70,12 +71,13 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `tests/bilibili-metadata.test.ts`: metadata and Part-listing behavior (pages as required array).
 - `tests/bilibili-chapters.test.ts`: Chapter retrieval, content→title mapping, error propagation, and empty-list fallback.
 - `tests/bilibili-search.test.ts`: authenticated request gating, bounded search parameters, result normalization, and empty-result behavior.
+- `tests/bilibili-favorites.test.ts`: cursor encode/decode round-trip and strict validation, credential/identity gates, exact Favorites endpoints/params/headers/request counts, no-Folder/empty-Folder/same-Folder/next-Folder/final/stale-cursor behavior, raw-empty versus filtered-empty page handling, malformed or mismatched Folder rows, reported-count/visible discrepancy, malformed Video rows and skipped_count, duplicate BVID across two Folder contexts, timestamp/duration fallbacks, and order preservation.
 - `tests/bilibili-request-count.test.ts`: verifies exactly 1 view-api request per default flow; cache-hit prevents subtitle requests.
 - `tests/bilibili-comments-tool.test.ts`: comments tool behavior.
 - `tests/cache.test.ts`: cache behavior.
 - `tests/validation.test.ts`: input validation behavior.
 - `tests/sanitization.test.ts`: sanitization helpers.
-- `tests/logger-redaction.test.ts`: log redaction and retry-message safety.
+- `tests/logger-redaction.test.ts`: log redaction and retry-message safety, including account/Favorite Folder identifiers embedded in params and URLs.
 - `tests/bvid.test.ts`: BV parsing and validation behavior.
 
 Default verification:

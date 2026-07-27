@@ -243,3 +243,21 @@
 - Fact: v1.9.1 is the current npm latest and GitHub Release.
 - Evidence: Annotated tag `v1.9.1` at `5cdd47b`, successful Actions run `30205162304`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, and the non-draft/non-prerelease GitHub Release.
 - Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.9.1` or `@latest`; all nine MCP tools and runtime behavior remain unchanged.
+
+## 2026-07-27
+
+- Fact: The Issue #22 working tree adds `list_bilibili_favorite_videos` as the tenth MCP tool for the currently authenticated account's created Favorite Folders.
+- Evidence: `src/bilibili/favorites.ts`, tool schema/handler registration, 25 files / 405 passing tests, official SDK ten-tool discovery, and redacted real first/continuation calls recorded in `docs/qa/2026-07-27-bilibili-favorites-discovery.md`.
+- Impact: An Agent can begin without a Folder ID and traverse every currently visible created Folder one upstream page at a time. Each call uses at most nav + created/list-all + one fixed 20-row resource request and returns identical JSON text/`structuredContent`.
+
+- Fact: Favorites continuation uses an opaque, stateless, versioned base64url cursor containing only Folder ID and page; it is strictly and canonically decoded before credentials or network access.
+- Evidence: `encodeFavoritesCursor`/`decodeFavoritesCursor`, the zero-network malformed/non-canonical cursor regressions, stale-cursor regressions, and MCP `VALIDATION_ERROR` smoke coverage.
+- Impact: No Cookie, account ID, Folder title, or Video data is stored in the cursor. Traversal remains best-effort against live Bilibili state rather than snapshot-isolated.
+
+- Fact: The Favorites release candidate is not yet committed or published; npm latest remains `v1.9.1`.
+- Evidence: `git status --short`, source candidate version `1.10.0`, no local/remote `v1.10.0` tag, npm version-availability check, and the 138-entry package dry run.
+- Impact: Local verification proves the implementation, but installed users will not receive the tenth tool until the authorized commit and release chain completes.
+
+- Fact: Source package metadata is prepared as feature release `1.10.0`; the published npm/GitHub baseline remains `1.9.1` until the tag workflow completes.
+- Evidence: `package.json`, root package-lock entries, bilingual `1.10.0` changelog sections, README Favorites coverage, clean install/build, 405-test suite, 138-entry package dry run, and independent release-verifier approval.
+- Impact: The release candidate is ready for a scoped commit and tag. Do not describe `1.10.0` as published until npm and GitHub Release verification succeeds.

@@ -293,4 +293,66 @@ export const toolSchemas: Tool[] = [
       required: ["query", "results"],
     },
   },
+  {
+    name: "list_bilibili_favorite_videos",
+    description:
+      "Discover every created Favorite Folder of the currently authenticated Bilibili account and return one bounded page of its Video memberships. Follow the returned next_cursor until it is absent to traverse every Folder; do not assume one response contains the full account. Requires configured, logged-in Bilibili Cookie; call get_credential_setup_instructions for help.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cursor: {
+          type: "string",
+          minLength: 1,
+          maxLength: 256,
+          pattern: "^[A-Za-z0-9_-]+$",
+          description:
+            "Opaque continuation token returned by a previous successful call. Omit on the first call. The token encodes only a versioned Folder ID and page number; it never contains credentials, account IDs, Folder titles, or Video data.",
+        },
+      },
+      required: [],
+    },
+    outputSchema: {
+      type: "object",
+      properties: {
+        folders_total: { type: "integer" },
+        folder: {
+          type: "object",
+          properties: {
+            id: { type: "integer" },
+            title: { type: "string" },
+            media_count: { type: "integer" },
+          },
+          required: ["id", "title", "media_count"],
+        },
+        page: { type: "integer" },
+        videos: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              bvid: { type: "string" },
+              title: { type: "string" },
+              author: { type: "string" },
+              duration_seconds: { type: "integer" },
+              published_at: { type: "string" },
+              favorited_at: { type: "string" },
+              source_url: { type: "string" },
+            },
+            required: [
+              "bvid",
+              "title",
+              "author",
+              "duration_seconds",
+              "published_at",
+              "favorited_at",
+              "source_url",
+            ],
+          },
+        },
+        skipped_count: { type: "integer" },
+        next_cursor: { type: "string" },
+      },
+      required: ["folders_total", "videos", "skipped_count"],
+    },
+  },
 ];

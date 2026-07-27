@@ -28,9 +28,9 @@ describe("MCP tool list baseline", () => {
   beforeAll(async () => {
     toolsResult = await getListToolsResult();
   });
-  it("exposes all 9 tools", () => {
+  it("exposes all 10 tools", () => {
     const names = toolsResult.tools.map((t) => t.name);
-    expect(names).toHaveLength(9);
+    expect(names).toHaveLength(10);
     expect(names).toContain("get_credential_setup_instructions");
     expect(names).toContain("check_bilibili_credentials");
     expect(names).toContain("check_mcp_update");
@@ -40,6 +40,7 @@ describe("MCP tool list baseline", () => {
     expect(names).toContain("get_video_metadata");
     expect(names).toContain("get_video_chapters");
     expect(names).toContain("search_bilibili_videos");
+    expect(names).toContain("list_bilibili_favorite_videos");
   });
 
   it("keeps the public tool order stable", () => {
@@ -53,6 +54,7 @@ describe("MCP tool list baseline", () => {
       "get_video_metadata",
       "get_video_chapters",
       "search_bilibili_videos",
+      "list_bilibili_favorite_videos",
     ]);
   });
 
@@ -74,6 +76,7 @@ describe("MCP tool list baseline", () => {
       get_video_metadata: ["bvid_or_url"],
       get_video_chapters: ["bvid_or_url"],
       search_bilibili_videos: ["query"],
+      list_bilibili_favorite_videos: [],
     });
   });
 
@@ -441,6 +444,78 @@ describe("MCP tool list baseline", () => {
         },
         required: ["query", "results"],
       });
+    });
+  });
+
+  describe("list_bilibili_favorite_videos schema", () => {
+    it("declares the bounded cursor input and structured favorites output", () => {
+      const schema = toolsResult.tools.find(
+        (tool) => tool.name === "list_bilibili_favorite_videos",
+      )!;
+
+      expect(schema).toBeDefined();
+      expect(schema.inputSchema).toEqual({
+        type: "object",
+        properties: {
+          cursor: {
+            type: "string",
+            minLength: 1,
+            maxLength: 256,
+            pattern: "^[A-Za-z0-9_-]+$",
+            description:
+              "Opaque continuation token returned by a previous successful call. Omit on the first call. The token encodes only a versioned Folder ID and page number; it never contains credentials, account IDs, Folder titles, or Video data.",
+          },
+        },
+        required: [],
+      });
+      expect(schema.outputSchema).toEqual({
+        type: "object",
+        properties: {
+          folders_total: { type: "integer" },
+          folder: {
+            type: "object",
+            properties: {
+              id: { type: "integer" },
+              title: { type: "string" },
+              media_count: { type: "integer" },
+            },
+            required: ["id", "title", "media_count"],
+          },
+          page: { type: "integer" },
+          videos: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                bvid: { type: "string" },
+                title: { type: "string" },
+                author: { type: "string" },
+                duration_seconds: { type: "integer" },
+                published_at: { type: "string" },
+                favorited_at: { type: "string" },
+                source_url: { type: "string" },
+              },
+              required: [
+                "bvid",
+                "title",
+                "author",
+                "duration_seconds",
+                "published_at",
+                "favorited_at",
+                "source_url",
+              ],
+            },
+          },
+          skipped_count: { type: "integer" },
+          next_cursor: { type: "string" },
+        },
+        required: ["folders_total", "videos", "skipped_count"],
+      });
+    });
+
+    it("is registered as the 10th tool", () => {
+      const names = toolsResult.tools.map((t) => t.name);
+      expect(names[9]).toBe("list_bilibili_favorite_videos");
     });
   });
 });

@@ -8,6 +8,22 @@
 
 ---
 
+## [1.10.0] - 2026-07-27
+
+### 新增
+- 新增 `list_bilibili_favorite_videos`（第 10 个工具），从当前已登录账号自动发现所有创建的收藏夹，并按 Folder/页 返回其中的视频成员。每次调用最多返回上游一页（固定 20 条）；可选 `cursor` 是不透明、无状态、版本化的 base64url 令牌，仅编码下一个 Folder ID 与页码，不含 Cookie、账号 ID、Folder 标题或视频数据。Agent 按 `next_cursor` 翻页直到结束。（Issue #22）
+- 成功结果同时返回格式化 JSON 文本和内容相同的 MCP `structuredContent`；账号无收藏夹时只返回 `folders_total: 0`、`videos: []`、`skipped_count: 0`。
+- 新增 `validateFavoritesCursor` 公共输入校验，配合 favorites 模块在网络请求前完成类型/长度/字符集/JSON/版本/正整数 Folder ID 与页码的严格解码。
+
+### 安全
+- 收藏夹发现必须从已登录的当前账号身份开始；不提供匿名降级，也不读取其他账号的公开收藏。每次调用最多 1 次 nav + 1 次 created/list-all + 0 或 1 次 resource/list；不发起字幕/评论/章节/搜索/下载或任何持久化、缓存、写入请求。
+- 游标在所有副作用前严格校验；同 BVID 出现在多个 Folder 时保留 Folder 上下文（不做跨 Folder 去重）；`skipped_count` 报告无法安全规范化的上游行数，且不会触发补漏请求。
+
+### 验证
+- 通过 25 个文件中的 405 项测试、TypeScript 构建、官方 MCP SDK stdio 十工具顺序与真实分页续读验收、npm package dry-run（138 个文件）和凭据/私密数据扫描。
+
+---
+
 ## [1.9.1] - 2026-07-26
 
 ### 文档

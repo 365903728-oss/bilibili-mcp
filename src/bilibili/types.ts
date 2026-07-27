@@ -211,6 +211,34 @@ export interface TranscriptSearchOptions {
   context_segments: number;
 }
 
+// 收藏夹文件夹
+export interface FavoriteFolder {
+  id: number;
+  title: string;
+  media_count: number;
+}
+
+// 收藏夹中的视频成员
+export interface FavoriteVideo {
+  bvid: string;
+  title: string;
+  author: string;
+  duration_seconds: number;
+  published_at: string;
+  favorited_at: string;
+  source_url: string;
+}
+
+// 单次 Favorites Discovery 调用返回的有界结果
+export interface FavoriteVideoPage {
+  folders_total: number;
+  folder?: FavoriteFolder;
+  page?: number;
+  videos: FavoriteVideo[];
+  skipped_count: number;
+  next_cursor?: string;
+}
+
 // 视频章节数据类型
 export interface VideoChaptersData {
   bvid: string;

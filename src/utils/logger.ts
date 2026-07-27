@@ -12,7 +12,8 @@ interface LogEntry {
   context?: Record<string, unknown>;
 }
 
-const SENSITIVE_KEY_PATTERN = /cookie|authorization|sessdata|bili_jct|dedeuserid|token|secret/i;
+const SENSITIVE_KEY_PATTERN =
+  /cookie|authorization|sessdata|bili_jct|dedeuserid|token|secret|(?:^|_)(?:mid|media_id|folder_id)$/i;
 
 function redactString(value: string): string {
   return value
@@ -21,7 +22,11 @@ function redactString(value: string): string {
     .replace(/(DedeUserID=)[^;\s",]+/gi, "$1***")
     .replace(/(BILIBILI_SESSDATA=)[^;\s",]+/gi, "$1***")
     .replace(/(BILIBILI_BILI_JCT=)[^;\s",]+/gi, "$1***")
-    .replace(/(BILIBILI_DEDEUSERID=)[^;\s",]+/gi, "$1***");
+    .replace(/(BILIBILI_DEDEUSERID=)[^;\s",]+/gi, "$1***")
+    .replace(
+      /([?&](?:up_mid|media_id|folder_id)=)[^&\s"',]+/gi,
+      "$1***",
+    );
 }
 
 export function redactSecrets(value: unknown, seen = new WeakSet<object>()): unknown {

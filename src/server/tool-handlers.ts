@@ -1,5 +1,6 @@
 import { getVideoChaptersData } from "../bilibili/chapters.js";
 import { getVideoCommentsData } from "../bilibili/comments.js";
+import { listBilibiliFavoriteVideos } from "../bilibili/favorites.js";
 import { checkLoginStatus } from "../bilibili/http.js";
 import { getVideoMetadataData } from "../bilibili/metadata.js";
 import { searchBilibiliVideos } from "../bilibili/search.js";
@@ -23,6 +24,7 @@ import {
   validateCommentSort,
   validateContextSegments,
   validateDetailLevel,
+  validateFavoritesCursor,
   validateLanguage,
   validateMaxMatches,
   validatePage,
@@ -225,6 +227,24 @@ export async function handleToolCall(name: string, args: ToolArgs) {
       const query = (rawQuery as string).trim();
       const limit = rawLimit === undefined ? 5 : (rawLimit as number);
       const result = await searchBilibiliVideos(query, limit);
+
+      return {
+        ...toTextContent(result),
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
+    }
+
+    case "list_bilibili_favorite_videos": {
+      const rawCursor = args?.cursor;
+
+      try {
+        validateFavoritesCursor(rawCursor);
+      } catch (error) {
+        return toErrorTextContent(buildValidationErrorPayload(error));
+      }
+
+      const cursor = typeof rawCursor === "string" ? rawCursor : undefined;
+      const result = await listBilibiliFavoriteVideos(cursor);
 
       return {
         ...toTextContent(result),

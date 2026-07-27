@@ -205,3 +205,21 @@ export function validateContextSegments(value: unknown): void {
     throw new Error("context_segments must be between 0 and 5");
   }
 }
+
+/**
+ * 验证 Favorites Discovery 游标的公开 schema：
+ * 字符串、长度 1-256、仅 base64url 字符。
+ * 不解码 payload；由 favorites 模块在副作用前完成严格解码。
+ */
+export function validateFavoritesCursor(cursor: unknown): void {
+  if (cursor === undefined) return;
+  if (typeof cursor !== "string") {
+    throw new Error("cursor must be a string");
+  }
+  if (cursor.length < 1 || cursor.length > 256) {
+    throw new Error("cursor length must be between 1 and 256");
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(cursor)) {
+    throw new Error("cursor must contain only base64url characters");
+  }
+}

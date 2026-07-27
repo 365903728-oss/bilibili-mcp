@@ -30,6 +30,25 @@ describe("logger secret redaction", () => {
     expect(serialized).toContain("BILIBILI_SESSDATA=***");
   });
 
+  it("redacts account and Favorite Folder identifiers from params and URLs", () => {
+    const redacted = redactSecrets({
+      params: {
+        up_mid: 1_234_567_890,
+        media_id: 9_876_543_210,
+      },
+      url: "https://api.bilibili.com/x/v3/fav/resource/list?up_mid=1234567890&media_id=9876543210&pn=1",
+    });
+
+    const serialized = JSON.stringify(redacted);
+
+    expect(serialized).toContain('"up_mid":"***"');
+    expect(serialized).toContain('"media_id":"***"');
+    expect(serialized).toContain("up_mid=***");
+    expect(serialized).toContain("media_id=***");
+    expect(serialized).not.toContain("1234567890");
+    expect(serialized).not.toContain("9876543210");
+  });
+
   it("redacts logger output before writing to stderr", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 

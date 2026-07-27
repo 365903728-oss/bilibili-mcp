@@ -6,6 +6,7 @@ const mockGetVideoMetadataData = vi.fn();
 const mockGetVideoChaptersData = vi.fn();
 const mockGetVideoTranscriptData = vi.fn();
 const mockSearchBilibiliVideos = vi.fn();
+const mockListBilibiliFavoriteVideos = vi.fn();
 
 vi.mock("../src/bilibili/subtitle.js", () => ({
   getVideoInfoWithSubtitle: vi.fn(),
@@ -24,6 +25,11 @@ vi.mock("../src/bilibili/chapters.js", () => ({
 vi.mock("../src/bilibili/search.js", () => ({
   searchBilibiliVideos: (...args: unknown[]) =>
     mockSearchBilibiliVideos(...args),
+}));
+
+vi.mock("../src/bilibili/favorites.js", () => ({
+  listBilibiliFavoriteVideos: (...args: unknown[]) =>
+    mockListBilibiliFavoriteVideos(...args),
 }));
 
 vi.mock("../src/bilibili/comments.js", () => ({
@@ -329,5 +335,141 @@ describe("search handler validation and output", () => {
     expect(result.isError).toBe(true);
     expect(result).not.toHaveProperty("structuredContent");
     expect(JSON.parse(result.content[0].text).code).toBe("UNKNOWN_ERROR");
+  });
+});
+
+describe("favorites handler validation and output", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ["non-string cursor", { cursor: 42 }],
+    ["empty cursor", { cursor: "" }],
+    ["overlong cursor", { cursor: `${"A".repeat(257)}` }],
+    ["non-base64url cursor", { cursor: "A+B" }],
+  ])("list_bilibili_favorite_videos with %s returns VALIDATION_ERROR", async (_case, args) => {
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 10,
+      params: {
+        name: "list_bilibili_favorite_videos",
+        arguments: args,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("VALIDATION_ERROR");
+    expect(mockListBilibiliFavoriteVideos).not.toHaveBeenCalled();
+  });
+
+  it("returns identical structured and text favorites output on success", async () => {
+    const fixture = {
+      folders_total: 2,
+      folder: { id: 7, title: "学习", media_count: 12 },
+      page: 1,
+      videos: [
+        {
+          bvid: "BV1T6PQzQERF",
+          title: "First favorite",
+          author: "Uploader",
+          duration_seconds: 90,
+          published_at: "2026-01-01T00:00:00.000Z",
+          favorited_at: "2026-07-01T00:00:00.000Z",
+          source_url: "https://www.bilibili.com/video/BV1T6PQzQERF/",
+        },
+      ],
+      skipped_count: 0,
+      next_cursor: "eyJ2ZXJzaW9uIjoxLCJmb2xkZXJfaWQiOjcsInBhZ2UiOjJ9",
+    };
+    mockListBilibiliFavoriteVideos.mockResolvedValueOnce(fixture);
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 11,
+      params: {
+        name: "list_bilibili_favorite_videos",
+        arguments: {},
+      },
+    });
+
+    expect(mockListBilibiliFavoriteVideos).toHaveBeenCalledWith(undefined);
+    expect(result.structuredContent).toEqual(fixture);
+    expect(result.content[0].text).toBe(JSON.stringify(fixture, null, 2));
+  });
+
+  it("passes a valid cursor through to the favorites module", async () => {
+    mockListBilibiliFavoriteVideos.mockResolvedValueOnce({
+      folders_total: 1,
+      videos: [],
+      skipped_count: 0,
+    });
+
+    const handler = getCallToolHandler();
+    await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 12,
+      params: {
+        name: "list_bilibili_favorite_videos",
+        arguments: { cursor: "eyJ2ZXJzaW9uIjoxLCJmb2xkZXJfaWQiOjEsInBhZ2UiOjF9" },
+      },
+    });
+
+    expect(mockListBilibiliFavoriteVideos).toHaveBeenCalledWith(
+      "eyJ2ZXJzaW9uIjoxLCJmb2xkZXJfaWQiOjEsInBhZ2UiOjF9",
+    );
+  });
+
+  it("keeps favorites failures text-only", async () => {
+    mockListBilibiliFavoriteVideos.mockRejectedValueOnce(
+      new Error("Unexpected favorites failure"),
+    );
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 13,
+      params: {
+        name: "list_bilibili_favorite_videos",
+        arguments: {},
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("UNKNOWN_ERROR");
+  });
+
+  it("routes a stale-cursor ValidationError from the favorites module as VALIDATION_ERROR", async () => {
+    const { ValidationError } = await import("../src/utils/errors.js");
+    mockListBilibiliFavoriteVideos.mockRejectedValueOnce(
+      new ValidationError(
+        "cursor folder no longer belongs to the current account; restart without a cursor",
+      ),
+    );
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 14,
+      params: {
+        name: "list_bilibili_favorite_videos",
+        arguments: { cursor: "eyJ2ZXJzaW9uIjoxLCJmb2xkZXJfaWQiOjk5OSwicGFnZSI6MX0" },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.code).toBe("VALIDATION_ERROR");
+    expect(payload.message).toContain("restart without a cursor");
   });
 });

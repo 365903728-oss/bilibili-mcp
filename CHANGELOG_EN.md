@@ -8,6 +8,22 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.10.0] - 2026-07-27
+
+### Added
+- Added `list_bilibili_favorite_videos` (the 10th tool), which automatically discovers every created Favorite Folder of the currently logged-in account and returns Folder/page-bounded Video memberships. Each call returns at most one upstream page (fixed at 20 rows); the optional `cursor` is an opaque, stateless, versioned base64url token that encodes only the next Folder ID and page number — never Cookie values, account IDs, Folder titles, or Video data. Agents follow `next_cursor` until it is absent. (Issue #22)
+- Successful calls return formatted JSON text plus identical MCP `structuredContent`; an account with no valid Folders returns only `folders_total: 0`, `videos: []`, `skipped_count: 0`.
+- Added `validateFavoritesCursor` public input validator; the favorites module performs strict decoding (type/length/charset/JSON/version/positive safe-integer Folder ID and page) before any network request.
+
+### Security
+- Favorites discovery must start from the currently logged-in account identity; it never falls back to anonymous access and never reads another user's public Favorites. Each call makes at most one nav request, one created/list-all request, and zero or one resource/list request; no transcript/comment/chapter/search/download/persistence/cache/write request is made.
+- Cursor is strictly validated before any side effect; the same BVID appearing in multiple Folders stays visible per Folder context (no cross-Folder dedupe); `skipped_count` reports rows that could not be safely normalized and never triggers a replacement request.
+
+### Verified
+- Passed 405 tests across 25 files, the TypeScript build, official MCP SDK stdio ten-tool order plus real paginated continuation acceptance, npm package dry-run (138 files), and credential/private-data scanning.
+
+---
+
 ## [1.9.1] - 2026-07-26
 
 ### Documentation

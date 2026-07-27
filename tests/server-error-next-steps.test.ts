@@ -6,6 +6,7 @@ const mockGetVideoInfoWithSubtitle = vi.fn();
 const mockGetVideoTranscriptData = vi.fn();
 const mockGetVideoCommentsData = vi.fn();
 const mockSearchBilibiliVideos = vi.fn();
+const mockListBilibiliFavoriteVideos = vi.fn();
 
 vi.mock("../src/bilibili/subtitle.js", () => ({
   getVideoInfoWithSubtitle: (...args: unknown[]) =>
@@ -26,6 +27,11 @@ vi.mock("../src/bilibili/comments.js", () => ({
 vi.mock("../src/bilibili/search.js", () => ({
   searchBilibiliVideos: (...args: unknown[]) =>
     mockSearchBilibiliVideos(...args),
+}));
+
+vi.mock("../src/bilibili/favorites.js", () => ({
+  listBilibiliFavoriteVideos: (...args: unknown[]) =>
+    mockListBilibiliFavoriteVideos(...args),
 }));
 
 const httpMock = vi.hoisted(() => ({
@@ -141,6 +147,35 @@ describe("generic MCP error credential next_steps", () => {
       "npx -y @xzxzzx/bilibili-mcp@latest config",
     );
     expect(JSON.stringify(payload)).not.toContain("configured");
+  });
+
+  it("returns safe credential recovery guidance for authenticated favorites discovery", async () => {
+    mockListBilibiliFavoriteVideos.mockRejectedValueOnce(
+      new BilibiliAPIError("Cookie expired", "COOKIE_EXPIRED"),
+    );
+
+    const handler = getCallToolHandler();
+    const response = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 4,
+      params: {
+        name: "list_bilibili_favorite_videos",
+        arguments: {},
+      },
+    });
+    const payload = JSON.parse(response.content[0].text);
+
+    expect(response.isError).toBe(true);
+    expect(response).not.toHaveProperty("structuredContent");
+    expectStructuredError(payload, "COOKIE_EXPIRED", {
+      retryable: false,
+      userActionRequired: true,
+    });
+    expect(payload.next_steps_en.join(" ")).toContain(
+      "npx -y @xzxzzx/bilibili-mcp@latest config",
+    );
+    expect(JSON.stringify(payload)).not.toMatch(/SESSDATA|bili_jct|DedeUserID/i);
   });
 
   it("adds bilingual next_steps when transcript subtitles are unavailable", async () => {

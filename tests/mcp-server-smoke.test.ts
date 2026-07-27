@@ -16,6 +16,22 @@ type ListToolsResponse = {
   tools: Array<{ name: string }>;
 };
 
+type CallToolRequest = {
+  method: "tools/call";
+  jsonrpc: "2.0";
+  id: number;
+  params: {
+    name: string;
+    arguments: Record<string, unknown>;
+  };
+};
+
+type CallToolResponse = {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+  structuredContent?: Record<string, unknown>;
+};
+
 describe("MCP stdio entrypoint", () => {
   beforeAll(() => {
     execSync("npm run build", { stdio: "pipe" });
@@ -105,7 +121,30 @@ describe("MCP stdio entrypoint", () => {
       "get_video_metadata",
       "get_video_chapters",
       "search_bilibili_videos",
+      "list_bilibili_favorite_videos",
     ]);
+  });
+
+  it("maps a base64url cursor with invalid JSON to VALIDATION_ERROR", async () => {
+    const handler = getMcpHandler<CallToolRequest, CallToolResponse>(
+      "tools/call",
+    );
+
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 2,
+      params: {
+        name: "list_bilibili_favorite_videos",
+        arguments: {
+          cursor: Buffer.from("not-json", "utf8").toString("base64url"),
+        },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("VALIDATION_ERROR");
   });
 
   it("server metadata version matches package.json version", () => {
