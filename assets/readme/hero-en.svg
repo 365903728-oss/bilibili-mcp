@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg"
-     width="1200" height="380" viewBox="0 0 1200 380"
+     width="1200" height="420" viewBox="0 0 1200 420"
      role="img" aria-labelledby="title desc">
   <title id="title">Bilibili MCP</title>
-  <desc id="desc">Search Bilibili, read transcripts, and return evidence links that open at the exact playback time.</desc>
+  <desc id="desc">Automatically discover every Favorite Folder created by the authenticated account. Start without a cursor, read at most 20 videos per call, and keep passing next_cursor into the next call until that field is absent.</desc>
 
-  <rect width="1200" height="380" rx="28" fill="#090b10"/>
+  <rect width="1200" height="420" rx="28" fill="#090b10"/>
   <path d="M0 206H1200" stroke="#232936"/>
 
   <g id="title-block">
@@ -17,66 +17,86 @@
     <rect x="64" y="138" width="92" height="4" rx="2" fill="#fb7299"/>
     <text x="64" y="178" fill="#b8c5d3"
           font-family="Segoe UI, Arial, sans-serif"
-          font-size="24">Search Bilibili. Read transcripts. Return timestamped evidence.</text>
+          font-size="23">Read every Favorite Folder. Follow next_cursor until traversal is complete.</text>
   </g>
 
-  <g id="status" transform="translate(852 54)">
-    <rect width="284" height="92" rx="18" fill="#11151d" stroke="#303746"/>
+  <g id="status" transform="translate(852 52)">
+    <rect width="284" height="96" rx="18" fill="#11151d" stroke="#303746"/>
     <circle cx="28" cy="30" r="6" fill="#22c55e"/>
     <text x="46" y="31" dominant-baseline="middle" fill="#86efac"
           font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
           font-size="18">MCP READY</text>
     <path d="M24 50H260" stroke="#29303c"/>
-    <text x="142" y="70" dominant-baseline="middle" text-anchor="middle" fill="#93a4b8"
+    <text x="142" y="73" dominant-baseline="middle" text-anchor="middle" fill="#93a4b8"
           font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-          font-size="18">LOCAL STDIO · STRUCTURED</text>
+          font-size="18">FAVORITES · PAGE ≤ 20</text>
   </g>
 
-  <g id="evidence-strip" transform="translate(64 230)">
-    <g id="discover">
-      <rect width="300" height="112" rx="18" fill="#11151d" stroke="#303746"/>
-      <text x="22" y="28" dominant-baseline="middle" fill="#fb7299"
+  <g id="favorites-flow" transform="translate(64 232)">
+    <g id="start">
+      <rect width="244" height="140" rx="18" fill="#11151d" stroke="#303746"/>
+      <text x="20" y="26" dominant-baseline="middle" fill="#fb7299"
             font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">01 · DISCOVER</text>
-      <text x="22" y="64" dominant-baseline="middle" fill="#f8fafc"
+            font-size="18">01 · START</text>
+      <path d="M20 44H224" stroke="#29303c"/>
+      <text x="20" y="78" dominant-baseline="middle" fill="#f8fafc"
             font-family="Segoe UI, Arial, sans-serif"
-            font-size="24" font-weight="600">Topic → candidates</text>
-      <text x="22" y="94" dominant-baseline="middle" fill="#93a4b8"
+            font-size="19" font-weight="600">DISCOVER ALL FOLDERS</text>
+      <text x="20" y="112" dominant-baseline="middle" fill="#93a4b8"
             font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">search_bilibili_videos</text>
+            font-size="18">NO CURSOR TO START</text>
     </g>
 
-    <path d="M312 56H328M321 49L328 56L321 63"
+    <path d="M256 70H264M257 63L264 70L257 77"
           fill="none" stroke="#fb7299" stroke-width="2"/>
 
-    <g id="locate" transform="translate(336 0)">
-      <rect width="300" height="112" rx="18" fill="#11151d" stroke="#00aeec"/>
-      <text x="22" y="28" dominant-baseline="middle" fill="#7dd3fc"
+    <g id="read-page" transform="translate(276 0)">
+      <rect width="244" height="140" rx="18" fill="#11151d" stroke="#00aeec"/>
+      <text x="20" y="26" dominant-baseline="middle" fill="#7dd3fc"
             font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">02 · LOCATE</text>
-      <text x="22" y="64" dominant-baseline="middle" fill="#f8fafc"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="24">BV1Eb411u7Fw · P4</text>
-      <text x="22" y="94" dominant-baseline="middle" fill="#93a4b8"
+            font-size="18">02 · READ PAGE</text>
+      <path d="M20 44H224" stroke="#29303c"/>
+      <text x="20" y="78" dominant-baseline="middle" fill="#f8fafc"
             font-family="Segoe UI, Arial, sans-serif"
-            font-size="18">Transcript query: function</text>
+            font-size="18" font-weight="600">CURRENT FOLDER + PAGE</text>
+      <text x="20" y="112" dominant-baseline="middle" fill="#93a4b8"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="18">VIDEOS[] · UP TO 20</text>
     </g>
 
-    <path d="M648 56H664M657 49L664 56L657 63"
+    <path d="M532 70H540M533 63L540 70L533 77"
           fill="none" stroke="#00aeec" stroke-width="2"/>
 
-    <g id="cite" transform="translate(672 0)">
-      <rect width="400" height="112" rx="18" fill="#0d2118" stroke="#237f50"/>
-      <text x="22" y="28" dominant-baseline="middle" fill="#86efac"
+    <g id="continue" transform="translate(552 0)">
+      <rect width="244" height="140" rx="18" fill="#11151d" stroke="#fb7299"/>
+      <text x="20" y="26" dominant-baseline="middle" fill="#fb7299"
             font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">03 · CITE</text>
-      <text x="22" y="64" dominant-baseline="middle" fill="#f8fafc"
+            font-size="18">03 · CONTINUE</text>
+      <path d="M20 44H224" stroke="#29303c"/>
+      <text x="20" y="78" dominant-baseline="middle" fill="#f8fafc"
             font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="24">?p=4&amp;t=1.12</text>
-      <text x="22" y="94" dominant-baseline="middle" fill="#b8c5d3"
+            font-size="18">RETURNED next_cursor</text>
+      <text x="20" y="112" dominant-baseline="middle" fill="#93a4b8"
             font-family="Segoe UI, Arial, sans-serif"
-            font-size="18">Direct transcript evidence</text>
-      <circle cx="368" cy="28" r="7" fill="#22c55e"/>
+            font-size="18">PASS INTO NEXT CALL</text>
+    </g>
+
+    <path d="M808 70H816M809 63L816 70L809 77"
+          fill="none" stroke="#22c55e" stroke-width="2"/>
+
+    <g id="complete" transform="translate(828 0)">
+      <rect width="244" height="140" rx="18" fill="#0d2118" stroke="#237f50"/>
+      <text x="20" y="26" dominant-baseline="middle" fill="#86efac"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="18">04 · COMPLETE</text>
+      <circle cx="216" cy="26" r="7" fill="#22c55e"/>
+      <path d="M20 44H224" stroke="#244a37"/>
+      <text x="20" y="78" dominant-baseline="middle" fill="#f8fafc"
+            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
+            font-size="18">NO next_cursor</text>
+      <text x="20" y="112" dominant-baseline="middle" fill="#b8c5d3"
+            font-family="Segoe UI, Arial, sans-serif"
+            font-size="19">ALL TITLES + BVIDS</text>
     </g>
   </g>
 </svg>

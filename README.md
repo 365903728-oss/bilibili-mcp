@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="Bilibili MCP：从视频搜索到带时间定位的字幕证据">
+  <img src="./assets/readme/hero.svg" width="100%" alt="Bilibili MCP：自动读取当前账号的全部收藏夹，并通过 next_cursor 逐页遍历视频">
 </p>
 
 # Bilibili MCP
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  让 Codex、Claude、Cursor 等 AI 客户端直接搜索 Bilibili 或读取当前账号收藏夹，并获取字幕、时间定位、元数据、章节与热门评论。
+  让 Codex、Claude、Cursor 等 AI 客户端从 Bilibili 主题或当前账号的收藏夹出发，获得可继续调用的 BVID、字幕上下文和可直达播放时刻的证据链接。
 </p>
 
 <p align="center">
@@ -23,61 +23,67 @@
   <a href="https://github.com/XZXZZX-Ai/bilibili-mcp/releases/latest">最新 Release</a>
 </p>
 
+## 两个入口，一条证据链
+
+- **从我的收藏夹开始**：首次调用无需 Folder ID；Agent 每次读取一个最多 20 条的上游页面，并把返回的 `next_cursor` 原样用于下一次调用，直到响应不再包含它。
+- **从一个主题开始**：按关键词返回最多 10 个普通视频候选，不自动抓取候选的字幕或评论。
+- **拿到 BVID 之后**：继续读取字幕、元数据、章节或热门评论；关键词命中可返回直达播放时刻的 `timestamp_url`。
+
 > [!NOTE]
-> **真实验收链路：**搜索视频 → 选择 `BV1Eb411u7Fw` 的 P4 → 在字幕中搜索“函数” → 返回上下文与可直达的 [`?p=4&t=1.12`](https://www.bilibili.com/video/BV1Eb411u7Fw/?p=4&t=1.12) 证据链接。搜索与转录成功结果同时提供兼容文本和 MCP `structuredContent`。
+> **真实验收链路：**搜索视频 → 选择 `BV1Eb411u7Fw` 的 P4 → 在字幕中搜索“函数” → 返回上下文与可直达的 [`?p=4&t=1.12`](https://www.bilibili.com/video/BV1Eb411u7Fw/?p=4&t=1.12) 证据链接。视频搜索、收藏夹分页和转录的成功结果都同时提供兼容文本与 MCP `structuredContent`。
 
-## ⚡ 安装与配置
+## 先让 Agent 帮你接入
 
-Agent 安装提示词、全部客户端配置位置、CLI / JSON / TOML 示例、Cookie 配置与登录验证步骤，都集中在：
+Agent 安装提示词、全部客户端配置位置、CLI / JSON / TOML 示例、Cookie 配置与登录验证，都集中在唯一完整入口：
 
-### [打开完整 Agent / 客户端安装指南 →](./docs/client-setup.md)
+### [打开 Agent / 客户端安装指南 →](./docs/client-setup.md)
 
-> [!IMPORTANT]
-> 本 README 不再重复任何安装或配置方法。请以安装指南为唯一完整来源。
-
-安装完成后，可以直接向 AI 提问：
+安装完成后，可以直接测试收藏夹遍历：
 
 ```text
-搜索 Bilibili 上的 MCP 入门视频，选一个候选，
-再从字幕中找出“工具调用”的出现位置并给我时间链接。
+读取我当前登录账号创建的全部收藏夹。每次拿到 next_cursor 就继续调用，
+直到响应不再包含 next_cursor；按收藏夹列出视频标题和 BVID，不要生成笔记。
 ```
 
-## 🧰 工具一览
+## 10 个工具，分成三层
 
-| 目标 | 工具 | 返回重点 |
-|---|---|---|
-| 只有主题，还没有视频链接 | `search_bilibili_videos` | 最多 10 个普通视频候选及可继续调用的 BVID |
-| 从我的 Bilibili 收藏夹开始读取 | `list_bilibili_favorite_videos` | 当前账号下所有创建的收藏夹的分页视频；按 `next_cursor` 翻页直到结束 |
-| 获取纯字幕或定位关键词 | `get_video_transcript` | 转录文本、语言、时间戳、区间过滤、关键词上下文与证据链接 |
-| 让 AI 总结视频 | `get_video_info` | 字幕优先；无字幕时可返回标题、简介和标签 |
-| 查看结构化视频信息 | `get_video_metadata` | 标题、作者、时长、发布时间、标签、统计数据和多 P 列表 |
-| 查看视频章节 | `get_video_chapters` | 创作者或平台定义的章节标题与起止时间 |
-| 查看观众反馈 | `get_video_comments` | 热门评论、时间戳评论和可选回复 |
-| 获取安全配置步骤 | `get_credential_setup_instructions` | 本机凭证配置命令与双语安全提醒 |
-| 检查登录凭证 | `check_bilibili_credentials` | 配置来源、登录状态和下一步建议，不返回 Cookie |
-| 检查 MCP 更新 | `check_mcp_update` | 当前版本、最新版本和安全更新命令 |
+### 发现入口
+
+`search_bilibili_videos` · `list_bilibili_favorite_videos`
+
+从主题或当前账号的全部收藏夹获得 BVID。
+
+### 内容证据
+
+`get_video_transcript` · `get_video_info` · `get_video_metadata` · `get_video_chapters` · `get_video_comments`
+
+读取字幕、时间定位、视频信息、章节和观众反馈。
+
+### 本机助手
+
+`get_credential_setup_instructions` · `check_bilibili_credentials` · `check_mcp_update`
+
+安全配置凭证、确认登录并检查版本。
 
 完整参数、JSON 示例、结构化错误和请求控制见[工具参考](./docs/tool-reference.md)。
 
-### 关键能力
+## 设计重点
 
-- **先发现、再阅读**：按主题搜索普通视频候选，或从当前账号的收藏夹分页发现视频，再把返回的 BVID 交给字幕、元数据、章节或评论工具。
-- **可验证的字幕证据**：支持多 P、语言偏好、时间戳、时间区间和关键词上下文；命中项包含可直达播放时刻的 `timestamp_url`。
-- **结构化输出**：视频搜索、视频转录和收藏夹分页的成功结果同时提供兼容文本与 MCP `structuredContent`。
-- **明确的失败语义**：区分凭证失效、无字幕、访问受限、限流、超时和其他 API 错误，并给出下一步建议。
-- **安全的凭证助手**：检查凭证状态时不返回 `SESSDATA`、`bili_jct`、`DedeUserID` 或完整 Cookie。
+- **Bilibili 原生**：保留多 P、平台章节、热门评论和收藏夹成员关系，不把项目扩成通用下载器。
+- **证据优先**：字幕支持语言偏好、时间戳、时间区间与关键词上下文；命中项可以直接打开对应播放时刻。
+- **按需调用**：收藏夹工具只返回 Folder 上下文和视频条目，不自动生成笔记，也不预取字幕、评论或章节。
+- **凭证留在本机**：状态工具不会返回 `SESSDATA`、`bili_jct`、`DedeUserID` 或完整 Cookie。
 
-## 🧭 行为边界
+## 行为边界
 
-- 视频搜索要求已配置且有效的 Bilibili 登录 Cookie，不提供匿名降级。
-- 收藏夹发现要求已登录的当前账号身份，每次调用仅返回一个上游 20 条资源页；`next_cursor` 是无状态、版本化的不透明令牌，仅包含下一个 Folder 与页码，不会编码 Cookie、账号 ID、Folder 标题或视频数据。
-- `get_video_transcript` 默认在无字幕时返回 `SUBTITLE_UNAVAILABLE`；只有显式设置 `fallback_to_description: true` 才会退回简介。
-- 时间戳、区间过滤和关键词搜索不会静默退回简介，避免把描述误当作字幕证据。
-- 章节来自 Bilibili 创作者或平台数据；没有章节时返回空列表，不推断章节。
-- 本项目不会绕过付费、会员、地区、私密、下架或其他访问限制。
+- “全部收藏夹”指当前登录账号创建、且 Bilibili API 当前可见的 Folder；遍历是实时 best-effort，不是快照。
+- 每次收藏夹调用最多读取一个 20 条上游页面。Agent 必须持续跟随 `next_cursor`；失效或无法安全规范化的条目会计入 `skipped_count`。
+- 视频搜索和收藏夹发现都要求有效登录凭证，不提供匿名降级。
+- `get_video_transcript` 默认在无字幕时返回 `SUBTITLE_UNAVAILABLE`；只有显式设置 `fallback_to_description: true` 才会退回简介，时间定位与关键词搜索不会静默退回简介。
+- 章节只使用 Bilibili 创作者或平台数据；项目不会绕过付费、会员、地区、私密、下架或其他访问限制。
 - 所有请求由用户本机发起；本项目是第三方工具，不是 Bilibili 官方服务。
 
-## 🛠️ 开发
+## 开发
 
 源码开发环境的安装步骤也集中在[完整安装指南：从源码开发](./docs/client-setup.md#从源码开发)。
 
@@ -91,13 +97,13 @@ Agent 安装提示词、全部客户端配置位置、CLI / JSON / TOML 示例�
 
 MCP stdio 协议使用 `stdout`；调试日志必须写到 `stderr`。测试和日志中不要使用真实 Cookie。
 
-## ⚖️ 安全与许可
+## 安全与许可
 
 - 请遵守 Bilibili 用户协议、接口访问规则和当地法律法规，不要用于大规模抓取、商业剥削、绕过权限或其他滥用场景。
 - 高频调用、异常访问模式或 Cookie 泄露可能触发限流、风控或账号异常，相关风险由使用者承担。
 - 本项目仅向 Bilibili 官方接口发送 Bilibili 凭证，不会把 Cookie 上传到第三方服务；本地配置文件不承诺系统级加密。
 - 本项目基于 [GNU General Public License v3.0](./LICENSE) 开源。
 
-## 💬 反馈
+## 反馈
 
 遇到问题或有功能建议，请提交 [GitHub Issue](https://github.com/XZXZZX-Ai/bilibili-mcp/issues)；一般讨论可前往 [GitHub Discussions](https://github.com/XZXZZX-Ai/bilibili-mcp/discussions)。

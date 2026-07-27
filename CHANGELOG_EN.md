@@ -8,6 +8,18 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.10.1] - 2026-07-27
+
+### Documentation
+- Reworked both README openings around discovering Videos from the current account's Favorites or a topic, obtaining BVIDs, and letting users request transcripts, metadata, chapters, or comments only when needed.
+- Narrowed both GitHub-safe SVG heroes to complete Favorites traversal: start without `cursor`, read at most 20 rows per call, keep passing `next_cursor`, and finish when that field is absent while preserving Folder context, titles, and BVIDs.
+- Reorganized the ten MCP tools, setup entry point, design priorities, and behavior boundaries, explicitly leaving knowledge-note generation to the user.
+
+### Verified
+- Passed bilingual README audits, local-link and heading-parity checks, SVG XML/safety checks, 900px/360px rendering, npm package dry-run, credential-pattern scanning, the TypeScript build, and the full test suite.
+
+---
+
 ## [1.10.0] - 2026-07-27
 
 ### Added
