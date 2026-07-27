@@ -1127,3 +1127,10 @@
 - Result: Package/lock, compiled CLI, and built MCP server report `1.10.1`; 25 files / 405 tests pass; the MCP surface remains ten tools in the frozen order, with 37/37 focused tests passing. The 138-file package contains both READMEs, both Hero SVGs, and required main/types/CLI output while excluding source, tests, tasks, QA, agent memory, previews, environment files, and obsolete Smithery content.
 - Security and boundary: Release additions and package contents have zero credential findings; four repository-wide matches are unchanged synthetic logger-redaction fixtures. Runtime source, schemas, tests, dependencies, and publish workflow are unchanged. npm `1.10.1` and local/remote tag `v1.10.1` are available.
 - Release boundary: The verifier reports no blocker if the exact 11-file staged set excludes `docs/agent-memory/pending-learning-proposals.md`.
+
+## 2026-07-27 v1.10.1 Publication
+
+- Commands: exact 11-file staged review; scoped commit and `master` push; annotated tag creation/push; GitHub Actions run watch; remote annotated-tag dereference; live npm latest/integrity/shasum/provenance lookup; isolated exact-package CLI version/help smoke; GitHub Release creation/inspection.
+- Result: Release commit `3aee13d9111feb7342b3a287baf4c1cb81741a04` is the remote tag target. Actions run `30233179604` passed install, 25 files / 405 tests, build, and trusted publication. npm latest is `1.10.1`; integrity is `sha512-Q08jBSAoEDYbbzlf52zMFhg9HcKCQ2guGBR7JtT1CcraFW2vvwwXu9dSUy4OsqGwDi6D1wT3D7DoBxN1TCcWpQ==`, shasum is `f52621b9ab575b43bc8c4b93be907e8df6432b6b`, SLSA provenance is present, the published CLI reports `1.10.1`, help works, and the GitHub Release is public.
+- Scope and security: The immutable tag contains exactly the 11 intended documentation/version files and excludes `pending-learning-proposals.md`. Runtime source, MCP schemas, tests, dependencies, and workflow are unchanged.
+- Caveat: The successful workflow repeated the existing Node 20 action-runtime deprecation annotation for `actions/checkout@v4` and `actions/setup-node@v4`; GitHub forced Node 24. Keep that as separate bounded workflow maintenance.

@@ -254,6 +254,10 @@
 - Evidence: `encodeFavoritesCursor`/`decodeFavoritesCursor`, the zero-network malformed/non-canonical cursor regressions, stale-cursor regressions, and MCP `VALIDATION_ERROR` smoke coverage.
 - Impact: No Cookie, account ID, Folder title, or Video data is stored in the cursor. Traversal remains best-effort against live Bilibili state rather than snapshot-isolated.
 
-- Fact: `v1.10.0` is the current npm latest and GitHub Release, publishing authenticated all-Favorites Video discovery as the tenth MCP tool.
+- Fact: `v1.10.0` was the published baseline immediately before the documentation-only `v1.10.1` refresh, publishing authenticated all-Favorites Video discovery as the tenth MCP tool.
 - Evidence: Release commit `7ff2257`, annotated tag `v1.10.0`, successful Actions run `30230653151`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, the non-draft/non-prerelease GitHub Release, and closed Issue #22.
-- Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.10.0` or `@latest`. The bilingual README describes the new capability; Issue #20 remains a separate compatibility follow-up.
+- Impact: Retain this as the runtime-feature release baseline; current install guidance uses the newer documentation patch recorded below.
+
+- Fact: `v1.10.1` is the current npm latest and GitHub Release, publishing the Favorites-first bilingual README and four-step cursor-traversal Hero SVGs without runtime, schema, test, dependency, or workflow changes.
+- Evidence: Release commit `3aee13d`, annotated tag `v1.10.1`, successful Actions run `30233179604`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, and the public non-draft/non-prerelease GitHub Release.
+- Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.10.1` or `@latest`. The package still exposes the same ten MCP tools; Issue #20 remains a separate compatibility follow-up.

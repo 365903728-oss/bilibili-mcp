@@ -302,3 +302,9 @@ Remove or stop using:
 - The bilingual README update shipped in the release commit, while the post-publication evidence remained a separate documentation commit.
 - Keep: exact staged-scope checks, tag-SHA verification, live npm provenance, isolated CLI smoke, and post-publish Issue closure.
 - Change: `actions/checkout@v4` and `actions/setup-node@v4` now emit a deprecated Node 20 action-runtime warning and were forced to Node 24. Refresh them in a separate bounded workflow-maintenance task; do not churn a successful immutable release.
+
+### 2026-07-27 Harness Eval: v1.10.1 documentation patch
+
+- One independent release verifier plus an explicit 11-file staged set was sufficient; the review-gated learning proposal stayed outside the commit and immutable tag.
+- The unchanged tag-triggered workflow passed 405 tests, build, trusted publication, provenance, remote tag dereference, and isolated exact-package CLI gates without repair.
+- Keep the current documentation-patch release sequence. The 360px Hero is an overview rather than a detail surface; adjacent Markdown and alt text preserve the complete workflow, so no extra mobile asset is justified unless users need the image itself to carry every label.
