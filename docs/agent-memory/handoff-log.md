@@ -380,3 +380,26 @@
   scope checks pass. The final Claude report and QA record contain the exact
   evidence. No commit, push, tag, version, release, publication, real Cookie,
   live Bilibili request, or model operation occurred.
+
+## 2026-08-05 v1.11.1 Source Preparation
+
+- Owner: Codex wrote the task ticket (`REL-2026-08-05-V1.11.1`) and file-backed
+  handoff, then launched Claude Code through Paseo.
+- Objective: Prepare the verified source commit for `@xzxzzx/bilibili-mcp@1.11.1`
+  (merged Issue #24 / PR #25 AI subtitle ID fix), credit `@CYL-collab` in both
+  changelogs, and create the release research, QA, and memory records without
+  any Git or publication action.
+- Files in scope: `package.json`, `package-lock.json`, `CHANGELOG.md`,
+  `CHANGELOG_EN.md`, `docs/research/2026-08-05-v1.11.1-publishing.md`,
+  `docs/qa/2026-08-05-v1.11.1-release.md`, scoped memory files, and the
+  required Claude report.
+- Required capability: the project `package-maintainer` subagent performed the
+  version-only bump; the `secret-scanning` boundary was applied value-free for
+  changed files and package contents. No other subagent or skill was needed.
+- Result: package/lock parity at `1.11.1`; bilingual changelog sections
+  describing only the merged fix and crediting `@CYL-collab`; `npm ci`, build,
+  39 files / 803 tests, zero-finding production audit, 181-file package dry
+  run, `git diff --check`, strict UTF-8, and value-free secret classification
+  all pass. Source, tests, dependencies, workflow, READMEs, tool surface, and
+  `pending-learning-proposals.md` are unchanged. No commit, push, tag, npm
+  publication, or GitHub Release was performed; publication remains Codex-owned.

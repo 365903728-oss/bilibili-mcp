@@ -8,6 +8,19 @@
 
 ---
 
+## [1.11.1] - 2026-08-05
+
+### 修复
+- 有效的 Bilibili AI 字幕数字 ID 大于 `Number.MAX_SAFE_INTEGER` 时不再被误判为无效元数据；公开响应结构与其余校验保持不变。（Issue #24，PR #25）
+
+### 致谢
+- 感谢 [@CYL-collab](https://github.com/CYL-collab) 报告该问题并贡献修复。
+
+### 验证
+- 通过 TypeScript 构建、39 个文件 / 803 项测试、生产依赖审计零漏洞、181 文件 package dry-run（包含 dist 入口与公开文档，不含源码、测试、内部记录、本地配置、凭据或 Smithery 文件）、`git diff --check`、严格 UTF-8 与机密分类检查；`package.json` 与锁文件版本一致为 `1.11.1`。
+
+---
+
 ## [1.11.0] - 2026-08-05
 
 ### 新增

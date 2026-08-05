@@ -8,6 +8,19 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.11.1] - 2026-08-05
+
+### Fixed
+- Valid Bilibili AI subtitle numeric IDs above `Number.MAX_SAFE_INTEGER` are no longer rejected as invalid metadata; the public response shape and remaining validation are unchanged. (Issue #24, PR #25)
+
+### Acknowledgements
+- Thanks to [@CYL-collab](https://github.com/CYL-collab) for reporting the issue and contributing the fix.
+
+### Verified
+- Passed the TypeScript build, 39 files / 803 tests, a production dependency audit with zero vulnerabilities, a 181-file package dry run (dist entry points and public docs included; source, tests, internal records, local config, credentials, and Smithery files excluded), `git diff --check`, strict UTF-8, and value-free secret classification; `package.json` and the lockfile both report `1.11.1`.
+
+---
+
 ## [1.11.0] - 2026-08-05
 
 ### Added

@@ -1288,3 +1288,40 @@
 - Boundary: no ready local ASR model existed, so no model download/switch or
   live ASR end-to-end transcription was performed. The review-gated
   `pending-learning-proposals.md` change remained excluded from the release.
+
+## 2026-08-05 v1.11.1 Source Preparation
+
+- Source: HEAD `15bb5f8` (merge commit of PR #25) contains the merged AI
+  subtitle ID fix in `src/bilibili/video-api.ts`; no source or test was edited.
+- Version: `npm version 1.11.1 --no-git-tag-version` set `package.json` and
+  both `package-lock.json` version fields to `1.11.1`; the diff touches only
+  the version lines. npm `latest` remained 1.11.0; `v1.11.1` is free.
+- Changelogs: `CHANGELOG.md` and `CHANGELOG_EN.md` gained matching `v1.11.1`
+  sections describing only the merged fix (Issue #24, PR #25) and crediting
+  `@CYL-collab`; a verification bullet records only actually run gates.
+- Gates: `npm ci` (466 packages) and `npm run build` passed; 39 test files /
+  803 tests passed; `npm audit --omit=dev --json` reported zero findings
+  (info/low/mod/high/critical all 0); `npm pack --dry-run --json
+  --ignore-scripts` reported `@xzxzzx/bilibili-mcp@1.11.1`, 181 files,
+  1,706,201 unpacked bytes, with `dist/index.*`, `dist/cli.*`, `dist/server.*`,
+  both READMEs, LICENSE, and the five README images, and zero source, test,
+  internal-report, local-config, credential, model, or Smithery paths;
+  `git diff --check` passed; strict UTF-8 decoding passed and added lines
+  introduced zero U+FFFD characters (the log retains six baseline characters);
+  value-free secret classification found only the
+  pre-existing `test:env` environment-variable-name reference.
+- Scope: `git status --short` lists seven modified files (both changelogs,
+  package files, and `docs/agent-memory/active-work.md`,
+  `docs/agent-memory/handoff-log.md`, `docs/agent-memory/verification-log.md`)
+  and five untracked/new files (handoff, task ticket, research note, QA
+  record, and this Claude report); source, tests, dependencies, workflow,
+  READMEs, tool surface, `dist/`, and `pending-learning-proposals.md` are
+  unchanged.
+- Review: independent `release-verifier` and `risk-reviewer` checks both
+  returned PASS with no release blocker. They confirmed PR #25 remains the
+  candidate's ancestor, a normal fast-forward push cannot overwrite it, and
+  the package, credential, changelog, workflow, and dirty-worktree boundaries
+  are intact. Their two documentation-only findings (new-file count and
+  baseline U+FFFD wording) were corrected before commit.
+- Boundary: no Git commit, push, tag, npm publication, or GitHub Release was
+  performed; publication remains Codex-owned and pending.
