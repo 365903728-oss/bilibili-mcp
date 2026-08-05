@@ -8,6 +8,16 @@
 
 ---
 
+## [1.11.3] - 2026-08-06
+
+### 修复
+- 修复官方 MCP Registry 命名空间大小写：`mcpName` 与 `server.json.name` 从 `io.github.xzxzzx-ai/bilibili-mcp` 更正为 `io.github.XZXZZX-Ai/bilibili-mcp`，与 GitHub 认证授予的权限（区分大小写，`io.github.XZXZZX-Ai/*`）一致；v1.11.2 发布尝试因此返回 HTTP 403。无运行时、MCP 工具或依赖变更。
+
+### 验证
+- 通过 TypeScript 构建、39 个文件 / 803 项测试与 `npm pack --dry-run`（181 个文件，包含更正后的 `mcpName`）；`package.json` 与锁文件版本一致为 `1.11.3`。
+
+---
+
 ## [1.11.2] - 2026-08-06
 
 ### 新增

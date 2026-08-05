@@ -8,6 +8,16 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.11.3] - 2026-08-06
+
+### Fixed
+- Fixed the Official MCP Registry namespace casing: `mcpName` and `server.json.name` corrected from `io.github.xzxzzx-ai/bilibili-mcp` to `io.github.XZXZZX-Ai/bilibili-mcp`, matching the case-sensitive GitHub-authorized permission (`io.github.XZXZZX-Ai/*`); the v1.11.2 publish attempt returned HTTP 403 on the casing mismatch. No runtime, MCP tool, or dependency changes.
+
+### Verified
+- Passed the TypeScript build, 39 files / 803 tests, and `npm pack --dry-run` (181 files, including the corrected `mcpName`); `package.json` and the lockfile both report `1.11.3`.
+
+---
+
 ## [1.11.2] - 2026-08-06
 
 ### Added

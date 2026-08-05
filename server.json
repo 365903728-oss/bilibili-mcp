@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.xzxzzx-ai/bilibili-mcp",
+  "name": "io.github.XZXZZX-Ai/bilibili-mcp",
   "title": "Bilibili MCP Server",
   "description": "Bilibili MCP tool for video metadata, transcripts, subtitles, and comment summarization",
   "repository": {
     "url": "https://github.com/XZXZZX-Ai/bilibili-mcp",
     "source": "github"
   },
-  "version": "1.11.2",
+  "version": "1.11.3",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@xzxzzx/bilibili-mcp",
-      "version": "1.11.2",
+      "version": "1.11.3",
       "transport": {
         "type": "stdio"
       }

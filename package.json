@@ -1,7 +1,7 @@
 {
   "name": "@xzxzzx/bilibili-mcp",
-  "version": "1.11.2",
-  "mcpName": "io.github.xzxzzx-ai/bilibili-mcp",
+  "version": "1.11.3",
+  "mcpName": "io.github.XZXZZX-Ai/bilibili-mcp",
   "description": "Bilibili MCP tool for video metadata, transcripts, subtitles, and comment summarization",
   "type": "module",
   "main": "dist/index.js",

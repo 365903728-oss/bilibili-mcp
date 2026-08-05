@@ -3,8 +3,8 @@
 ## Ticket
 
 - ID: `REGISTRY-001`
-- Title: Prepare version 1.11.2 for the Official MCP Registry
-- Status: `done`
+- Title: Prepare version 1.11.3 for the Official MCP Registry
+- Status: `in_progress`
 - Owner: `Claude Code`
 - Source: User request on 2026-08-06
 
@@ -12,13 +12,16 @@
 
 Prepare the smallest package-metadata release that lets `@xzxzzx/bilibili-mcp` pass Official MCP Registry npm ownership validation.
 
+Fix the Registry namespace casing: the authenticated GitHub permission is exactly `io.github.XZXZZX-Ai/*` (case-sensitive), and the v1.11.2 publish attempt returned HTTP 403.
+
 ## Scope
 
 In scope:
 
 - Add the Registry `mcpName`.
 - Add root `server.json` for the public npm stdio package.
-- Bump package and lockfile versions to `1.11.2`.
+- Correct `mcpName` and `server.json.name` casing to `io.github.XZXZZX-Ai/bilibili-mcp`.
+- Bump package and lockfile versions to `1.11.3`.
 - Add concise bilingual changelog entries.
 
 Out of scope:
@@ -47,8 +50,9 @@ Do not touch:
 
 ## Acceptance Criteria
 
-- [ ] `package.json.mcpName` and `server.json.name` both equal `io.github.xzxzzx-ai/bilibili-mcp`.
-- [ ] Package, lockfile, server metadata, and changelogs use `1.11.2` where applicable.
+- [ ] `package.json.mcpName` and `server.json.name` both equal `io.github.XZXZZX-Ai/bilibili-mcp`.
+- [ ] Package, lockfile, server metadata, and changelogs use `1.11.3` where applicable.
+- [ ] Live 403 evidence from the v1.11.2 publish attempt recorded in the research note.
 - [ ] `server.json` points to `@xzxzzx/bilibili-mcp` with stdio transport.
 - [ ] Public MCP tool behavior and dependencies are unchanged.
 - [ ] No secret, Cookie, token, or `.env` content is printed or committed.
@@ -67,8 +71,7 @@ Also validate `server.json` with the current official publisher CLI before relea
 
 ## Risks And Rollback
 
-- Risk: a wrong namespace or version prevents Registry validation.
-- Rollback: do not tag or publish until all local checks pass; discard this isolated branch if necessary.
+- Risk: namespace matching is case-sensitive; the v1.11.2 publish attempt returned 403 because the authenticated permission is exactly `io.github.XZXZZX-Ai/*`. Rollback: do not tag or publish until all local checks pass; discard this isolated branch if necessary.
 
 ## Stop And Report Conditions
 

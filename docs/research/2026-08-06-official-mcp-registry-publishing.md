@@ -16,6 +16,8 @@ What does the current Official MCP Registry require for this public npm MCP serv
 
 The project is already publicly published as npm version `1.11.1`, but that package does not declare the Registry ownership field.
 
+Live publish attempt of npm 1.11.2 (namespace `io.github.xzxzzx-ai/bilibili-mcp`) returned HTTP 403: the authenticated GitHub permission is exactly `io.github.XZXZZX-Ai/*`, and namespace matching is case-sensitive.
+
 ## Sources
 
 | Source | Type | Date checked | Notes |
@@ -28,15 +30,15 @@ The project is already publicly published as npm version `1.11.1`, but that pack
 ## Findings
 
 - The Registry stores metadata; the installable npm artifact must already be public.
-- GitHub authentication permits the name `io.github.xzxzzx-ai/bilibili-mcp` when authenticated as the repository owner.
+- GitHub authentication permits `io.github.XZXZZX-Ai/bilibili-mcp` only — namespace matching is case-sensitive and the granted permission is exactly `io.github.XZXZZX-Ai/*`.
 - `package.json.mcpName` and `server.json.name` must match exactly.
-- Because npm version `1.11.1` is immutable and lacks `mcpName`, a new package version is required.
+- Because npm `1.11.1`/`1.11.2` are immutable and the lowercase namespace was rejected, a corrected package version (`1.11.3`) is required.
 
 ## Applicability To This Project
 
 Applies:
 
-- Add `mcpName`, create `server.json`, publish npm `1.11.2`, then publish Registry metadata.
+- Add `mcpName`, create `server.json`, publish npm `1.11.3` with the corrected namespace `io.github.XZXZZX-Ai/bilibili-mcp`, then publish Registry metadata.
 
 Does not apply:
 
@@ -45,7 +47,7 @@ Does not apply:
 ## Decision Impact
 
 - Use the existing tag-triggered trusted-publishing workflow for npm.
-- Publish to the Official MCP Registry only after npm `1.11.2` is live.
+- Publish to the Official MCP Registry only after npm `1.11.3` is live.
 
 ## Risks And Unknowns
 
@@ -54,4 +56,4 @@ Does not apply:
 
 ## Follow-Up
 
-- [ ] Verify npm `1.11.2`, Registry status, and public metadata after publication.
+- [ ] Verify npm `1.11.3`, Registry status, and public metadata after publication.
