@@ -1269,3 +1269,22 @@
 - Boundary: no live Bilibili/Cookie or ready-model ASR E2E was run; no model,
   Python package, Git, version, release, publication, or learning-proposal
   action occurred. HEAD remains `ab4dd02854f0483fc7668c713523b4be77de6cc7`.
+
+## 2026-08-05 v1.11.0 Publication
+
+- Source: release commit `e43c247` was fast-forward pushed to `origin/master`;
+  annotated tag `v1.11.0` points to the same commit. The GitHub Release title
+  and body are bilingual Chinese/English.
+- Local gates: TypeScript build passed; 39 test files / 803 tests and 95/95
+  focused stdio/tool/handler tests passed; `git diff --check` passed; production
+  audit, secret classification, and ASR state-temp residue were all zero.
+- Package: dry run contained 181 files / 1,085,303 packed bytes / 1,706,096
+  unpacked bytes, included all five README images, and contained zero forbidden
+  source, test, internal report, local config, model, or credential paths.
+- Publication: GitHub Actions run `31003552987` passed install, tests, build,
+  and npm trusted publishing. npm `latest` and exact version are 1.11.0 with
+  registry integrity, shasum, and SLSA provenance. An isolated exact-version
+  npx smoke returned 1.11.0 and exposed setup, doctor, and config.
+- Boundary: no ready local ASR model existed, so no model download/switch or
+  live ASR end-to-end transcription was performed. The review-gated
+  `pending-learning-proposals.md` change remained excluded from the release.

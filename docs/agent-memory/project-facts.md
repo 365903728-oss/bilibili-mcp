@@ -365,3 +365,15 @@
 - Evidence: Current user instruction and the task ticket status.
 - Impact: No Paseo or other implementation agent is part of the 38-finding
   remediation evidence.
+
+## 2026-08-05
+
+- Fact: `v1.11.0` is the current npm latest and GitHub Release, published from
+  release commit `e43c247` through annotated tag `v1.11.0` and trusted-publishing
+  Actions run `31003552987`.
+- Evidence: npm registry version, integrity and SLSA provenance metadata; the
+  successful GitHub Actions run; the bilingual GitHub Release; and isolated
+  `npx -y @xzxzzx/bilibili-mcp@1.11.0` version/help smoke.
+- Impact: ASR Phase 1–3, CLI setup/doctor, both security-remediation rounds,
+  SDK 1.30.0, and the bilingual README overview are public. MCP protocol
+  modernization remains a separate inactive future direction.
