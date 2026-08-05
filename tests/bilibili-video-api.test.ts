@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe("getVideoSubtitle", () => {
-  it("returns WBI subtitles without calling the non-WBI fallback", async () => {
+  it("accepts WBI subtitle IDs beyond the safe integer range without calling the non-WBI fallback", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes("/x/frontend/finger/spi")) {
         return jsonResponse({
@@ -77,9 +77,9 @@ describe("getVideoSubtitle", () => {
             subtitle: {
               subtitles: [
                 {
-                  id: 1,
-                  lan: "zh-Hans",
-                  lan_doc: "中文",
+                  id: 9_007_199_254_740_992,
+                  lan: "ai-zh",
+                  lan_doc: "AI中文",
                   subtitle_url: "//example.test/wbi.json",
                 },
               ],

@@ -176,7 +176,7 @@ function parseSubtitleResponse(raw: unknown): SubtitleResponse {
     if (
       !isRecord(row) ||
       typeof row.id !== "number" ||
-      !Number.isSafeInteger(row.id) ||
+      !Number.isInteger(row.id) ||
       row.id < 0 ||
       typeof row.lan !== "string" ||
       row.lan.length < 1 ||
