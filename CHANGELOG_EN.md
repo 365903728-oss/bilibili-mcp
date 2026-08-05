@@ -8,6 +8,16 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.11.2] - 2026-08-06
+
+### Added
+- Added Official MCP Registry metadata: `mcpName` in `package.json` and a root `server.json` pointing to npm package `@xzxzzx/bilibili-mcp` v1.11.2 (stdio transport). No runtime, MCP tool, or dependency changes.
+
+### Verified
+- Passed the TypeScript build, 39 files / 803 tests, and `npm pack --dry-run` (181 files, including `mcpName`; `server.json` stays at the repository root for the Official Registry); `package.json` and the lockfile both report `1.11.2`.
+
+---
+
 ## [1.11.1] - 2026-08-05
 
 ### Fixed

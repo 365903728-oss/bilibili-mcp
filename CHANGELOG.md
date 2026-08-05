@@ -8,6 +8,16 @@
 
 ---
 
+## [1.11.2] - 2026-08-06
+
+### 新增
+- 新增官方 MCP Registry 元数据：`package.json` 中的 `mcpName` 与根目录 `server.json`，指向 npm 包 `@xzxzzx/bilibili-mcp` v1.11.2（stdio 传输）。无运行时、MCP 工具或依赖变更。
+
+### 验证
+- 通过 TypeScript 构建、39 个文件 / 803 项测试与 `npm pack --dry-run`（181 个文件，包含 `mcpName`；`server.json` 保留于仓库根目录，供官方 Registry 使用）；`package.json` 与锁文件版本一致为 `1.11.2`。
+
+---
+
 ## [1.11.1] - 2026-08-05
 
 ### 修复
