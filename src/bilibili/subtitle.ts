@@ -1,9 +1,19 @@
 // 字幕处理逻辑
 import { getVideoSubtitle, getSubtitleContent, checkLoginStatus, matchPartIdentity, resolvePartCid } from "./client.js";
+import { transcribeVideoPart } from "../asr/transcription.js";
 import { extractBVId } from "../utils/bvid.js";
 import { cacheManager } from "../utils/cache.js";
-import { BilibiliAPIError, NoSubtitleError, PaidVideoError } from "../utils/errors.js";
+import {
+  AsrError,
+  BilibiliAPIError,
+  NoSubtitleError,
+  PaidVideoError,
+  ResourceLimitError,
+} from "../utils/errors.js";
 import { logger, redactSecrets } from "../utils/logger.js";
+import { SECURITY_LIMITS, utf8ByteLength } from "../security/limits.js";
+import { throwIfAborted } from "../security/operation-context.js";
+import { boundedRemoteText } from "../utils/bounded-text.js";
 import type {
   BilibiliSubtitleItem,
   PartInfo,
@@ -163,6 +173,11 @@ function searchTranscript(
   maxMatches: number,
   contextSegments: number,
   sourceUrl: string,
+  buildEnvelope: (
+    transcript: string,
+    matches: TranscriptMatch[],
+    totalMatches: number,
+  ) => VideoTranscriptData,
 ): {
   matches: TranscriptMatch[];
   totalMatches: number;
@@ -191,20 +206,41 @@ function searchTranscript(
     const start = Math.max(0, idx - contextSegments);
     const end = Math.min(body.length - 1, idx + contextSegments);
 
-    for (let j = start; j <= end; j++) {
-      contextIndices.add(j);
-    }
-
     const timestampUrl = new URL(sourceUrl);
     timestampUrl.searchParams.set("t", String(hit.from));
 
-    matches.push({
+    const context = mergeSubtitleText(body.slice(start, end + 1), true);
+    const candidate: TranscriptMatch = {
       start_seconds: hit.from,
       end_seconds: hit.to,
       content: hit.content,
-      context: mergeSubtitleText(body.slice(start, end + 1), true),
+      context,
       timestamp_url: timestampUrl.toString(),
-    });
+    };
+
+    const newIndices: number[] = [];
+    for (let j = start; j <= end; j++) {
+      if (contextIndices.has(j)) continue;
+      newIndices.push(j);
+    }
+    const tentativeIndices = new Set(contextIndices);
+    for (const contextIndex of newIndices) tentativeIndices.add(contextIndex);
+    const tentativeCompactBody = [...tentativeIndices]
+      .sort((left, right) => left - right)
+      .map((contextIndex) => body[contextIndex]);
+    const tentativeTranscript = mergeSubtitleText(tentativeCompactBody, true);
+    const tentativeMatches = [...matches, candidate];
+    const exactSearchBytes = utf8ByteLength(JSON.stringify(
+      buildEnvelope(tentativeTranscript, tentativeMatches, totalMatches),
+    ));
+    if (exactSearchBytes > SECURITY_LIMITS.transcriptSearchBytes) {
+      break;
+    }
+
+    matches.push(candidate);
+    for (const contextIndex of newIndices) {
+      contextIndices.add(contextIndex);
+    }
   }
 
   const sortedIndices = [...contextIndices].sort((a, b) => a - b);
@@ -253,15 +289,144 @@ export async function getVideoTranscriptData(
   startSeconds?: number,
   endSeconds?: number,
   searchOptions?: TranscriptSearchOptions,
+  fallbackToAsr?: boolean,
+  signal?: AbortSignal,
 ): Promise<VideoTranscriptData> {
+  throwIfAborted(signal);
   const bvid = extractBVId(bvidOrUrl);
   const wantsTimedOutput = includeTimestamps || startSeconds !== undefined || endSeconds !== undefined;
   const wantsSearch = searchOptions !== undefined;
   const { cid, pages, videoData } = await resolvePartCid(bvidOrUrl, page);
-  const title = videoData.title;
-  const description = videoData.desc || "";
+  const title = boundedRemoteText(videoData.title, 512);
+  const description = boundedRemoteText(videoData.desc, 20_000);
   const resolvedPage = page ?? matchPartIdentity(videoData.cid, pages, videoData.title).page;
   const sourceUrl = buildTranscriptSourceUrl(bvid, pages, resolvedPage);
+
+  const buildSegmentResult = (
+    body: SubtitleBodyItem[],
+    dataSource: "subtitle" | "asr",
+    language?: string,
+  ): VideoTranscriptData => {
+    const filteredBody = filterSegmentsByRange(body, startSeconds, endSeconds);
+
+    if (wantsSearch) {
+      const { query, max_matches, context_segments } = searchOptions!;
+      const buildSearchResult = (
+        transcript: string,
+        matches: TranscriptMatch[],
+        totalMatches: number,
+      ): VideoTranscriptData => ({
+        bvid,
+        data_source: dataSource,
+        language,
+        transcript,
+        title,
+        source_url: sourceUrl,
+        page: resolvedPage,
+        query,
+        total_matches: totalMatches,
+        returned_matches: matches.length,
+        truncated: totalMatches > matches.length,
+        matches,
+      });
+      const { matches, totalMatches, compactTranscript } = searchTranscript(
+        filteredBody,
+        query,
+        max_matches,
+        context_segments,
+        sourceUrl,
+        buildSearchResult,
+      );
+      const result = buildSearchResult(
+        compactTranscript,
+        matches,
+        totalMatches,
+      );
+      if (
+        utf8ByteLength(JSON.stringify(result)) >
+        SECURITY_LIMITS.transcriptSearchBytes
+      ) {
+        throw new ResourceLimitError(
+          "Transcript search result exceeded its byte limit",
+          "transcript_search_result",
+          SECURITY_LIMITS.transcriptSearchBytes,
+        );
+      }
+      return result;
+    }
+
+    return {
+      bvid,
+      data_source: dataSource,
+      language,
+      transcript: mergeSubtitleText(filteredBody, includeTimestamps),
+      title,
+      source_url: sourceUrl,
+      page: resolvedPage,
+    };
+  };
+
+  const buildDescriptionFallback = (reason: string): VideoTranscriptData => {
+    if (!fallbackToDescription || wantsSearch || wantsTimedOutput) {
+      const suffix = wantsSearch
+        ? "; description fallback is incompatible with keyword search"
+        : wantsTimedOutput
+          ? "; description fallback is incompatible with timestamps or range"
+          : "";
+      throw new NoSubtitleError(`${reason}${suffix}`);
+    }
+    return {
+      bvid,
+      data_source: "description",
+      transcript: description,
+      title,
+      source_url: sourceUrl,
+      page: resolvedPage,
+    };
+  };
+
+  const handleDefinitiveSubtitleAbsence = async (
+    reason: string,
+  ): Promise<VideoTranscriptData> => {
+    if (fallbackToAsr) {
+      throwIfAborted(signal);
+      const exactPart = pages.find((part) => part.cid === cid);
+      const durationSeconds =
+        exactPart?.duration ??
+        (
+          pages.length === 1 &&
+          videoData.cid === cid &&
+          typeof videoData.duration === "number"
+            ? videoData.duration
+            : undefined
+        );
+      if (
+        durationSeconds === undefined ||
+        !Number.isFinite(durationSeconds) ||
+        durationSeconds <= 0
+      ) {
+        throw new AsrError(
+          "ASR_AUDIO_UNAVAILABLE",
+          "The selected Part has no trustworthy duration metadata.",
+        );
+      }
+      const asrRequest = {
+        bvid,
+        cid,
+        durationSeconds,
+      };
+      const asr = signal === undefined
+        ? await transcribeVideoPart(asrRequest)
+        : await transcribeVideoPart(asrRequest, {}, signal);
+      if (asr !== null) {
+        return buildSegmentResult(asr.segments, "asr", asr.language);
+      }
+      return buildDescriptionFallback(
+        `${reason}; Bilibili returned no valid audio-only representation`,
+      );
+    }
+    return buildDescriptionFallback(reason);
+  };
 
   // 获取字幕列表
   try {
@@ -272,22 +437,7 @@ export async function getVideoTranscriptData(
       subtitleData.subtitle.subtitles.length === 0
     ) {
       await verifyLoginForEmptySubtitles(bvid);
-      if (fallbackToDescription && !wantsSearch) {
-        if (wantsTimedOutput) {
-          throw new NoSubtitleError(
-            `Video ${bvid} has no subtitles available; description fallback is incompatible with timestamps or range`,
-          );
-        }
-        return {
-          bvid,
-          data_source: "description",
-          transcript: description,
-          title,
-          source_url: sourceUrl,
-          page: resolvedPage,
-        };
-      }
-      throw new NoSubtitleError(
+      return await handleDefinitiveSubtitleAbsence(
         `Video ${bvid} has no subtitles available`,
       );
     }
@@ -298,22 +448,7 @@ export async function getVideoTranscriptData(
     );
 
     if (!bestSubtitle) {
-      if (fallbackToDescription && !wantsSearch) {
-        if (wantsTimedOutput) {
-          throw new NoSubtitleError(
-            `No suitable subtitle found for video ${bvid}; description fallback is incompatible with timestamps or range`,
-          );
-        }
-        return {
-          bvid,
-          data_source: "description",
-          transcript: description,
-          title,
-          source_url: sourceUrl,
-          page: resolvedPage,
-        };
-      }
-      throw new NoSubtitleError(
+      return await handleDefinitiveSubtitleAbsence(
         `No suitable subtitle found for video ${bvid}`,
       );
     }
@@ -323,65 +458,12 @@ export async function getVideoTranscriptData(
     );
 
     if (!subtitleContent?.body || subtitleContent.body.length === 0) {
-      if (fallbackToDescription && !wantsSearch) {
-        if (wantsTimedOutput) {
-          throw new NoSubtitleError(
-            `Subtitle body is empty for video ${bvid}; description fallback is incompatible with timestamps or range`,
-          );
-        }
-        return {
-          bvid,
-          data_source: "description",
-          transcript: description,
-          title,
-          source_url: sourceUrl,
-          page: resolvedPage,
-        };
-      }
-      throw new NoSubtitleError(
+      return await handleDefinitiveSubtitleAbsence(
         `Subtitle body is empty for video ${bvid}`,
       );
     }
 
-    const body = filterSegmentsByRange(subtitleContent.body, startSeconds, endSeconds);
-
-    if (wantsSearch) {
-      const { query, max_matches, context_segments } = searchOptions!;
-      const { matches, totalMatches, compactTranscript } = searchTranscript(
-        body,
-        query,
-        max_matches,
-        context_segments,
-        sourceUrl,
-      );
-
-      return {
-        bvid,
-        data_source: "subtitle",
-        language: bestSubtitle.lan,
-        transcript: compactTranscript,
-        title,
-        source_url: sourceUrl,
-        page: resolvedPage,
-        query,
-        total_matches: totalMatches,
-        returned_matches: matches.length,
-        truncated: totalMatches > max_matches,
-        matches,
-      };
-    }
-
-    const transcript = mergeSubtitleText(body, includeTimestamps);
-
-    return {
-      bvid,
-      data_source: "subtitle",
-      language: bestSubtitle.lan,
-      transcript,
-      title,
-      source_url: sourceUrl,
-      page: resolvedPage,
-    };
+    return buildSegmentResult(subtitleContent.body, "subtitle", bestSubtitle.lan);
   } catch (error) {
     // COOKIE_EXPIRED must propagate
     if (
@@ -390,26 +472,13 @@ export async function getVideoTranscriptData(
     ) {
       throw error;
     }
+    if (error instanceof AsrError || fallbackToAsr) {
+      throw error;
+    }
     // NoSubtitleError: only rethrow if fallback disabled
     if (error instanceof NoSubtitleError) {
       if (!fallbackToDescription || wantsSearch) throw error;
       if (wantsTimedOutput) throw error;
-      return {
-        bvid,
-        data_source: "description",
-        transcript: description,
-        title,
-        source_url: sourceUrl,
-        page: resolvedPage,
-      };
-    }
-    // Other errors: fallback to description if enabled, else rethrow
-    if (fallbackToDescription && !wantsSearch) {
-      if (wantsTimedOutput) {
-        throw new NoSubtitleError(
-          `Subtitle fetch failed for video ${bvid}; description fallback is incompatible with timestamps or range`,
-        );
-      }
       return {
         bvid,
         data_source: "description",
@@ -553,25 +622,14 @@ export async function getVideoInfoWithSubtitle(
       if (error instanceof BilibiliAPIError && error.code === 'COOKIE_EXPIRED') {
         throw error;
       }
-      // 其他字幕获取失败，使用简介作为降级方案
+      // Transport/API/parser failures must remain errors. Only the explicit
+      // verified-empty branches above may return description data.
       logger.warn(
-        "Failed to fetch subtitles, using description fallback",
-        { bvid, error: error instanceof Error ? error.message : error },
+        "Failed to fetch subtitles",
+        { bvid, error: error instanceof Error ? error.name : "UnknownError" },
         { type: "subtitle" },
       );
-
-      const result: SubtitleData = {
-        data_source: "description",
-        video_info: {
-          title,
-          description: description || "该视频没有可用的简介",
-          tags: tags.length > 0 ? tags : ["无标签"],
-          pubdate: formattedDate,
-          pubdate_timestamp: pubdate,
-        },
-      };
-      // 不缓存降级结果，以便下次重试时能拉取字幕
-      return result;
+      throw error;
     }
   } catch (error) {
     logger.error(

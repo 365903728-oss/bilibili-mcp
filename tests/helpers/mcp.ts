@@ -6,7 +6,10 @@ type ServerWithRequestHandlers = {
 
 export function getMcpHandler<TRequest, TResponse>(
   method: string,
-): (request: TRequest) => Promise<TResponse> {
+): (
+  request: TRequest,
+  extra?: { signal?: AbortSignal },
+) => Promise<TResponse> {
   const handlers = (server as unknown as ServerWithRequestHandlers)
     ._requestHandlers;
 
@@ -19,5 +22,8 @@ export function getMcpHandler<TRequest, TResponse>(
     throw new Error(`${method} handler not registered`);
   }
 
-  return handler as (request: TRequest) => Promise<TResponse>;
+  return handler as (
+    request: TRequest,
+    extra?: { signal?: AbortSignal },
+  ) => Promise<TResponse>;
 }

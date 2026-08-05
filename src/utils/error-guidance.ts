@@ -1,10 +1,13 @@
 import {
+  AsrError,
   BilibiliAPIError,
   CommentsDisabledError,
   NetworkError,
   NoSubtitleError,
   PaidVideoError,
+  ResourceLimitError,
   TimeoutError,
+  UpstreamResponseError,
   ValidationError,
 } from "./errors.js";
 import {
@@ -12,6 +15,8 @@ import {
   buildCredentialNextStepsEn,
   buildCredentialNextStepsZh,
 } from "./credential-guidance.js";
+import { boundedRemoteText } from "./bounded-text.js";
+import { redactSecrets } from "./logger.js";
 
 export type StructuredErrorCode =
   | "VALIDATION_ERROR"
@@ -24,6 +29,7 @@ export type StructuredErrorCode =
   | "PAID_VIDEO"
   | "COMMENTS_DISABLED"
   | "BILIBILI_API_ERROR"
+  | "RESOURCE_LIMIT_EXCEEDED"
   | "UNKNOWN_ERROR";
 
 export type StructuredErrorCategory =
@@ -34,6 +40,8 @@ export type StructuredErrorCategory =
   | "access"
   | "rate_limit"
   | "api"
+  | "resource"
+  | "runtime"
   | "unknown";
 
 export interface StructuredErrorPayload {
@@ -68,8 +76,10 @@ function withCompatibilityNextSteps(
   };
 }
 
-function safeMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
+function safeValidationMessage(error: unknown): string {
+  if (!(error instanceof Error) || !error.message) return "Invalid input";
+  const redacted = redactSecrets(error.message);
+  return boundedRemoteText(redacted, 512) || "Invalid input";
 }
 
 export function buildStructuredErrorPayload(
@@ -82,8 +92,8 @@ export function buildStructuredErrorPayload(
   ) {
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(error, "Invalid input"),
-      message_en: safeMessage(error, "Invalid input"),
+      message: safeValidationMessage(error),
+      message_en: safeValidationMessage(error),
       message_zh: "输入参数无效，请检查 BV 号、链接、语言代码或评论参数。",
       code: "VALIDATION_ERROR",
       category: "validation",
@@ -97,10 +107,7 @@ export function buildStructuredErrorPayload(
   if (error instanceof BilibiliAPIError && error.code === "COOKIE_EXPIRED") {
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(
-        error,
-        "Current Bilibili credentials are expired or not logged in.",
-      ),
+      message: "Current Bilibili credentials are expired or not logged in.",
       message_en:
         "Current Bilibili credentials are expired or not logged in.",
       message_zh: "当前 Bilibili 凭据已过期或未登录。",
@@ -123,7 +130,7 @@ export function buildStructuredErrorPayload(
       : "如果接受降级为视频简介，请使用 get_video_info，或用 fallback_to_description: true 重试字幕工具。";
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(error, "No subtitles are available for this video."),
+      message: "No subtitles are available for this video.",
       message_en: "No subtitles are available for this video.",
       message_zh: "该视频没有可用字幕。",
       code: "SUBTITLE_UNAVAILABLE",
@@ -143,10 +150,79 @@ export function buildStructuredErrorPayload(
     });
   }
 
+  if (error instanceof AsrError) {
+    const guidance: Record<
+      AsrError["code"],
+      { en: string; zh: string; stepsEn: string[]; stepsZh: string[] }
+    > = {
+      ASR_NOT_READY: {
+        en: "Local ASR is not ready.",
+        zh: "本地 ASR 尚未就绪。",
+        stepsEn: [
+          "Run `npx -y @xzxzzx/bilibili-mcp@latest setup` outside the MCP call.",
+          "Inspect `npx -y @xzxzzx/bilibili-mcp@latest doctor --json` before retrying.",
+        ],
+        stepsZh: [
+          "请在 MCP 调用之外运行 `npx -y @xzxzzx/bilibili-mcp@latest setup`。",
+          "重试前请检查 `npx -y @xzxzzx/bilibili-mcp@latest doctor --json`。",
+        ],
+      },
+      ASR_AUDIO_UNAVAILABLE: {
+        en: "A temporary audio-only source is unavailable.",
+        zh: "无法获取临时纯音频源。",
+        stepsEn: ["Retry later; Bilibili playback URLs are temporary."],
+        stepsZh: ["请稍后重试；Bilibili 播放地址是临时的。"],
+      },
+      ASR_LIMIT_EXCEEDED: {
+        en: "The selected Part exceeds a bounded ASR safety limit.",
+        zh: "所选分集超出了 ASR 安全限制。",
+        stepsEn: ["Choose a shorter Part or use native subtitles."],
+        stepsZh: ["请选择更短的分集，或使用原生字幕。"],
+      },
+      ASR_BUSY: {
+        en: "Another local ASR transcription is already active.",
+        zh: "已有一个本地 ASR 转录正在运行。",
+        stepsEn: ["Retry after the active transcription finishes."],
+        stepsZh: ["请在当前转录完成后重试。"],
+      },
+      ASR_TRANSCRIPTION_TIMEOUT: {
+        en: "Local ASR exceeded its time limit.",
+        zh: "本地 ASR 超过了时间限制。",
+        stepsEn: ["Retry later or choose a shorter Part."],
+        stepsZh: ["请稍后重试，或选择更短的分集。"],
+      },
+      ASR_TRANSCRIPTION_FAILED: {
+        en: "The managed local ASR process failed.",
+        zh: "项目托管的本地 ASR 进程失败。",
+        stepsEn: ["Inspect `doctor --json`, then retry without changing the model inside MCP."],
+        stepsZh: ["请检查 `doctor --json`，不要在 MCP 调用中切换模型，然后重试。"],
+      },
+      ASR_OUTPUT_INVALID: {
+        en: "The managed local ASR process returned invalid bounded output.",
+        zh: "项目托管的本地 ASR 进程返回了无效的有界输出。",
+        stepsEn: ["Run `doctor --json` and report the error if it repeats."],
+        stepsZh: ["请运行 `doctor --json`；如反复出现，请反馈该错误。"],
+      },
+    };
+    const selected = guidance[error.code];
+    return withCompatibilityNextSteps({
+      error: true,
+      message: selected.en,
+      message_en: selected.en,
+      message_zh: selected.zh,
+      code: error.code,
+      category: "runtime",
+      retryable: error.retryable,
+      user_action_required: error.code === "ASR_NOT_READY" || error.code === "ASR_LIMIT_EXCEEDED",
+      next_steps_en: selected.stepsEn,
+      next_steps_zh: selected.stepsZh,
+    });
+  }
+
   if (error instanceof TimeoutError) {
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(error, "Bilibili request timed out."),
+      message: "The Bilibili request timed out.",
       message_en: "The Bilibili request timed out.",
       message_zh: "请求 Bilibili 超时。",
       code: "NETWORK_TIMEOUT",
@@ -165,14 +241,45 @@ export function buildStructuredErrorPayload(
     });
   }
 
+  if (error instanceof ResourceLimitError) {
+    return withCompatibilityNextSteps({
+      error: true,
+      message: "The request exceeded a local safety limit.",
+      message_en: "The request exceeded a local safety limit.",
+      message_zh: "请求超出了本地安全限制。",
+      code: "RESOURCE_LIMIT_EXCEEDED",
+      category: "resource",
+      retryable: true,
+      user_action_required: false,
+      next_steps_en: [
+        "Reduce request concurrency or requested output size, then retry.",
+      ],
+      next_steps_zh: ["请降低请求并发量或请求的输出规模后重试。"],
+    });
+  }
+
+  if (error instanceof UpstreamResponseError) {
+    return withCompatibilityNextSteps({
+      error: true,
+      message: "The remote service returned an invalid bounded response.",
+      message_en: "The remote service returned an invalid bounded response.",
+      message_zh: "远程服务返回了无效或超出格式约束的响应。",
+      code: "UPSTREAM_RESPONSE_INVALID",
+      category: "api",
+      retryable: false,
+      user_action_required: false,
+      next_steps_en: ["Retry later if the upstream response was temporary."],
+      next_steps_zh: ["如果上游响应异常是临时问题，请稍后重试。"],
+    });
+  }
+
   if (error instanceof NetworkError) {
     const rateLimited = error.statusCode === 429;
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(
-        error,
-        rateLimited ? "Bilibili API rate limit reached." : "Network request failed.",
-      ),
+      message: rateLimited
+        ? "Bilibili API rate limit reached."
+        : "Network request failed.",
       message_en: rateLimited
         ? "Bilibili API rate limit reached."
         : "Network request failed.",
@@ -208,7 +315,7 @@ export function buildStructuredErrorPayload(
   if (error instanceof BilibiliAPIError && error.code === "ACCESS_DENIED") {
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(error, "Bilibili denied access to this resource."),
+      message: "Bilibili denied access to this resource.",
       message_en: "Bilibili denied access to this resource.",
       message_zh: "Bilibili 拒绝访问该资源。",
       code: "ACCESS_DENIED",
@@ -230,10 +337,7 @@ export function buildStructuredErrorPayload(
   if (error instanceof PaidVideoError) {
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(
-        error,
-        "This video appears to require paid access.",
-      ),
+      message: "This video appears to require paid access.",
       message_en: "This video appears to require paid access.",
       message_zh: "该视频可能需要付费、会员或额外权限。",
       code: "PAID_VIDEO",
@@ -254,10 +358,7 @@ export function buildStructuredErrorPayload(
   if (error instanceof CommentsDisabledError) {
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(
-        error,
-        "Comments are disabled or restricted for this video.",
-      ),
+      message: "Comments are disabled or restricted for this video.",
       message_en: "Comments are disabled or restricted for this video.",
       message_zh: "该视频评论已关闭或访问受限。",
       code: "COMMENTS_DISABLED",
@@ -278,7 +379,7 @@ export function buildStructuredErrorPayload(
   if (error instanceof BilibiliAPIError) {
     return withCompatibilityNextSteps({
       error: true,
-      message: safeMessage(error, "Bilibili API returned an error."),
+      message: "Bilibili API returned an error.",
       message_en: "Bilibili API returned an error.",
       message_zh: "Bilibili API 返回错误。",
       code: "BILIBILI_API_ERROR",
@@ -299,8 +400,8 @@ export function buildStructuredErrorPayload(
 
   return withCompatibilityNextSteps({
     error: true,
-    message: safeMessage(error, "Unknown error"),
-    message_en: safeMessage(error, "Unknown error"),
+    message: "An internal error occurred.",
+    message_en: "An internal error occurred.",
     message_zh: "发生未知错误。",
     code: "UNKNOWN_ERROR",
     category: "unknown",

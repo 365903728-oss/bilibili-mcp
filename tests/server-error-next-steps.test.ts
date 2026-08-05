@@ -43,6 +43,7 @@ vi.mock("../src/bilibili/http.js", () => ({
 }));
 
 const {
+  AsrError,
   BilibiliAPIError,
   CommentsDisabledError,
   NetworkError,
@@ -210,6 +211,36 @@ describe("generic MCP error credential next_steps", () => {
 });
 
 describe("structured MCP error categories", () => {
+  it.each([
+    ["ASR_NOT_READY", false, true],
+    ["ASR_AUDIO_UNAVAILABLE", true, false],
+    ["ASR_LIMIT_EXCEEDED", false, true],
+    ["ASR_BUSY", true, false],
+    ["ASR_TRANSCRIPTION_TIMEOUT", true, false],
+    ["ASR_TRANSCRIPTION_FAILED", true, false],
+    ["ASR_OUTPUT_INVALID", false, false],
+  ] as const)("maps %s to bounded bilingual runtime guidance", async (code, retryable, userActionRequired) => {
+    mockGetVideoTranscriptData.mockRejectedValueOnce(
+      new AsrError(code, `safe ${code}`, retryable),
+    );
+    const handler = getCallToolHandler();
+    const response = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 30,
+      params: {
+        name: "get_video_transcript",
+        arguments: { bvid_or_url: "BV1T6PQzQErF", fallback_to_asr: true },
+      },
+    });
+    const payload = JSON.parse(response.content[0].text);
+
+    expect(response.isError).toBe(true);
+    expect(response).not.toHaveProperty("structuredContent");
+    expectStructuredError(payload, code, { retryable, userActionRequired });
+    expect(JSON.stringify(payload)).not.toMatch(/SESSDATA|bili_jct|DedeUserID|token=|audio\.m4s/i);
+  });
+
   it("maps handler validation errors to VALIDATION_ERROR", async () => {
     const handler = getCallToolHandler();
     const response = await handler({

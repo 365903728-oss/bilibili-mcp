@@ -11,7 +11,7 @@
 | 只有主题，还没有视频链接 | `search_bilibili_videos` | 最多 10 个普通视频候选及可继续调用的 BVID；不自动抓取字幕或评论 |
 | 从我的 Bilibili 收藏夹开始读取 | `list_bilibili_favorite_videos` | 当前账号所有创建的收藏夹的一页视频（最多 20 条），按 `next_cursor` 翻页直到结束；不读取字幕、评论或下载 |
 | 想让 AI 总结一个视频 | `get_video_info` | 字幕优先；无字幕时返回标题、简介、标签 |
-| 只想拿完整转录文本或关键词定位 | `get_video_transcript` | 纯字幕文本、语言、数据来源；支持时间戳、区间过滤和关键词搜索 |
+| 只想拿完整转录文本或关键词定位 | `get_video_transcript` | 原生字幕优先，可显式 ASR 回退；支持时间戳、区间过滤和关键词搜索 |
 | 想查看标题、作者、播放量等结构化信息 | `get_video_metadata` | 标题、作者、时长、发布时间、标签、统计数据、多P分集列表（`pages`） |
 | 想看观众反馈和热门评论 | `get_video_comments` | 热门评论、时间戳评论、可选回复 |
 | 想看视频章节/进度条分段 | `get_video_chapters` | 章节标题、起止时间；无章节时返回空列表 |
@@ -40,7 +40,7 @@
   - `include_replies`: 是否包含高赞回复（默认 `true`）
 
 ### 3. 视频转录 (`get_video_transcript`)
-- 返回纯字幕文本，按行合并
+- 返回按行合并的原生字幕或显式请求的本地 ASR 转录
 - 支持指定偏好语言（默认按 `zh-Hans` > `ai-zh` > `zh-CN` > `zh-Hant` > `en` 优先级选择）
 - 支持多P分集选择、时间戳输出和时间区间过滤
 - 支持可选关键词搜索：返回带上下文的时间戳匹配列表（大小写不敏感字面匹配）
@@ -48,6 +48,7 @@
 - 可选参数：
   - `preferred_lang`: 偏好字幕语言代码
   - `fallback_to_description`: 字幕不可用时是否降级为视频描述（默认 `false`）
+  - `fallback_to_asr`: 确认无可用字幕时是否运行已就绪的本地 ASR（默认 `false`）
   - `page`: 多P视频分集编号（从1开始的正整数）
   - `include_timestamps`: 每行添加 `[HH:MM:SS --> HH:MM:SS]` 时间戳前缀
   - `start_seconds` / `end_seconds`: 只返回与此区间重叠的字幕段
@@ -55,6 +56,10 @@
   - `max_matches`: 最大匹配数（1-20，默认10）
   - `context_segments`: 每个匹配前后的上下文段数（0-5，默认1）
 - 默认不降级：无字幕时返回 `SUBTITLE_UNAVAILABLE` 错误
+- 回退顺序固定为原生字幕 → 显式 ASR → 仅在播放 API 返回有效空音频集合且同时显式请求时使用视频描述
+- 只有字幕列表、选中字幕或字幕正文被确认为空时才触发 ASR；Cookie、HTTP、超时、解析、风控和其他 API 错误保持可见
+- ASR 使用 setup 管理的 ready 模型、CPU INT8 和一个临时音频文件；MCP 调用不会下载或切换模型
+- 有界限制：单 Part 最长 7200 秒、音频 128 MiB、3 个候选地址/每个 3 次重定向、下载 120 秒、转录 30 分钟、stdout 2 MiB、10000 段、同时一个任务且不排队
 - 时间戳/区间过滤/关键词搜索与描述降级不兼容：请求 timed 输出或搜索时不会静默降级
 - Cookie 失效时始终返回 `COOKIE_EXPIRED`，不静默降级
 - 证据链接：
@@ -146,7 +151,7 @@
 
 - `error` / `message` / `code` / `next_steps`：向后兼容字段；`next_steps` 与 `next_steps_en` 内容一致。
 - `message_en` / `message_zh` / `next_steps_en` / `next_steps_zh`：显式中英文版本，便于客户端按语言渲染。
-- `category`：错误分类（`validation` / `credentials` / `content` / `network` / `access` / `rate_limit` / `api` / `unknown`）。
+- `category`：错误分类（`validation` / `credentials` / `content` / `network` / `access` / `rate_limit` / `api` / `runtime` / `unknown`）。
 - `retryable`：是否建议自动重试。
 - `user_action_required`：是否需要用户介入才能解决。
 - `details`：可选的附加信息（如 HTTP 状态码、超时毫秒数、Bilibili API 错误码），不包含 Cookie 或完整 URL。
@@ -158,6 +163,13 @@
 | `VALIDATION_ERROR` | 输入参数不合法 | 检查并修正 `bvid_or_url` 或其他参数 |
 | `COOKIE_EXPIRED` | Cookie 已失效或未登录 | 用户应更新/轮换 Bilibili 凭据 |
 | `SUBTITLE_UNAVAILABLE` | 视频无可用的字幕 | 对 `get_video_transcript` 可重试并设置 `fallback_to_description: true` |
+| `ASR_NOT_READY` | 本地 ASR 未就绪 | 在本地运行 `setup`，并用 `doctor --json` 确认 ready |
+| `ASR_AUDIO_UNAVAILABLE` | 无法安全获取临时纯音频 | 稍后重试；Bilibili 播放地址是临时的 |
+| `ASR_LIMIT_EXCEEDED` | 分集、音频或输出超过安全限制 | 选择更短的 Part 或使用原生字幕 |
+| `ASR_BUSY` | 已有一个本地 ASR 任务 | 当前任务完成后重试；不会排队 |
+| `ASR_TRANSCRIPTION_TIMEOUT` | 本地转录超过 30 分钟 | 稍后重试或选择更短的 Part |
+| `ASR_TRANSCRIPTION_FAILED` | 托管 Python/模型运行失败 | 检查 `doctor --json` 后重试 |
+| `ASR_OUTPUT_INVALID` | 托管 ASR 返回无效或超限的 NDJSON | 检查本地 ASR 状态并反馈重复错误 |
 | `NETWORK_ERROR` | 网络请求失败（HTTP 5xx、连接错误等） | 稍后重试；如反复出现请检查网络/代理/防火墙 |
 | `NETWORK_TIMEOUT` | 请求 Bilibili 超时 | 稍后重试；如反复出现请检查网络/代理/防火墙 |
 | `API_RATE_LIMITED` | 触发 Bilibili API 频率限制（HTTP 429） | 等待一段时间后重试；降低调用频率或调大 `BILIBILI_RATE_LIMIT_MS` |
@@ -276,14 +288,31 @@
   "arguments": {
     "bvid_or_url": "https://www.bilibili.com/video/BV1xx411c7mD",
     "preferred_lang": "zh-Hans",
-    "fallback_to_description": false
+    "fallback_to_description": false,
+    "fallback_to_asr": false
   }
 }
 ```
 
-返回内容：`bvid`、`title`、`language`、`transcript`（按行合并）、`data_source`（`subtitle` 或 `description`）、`page`（分集编号）。
+返回内容：`bvid`、`title`、`language`、`transcript`（按行合并）、`data_source`（`subtitle`、`asr` 或 `description`）、`page`（分集编号）。
 
 > 默认无字幕时返回 `SUBTITLE_UNAVAILABLE`。如需降级，设置 `fallback_to_description: true`。
+
+**显式 ASR 回退示例**：
+
+```json
+{
+  "name": "get_video_transcript",
+  "arguments": {
+    "bvid_or_url": "BV1xx411c7mD",
+    "page": 1,
+    "fallback_to_asr": true,
+    "include_timestamps": true
+  }
+}
+```
+
+原生字幕始终优先。只有确认没有可用字幕且 `doctor --json` 报告 ready 时，结果才返回 `data_source: "asr"`；ASR 段继续使用相同的区间、关键词、上下文、`source_url` 和 `timestamp_url` 管线。
 
 **关键词搜索示例**：
 

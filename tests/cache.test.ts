@@ -14,6 +14,7 @@ const envCleanup = vi.hoisted(() => {
 // ponytail: hoisted env set for this file's eviction test; cleanup via return
 
 import { CacheManager } from "../src/utils/cache.js";
+import { SECURITY_LIMITS } from "../src/security/limits.js";
 
 describe("CacheManager", () => {
   it("keeps primitive key generation stable", () => {
@@ -66,6 +67,55 @@ describe("CacheManager", () => {
     expect(cache.getCommentInfo("comment-key")).toEqual({
       comments: ["first"],
     });
+  });
+
+  it("refuses values above each per-entry byte budget", () => {
+    const cache = new CacheManager<string, string>();
+    const exactVideo = "v".repeat(
+      SECURITY_LIMITS.videoCacheEntryBytes - 2,
+    );
+    const oversizedVideo = `${exactVideo}x`;
+    const exactComment = "c".repeat(
+      SECURITY_LIMITS.commentCacheEntryBytes - 2,
+    );
+    const oversizedComment = `${exactComment}x`;
+
+    cache.setVideoInfo("video-exact", exactVideo);
+    cache.setVideoInfo("video-over", oversizedVideo);
+    cache.setCommentInfo("comment-exact", exactComment);
+    cache.setCommentInfo("comment-over", oversizedComment);
+
+    expect(cache.getVideoInfo("video-exact")).toBe(exactVideo);
+    expect(cache.getVideoInfo("video-over")).toBeUndefined();
+    expect(cache.getCommentInfo("comment-exact")).toBe(exactComment);
+    expect(cache.getCommentInfo("comment-over")).toBeUndefined();
+  });
+
+  it("evicts weighted video entries before crossing the aggregate byte budget", () => {
+    const cache = new CacheManager<{ value: string }>();
+    const value = { value: "x".repeat(3 * 1024 * 1024) };
+
+    cache.setVideoInfo("first", value);
+    cache.setVideoInfo("second", { ...value });
+    cache.setVideoInfo("third", { ...value });
+
+    expect(cache.getVideoInfo("first")).toBeUndefined();
+    expect(cache.getVideoInfo("second")).toEqual(value);
+    expect(cache.getVideoInfo("third")).toEqual(value);
+  });
+
+  it("accounts for replacement and clear without retaining stale weight", () => {
+    const cache = new CacheManager<{ value: string }>();
+
+    cache.setVideoInfo("same", { value: "x".repeat(3 * 1024 * 1024) });
+    cache.setVideoInfo("same", { value: "small" });
+    cache.setVideoInfo("second", { value: "y".repeat(3 * 1024 * 1024) });
+    cache.setVideoInfo("third", { value: "z".repeat(3 * 1024 * 1024) });
+
+    expect(cache.getVideoInfo("same")).toEqual({ value: "small" });
+    cache.clear();
+    expect(cache.getVideoInfo("second")).toBeUndefined();
+    expect(cache.getVideoInfo("third")).toBeUndefined();
   });
 });
 

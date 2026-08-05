@@ -146,6 +146,7 @@ describe("getVideoChaptersData", () => {
 
     const result = await getVideoChaptersData("BV1T6PQzQErF");
 
-    expect(result.chapters[0].title.length).toBe(500);
+    expect(Buffer.byteLength(result.chapters[0].title, "utf8")).toBe(500);
+    expect(result.chapters[0].title.endsWith("…")).toBe(true);
   });
 });

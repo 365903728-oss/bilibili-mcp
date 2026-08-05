@@ -1,16 +1,23 @@
-import { redactSecrets } from "./logger.js";
+import {
+  abortableDelay,
+  getOperationSignal,
+  throwIfAborted,
+} from "../security/operation-context.js";
+import { TimeoutError } from "./errors.js";
 
 /**
  * 重试机制模块
  * 提供带指数退避的请求重试功能
  */
 
-interface RetryOptions {
+export interface RetryOptions {
   maxRetries?: number;
   baseDelay?: number;
   maxDelay?: number;
   retryableStatusCodes?: number[];
   retryableErrorTypes?: string[];
+  signal?: AbortSignal;
+  deadlineAt?: number;
 }
 
 interface RetryStats {
@@ -42,20 +49,35 @@ class RetryManager {
       baseDelay = 1000,
       maxDelay = 10000,
       retryableStatusCodes = [408, 429, 500, 502, 503, 504],
-      retryableErrorTypes = ['NetworkError', 'TimeoutError', 'AbortError']
+      retryableErrorTypes = ['NetworkError', 'TimeoutError'],
+      deadlineAt,
     } = options;
+    const signal = getOperationSignal(options.signal);
 
     let lastError: any;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
+        throwIfAborted(signal);
+        this.assertDeadline(deadlineAt);
         this.stats.attempts++;
         const startTime = Date.now();
         
         if (attempt > 0) {
-          const delay = this.calculateDelay(attempt, baseDelay, maxDelay);
+          const calculatedDelay = this.calculateDelay(
+            attempt,
+            baseDelay,
+            maxDelay,
+          );
+          const delay = deadlineAt === undefined
+            ? calculatedDelay
+            : Math.min(calculatedDelay, Math.max(0, deadlineAt - Date.now()));
+          if (delay <= 0) {
+            this.assertDeadline(deadlineAt);
+          }
           console.error(`Retrying attempt ${attempt}/${maxRetries} after ${delay}ms...`);
-          await this.delay(delay);
+          await abortableDelay(delay, signal);
+          this.assertDeadline(deadlineAt);
         }
 
         const result = await fn();
@@ -66,6 +88,11 @@ class RetryManager {
         return result;
       } catch (error: any) {
         lastError = error;
+        if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+          this.stats.failures++;
+          this.stats.lastError = error;
+          throw error;
+        }
         
         // 检查是否应该重试
         if (attempt >= maxRetries) {
@@ -81,10 +108,7 @@ class RetryManager {
           throw error;
         }
 
-        console.error(
-          `Attempt ${attempt} failed, will retry:`,
-          redactSecrets(error.message),
-        );
+        console.error(`Attempt ${attempt} failed; retry scheduled.`);
       }
     }
 
@@ -102,11 +126,10 @@ class RetryManager {
     return Math.floor(delay);
   }
 
-  /**
-   * 延迟函数
-   */
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  private assertDeadline(deadlineAt: number | undefined): void {
+    if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+      throw new TimeoutError("Request deadline exceeded", 0);
+    }
   }
 
   /**

@@ -14,7 +14,11 @@ import {
   buildCredentialStatus,
 } from "../utils/credential-guidance.js";
 import { buildStructuredErrorPayload } from "../utils/error-guidance.js";
-import { NoSubtitleError } from "../utils/errors.js";
+import {
+  AsrError,
+  NoSubtitleError,
+  ValidationError,
+} from "../utils/errors.js";
 import { sanitizeBVInput } from "../utils/sanitization.js";
 import { buildPackageUpdateInfo } from "../utils/update-check.js";
 import {
@@ -35,12 +39,32 @@ import {
 import {
   buildValidationErrorPayload,
   toErrorTextContent,
+  toStructuredContent,
   toTextContent,
 } from "./error-response.js";
 
 type ToolArgs = Record<string, unknown> | undefined;
+const KNOWN_TOOL_NAMES = new Set([
+  "get_credential_setup_instructions",
+  "check_bilibili_credentials",
+  "check_mcp_update",
+  "get_video_info",
+  "get_video_comments",
+  "get_video_transcript",
+  "get_video_metadata",
+  "get_video_chapters",
+  "search_bilibili_videos",
+  "list_bilibili_favorite_videos",
+]);
 
-export async function handleToolCall(name: string, args: ToolArgs) {
+export async function handleToolCall(
+  name: string,
+  args: ToolArgs,
+  signal?: AbortSignal,
+) {
+  if (name.length > 128 || !KNOWN_TOOL_NAMES.has(name)) {
+    throw new Error("Unknown MCP tool");
+  }
   switch (name) {
     case "get_credential_setup_instructions": {
       return toTextContent(buildCredentialSetupInstructions());
@@ -52,7 +76,7 @@ export async function handleToolCall(name: string, args: ToolArgs) {
     }
 
     case "check_mcp_update": {
-      const result = await buildPackageUpdateInfo();
+      const result = await buildPackageUpdateInfo(globalThis.fetch, signal);
       return toTextContent(result);
     }
 
@@ -91,7 +115,7 @@ export async function handleToolCall(name: string, args: ToolArgs) {
         if (limit !== undefined) validateCommentLimit(limit);
         if (sort !== undefined) validateCommentSort(sort);
         if (includeReplies !== undefined && typeof includeReplies !== "boolean") {
-          throw new Error("include_replies must be a boolean");
+          throw new ValidationError("include_replies must be a boolean");
         }
         sanitizedBvidOrUrl = sanitizeBVInput(bvidOrUrl);
       } catch (error) {
@@ -112,6 +136,7 @@ export async function handleToolCall(name: string, args: ToolArgs) {
       const bvidOrUrl = args?.bvid_or_url as string;
       const preferredLang = args?.preferred_lang as string | undefined;
       const fallbackToDescription = (args?.fallback_to_description as boolean) || false;
+      const fallbackToAsr = (args?.fallback_to_asr as boolean) || false;
       const page = args?.page as number | undefined;
       const includeTimestamps = args?.include_timestamps as boolean | undefined;
       const startSeconds = args?.start_seconds as number | undefined;
@@ -125,11 +150,15 @@ export async function handleToolCall(name: string, args: ToolArgs) {
         validateBVInput(bvidOrUrl);
         validateLanguage(preferredLang);
         validateBoolean(fallbackToDescription, "fallback_to_description");
+        validateBoolean(fallbackToAsr, "fallback_to_asr");
         validatePage(page);
         validateBoolean(includeTimestamps, "include_timestamps");
         validateTimestampRange(startSeconds, endSeconds);
         if (args?.fallback_to_description !== undefined && typeof args.fallback_to_description !== "boolean") {
-          throw new Error("fallback_to_description must be a boolean");
+          throw new ValidationError("fallback_to_description must be a boolean");
+        }
+        if (args?.fallback_to_asr !== undefined && typeof args.fallback_to_asr !== "boolean") {
+          throw new ValidationError("fallback_to_asr must be a boolean");
         }
         validateQuery(query);
         validateMaxMatches(maxMatches);
@@ -150,7 +179,7 @@ export async function handleToolCall(name: string, args: ToolArgs) {
         : undefined;
 
       try {
-        const result = await getVideoTranscriptData(
+        const transcriptArgs = [
           sanitizedBvidOrUrl,
           normalizedLang,
           fallbackToDescription,
@@ -159,13 +188,16 @@ export async function handleToolCall(name: string, args: ToolArgs) {
           startSeconds,
           endSeconds,
           searchOptions,
+          fallbackToAsr,
+        ] as const;
+        const result = signal === undefined
+          ? await getVideoTranscriptData(...transcriptArgs)
+          : await getVideoTranscriptData(...transcriptArgs, signal);
+        return toStructuredContent(
+          result as unknown as Record<string, unknown>,
         );
-        return {
-          ...toTextContent(result),
-          structuredContent: result as unknown as Record<string, unknown>,
-        };
       } catch (error) {
-        if (error instanceof NoSubtitleError) {
+        if (error instanceof NoSubtitleError || error instanceof AsrError) {
           return toErrorTextContent(
             buildStructuredErrorPayload(error, {
               fallbackToDescriptionAvailable: !includeTimestamps && startSeconds === undefined && endSeconds === undefined && fallbackToDescription !== true,
@@ -216,7 +248,7 @@ export async function handleToolCall(name: string, args: ToolArgs) {
 
       try {
         if (rawQuery === undefined) {
-          throw new Error("query is required");
+          throw new ValidationError("query is required");
         }
         validateQuery(rawQuery);
         validateSearchLimit(rawLimit);
@@ -228,10 +260,7 @@ export async function handleToolCall(name: string, args: ToolArgs) {
       const limit = rawLimit === undefined ? 5 : (rawLimit as number);
       const result = await searchBilibiliVideos(query, limit);
 
-      return {
-        ...toTextContent(result),
-        structuredContent: result as unknown as Record<string, unknown>,
-      };
+      return toStructuredContent(result as unknown as Record<string, unknown>);
     }
 
     case "list_bilibili_favorite_videos": {
@@ -246,13 +275,10 @@ export async function handleToolCall(name: string, args: ToolArgs) {
       const cursor = typeof rawCursor === "string" ? rawCursor : undefined;
       const result = await listBilibiliFavoriteVideos(cursor);
 
-      return {
-        ...toTextContent(result),
-        structuredContent: result as unknown as Record<string, unknown>,
-      };
+      return toStructuredContent(result as unknown as Record<string, unknown>);
     }
 
     default:
-      throw new Error(`Unknown tool: ${name}`);
+      throw new Error("Unknown MCP tool");
   }
 }

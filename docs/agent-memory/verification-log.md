@@ -1134,3 +1134,138 @@
 - Result: Release commit `3aee13d9111feb7342b3a287baf4c1cb81741a04` is the remote tag target. Actions run `30233179604` passed install, 25 files / 405 tests, build, and trusted publication. npm latest is `1.10.1`; integrity is `sha512-Q08jBSAoEDYbbzlf52zMFhg9HcKCQ2guGBR7JtT1CcraFW2vvwwXu9dSUy4OsqGwDi6D1wT3D7DoBxN1TCcWpQ==`, shasum is `f52621b9ab575b43bc8c4b93be907e8df6432b6b`, SLSA provenance is present, the published CLI reports `1.10.1`, help works, and the GitHub Release is public.
 - Scope and security: The immutable tag contains exactly the 11 intended documentation/version files and excludes `pending-learning-proposals.md`. Runtime source, MCP schemas, tests, dependencies, and workflow are unchanged.
 - Caveat: The successful workflow repeated the existing Node 20 action-runtime deprecation annotation for `actions/checkout@v4` and `actions/setup-node@v4`; GitHub forced Node 24. Keep that as separate bounded workflow maintenance.
+
+## 2026-07-27 CLI Setup And Doctor
+
+- Commands: `npm run build`; focused `tests/cli.test.ts` plus `tests/mcp-server-smoke.test.ts`; full `npm test`; `npm pack --dry-run --json`; built CLI help, doctor, setup, no-argument stdio, and version probes; `git diff --check`; scoped high-confidence secret scanning.
+- Result: Build passes; the focused suite passes 30 tests; the full suite passes 26 files / 431 tests; and the package remains 138 files with zero test, QA, agent-memory, `.env`, `.claude`, or `.codex` entries. Built CLI no-argument startup keeps stdout empty and ready signaling on stderr.
+- CLI evidence: Help has no duplicated `[command]`; `doctor --json` emits one parseable secret-free object; isolated HOME returns `needs_credentials` with exit 1; current local credentials return `locally_ready` with exit 0; deterministic fault injection proves exit 2; non-TTY setup exits 1 without prompting; expired/unloadable credentials reach reconfiguration; `-V`, `--version`, `-v`, and `version` all report 1.10.1.
+- Scope: MCP tools/schemas/handlers, Bilibili requests, dependencies, package metadata, generated `dist/`, and release workflow are unchanged. The pre-existing `pending-learning-proposals.md` modification remains untouched. No commit, push, tag, release, or publication was performed.
+
+## 2026-07-27 Bilingual README Full Redesign
+
+- Commands: both `beautify-github-readme` audits; bilingual heading/tool coverage; local-link and strict UTF-8 checks; SVG XML, accessibility, external-resource, and unsafe-feature checks; independent ImageMagick renders at 900px and 360px; scoped high-confidence secret scan; `npm run build`; 30 focused CLI/entrypoint tests; full `npm test`; built CLI help and secret-free doctor probe; `npm pack --dry-run --json --ignore-scripts`; live npm/Commander engine lookups; `git diff --check`.
+- Result: Both READMEs pass with seven equivalent top-level sections and all ten MCP tools. All four SVGs render without clipping or overlap; the installation pair remains readable at 360px and keeps `doctor --json` visible. Build passes, 2 focused files / 30 tests pass, and 26 files / 431 tests pass.
+- Package and security: The 140-file, 126,320-byte dry run contains all four README SVGs and excludes source, tests, QA, agent-memory, environment, Claude, and Codex paths. Local links pass, SVGs have no scripts, `foreignObject`, or external resources, and the changed worktree has zero high-confidence credential findings.
+- Release boundary: npm latest is still `1.10.1`; the rewritten `@latest setup`/`doctor` guidance is intentionally Unreleased and must ship with the CLI. Commander 14.0.3 requires Node 20 while package metadata still says Node 18, so the engine-floor mismatch remains a release blocker. No commit, push, version bump, tag, release, or publication occurred.
+
+## 2026-07-27 README User Comprehension Repair
+
+- Commands: independent Agent-install and Windows manual-install persona walkthroughs; bilingual `beautify-github-readme` audits; strict UTF-8, required onboarding content, local-link, high-confidence secret, package-boundary, and `git diff --check` checks.
+- Result: After final fact review caught and repaired a missing copyable `doctor --json` invocation, both persona walkthroughs report no blocking ambiguity. The READMEs now contain independently complete Agent-assisted and manual paths, all three exact `setup` / `check` / `doctor --json` commands, and the setup guides explain how to locate only `SESSDATA`, `bili_jct`, and `DedeUserID` in Chrome, Edge, or Firefox before hidden local entry. The bounded documentation check reports `COMPREHENSION_DOC_CHECK=PASS`.
+- Package and security: The final dry run contains 140 files / 127,990 bytes and no source, test, QA, agent-memory, environment, Claude, or Codex paths. High-confidence secret findings remain zero; no Cookie value is requested in chat, placed in MCP client configuration, or printed in documentation.
+- Scope: This repair changes only bilingual onboarding documentation and its task/report records. Runtime code, MCP schemas, tests, package metadata, version, SVGs, and release workflow are unchanged, so build and Vitest were not rerun after this documentation-only repair. No commit, push, tag, release, or publication occurred.
+
+## 2026-07-27 README Information Architecture Correction
+
+- Commands: both `beautify-github-readme` audits; bilingual section-order and ten-tool checks; exact CLI command, Favorites best-effort, literal-keyword, local-link, high-confidence secret, package-boundary, and `git diff --check` checks; two independent read-only reviews.
+- Result: Both READMEs now follow project definition → five core capability groups → three prominent use cases → installation → tool detail → limits/security. Independent review confirms that moving the unchanged Favorites SVG beside its matching example improves the opening. The two review findings—overclaiming every Favorite row and using untranslated `"function"` for a literal transcript search—were repaired and rechecked.
+- Package and security: `README_INFORMATION_ARCHITECTURE_GATES=PASS`; 9 local links resolve; both READMEs retain all ten tools and complete `doctor --json` commands; high-confidence secret findings are zero. The 140-file / 128,346-byte dry run contains no source, tests, QA, agent memory, environment, Claude, or Codex paths.
+- Scope: README ordering/copy, bilingual Unreleased changelog copy, and existing task/memory records changed. SVG files, runtime, tests, package metadata/version, dependencies, lockfile, workflow, QA checklist, and codemap are unchanged. Build and Vitest were not rerun for this documentation-only correction. No commit, push, tag, release, or publication occurred.
+
+## 2026-07-27 DeepSeek README Logic Rewrite
+
+- Commands: both `beautify-github-readme` audits; bilingual section-order, ten-tool, and three-command checks; Favorites best-effort/`skipped_count`, literal `函数`, keyword-only playback-link, local-link, high-confidence secret, package-boundary, and `git diff --check` checks; independent narrative and fact reviews.
+- Result: `DEEPSEEK_README_GATES=PASS`. Both READMEs now flow from a user-outcome opening through three capability paths, three copyable examples, installation, tool detail, limits, privacy, development, and help. Narrative review found no blocker; the only factual review finding was repaired in both languages.
+- Package and security: 9 local links resolve; all ten tools and all three complete CLI commands remain present; high-confidence secret findings are zero. The 140-file / 128,501-byte dry run contains no source, tests, QA, agent memory, environment, Claude, or Codex paths.
+- Scope: DeepSeek changed only the bilingual READMEs, bilingual Unreleased changelog entries, and the existing Claude report. Codex updated the task and durable memory records after acceptance. SVGs, setup/reference guides, runtime, tests, package metadata/version, dependencies, lockfile, workflow, QA checklist, codemap, and pending learning proposals are unchanged. Build and Vitest were not rerun for this documentation-only rewrite. No commit, push, tag, release, or publication occurred.
+
+## 2026-07-27 DeepSeek README Reader-First Repair
+
+- Commands: both `beautify-github-readme` audits; custom bilingual section-order, ten-tool, three-command, local-target, first-use BVID, literal `函数`, Favorites best-effort/`skipped_count`, and comment-order contract checks; scoped high-confidence secret scan with redacted false-positive classification; `npm pack --dry-run --json --ignore-scripts`; `git diff --check`; two independent final reviews.
+- Result: `README_CONTRACT_CHECK=PASS`. The final pages use a plain two-sentence introduction, three product outcomes, a visible Node.js prerequisite and four numbered install/verify steps, then three copyable examples. Both reviewers report no narrative or factual blocker.
+- Package and security: Both image audits pass. The 140-file / 128,755-byte package contains all four README SVGs and excludes source, tests, QA, agent memory, environment, Claude, and Codex paths. Primary high-confidence secret patterns are zero; five `SESSDATA`-shaped matches were classified without printing values as four synthetic CLI fixtures and one historical scan placeholder.
+- Scope: The final repair changed only the bilingual README/changelog copy, existing handoff/report/task records, and durable project memory. Build and Vitest were not rerun because runtime and tests were unchanged. No commit, push, tag, release, or publication occurred.
+
+## 2026-07-27 Optional ASR Model Installation Phase 1
+
+- Commands: `npm run build`; focused ASR/CLI/MCP smoke Vitest; full `npm test`; built CLI help and secret-free `doctor --json`; real local Python discovery and temporary managed-venv creation; `npm pack --dry-run --json --ignore-scripts`; scoped credential-pattern review; `git diff --check`; independent final-diff review.
+- Result: Build passes; 95 focused tests and 27 files / 496 full tests pass; the package contains 148 files / 140,199 bytes with compiled ASR modules but no model, venv, state, test, QA, or agent-memory data. The real Windows smoke discovered Python 3.13.7 through `py -3`, created and rediscovered a temporary isolated venv, then moved that temporary venv to the Recycle Bin.
+- CLI evidence: Default No has no ASR side effects. Yes uses the managed venv for pip, pinned snapshot download, and CPU INT8 verification; state becomes `ready` only after verification. Doctor currently reports `not_installed` on this machine and keeps credential status semantics unchanged.
+- Security: Child processes use argv arrays, `shell: false`, Python isolated mode, bounded diagnostics, and filtered environment variables. An early failed test accidentally expanded the parent process environment into local agent logs; no value entered source or package output, the test seam was repaired to use synthetic environments, and external credentials present in that process should be assessed and rotated.
+- Caveats: No real model download or CPU model-load smoke was run, and simultaneous `setup` processes are not locked. Model selection, audio retrieval, transcription, fallback integration, Git delivery, version bump, release, and publication remain out of scope.
+
+## 2026-07-27 ASR Model Selector Phase 2
+
+- Commands: `npm run build`; focused ASR/CLI/MCP smoke Vitest; full `npm test`; built selector mapping and CLI help probes; built secret-free `doctor --json`; `npm pack --dry-run --json --ignore-scripts`; scoped high-confidence secret scan with test-fixture classification; `git diff --check`; independent stable-tree review.
+- Result: Build passes; 3 focused files / 169 tests and 27 files / 570 full tests pass. The selector exposes exactly `tiny` (~78.2 MB), `base` (~148 MB), and `small` (~486 MB); Enter and `3` resolve to `small`, invalid input resolves to no selection, and the built doctor reports `asr.status: not_installed` plus `asr.model: null` on this machine.
+- State and failure evidence: The Phase 1 `small` marker remains readable under state version 1; exact repository/revision pairs are allowlisted; same-model setup is idempotent; cross-paired or malicious keys fail before mutation; switching models clears old readiness; and a failed switch is read as `incomplete`.
+- Package and security: The dry run contains 148 files / 563,026 bytes, includes the compiled ASR modules, and excludes tests, QA, agent memory, local model data, venvs, state, `.env`, `.claude`, and `.codex` paths. Forty-seven changed or untracked files have zero high-confidence token/private-key findings; two Bilibili-shaped assignments are synthetic fixtures in `tests/cli.test.ts`. `gitleaks` is unavailable.
+- Caveats: No real model weights were downloaded and no real CPU model-load smoke was run. Concurrent setup processes remain unlocked. Audio retrieval, transcription, automatic subtitle fallback, commit, push, version bump, release, and publication remain outside this phase. npm latest remains `1.10.1`, so the working-tree commands are not yet available through `@latest`.
+
+## 2026-07-29 ASR Transcription Fallback Phase 3
+
+- Commands: `npm run build`; the exact 10-suite Phase 3 focused command; full `npm test`; `npm pack --dry-run --json --ignore-scripts`; `npm audit --omit=dev --json`; built CLI help, version, and doctor; public stdio initialize/list/call tests; scoped high-confidence secret scan; UTF-8/link/parity checks; ASR temp residue count; `git diff --check`.
+- Result: Build passes; 10 focused files / 356 tests and 29 files / 629 full tests pass. After repairing Phase 1/2 test-fixture directory cleanup, 2 ASR files / 126 tests pass and leave zero `bilibili-mcp-asr-*` temp directories.
+- MCP evidence: Exactly ten tools remain in their original order. `get_video_transcript` alone accepts optional `fallback_to_asr` defaulting false, returns `data_source: "asr"` on ASR success, keeps text JSON equal to `structuredContent`, and shares timestamp/range/query/context/source-link transformations. The public legacy stdio flow initializes, lists, and calls a representative safe tool with JSON-only stdout.
+- Playback/runtime evidence: Exact BVID/CID playurl parameters and Cookie ownership, deterministic audio ordering, malformed-versus-empty DASH, provider-specific HTTPS hosts, redirect revalidation, byte/duration/time/output/segment limits, filtered child env, `-I`, `shell: false`, timeout kill/close, strict NDJSON, concurrency, and every cleanup path are deterministic tests with no real network, Cookie, Python, audio, or model.
+- Package and security: The package dry run contains 156 files / 159,670 bytes (630,098 unpacked) and excludes `.env`, tests, QA, research, agent memory, models, venvs, state, audio, and temp paths. A 282-file scoped scan found no private key, GitHub/npm/AWS token, or real credential; its three matches are one synthetic signed URL and two synthetic CLI credential fixtures. `gitleaks` is unavailable. Production audit reports two known moderate dependency nodes and zero high/critical; fixing them requires the separately excluded SDK/Hono major migration.
+- Live boundary: Built doctor reports `asr.status: not_installed` and `asr.model: null`; no model was downloaded/switched and no live ASR E2E was run. No Git/release/protocol/learning-proposal action occurred.
+
+## 2026-07-30 Deep Security Remediation
+
+- Commands: original sealed-scan finding inventory; direct Codex remediation;
+  22-file focused Vitest; full `npm test`; `npm run build`; Python
+  byte-compilation; `.codex/scripts/test_hook_safety.py`;
+  `.codex/scripts/test_stop_summary.py`; built CLI help and public stdio smoke;
+  `npm pack --dry-run --json --ignore-scripts`; value-free full-tree and package
+  secret classification; `npm audit --omit=dev --json`; `npm ls`; live npm
+  metadata; SDK/project import reachability; official GitHub Action ref
+  resolution; official `@openai/codex-security` CLI dry run and full-worktree
+  deep scan.
+- Result: All 38 original `extensions.reportId` finding slugs have implemented
+  closing controls and rows in
+  `docs/qa/2026-07-30-deep-security-remediation.md`. Focused security
+  tests pass 22 files / 407 tests; full Vitest passes 38 files / 721 tests;
+  TypeScript build passes; hook suites pass 6/6 and 8/8; built CLI and JSON-only
+  stdio behavior pass.
+- Network/resource boundary: stdio, MCP payload/envelope, outbound admission,
+  decoded JSON, redirects, bootstrap waiters, caches, logs, comments,
+  Favorites, playback, transcript search, ASR download/runtime/installer, and
+  hook retention now have explicit process-local byte/time/count/concurrency
+  ceilings. Playback DNS tests prove all-answer public validation, connection
+  pinning, original-host TLS, and credential stripping using synthetic
+  resolvers only.
+- Package/security: the dry run contains 180 files / 190,267 packed bytes /
+  776,730 unpacked bytes. Structural forbidden paths and high-confidence
+  private-key/GitHub/npm/AWS-token package matches are zero. Whole-tree
+  Bilibili-shaped assignments were classified without printing values as
+  synthetic tests, scanner patterns, or redacted historical examples;
+  suspicious unclassified matches are zero.
+- Audit caveat: production audit remains two moderate nodes through
+  `@modelcontextprotocol/sdk@1.27.1` →
+  `@hono/node-server@1.19.14` and GHSA-frvp-7c67-39w9. Current project imports
+  do not reach the SDK's Streamable HTTP/static-file module. This is
+  installed-but-unreachable residual risk, not a zero-advisory result.
+- Live boundary: no Bilibili request, real Cookie, signed media URL, ASR model,
+  audio, Python transcription, stage, commit, push, PR, tag, version, release,
+  publication, or persistent Codex config mutation was used.
+- Independent scan: the official open-source Codex Security CLI resolved the
+  exact `0a1b` worktree and passed deep-mode dry run using stored Codex
+  credentials. Scan `c93dd212-6e9c-4ed0-a0c6-36bc93f9769b` then failed before
+  artifact collection because CLI 0.1.3 completed the workbench scan before
+  collecting canonical files; its output directory is empty. A fresh official
+  CLI 0.1.4 scan and sealed result/report are required before completion.
+
+## 2026-08-05 Strix + DeepSeek Follow-Up Remediation
+
+- Executor: one Paseo-managed Claude Code agent using the live
+  `claude/deepseek-v4-flash` provider; Codex independently reviewed the final
+  state and returned four bounded same-scope repair rounds to the same agent.
+- Closed boundaries: unsafe C1/bidi/zero-width remote text, non-string BVID
+  engine-error disclosure, subtitle custom-port/userinfo admission, ASR state
+  temp predictability/symlink/path-type/root-permission weaknesses, and the
+  compatible SDK/transitive dependency advisories.
+- Final commands: `npm run build`; `npm test`; focused stdio/tool/handler
+  Vitest; `npm audit --omit=dev --json`; `npm pack --dry-run --json
+  --ignore-scripts`; `git diff --check`; value-free secret classification; ASR
+  state-temp residue count; Git stage/HEAD checks.
+- Result: build passes; 39 files / 803 tests and 3 focused files / 95 tests pass;
+  production audit reports zero vulnerabilities; `fast-uri` is compatibly
+  locked at 3.1.5 without overrides; the dry-run package contains 180 files /
+  788,704 unpacked bytes with zero forbidden paths; diff check passes; staged
+  files, suspicious literal credential assignments, and ASR state temp residue
+  are all zero.
+- Boundary: no live Bilibili/Cookie or ready-model ASR E2E was run; no model,
+  Python package, Git, version, release, publication, or learning-proposal
+  action occurred. HEAD remains `ab4dd02854f0483fc7668c713523b4be77de6cc7`.

@@ -1,0 +1,2054 @@
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  buildAsrChildEnv,
+  discoverPython,
+  runAsrInstallation,
+  verifyModel,
+  downloadModel,
+  createVenv,
+  installRuntime,
+  validateModelInstallTree,
+  type PythonCommand,
+} from "../src/asr/installer.js";
+import {
+  ASR_MODEL_SPECS,
+  ASR_PINNED_MODEL,
+  ASR_PINNED_REVISION,
+  ASR_PINNED_RUNTIME,
+  ASR_STATE_VERSION,
+  deriveAsrPaths,
+  isAllowlistedModel,
+  modelKeyForRepo,
+  readAsrState,
+  resolveModelSpec,
+  writeAsrState,
+  type AsrModelKey,
+  type AsrState,
+} from "../src/asr/state.js";
+
+// ---------- state.ts ----------
+
+describe("deriveAsrPaths", () => {
+  it("returns paths under ~/.bilibili-mcp/asr/ by default", () => {
+    const paths = deriveAsrPaths();
+    expect(paths.root).toContain(".bilibili-mcp");
+    expect(paths.root).toContain("asr");
+    expect(paths.venv).toBe(path.join(paths.root, "venv"));
+    expect(paths.model).toBe(path.join(paths.root, "models"));
+    expect(paths.stateFile).toBe(path.join(paths.root, "state.json"));
+  });
+
+  it("respects a custom base", () => {
+    const base = os.platform() === "win32" ? "C:\\tmp\\test-asr" : "/tmp/test-asr";
+    const paths = deriveAsrPaths(base);
+    expect(paths.root).toBe(base);
+    expect(paths.venv).toBe(path.join(base, "venv"));
+  });
+});
+
+describe("readAsrState", () => {
+  it("returns not_installed when state file and all artifacts are absent", () => {
+    const existsSync = vi.fn(() => false);
+    const state = readAsrState("/tmp/asr/state.json", fs.readFileSync, existsSync);
+    expect(state.kind).toBe("not_installed");
+  });
+
+  it("returns incomplete when state file absent but venv artifact exists", () => {
+    const stateFile = "/tmp/asr/state.json";
+    const venvDir = path.join(path.dirname(stateFile), "venv");
+    const existsSync = vi.fn((p: string) => p === stateFile ? false : p === venvDir ? true : p === path.dirname(stateFile));
+    const state = readAsrState(stateFile, fs.readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when state file absent but models artifact exists", () => {
+    const stateFile = "/tmp/asr/state.json";
+    const modelsDir = path.join(path.dirname(stateFile), "models");
+    const existsSync = vi.fn((p: string) => p === modelsDir);
+    const state = readAsrState(stateFile, fs.readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete for malformed JSON", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() => "not json");
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when version does not match", () => {
+    const existsSync = vi.fn((p: string) => p.endsWith("state.json"));
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: 999, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when kind field is missing", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when runtime does not match", () => {
+    const existsSync = vi.fn((p: string) => p.endsWith("state.json"));
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: "wrong==1.0.0", model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when model does not match", () => {
+    const existsSync = vi.fn((p: string) => p.endsWith("state.json"));
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: "other/model", revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns ready when all fields match AND artifacts exist", () => {
+    const existsSync = vi.fn(() => true); // everything exists
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+      isFile: () => true,
+    }));
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, lstatSync);
+    expect(state.kind).toBe("ready");
+    expect(state.version).toBe(ASR_STATE_VERSION);
+    expect(state.runtime).toBe(ASR_PINNED_RUNTIME);
+  });
+
+  it("returns incomplete when venv Python executable is missing", () => {
+    const stateFile = "/tmp/asr/state.json";
+    const venvPython = path.join(
+      path.dirname(stateFile), "venv",
+      os.platform() === "win32" ? "Scripts" : "bin",
+      os.platform() === "win32" ? "python.exe" : "python",
+    );
+    const existsSync = vi.fn((p: string) => p !== venvPython);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState(stateFile, readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when model.bin is missing", () => {
+    const modelBin = path.join(path.dirname("/tmp/asr/state.json"), "models", "model.bin");
+    const existsSync = vi.fn((p: string) => p !== modelBin);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when config.json is missing", () => {
+    const configJson = path.join(path.dirname("/tmp/asr/state.json"), "models", "config.json");
+    const existsSync = vi.fn((p: string) => p !== configJson);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when tokenizer.json is missing", () => {
+    const tok = path.join(path.dirname("/tmp/asr/state.json"), "models", "tokenizer.json");
+    const existsSync = vi.fn((p: string) => p !== tok);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("returns incomplete when vocabulary.txt is missing", () => {
+    const vocab = path.join(path.dirname("/tmp/asr/state.json"), "models", "vocabulary.txt");
+    const existsSync = vi.fn((p: string) => p !== vocab);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+});
+
+describe("writeAsrState", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bilibili-mcp-asr-test-"));
+  const stateFile = path.join(tmpDir, "state.json");
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  afterEach(() => {
+    try { fs.unlinkSync(stateFile); } catch { /* ok */ }
+    try { fs.unlinkSync(stateFile + ".tmp"); } catch { /* ok */ }
+  });
+
+  it("writes a valid state file atomically", () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    writeAsrState(stateFile);
+    expect(fs.existsSync(stateFile)).toBe(true);
+    expect(fs.existsSync(stateFile + ".tmp")).toBe(false);
+
+    const raw = fs.readFileSync(stateFile, "utf8");
+    const parsed = JSON.parse(raw);
+    expect(parsed.version).toBe(ASR_STATE_VERSION);
+    expect(parsed.runtime).toBe(ASR_PINNED_RUNTIME);
+    expect(parsed.model).toBe(ASR_PINNED_MODEL);
+    expect(parsed.revision).toBe(ASR_PINNED_REVISION);
+  });
+
+  it("cleans tmp file on rename failure", () => {
+    const write = vi.fn();
+    const rename = vi.fn(() => { throw new Error("rename failed"); });
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+
+    expect(() => writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir)).toThrow("atomically");
+    expect(unlink).toHaveBeenCalledWith(expect.stringMatching(/\.state-[0-9a-f-]{36}\.tmp$/));
+  });
+
+  it("cleans tmp file when writeFileSync throws", () => {
+    const write = vi.fn(() => { throw new Error("disk full"); });
+    const rename = vi.fn();
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+
+    expect(() => writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir)).toThrow("write ASR state file");
+    expect(rename).not.toHaveBeenCalled();
+    expect(unlink).toHaveBeenCalledWith(expect.stringMatching(/\.state-[0-9a-f-]{36}\.tmp$/));
+  });
+});
+
+describe("readAsrState symlink safety", () => {
+  const readyStateJson = JSON.stringify({
+    kind: "ready",
+    version: ASR_STATE_VERSION,
+    runtime: ASR_PINNED_RUNTIME,
+    model: ASR_PINNED_MODEL,
+    revision: ASR_PINNED_REVISION,
+  });
+
+  const managedPaths = (): Array<[string, "dir" | "file"]> => {
+    const stateFile = "/tmp/asr/state.json";
+    const root = path.dirname(stateFile);
+    const venvDir = path.join(root, "venv");
+    const binDir = path.join(venvDir, os.platform() === "win32" ? "Scripts" : "bin");
+    const pythonExe = path.join(binDir, os.platform() === "win32" ? "python.exe" : "python");
+    const modelDir = path.join(root, "models");
+    return [
+      [stateFile, "file"],
+      [venvDir, "dir"],
+      [binDir, "dir"],
+      [pythonExe, "file"],
+      [modelDir, "dir"],
+      [path.join(modelDir, "model.bin"), "file"],
+      [path.join(modelDir, "config.json"), "file"],
+      [path.join(modelDir, "tokenizer.json"), "file"],
+      [path.join(modelDir, "vocabulary.txt"), "file"],
+    ];
+  };
+
+  it.each(managedPaths())(
+    "rejects a symlinked managed path before returning ready: %s",
+    (managed, kind) => {
+      const existsSync = vi.fn(() => true);
+      const readFileSync = vi.fn(() => readyStateJson);
+      const lstatSync = vi.fn((candidate: string) => {
+        const entry = managedPaths().find(([p]) => p === candidate);
+        return {
+          isSymbolicLink: () => candidate === managed,
+          isDirectory: () =>
+            candidate === path.dirname("/tmp/asr/state.json") ||
+            entry?.[1] === "dir",
+          isFile: () => entry?.[1] === "file",
+        };
+      });
+      const state = readAsrState(
+        "/tmp/asr/state.json",
+        readFileSync,
+        existsSync,
+        lstatSync,
+      );
+      expect(state.kind).toBe("incomplete");
+    },
+  );
+
+  it("fails closed when a managed path cannot be inspected", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() => readyStateJson);
+    const lstatSync = vi.fn(() => {
+      throw new Error("permission denied");
+    });
+    const state = readAsrState(
+      "/tmp/asr/state.json",
+      readFileSync,
+      existsSync,
+      lstatSync,
+    );
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("rejects a symlinked ASR root before reading the state file", () => {
+    const readFileSync = vi.fn(() => readyStateJson);
+    const existsSync = vi.fn(() => true);
+    const lstatSync = vi.fn((candidate: string) => ({
+      isSymbolicLink: () => candidate === "/tmp/asr",
+    }));
+    const state = readAsrState(
+      "/tmp/asr/state.json",
+      readFileSync,
+      existsSync,
+      lstatSync,
+    );
+    expect(state.kind).toBe("incomplete");
+    expect(readFileSync).not.toHaveBeenCalled();
+  });
+
+  it("rejects a symlinked state file before the read mock runs", () => {
+    const readFileSync = vi.fn(() => readyStateJson);
+    const existsSync = vi.fn(() => true);
+    const lstatSync = vi.fn((candidate: string) => ({
+      // The root itself is a real directory; only the state file is a symlink.
+      isSymbolicLink: () => candidate === "/tmp/asr/state.json",
+      isDirectory: () => candidate === path.dirname("/tmp/asr/state.json"),
+      isFile: () => false,
+    }));
+    const state = readAsrState(
+      "/tmp/asr/state.json",
+      readFileSync,
+      existsSync,
+      lstatSync,
+    );
+    expect(state.kind).toBe("incomplete");
+    expect(readFileSync).not.toHaveBeenCalled();
+  });
+});
+
+describe("readAsrState path type verification", () => {
+  const readyStateJson = JSON.stringify({
+    kind: "ready",
+    version: ASR_STATE_VERSION,
+    runtime: ASR_PINNED_RUNTIME,
+    model: ASR_PINNED_MODEL,
+    revision: ASR_PINNED_REVISION,
+  });
+  const stateFile = "/tmp/asr/state.json";
+  const root = path.dirname(stateFile);
+  const venvDir = path.join(root, "venv");
+  const binDir = path.join(venvDir, os.platform() === "win32" ? "Scripts" : "bin");
+  const pythonExe = path.join(binDir, os.platform() === "win32" ? "python.exe" : "python");
+  const modelDir = path.join(root, "models");
+
+  const fileSlots = [
+    stateFile,
+    pythonExe,
+    path.join(modelDir, "model.bin"),
+    path.join(modelDir, "config.json"),
+    path.join(modelDir, "tokenizer.json"),
+    path.join(modelDir, "vocabulary.txt"),
+  ];
+  const dirSlots = [venvDir, binDir, modelDir];
+
+  it.each(fileSlots)("a directory in a file slot never returns ready: %s", (slot) => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() => readyStateJson);
+    const lstatSync = vi.fn((candidate: string) => {
+      const isTarget = candidate === slot;
+      const isDirSlot = candidate === root || dirSlots.includes(candidate);
+      const isFileSlot = fileSlots.includes(candidate);
+      return {
+        isSymbolicLink: () => false,
+        isDirectory: () => isDirSlot || isTarget,
+        isFile: () => isFileSlot && !isTarget,
+      };
+    });
+    const state = readAsrState(stateFile, readFileSync, existsSync, lstatSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it.each(dirSlots)("a file in a directory slot never returns ready: %s", (slot) => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() => readyStateJson);
+    const lstatSync = vi.fn((candidate: string) => {
+      const isTarget = candidate === slot;
+      const isDirSlot = candidate === root || dirSlots.includes(candidate);
+      const isFileSlot = fileSlots.includes(candidate);
+      return {
+        isSymbolicLink: () => false,
+        isDirectory: () => !isTarget && isDirSlot,
+        isFile: () => isTarget || isFileSlot,
+      };
+    });
+    const state = readAsrState(stateFile, readFileSync, existsSync, lstatSync);
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("never reads a state file that is a directory", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() => readyStateJson);
+    const lstatSync = vi.fn((candidate: string) => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => candidate === root || candidate === stateFile,
+      isFile: () => false,
+    }));
+    const state = readAsrState(stateFile, readFileSync, existsSync, lstatSync);
+    expect(state.kind).toBe("incomplete");
+    expect(readFileSync).not.toHaveBeenCalled();
+  });
+
+  it("never reads when the ASR root is a regular file", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() => readyStateJson);
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
+    const state = readAsrState(stateFile, readFileSync, existsSync, lstatSync);
+    expect(state.kind).toBe("incomplete");
+    expect(readFileSync).not.toHaveBeenCalled();
+  });
+});
+
+describe("writeAsrState secure temp file", () => {
+  it("writes a unique wx 0600 temp file, renames it atomically, and creates the root 0700", () => {
+    const written: Array<{ path: string; options: unknown }> = [];
+    const write = vi.fn((p: string, _data: unknown, options: unknown) => {
+      written.push({ path: p, options });
+    });
+    const rename = vi.fn();
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+
+    writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir);
+
+    expect(mkdir).toHaveBeenCalledWith(path.dirname("/tmp/asr/state.json"), {
+      recursive: true,
+      mode: 0o700,
+    });
+    expect(written).toHaveLength(1);
+    expect(written[0].path).not.toBe("/tmp/asr/state.json");
+    expect(written[0].path).toMatch(/\.state-[0-9a-f-]{36}\.tmp$/);
+    expect(written[0].options).toMatchObject({
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
+    });
+    expect(rename).toHaveBeenCalledWith(written[0].path, "/tmp/asr/state.json");
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it("uses the injected random source for the temp name", () => {
+    const written: Array<{ path: string }> = [];
+    const write = vi.fn((p: string) => {
+      written.push({ path: p });
+    });
+    const rename = vi.fn();
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+    const randomId = vi.fn(() => "abc-123");
+
+    writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir, randomId);
+
+    expect(written[0].path).toBe(path.join("/tmp/asr", ".state-abc-123.tmp"));
+    expect(rename).toHaveBeenCalledWith(
+      path.join("/tmp/asr", ".state-abc-123.tmp"),
+      "/tmp/asr/state.json",
+    );
+  });
+
+  it("produces a fresh unpredictable temp name per write", () => {
+    const write = vi.fn();
+    const rename = vi.fn();
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+    const randomId = vi
+      .fn()
+      .mockReturnValueOnce("first")
+      .mockReturnValueOnce("second");
+
+    writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir, randomId);
+    writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir, randomId);
+
+    const tmpPaths = write.mock.calls.map(([p]) => p);
+    expect(tmpPaths).toEqual([
+      path.join("/tmp/asr", ".state-first.tmp"),
+      path.join("/tmp/asr", ".state-second.tmp"),
+    ]);
+    expect(rename).toHaveBeenNthCalledWith(
+      1,
+      path.join("/tmp/asr", ".state-first.tmp"),
+      "/tmp/asr/state.json",
+    );
+    expect(rename).toHaveBeenNthCalledWith(
+      2,
+      path.join("/tmp/asr", ".state-second.tmp"),
+      "/tmp/asr/state.json",
+    );
+  });
+
+  it("rejects a symlinked root before any write or rename", () => {
+    const write = vi.fn();
+    const rename = vi.fn();
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+    const chmodSync = vi.fn();
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => true,
+      isDirectory: () => false,
+      isFile: () => false,
+    }));
+
+    expect(() =>
+      writeAsrState(
+        "/tmp/asr/state.json",
+        "small",
+        write,
+        rename,
+        unlink,
+        mkdir,
+        undefined,
+        lstatSync,
+        chmodSync,
+      ),
+    ).toThrow(/symlink/);
+    expect(write).not.toHaveBeenCalled();
+    expect(rename).not.toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalled();
+    expect(mkdir).not.toHaveBeenCalled();
+    expect(chmodSync).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-directory root before any write or rename", () => {
+    const write = vi.fn();
+    const rename = vi.fn();
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+    const chmodSync = vi.fn();
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
+
+    expect(() =>
+      writeAsrState(
+        "/tmp/asr/state.json",
+        "small",
+        write,
+        rename,
+        unlink,
+        mkdir,
+        undefined,
+        lstatSync,
+        chmodSync,
+      ),
+    ).toThrow(/not a directory/);
+    expect(write).not.toHaveBeenCalled();
+    expect(rename).not.toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalled();
+    expect(mkdir).not.toHaveBeenCalled();
+    expect(chmodSync).not.toHaveBeenCalled();
+  });
+
+  it("enforces owner-only permissions on an existing real root", () => {
+    const write = vi.fn();
+    const rename = vi.fn();
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+    const chmodSync = vi.fn();
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+      isFile: () => false,
+    }));
+
+    writeAsrState(
+      "/tmp/asr/state.json",
+      "small",
+      write,
+      rename,
+      unlink,
+      mkdir,
+      undefined,
+      lstatSync,
+      chmodSync,
+    );
+
+    expect(chmodSync).toHaveBeenCalledWith(path.dirname("/tmp/asr/state.json"), 0o700);
+  });
+
+  it("creates an absent root owner-only without a chmod attempt", () => {
+    const write = vi.fn();
+    const rename = vi.fn();
+    const unlink = vi.fn();
+    const mkdir = vi.fn();
+    const chmodSync = vi.fn();
+    const lstatSync = vi.fn(() => {
+      const error = new Error("no such file") as NodeJS.ErrnoException;
+      error.code = "ENOENT";
+      throw error;
+    });
+
+    writeAsrState(
+      "/tmp/asr/state.json",
+      "small",
+      write,
+      rename,
+      unlink,
+      mkdir,
+      undefined,
+      lstatSync,
+      chmodSync,
+    );
+
+    expect(chmodSync).not.toHaveBeenCalled();
+    expect(mkdir).toHaveBeenCalledWith(path.dirname("/tmp/asr/state.json"), {
+      recursive: true,
+      mode: 0o700,
+    });
+  });
+
+  it.each(["EPERM", "EACCES"])(
+    "fails closed when chmod on an existing root is denied: %s",
+    (code) => {
+      const write = vi.fn();
+      const rename = vi.fn();
+      const unlink = vi.fn();
+      const mkdir = vi.fn();
+      const lstatSync = vi.fn(() => ({
+        isSymbolicLink: () => false,
+        isDirectory: () => true,
+        isFile: () => false,
+      }));
+      const chmodSync = vi.fn(() => {
+        const error = new Error(`chmod ${code}`) as NodeJS.ErrnoException;
+        error.code = code;
+        throw error;
+      });
+
+      expect(() =>
+        writeAsrState(
+          "/tmp/asr/state.json",
+          "small",
+          write,
+          rename,
+          unlink,
+          mkdir,
+          undefined,
+          lstatSync,
+          chmodSync,
+        ),
+      ).toThrow(`chmod ${code}`);
+      expect(write).not.toHaveBeenCalled();
+      expect(rename).not.toHaveBeenCalled();
+      expect(unlink).not.toHaveBeenCalled();
+      expect(mkdir).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["ENOSYS", "EOPNOTSUPP"])(
+    "skips chmod only when explicitly unsupported: %s",
+    (code) => {
+      const write = vi.fn();
+      const rename = vi.fn();
+      const unlink = vi.fn();
+      const mkdir = vi.fn();
+      const lstatSync = vi.fn(() => ({
+        isSymbolicLink: () => false,
+        isDirectory: () => true,
+        isFile: () => false,
+      }));
+      const chmodSync = vi.fn(() => {
+        const error = new Error(`chmod ${code}`) as NodeJS.ErrnoException;
+        error.code = code;
+        throw error;
+      });
+
+      writeAsrState(
+        "/tmp/asr/state.json",
+        "small",
+        write,
+        rename,
+        unlink,
+        mkdir,
+        undefined,
+        lstatSync,
+        chmodSync,
+      );
+
+      expect(chmodSync).toHaveBeenCalledWith(path.dirname("/tmp/asr/state.json"), 0o700);
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(rename).toHaveBeenCalledTimes(1);
+    },
+  );
+});
+
+describe("readAsrState real-fs symlink rejection", () => {
+  it("returns incomplete when model.bin is a symlink", () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), "bilibili-mcp-asr-sym-"));
+    const stateFile = path.join(base, "state.json");
+    const binDir = path.join(base, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    const pythonExe = path.join(binDir, os.platform() === "win32" ? "python.exe" : "python");
+    const modelDir = path.join(base, "models");
+    const outside = path.join(os.tmpdir(), `bilibili-mcp-asr-outside-${process.pid}.bin`);
+
+    try {
+      fs.mkdirSync(binDir, { recursive: true });
+      fs.mkdirSync(modelDir, { recursive: true });
+      fs.writeFileSync(pythonExe, "");
+      for (const name of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+        fs.writeFileSync(path.join(modelDir, name), "");
+      }
+      fs.writeFileSync(
+        stateFile,
+        JSON.stringify({
+          kind: "ready",
+          version: ASR_STATE_VERSION,
+          runtime: ASR_PINNED_RUNTIME,
+          model: ASR_PINNED_MODEL,
+          revision: ASR_PINNED_REVISION,
+        }),
+      );
+      expect(readAsrState(stateFile).kind).toBe("ready");
+
+      fs.writeFileSync(outside, "outside");
+      fs.unlinkSync(path.join(modelDir, "model.bin"));
+      try {
+        fs.symlinkSync(outside, path.join(modelDir, "model.bin"), "file");
+      } catch {
+        return; // symlink creation unavailable on this platform
+      }
+      expect(readAsrState(stateFile).kind).toBe("incomplete");
+    } finally {
+      fs.rmSync(base, { recursive: true, force: true });
+      fs.rmSync(outside, { force: true });
+    }
+  });
+
+  it("returns incomplete when the ASR root directory is a symlink", () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), "bilibili-mcp-asr-symroot-"));
+    const outside = path.join(base, "outside");
+    const linkRoot = path.join(base, "linkRoot");
+
+    try {
+      const binDir = path.join(outside, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+      const pythonExe = path.join(binDir, os.platform() === "win32" ? "python.exe" : "python");
+      const modelDir = path.join(outside, "models");
+      fs.mkdirSync(binDir, { recursive: true });
+      fs.mkdirSync(modelDir, { recursive: true });
+      fs.writeFileSync(pythonExe, "");
+      for (const name of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+        fs.writeFileSync(path.join(modelDir, name), "");
+      }
+      fs.writeFileSync(
+        path.join(outside, "state.json"),
+        JSON.stringify({
+          kind: "ready",
+          version: ASR_STATE_VERSION,
+          runtime: ASR_PINNED_RUNTIME,
+          model: ASR_PINNED_MODEL,
+          revision: ASR_PINNED_REVISION,
+        }),
+      );
+
+      try {
+        fs.symlinkSync(outside, linkRoot, "dir");
+      } catch {
+        return; // symlink creation unavailable on this platform
+      }
+      // The tree behind the symlink is complete, so `incomplete` proves the
+      // symlinked root was rejected before the state file was read.
+      expect(readAsrState(path.join(linkRoot, "state.json")).kind).toBe("incomplete");
+    } finally {
+      fs.rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------- installer.ts: Python discovery ----------
+
+describe("discoverPython", () => {
+  it("returns the override when BILIBILI_ASR_PYTHON is set and valid", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.11.5\n", stderr: "" }));
+    const result = await discoverPython(spawnFn, "/usr/bin/python3.11");
+    expect(result.executable).toBe("/usr/bin/python3.11");
+    expect(result.prefixArgs).toEqual([]);
+    expect(spawnFn).toHaveBeenCalledWith("/usr/bin/python3.11", ["-I", "--version"]);
+  });
+
+  it("throws when override exits non-zero", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "not found" }));
+    await expect(discoverPython(spawnFn, "/fake/python")).rejects.toThrow("failed to start");
+  });
+
+  it("throws when BILIBILI_ASR_PYTHON is too old", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.8.10\n", stderr: "" }));
+    await expect(discoverPython(spawnFn, "/usr/bin/python3.8")).rejects.toThrow("3.9+ required");
+  });
+
+  it("returns python3 from default non-Windows candidate order", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" }));
+    const result = await discoverPython(spawnFn, undefined, [
+      { executable: "python3", prefixArgs: [] },
+      { executable: "python", prefixArgs: [] },
+    ]);
+    expect(result.executable).toBe("python3");
+    expect(result.prefixArgs).toEqual([]);
+  });
+
+  it("returns py -3 when it is the first candidate (Windows-order injection)", async () => {
+    const spawnFn = vi.fn((file: string) => {
+      if (file === "py") return Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" });
+      return Promise.reject(new Error("ENOENT"));
+    });
+    const result = await discoverPython(spawnFn, undefined, [
+      { executable: "py", prefixArgs: ["-3"] },
+      { executable: "python3", prefixArgs: [] },
+      { executable: "python", prefixArgs: [] },
+    ]);
+    expect(result.executable).toBe("py");
+    expect(result.prefixArgs).toEqual(["-3"]);
+  });
+
+  it("falls back to python when python3 not found", async () => {
+    let callCount = 0;
+    const spawnFn = vi.fn((file: string) => {
+      callCount++;
+      if (file === "python3" || file === "py") return Promise.reject(new Error("ENOENT"));
+      return Promise.resolve({ code: 0, stdout: "Python 3.10.0\n", stderr: "" });
+    });
+    const result = await discoverPython(spawnFn);
+    expect(result.executable).toBe("python");
+    expect(callCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("throws when no Python found", async () => {
+    const spawnFn = vi.fn(() => Promise.reject(new Error("ENOENT")));
+    await expect(discoverPython(spawnFn)).rejects.toThrow("not found");
+  });
+
+  it("rejects old Python from discovery", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.8.10\n", stderr: "" }));
+    await expect(discoverPython(spawnFn)).rejects.toThrow("not found");
+  });
+});
+
+// ---------- installer.ts: subprocess actions ----------
+
+function spawnOk(stdout = "") {
+  return vi.fn(() => Promise.resolve({ code: 0, stdout, stderr: "" }));
+}
+
+describe("createVenv", () => {
+  it("creates a venv and returns venv Python command", async () => {
+    const spawnFn = spawnOk();
+    const mkdirSyncFn = vi.fn();
+    const python: PythonCommand = { executable: "python3", prefixArgs: [] };
+    const venvPath = path.join(os.tmpdir(), "test-venv");
+    const result = await createVenv(python, venvPath, spawnFn, mkdirSyncFn);
+
+    expect(spawnFn).toHaveBeenCalledWith("python3", ["-I", "-m", "venv", venvPath]);
+    expect(result.executable).toContain("python");
+    expect(result.prefixArgs).toEqual([]);
+  });
+
+  it("throws when venv creation fails", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "error" }));
+    const python: PythonCommand = { executable: "python3", prefixArgs: [] };
+    await expect(createVenv(python, "/tmp/v", spawnFn, vi.fn())).rejects.toThrow("venv creation failed");
+  });
+});
+
+describe("installRuntime", () => {
+  it("calls venv python -m pip install with pinned runtime", async () => {
+    const spawnFn = spawnOk();
+    const venvPython: PythonCommand = { executable: "/tmp/venv/bin/python", prefixArgs: [] };
+    await installRuntime(venvPython, spawnFn);
+
+    expect(spawnFn).toHaveBeenCalledWith(
+      "/tmp/venv/bin/python",
+      ["-I", "-m", "pip", "install", "--quiet", ASR_PINNED_RUNTIME],
+    );
+  });
+
+  it("throws on pip failure", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "pip error" }));
+    await expect(installRuntime({ executable: "python3", prefixArgs: [] }, spawnFn)).rejects.toThrow("pip install");
+  });
+});
+
+describe("downloadModel", () => {
+  it("passes model_id, revision, local_dir via argv", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "DOWNLOADED\n", stderr: "" }));
+    const mkdirSyncFn = vi.fn();
+
+    await downloadModel(
+      { executable: "python3", prefixArgs: [] },
+      "/tmp/models",
+      ASR_PINNED_MODEL,
+      ASR_PINNED_REVISION,
+      spawnFn,
+      mkdirSyncFn,
+    );
+
+    const args = spawnFn.mock.calls[0][1];
+    expect(args).toContain(ASR_PINNED_MODEL);
+    expect(args).toContain(ASR_PINNED_REVISION);
+    expect(args).toContain("/tmp/models");
+  });
+
+  it("throws when stdout is not exactly DOWNLOADED", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "DOWNLOADED with extra text\n", stderr: "" }));
+    await expect(
+      downloadModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", ASR_PINNED_MODEL, ASR_PINNED_REVISION, spawnFn, vi.fn()),
+    ).rejects.toThrow("did not confirm completion");
+  });
+
+  it("throws on non-zero exit", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "network error" }));
+    await expect(
+      downloadModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", ASR_PINNED_MODEL, ASR_PINNED_REVISION, spawnFn, vi.fn()),
+    ).rejects.toThrow("Model download failed");
+  });
+});
+
+describe("verifyModel", () => {
+  it("passes model path via argv", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" }));
+    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn);
+
+    const args = spawnFn.mock.calls[0][1];
+    expect(args).toContain("/tmp/models");
+  });
+
+  it("throws when stdout is not exactly VERIFIED", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED and more\n", stderr: "" }));
+    await expect(verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn)).rejects.toThrow("did not confirm load");
+  });
+
+  it("throws on non-zero exit", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "import error" }));
+    await expect(verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn)).rejects.toThrow("Model verification failed");
+  });
+});
+
+// ---------- installer.ts: full orchestration ----------
+
+describe("runAsrInstallation root guard", () => {
+  it("refuses to install when the ASR root is a symlink, before any mutation", async () => {
+    const spawnFn = vi.fn();
+    const fsMkdirSync = vi.fn();
+    const fsUnlinkSync = vi.fn();
+    const fsLstatSync = vi.fn(() => ({
+      isSymbolicLink: () => true,
+      isDirectory: () => false,
+      isFile: () => false,
+    }));
+
+    const result = await runAsrInstallation({
+      spawnFn,
+      fsMkdirSync,
+      fsUnlinkSync,
+      fsLstatSync,
+      asrBase: "/tmp/asr",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("symlink");
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect(fsMkdirSync).not.toHaveBeenCalled();
+    expect(fsUnlinkSync).not.toHaveBeenCalled();
+  });
+
+  it("refuses to install when the ASR root is not a directory, before any mutation", async () => {
+    const spawnFn = vi.fn();
+    const fsMkdirSync = vi.fn();
+    const fsUnlinkSync = vi.fn();
+    const fsLstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
+
+    const result = await runAsrInstallation({
+      spawnFn,
+      fsMkdirSync,
+      fsUnlinkSync,
+      fsLstatSync,
+      asrBase: "/tmp/asr",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not a directory");
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect(fsMkdirSync).not.toHaveBeenCalled();
+    expect(fsUnlinkSync).not.toHaveBeenCalled();
+  });
+
+  it("proceeds when the ASR root does not exist yet", async () => {
+    const spawnFn = vi
+      .fn()
+      .mockResolvedValueOnce({ code: 0, stdout: "Python 3.12.0\n", stderr: "" })
+      .mockResolvedValue({ code: 1, stdout: "", stderr: "boom" });
+    const fsMkdirSync = vi.fn();
+    const fsUnlinkSync = vi.fn();
+    const fsLstatSync = vi.fn(() => {
+      const error = new Error("no such file") as NodeJS.ErrnoException;
+      error.code = "ENOENT";
+      throw error;
+    });
+
+    const result = await runAsrInstallation({
+      spawnFn,
+      fsMkdirSync,
+      fsUnlinkSync,
+      fsLstatSync,
+      asrBase: "/tmp/asr",
+    });
+
+    // The guard passed (absent root is allowed); the pipeline ran and failed
+    // later at venv creation, proving spawn happened after the guard.
+    expect(spawnFn).toHaveBeenCalled();
+    expect(result.success).toBe(false);
+  });
+
+  it("fails before any mutation when the root path has an invalid component (ENOTDIR)", async () => {
+    const spawnFn = vi.fn();
+    const fsMkdirSync = vi.fn();
+    const fsUnlinkSync = vi.fn();
+    const fsLstatSync = vi.fn(() => {
+      const error = new Error("not a directory") as NodeJS.ErrnoException;
+      error.code = "ENOTDIR";
+      throw error;
+    });
+
+    const result = await runAsrInstallation({
+      spawnFn,
+      fsMkdirSync,
+      fsUnlinkSync,
+      fsLstatSync,
+      asrBase: "/tmp/asr",
+    });
+
+    // ENOTDIR means an invalid/non-directory path component, not an absent
+    // root: it must fail before any spawn or mutation.
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Cannot inspect ASR root");
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect(fsMkdirSync).not.toHaveBeenCalled();
+    expect(fsUnlinkSync).not.toHaveBeenCalled();
+  });
+});
+
+describe("runAsrInstallation", () => {
+  it("succeeds when all steps pass and writes ready marker", async () => {
+    let step = 0;
+    const outputs = [
+      "Python 3.12.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n",
+    ];
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: outputs[step++] ?? "", stderr: "" }));
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-int-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    // Create expected artifact directories so readAsrState finds them
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+
+    const result = await runAsrInstallation({ spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase });
+    expect(result.success).toBe(true);
+
+    // pip, download, verify all use the derived venv Python
+    const calls = spawnFn.mock.calls.map((c) => c[0]);
+    const venvPythonExe = process.platform === "win32" ? "python.exe" : "python";
+    // skip: discovery (0), venv creation (1)
+    const postVenv = calls.slice(2);
+    expect(postVenv.length).toBeGreaterThanOrEqual(3);
+    expect(postVenv.every((exe) => path.basename(exe) === venvPythonExe)).toBe(true);
+    // Ready marker was written
+    expect(fs.existsSync(path.join(tmpBase, "state.json"))).toBe(true);
+    expect(readAsrState(path.join(tmpBase, "state.json")).kind).toBe("ready");
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("verify failure leaves no ready marker", async () => {
+    let step = 0;
+    const outputs = [
+      "Python 3.12.0\n", "", "",
+      "DOWNLOADED\n",
+      { code: 1, stdout: "", stderr: "model load failed" },
+    ];
+    let verifyReached = false;
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      const out = outputs[step++];
+      if (typeof out !== "string" && args.some((a) => a.includes("WhisperModel"))) {
+        verifyReached = true;
+      }
+      if (typeof out === "string") return Promise.resolve({ code: 0, stdout: out, stderr: "" });
+      return Promise.resolve(out);
+    });
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-vfy-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+
+    const result = await runAsrInstallation({ spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase });
+    expect(result.success).toBe(false);
+    expect(verifyReached).toBe(true);
+    // No ready marker
+    expect(fs.existsSync(path.join(tmpBase, "state.json"))).toBe(false);
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("returns success false when discovery fails", async () => {
+    const spawnFn = vi.fn(() => Promise.reject(new Error("ENOENT")));
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-disc-" + Date.now());
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not found");
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("returns success false mid-install", async () => {
+    let step = 0;
+    const outputs = [
+      { code: 0, stdout: "Python 3.12.0\n" },
+      { code: 1, stdout: "", stderr: "disk full" },
+    ];
+    const spawnFn = vi.fn(() => Promise.resolve(outputs[step++] ?? { code: 1, stdout: "", stderr: "unknown" }));
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-mid-" + Date.now());
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase });
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("is idempotent when already ready", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-idem-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const stateFile = path.join(tmpBase, "state.json");
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+    writeAsrState(stateFile);
+
+    const spawnFn = vi.fn();
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase });
+
+    expect(result.success).toBe(true);
+    expect(spawnFn).not.toHaveBeenCalled();
+
+    // cleanup
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("old marker + missing file + download restores files + verify fails => incomplete", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-regr-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const stateFile = path.join(tmpBase, "state.json");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+
+    // Write old valid marker
+    writeAsrState(stateFile);
+    // All model files present – state is ready
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+    expect(readAsrState(stateFile).kind).toBe("ready");
+
+    // Delete model.bin to simulate corrupt artifact
+    fs.unlinkSync(path.join(modelsDir, "model.bin"));
+    expect(readAsrState(stateFile).kind).toBe("incomplete");
+
+    // Retry: discover → venv → pip → download (restores model.bin) → verify fails
+    let step = 0;
+    const outputs = [
+      "Python 3.12.0\n",   // 0: discoverPython ok
+      "",                    // 1: createVenv ok
+      "",                    // 2: installRuntime (pip) ok
+      "DOWNLOADED\n",        // 3: downloadModel — actually write model.bin
+      { code: 1, stdout: "", stderr: "verify error" }, // 4: verifyModel FAILS
+    ];
+    let verifyReached = false;
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      const out = outputs[step++];
+      // Download call restores model.bin in the managed staging directory.
+      if (typeof out === "string" && out.trim() === "DOWNLOADED") {
+        const staging = args.find(
+          (arg) => arg.includes(".models-staging-"),
+        );
+        if (!staging) throw new Error("missing staging path");
+        fs.writeFileSync(path.join(staging, "model.bin"), "restored");
+      }
+      // Track that verifyModel was called (script contains WhisperModel)
+      if (typeof out !== "string" && args.some((a) => a.includes("WhisperModel"))) {
+        verifyReached = true;
+      }
+      if (typeof out === "string") return Promise.resolve({ code: 0, stdout: out, stderr: "" });
+      return Promise.resolve(out);
+    });
+
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase });
+    expect(result.success).toBe(false);
+    expect(verifyReached).toBe(true);
+    // Verification failure removes staging and never publishes a model tree.
+    expect(fs.existsSync(path.join(modelsDir, "model.bin"))).toBe(false);
+    // Old marker was invalidated; remaining artifacts are incomplete.
+    expect(readAsrState(stateFile).kind).toBe("incomplete");
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("buildAsrChildEnv uses an allowlist and fixed safe flags", () => {
+    const source = {
+      BILIBILI_SESSDATA: "x",
+      bilibili_sessdata: "x",
+      BILIBILI_DEDEUSERID: "x",
+      BILIBILI_BILI_JCT: "x",
+      PYTHONPATH: "/some/path",
+      PYTHONHOME: "/some/home",
+      OTHER_VAR: "x",
+      PATH: "/usr/bin",
+    };
+    const result = buildAsrChildEnv(source);
+    expect(result.BILIBILI_SESSDATA).toBeUndefined();
+    expect(result.bilibili_sessdata).toBeUndefined();
+    expect(result.BILIBILI_DEDEUSERID).toBeUndefined();
+    expect(result.BILIBILI_BILI_JCT).toBeUndefined();
+    expect(result.PYTHONPATH).toBeUndefined();
+    expect(result.PYTHONHOME).toBeUndefined();
+    expect(result.OTHER_VAR).toBeUndefined();
+    expect(result.PATH).toBe("/usr/bin");
+    expect(result.PIP_NO_INPUT).toBe("1");
+    expect(result.PYTHONNOUSERSITE).toBe("1");
+  });
+
+  it("stale-marker unlink with permission error aborts before mutation", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-perm-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const stateFile = path.join(tmpBase, "state.json");
+    // Write an incomplete marker
+    fs.writeFileSync(stateFile, JSON.stringify({ kind: "ready", version: 999 }), "utf8");
+
+    const unlockFn = vi.fn(() => {
+      const err = new Error("EPERM: permission denied") as NodeJS.ErrnoException;
+      err.code = "EPERM";
+      throw err;
+    });
+    const spawnFn = vi.fn();
+
+    const result = await runAsrInstallation({
+      spawnFn,
+      asrBase: tmpBase,
+      fsUnlinkSync: unlockFn,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Cannot clear stale ASR state");
+    // Must not proceed to spawn
+    expect(spawnFn).not.toHaveBeenCalled();
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("stale-marker unlink with ENOENT proceeds to install", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-enoent-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const stateFile = path.join(tmpBase, "state.json");
+    fs.writeFileSync(stateFile, JSON.stringify({ kind: "ready", version: 999 }), "utf8");
+
+    const unlockFn = vi.fn(() => {
+      const err = new Error("ENOENT") as NodeJS.ErrnoException;
+      err.code = "ENOENT";
+      throw err;
+    });
+    // discoverPython will fail with no candidates matching, but that's fine —
+    // what matters is unlink ENOENT is swallowed and execution continues
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" }));
+
+    const result = await runAsrInstallation({
+      spawnFn,
+      asrBase: tmpBase,
+      fsUnlinkSync: unlockFn,
+    });
+
+    // ENOENT swallowed → install attempted (succeeds or fails is fine)
+    expect(unlockFn).toHaveBeenCalled();
+    expect(spawnFn).toHaveBeenCalled();
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("buildAsrChildEnv drops ambient non-allowlisted variables", () => {
+    const source = { BILIBILI_SESSDATA: "a", OTHER_KEEP: "b" };
+    const result = buildAsrChildEnv(source);
+    expect(result.BILIBILI_SESSDATA).toBeUndefined();
+    expect(result.OTHER_KEEP).toBeUndefined();
+  });
+
+  it("uses env BILIBILI_ASR_PYTHON when pythonOverride not passed", async () => {
+    const saved = process.env.BILIBILI_ASR_PYTHON;
+    try {
+      process.env.BILIBILI_ASR_PYTHON = "/custom/python";
+
+      let step = 0;
+      const outputs = [
+        "Python 3.11.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n",
+      ];
+      const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: outputs[step++] ?? "", stderr: "" }));
+
+      const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-env-" + Date.now());
+      fs.mkdirSync(tmpBase, { recursive: true });
+      const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase });
+
+      expect(spawnFn).toHaveBeenCalledWith("/custom/python", ["-I", "--version"]);
+      expect(result.pythonPath).toBe("/custom/python");
+
+      try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+    } finally {
+      if (saved === undefined) delete process.env.BILIBILI_ASR_PYTHON;
+      else process.env.BILIBILI_ASR_PYTHON = saved;
+    }
+  });
+
+  it("explicit pythonOverride takes precedence over env", async () => {
+    const saved = process.env.BILIBILI_ASR_PYTHON;
+    try {
+      process.env.BILIBILI_ASR_PYTHON = "/env/python";
+
+      let step = 0;
+      const outputs = [
+        "Python 3.11.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n",
+      ];
+      const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: outputs[step++] ?? "", stderr: "" }));
+
+      const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-expl-" + Date.now());
+      fs.mkdirSync(tmpBase, { recursive: true });
+      const result = await runAsrInstallation({ spawnFn, pythonOverride: "/explicit/python", asrBase: tmpBase });
+
+      expect(spawnFn).toHaveBeenCalledWith("/explicit/python", ["-I", "--version"]);
+      expect(result.pythonPath).toBe("/explicit/python");
+
+      try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+    } finally {
+      if (saved === undefined) delete process.env.BILIBILI_ASR_PYTHON;
+      else process.env.BILIBILI_ASR_PYTHON = saved;
+    }
+  });
+
+  it("all Python operations include -I (isolated mode)", async () => {
+    // Override probe
+    const ovr = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.11.0\n", stderr: "" }));
+    await discoverPython(ovr, "/bin/python");
+    expect(ovr.mock.calls[0][1]).toEqual(["-I", "--version"]);
+
+    // Candidate probe
+    const cand = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" }));
+    await discoverPython(cand, undefined, [{ executable: "python3", prefixArgs: [] }]);
+    expect(cand.mock.calls[0][1]).toEqual(["-I", "--version"]);
+
+    // py -3 probe
+    const py3 = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" }));
+    await discoverPython(py3, undefined, [{ executable: "py", prefixArgs: ["-3"] }]);
+    expect(py3.mock.calls[0][1]).toEqual(["-3", "-I", "--version"]);
+
+    // venv
+    const vv = vi.fn(() => Promise.resolve({ code: 0, stdout: "", stderr: "" }));
+    await createVenv({ executable: "python3", prefixArgs: [] }, "/tmp/venv", vv, vi.fn());
+    expect(vv.mock.calls[0][1]).toEqual(["-I", "-m", "venv", "/tmp/venv"]);
+
+    // pip
+    const pip = vi.fn(() => Promise.resolve({ code: 0, stdout: "", stderr: "" }));
+    await installRuntime({ executable: "/tmp/venv/bin/python", prefixArgs: [] }, pip);
+    expect(pip.mock.calls[0][1][0]).toBe("-I");
+    expect(pip.mock.calls[0][1][1]).toBe("-m");
+
+    // download
+    const dl = vi.fn(() => Promise.resolve({ code: 0, stdout: "DOWNLOADED\n", stderr: "" }));
+    await downloadModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", ASR_PINNED_MODEL, ASR_PINNED_REVISION, dl, vi.fn());
+    expect(dl.mock.calls[0][1][0]).toBe("-I");
+    expect(dl.mock.calls[0][1][1]).toBe("-c");
+
+    // verify
+    const vrfy = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" }));
+    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", vrfy);
+    expect(vrfy.mock.calls[0][1][0]).toBe("-I");
+    expect(vrfy.mock.calls[0][1][1]).toBe("-c");
+  });
+
+  it("all exported functions are defined", async () => {
+    const mod = await import("../src/asr/installer.js");
+    expect(mod.discoverPython).toBeDefined();
+    expect(mod.runAsrInstallation).toBeDefined();
+    expect(mod.verifyModel).toBeDefined();
+    expect(mod.downloadModel).toBeDefined();
+    expect(mod.createVenv).toBeDefined();
+    expect(mod.installRuntime).toBeDefined();
+  });
+});
+
+// ---------- Phase 2: model allowlist ----------
+
+describe("resolveModelSpec", () => {
+  it("returns tiny spec for 'tiny'", () => {
+    const spec = resolveModelSpec("tiny");
+    expect(spec.key).toBe("tiny");
+    expect(spec.repository).toBe("Systran/faster-whisper-tiny");
+    expect(spec.approximateMB).toBe(78.2);
+  });
+
+  it("returns base spec for 'base'", () => {
+    const spec = resolveModelSpec("base");
+    expect(spec.key).toBe("base");
+    expect(spec.repository).toBe("Systran/faster-whisper-base");
+    expect(spec.approximateMB).toBe(148);
+  });
+
+  it("returns small spec for 'small'", () => {
+    const spec = resolveModelSpec("small");
+    expect(spec.key).toBe("small");
+    expect(spec.repository).toBe("Systran/faster-whisper-small");
+    expect(spec.approximateMB).toBe(486);
+  });
+
+  it("is case-insensitive", () => {
+    expect(resolveModelSpec("TINY").key).toBe("tiny");
+    expect(resolveModelSpec("Small").key).toBe("small");
+  });
+
+  it("throws for unknown model key", () => {
+    expect(() => resolveModelSpec("large")).toThrow("Unknown ASR model key");
+  });
+
+  it("throws for empty string", () => {
+    expect(() => resolveModelSpec("")).toThrow("Unknown ASR model key");
+  });
+});
+
+describe("isAllowlistedModel", () => {
+  it("returns true for Phase 1 small repository/revision", () => {
+    expect(isAllowlistedModel(ASR_PINNED_MODEL, ASR_PINNED_REVISION)).toBe(true);
+  });
+
+  it("returns true for tiny repository/revision", () => {
+    expect(isAllowlistedModel("Systran/faster-whisper-tiny", "d90ca5fe260221311c53c58e660288d3deb8d356")).toBe(true);
+  });
+
+  it("returns true for base repository/revision", () => {
+    expect(isAllowlistedModel("Systran/faster-whisper-base", "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66")).toBe(true);
+  });
+
+  it("returns false for unknown repository", () => {
+    expect(isAllowlistedModel("unknown/model", ASR_PINNED_REVISION)).toBe(false);
+  });
+
+  it("returns false for known repository with wrong revision", () => {
+    expect(isAllowlistedModel(ASR_PINNED_MODEL, "0000000000000000000000000000000000000000")).toBe(false);
+  });
+});
+
+describe("readAsrState Phase 2 compatibility", () => {
+  it("returns ready for tiny model state with matching artifacts", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({
+        kind: "ready",
+        version: ASR_STATE_VERSION,
+        runtime: ASR_PINNED_RUNTIME,
+        model: "Systran/faster-whisper-tiny",
+        revision: "d90ca5fe260221311c53c58e660288d3deb8d356",
+      }),
+    );
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+      isFile: () => true,
+    }));
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, lstatSync);
+    expect(state.kind).toBe("ready");
+    expect(state.model).toBe("Systran/faster-whisper-tiny");
+  });
+
+  it("returns ready for base model state with matching artifacts", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({
+        kind: "ready",
+        version: ASR_STATE_VERSION,
+        runtime: ASR_PINNED_RUNTIME,
+        model: "Systran/faster-whisper-base",
+        revision: "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+      }),
+    );
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+      isFile: () => true,
+    }));
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, lstatSync);
+    expect(state.kind).toBe("ready");
+  });
+
+  it("Phase 1 small state is still read as ready", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({
+        kind: "ready",
+        version: ASR_STATE_VERSION,
+        runtime: ASR_PINNED_RUNTIME,
+        model: ASR_PINNED_MODEL,
+        revision: ASR_PINNED_REVISION,
+      }),
+    );
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+      isFile: () => true,
+    }));
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, lstatSync);
+    expect(state.kind).toBe("ready");
+  });
+
+  it("returns incomplete for un-allowlisted model even with valid version", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({
+        kind: "ready",
+        version: ASR_STATE_VERSION,
+        runtime: ASR_PINNED_RUNTIME,
+        model: "evil/model",
+        revision: "deadbeef",
+      }),
+    );
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+  });
+});
+
+describe("writeAsrState Phase 2", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bilibili-mcp-asr-p2-"));
+  const stateFile = path.join(tmpDir, "state.json");
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  afterEach(() => {
+    try { fs.unlinkSync(stateFile); } catch { /* ok */ }
+    try { fs.unlinkSync(stateFile + ".tmp"); } catch { /* ok */ }
+  });
+
+  it("writes tiny model state", () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    writeAsrState(stateFile, "tiny");
+    const parsed = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    expect(parsed.model).toBe("Systran/faster-whisper-tiny");
+    expect(parsed.revision).toBe("d90ca5fe260221311c53c58e660288d3deb8d356");
+  });
+
+  it("writes base model state", () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    writeAsrState(stateFile, "base");
+    const parsed = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    expect(parsed.model).toBe("Systran/faster-whisper-base");
+  });
+
+  it("throws for invalid model key", () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    expect(() => writeAsrState(stateFile, "large")).toThrow("Unknown ASR model key");
+  });
+});
+
+// ---------- Phase 2: installer model selection ----------
+
+describe("runAsrInstallation with modelKey", () => {
+  it("installs tiny model when modelKey is 'tiny'", async () => {
+    let step = 0;
+    const outputs = ["Python 3.12.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n"];
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: outputs[step++] ?? "", stderr: "" }));
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-tiny-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+
+    const result = await runAsrInstallation({ spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase, modelKey: "tiny" });
+    expect(result.success).toBe(true);
+
+    const state = readAsrState(path.join(tmpBase, "state.json"));
+    expect(state.kind).toBe("ready");
+    expect(state.model).toBe("Systran/faster-whisper-tiny");
+    expect(state.revision).toBe("d90ca5fe260221311c53c58e660288d3deb8d356");
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("defaults to small when no modelKey is provided", async () => {
+    let step = 0;
+    const outputs = ["Python 3.12.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n"];
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: outputs[step++] ?? "", stderr: "" }));
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-def-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+
+    const result = await runAsrInstallation({ spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase });
+    expect(result.success).toBe(true);
+    const state = readAsrState(path.join(tmpBase, "state.json"));
+    expect(state.model).toBe("Systran/faster-whisper-small");
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("throws before any mutation when modelKey is invalid", async () => {
+    const spawnFn = vi.fn();
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-bad-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "large" });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Unknown ASR model key");
+    expect(spawnFn).not.toHaveBeenCalled();
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("reinstalls when existing state has different model (model switch)", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-switch-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const stateFile = path.join(tmpBase, "state.json");
+
+    // Pre-create ready state for tiny
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+    writeAsrState(stateFile, "tiny");
+    expect(readAsrState(stateFile).kind).toBe("ready");
+
+    // Now install small — should invalidate tiny state and reinstall
+    let step = 0;
+    const outputs = ["Python 3.12.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n"];
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: outputs[step++] ?? "", stderr: "" }));
+
+    const result = await runAsrInstallation({ spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase, modelKey: "small" });
+    expect(result.success).toBe(true);
+
+    // State should now be small
+    const finalState = readAsrState(stateFile);
+    expect(finalState.kind).toBe("ready");
+    expect(finalState.model).toBe("Systran/faster-whisper-small");
+
+    // Spawn was called (reinstalled)
+    expect(spawnFn).toHaveBeenCalled();
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("same-model ready state is idempotent (skips reinstall)", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-same-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const stateFile = path.join(tmpBase, "state.json");
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+    writeAsrState(stateFile, "small");
+
+    const spawnFn = vi.fn();
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "small" });
+    expect(result.success).toBe(true);
+    expect(result.pythonPath).toBe("already installed");
+    expect(spawnFn).not.toHaveBeenCalled();
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("already-installed tiny is idempotent with explicit modelKey", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-tidem-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const stateFile = path.join(tmpBase, "state.json");
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+    writeAsrState(stateFile, "tiny");
+
+    const spawnFn = vi.fn();
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "tiny" });
+    expect(result.success).toBe(true);
+    expect(spawnFn).not.toHaveBeenCalled();
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("shows correct model size in progress message", async () => {
+    const stages: string[] = [];
+    let step = 0;
+    const outputs = ["Python 3.12.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n"];
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: outputs[step++] ?? "", stderr: "" }));
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-size-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+
+    await runAsrInstallation({
+      spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase, modelKey: "tiny",
+      onStage: (s) => stages.push(s),
+    });
+
+    const downloadStage = stages.find((s) => s.includes("下载"));
+    expect(downloadStage).toContain("78.2");
+    expect(downloadStage).not.toContain("486");
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("model-switch failure: ready tiny → switch to small, verify fails → incomplete", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-swfail-" + Date.now());
+    fs.mkdirSync(tmpBase, { recursive: true });
+    const stateFile = path.join(tmpBase, "state.json");
+
+    // Pre-create ready state for tiny
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const f of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, f), "placeholder");
+    }
+    writeAsrState(stateFile, "tiny");
+    expect(readAsrState(stateFile).kind).toBe("ready");
+
+    // Switch to small — pass discovery/venv/pip/download, fail verify
+    let step = 0;
+    const outputs = [
+      "Python 3.12.0\n",
+      "",                    // venv OK
+      "",                    // pip OK
+      "DOWNLOADED\n",        // download OK
+      { code: 1, stdout: "", stderr: "model load failed" }, // verify FAILS
+    ];
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      const out = outputs[step++];
+      if (typeof out === "string") return Promise.resolve({ code: 0, stdout: out, stderr: "" });
+      return Promise.resolve(out);
+    });
+
+    const result = await runAsrInstallation({
+      spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase, modelKey: "small",
+    });
+    expect(result.success).toBe(false);
+    // Old tiny ready marker must be gone → state is incomplete
+    expect(readAsrState(stateFile).kind).toBe("incomplete");
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("invalid modelKey leaves all mutation functions untouched", async () => {
+    const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-untouch-" + Date.now());
+    const unlockFn = vi.fn();
+    const mkdirFn = vi.fn();
+    const spawnFn = vi.fn();
+
+    // At runtime, an invalid key passes through the catch block in runAsrInstallation
+    const result = await runAsrInstallation({
+      spawnFn, fsMkdirSync: mkdirFn, fsUnlinkSync: unlockFn, asrBase: tmpBase,
+      modelKey: "large" as AsrModelKey,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Unknown ASR model key");
+    // No mutation functions called before validation
+    expect(unlockFn).not.toHaveBeenCalled();
+    expect(mkdirFn).not.toHaveBeenCalled();
+    expect(spawnFn).not.toHaveBeenCalled();
+
+    try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+});
+
+// ---------- Phase 2: allowlist order and validation ----------
+
+describe("ASR_MODEL_SPECS order", () => {
+  it("first entry is tiny", () => {
+    expect(ASR_MODEL_SPECS[0].key).toBe("tiny");
+  });
+
+  it("second entry is base", () => {
+    expect(ASR_MODEL_SPECS[1].key).toBe("base");
+  });
+
+  it("third entry is small", () => {
+    expect(ASR_MODEL_SPECS[2].key).toBe("small");
+  });
+
+  it("has exactly three entries", () => {
+    expect(ASR_MODEL_SPECS.length).toBe(3);
+  });
+});
+
+describe("isAllowlistedModel cross-paired rejection", () => {
+  it("rejects tiny repository with small revision", () => {
+    expect(isAllowlistedModel(
+      "Systran/faster-whisper-tiny",
+      "536b0662742c02347bc0e980a01041f333bce120", // small revision
+    )).toBe(false);
+  });
+
+  it("rejects base repository with tiny revision", () => {
+    expect(isAllowlistedModel(
+      "Systran/faster-whisper-base",
+      "d90ca5fe260221311c53c58e660288d3deb8d356", // tiny revision
+    )).toBe(false);
+  });
+
+  it("rejects small repository with base revision", () => {
+    expect(isAllowlistedModel(
+      "Systran/faster-whisper-small",
+      "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66", // base revision
+    )).toBe(false);
+  });
+});
+
+describe("resolveModelSpec rejects malicious/invalid keys", () => {
+  it("rejects 'medium'", () => {
+    expect(() => resolveModelSpec("medium" as any)).toThrow("Unknown ASR model key");
+  });
+
+  it("rejects URL-like input", () => {
+    expect(() => resolveModelSpec("https://evil.com/model" as any)).toThrow("Unknown ASR model key");
+  });
+
+  it("rejects '../tiny'", () => {
+    expect(() => resolveModelSpec("../tiny" as any)).toThrow("Unknown ASR model key");
+  });
+
+  it("rejects 'constructor'", () => {
+    expect(() => resolveModelSpec("constructor" as any)).toThrow("Unknown ASR model key");
+  });
+
+  it("rejects '__proto__'", () => {
+    expect(() => resolveModelSpec("__proto__" as any)).toThrow("Unknown ASR model key");
+  });
+
+});
+
+describe("modelKeyForRepo", () => {
+  it("returns 'tiny' for tiny repository+revision pair", () => {
+    expect(modelKeyForRepo("Systran/faster-whisper-tiny", "d90ca5fe260221311c53c58e660288d3deb8d356")).toBe("tiny");
+  });
+
+  it("returns 'base' for base repository+revision pair", () => {
+    expect(modelKeyForRepo("Systran/faster-whisper-base", "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66")).toBe("base");
+  });
+
+  it("returns 'small' for small repository+revision pair", () => {
+    expect(modelKeyForRepo("Systran/faster-whisper-small", "536b0662742c02347bc0e980a01041f333bce120")).toBe("small");
+  });
+
+  it("returns null for cross-paired repo+revision", () => {
+    expect(modelKeyForRepo("Systran/faster-whisper-tiny", "536b0662742c02347bc0e980a01041f333bce120")).toBeNull();
+  });
+
+  it("returns null for unknown repository", () => {
+    expect(modelKeyForRepo("evil/model", "deadbeef")).toBeNull();
+  });
+});
+
+describe("readAsrState derived modelKey", () => {
+  it("ready state includes derived modelKey for small", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({
+        kind: "ready",
+        version: ASR_STATE_VERSION,
+        runtime: ASR_PINNED_RUNTIME,
+        model: ASR_PINNED_MODEL,
+        revision: ASR_PINNED_REVISION,
+      }),
+    );
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+      isFile: () => true,
+    }));
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, lstatSync);
+    expect(state.modelKey).toBe("small");
+  });
+
+  it("ready state includes derived modelKey for tiny", () => {
+    const existsSync = vi.fn(() => true);
+    const readFileSync = vi.fn(() =>
+      JSON.stringify({
+        kind: "ready",
+        version: ASR_STATE_VERSION,
+        runtime: ASR_PINNED_RUNTIME,
+        model: "Systran/faster-whisper-tiny",
+        revision: "d90ca5fe260221311c53c58e660288d3deb8d356",
+      }),
+    );
+    const lstatSync = vi.fn(() => ({
+      isSymbolicLink: () => false,
+      isDirectory: () => true,
+      isFile: () => true,
+    }));
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, lstatSync);
+    expect(state.modelKey).toBe("tiny");
+  });
+
+  it("incomplete state has no modelKey", () => {
+    // state file absent, but venv directory exists → incomplete
+    const stateFile = "/tmp/asr/state.json";
+    const venvDir = path.join(path.dirname(stateFile), "venv");
+    const existsSync = vi.fn((p: string) => p === venvDir);
+    const state = readAsrState(stateFile, fs.readFileSync, existsSync);
+    expect(state.kind).toBe("incomplete");
+    expect(state.modelKey).toBeUndefined();
+  });
+
+  it("not_installed state has no modelKey", () => {
+    const existsSync = vi.fn(() => false);
+    const state = readAsrState("/tmp/asr/state.json", fs.readFileSync, existsSync);
+    expect(state.modelKey).toBeUndefined();
+    expect(state.kind).toBe("not_installed");
+  });
+});
+
+describe("ASR installer staging containment", () => {
+  it("enforces file-count and byte budgets on the staged model tree", () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "bilibili-mcp-asr-tree-"),
+    );
+    try {
+      fs.writeFileSync(path.join(root, "one.bin"), Buffer.alloc(6));
+      fs.writeFileSync(path.join(root, "two.bin"), Buffer.alloc(5));
+
+      expect(validateModelInstallTree(root, 11, 2)).toEqual({
+        bytes: 11,
+        files: 2,
+      });
+      expect(() => validateModelInstallTree(root, 10, 2)).toThrow(
+        "storage budget",
+      );
+      expect(() => validateModelInstallTree(root, 11, 1)).toThrow(
+        "storage budget",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects symbolic links in the staged model tree", () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "bilibili-mcp-asr-link-"),
+    );
+    const outside = path.join(
+      os.tmpdir(),
+      `bilibili-mcp-asr-outside-${Date.now()}.bin`,
+    );
+    try {
+      fs.writeFileSync(outside, "outside");
+      try {
+        fs.symlinkSync(outside, path.join(root, "linked.bin"), "file");
+      } catch {
+        return;
+      }
+      expect(() => validateModelInstallTree(root, 1024)).toThrow(
+        "symbolic link",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(outside, { force: true });
+    }
+  });
+
+  it("does not forward proxy, cloud, package-token, or credential variables", () => {
+    const environment = buildAsrChildEnv({
+      PATH: "safe-path",
+      SYSTEMROOT: "safe-root",
+      HTTPS_PROXY: "http://synthetic-proxy",
+      HTTP_PROXY: "http://synthetic-proxy",
+      NO_PROXY: "127.0.0.1",
+      AWS_SECRET_ACCESS_KEY: "synthetic-secret",
+      AZURE_CLIENT_SECRET: "synthetic-secret",
+      GOOGLE_APPLICATION_CREDENTIALS: "synthetic-private-path",
+      NPM_TOKEN: "synthetic-secret",
+      HF_TOKEN: "synthetic-secret",
+      BILIBILI_SESSDATA: "synthetic-secret",
+    });
+
+    expect(environment).toMatchObject({
+      PATH: "safe-path",
+      SYSTEMROOT: "safe-root",
+      PIP_NO_INPUT: "1",
+      PYTHONNOUSERSITE: "1",
+    });
+    const serialized = JSON.stringify(environment);
+    expect(serialized).not.toContain("synthetic-secret");
+    expect(serialized).not.toContain("synthetic-proxy");
+    expect(serialized).not.toContain("synthetic-private-path");
+  });
+});

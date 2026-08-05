@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SECURITY_LIMITS } from "../src/security/limits.js";
 import { getMcpHandler } from "./helpers/mcp.js";
 
+const mockGetVideoInfoWithSubtitle = vi.fn();
 const mockGetVideoMetadataData = vi.fn();
 const mockGetVideoChaptersData = vi.fn();
 const mockGetVideoTranscriptData = vi.fn();
+const mockGetVideoCommentsData = vi.fn();
 const mockSearchBilibiliVideos = vi.fn();
 const mockListBilibiliFavoriteVideos = vi.fn();
 
 vi.mock("../src/bilibili/subtitle.js", () => ({
-  getVideoInfoWithSubtitle: vi.fn(),
+  getVideoInfoWithSubtitle: (...args: unknown[]) =>
+    mockGetVideoInfoWithSubtitle(...args),
   getVideoTranscriptData: (...args: unknown[]) =>
     mockGetVideoTranscriptData(...args),
 }));
@@ -33,14 +37,15 @@ vi.mock("../src/bilibili/favorites.js", () => ({
 }));
 
 vi.mock("../src/bilibili/comments.js", () => ({
-  getVideoCommentsData: vi.fn(),
+  getVideoCommentsData: (...args: unknown[]) =>
+    mockGetVideoCommentsData(...args),
 }));
 
 vi.mock("../src/bilibili/http.js", () => ({
   checkLoginStatus: vi.fn(async () => ({ isLogin: false })),
 }));
 
-const { NoSubtitleError } = await import("../src/utils/errors.js");
+const { AsrError, NoSubtitleError } = await import("../src/utils/errors.js");
 
 function getCallToolHandler() {
   return getMcpHandler<
@@ -90,6 +95,7 @@ describe("handler validation and transcript output", () => {
     ["empty query", { query: "   " }],
     ["max_matches out of range", { query: "hello", max_matches: 999 }],
     ["context_segments out of range", { query: "hello", context_segments: 99 }],
+    ["non-boolean fallback_to_asr", { fallback_to_asr: "yes" }],
   ])("get_video_transcript with %s returns VALIDATION_ERROR", async (_case, args) => {
     const handler = getCallToolHandler();
     const result = await handler({
@@ -158,6 +164,37 @@ describe("handler validation and transcript output", () => {
     expect(result.content[0].text).toBe(JSON.stringify(fixture, null, 2));
   });
 
+  it("forwards explicit ASR opt-in and returns identical ASR text/structured output", async () => {
+    const fixture = {
+      bvid: "BV1T6PQzQErF",
+      data_source: "asr" as const,
+      language: "zh",
+      transcript: "本地转录",
+      title: "ASR fixture",
+      page: 1,
+      source_url: "https://www.bilibili.com/video/BV1T6PQzQErF/",
+    };
+    mockGetVideoTranscriptData.mockResolvedValueOnce(fixture);
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 41,
+      params: {
+        name: "get_video_transcript",
+        arguments: {
+          bvid_or_url: "BV1T6PQzQErF",
+          fallback_to_asr: true,
+        },
+      },
+    });
+
+    expect(mockGetVideoTranscriptData.mock.calls[0].at(-1)).toBe(true);
+    expect(result.structuredContent).toEqual(fixture);
+    expect(JSON.parse(result.content[0].text)).toEqual(fixture);
+  });
+
   it("keeps transcript errors text-only", async () => {
     mockGetVideoTranscriptData.mockRejectedValueOnce(
       new NoSubtitleError("No subtitles"),
@@ -183,6 +220,27 @@ describe("handler validation and transcript output", () => {
     );
   });
 
+  it("keeps ASR errors text-only with their bounded code", async () => {
+    mockGetVideoTranscriptData.mockRejectedValueOnce(
+      new AsrError("ASR_BUSY", "Another ASR transcription is active", true),
+    );
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 51,
+      params: {
+        name: "get_video_transcript",
+        arguments: { bvid_or_url: "BV1T6PQzQErF", fallback_to_asr: true },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("ASR_BUSY");
+  });
+
   it("keeps generic transcript failures text-only", async () => {
     mockGetVideoTranscriptData.mockRejectedValueOnce(
       new Error("Unexpected transcript failure"),
@@ -204,6 +262,85 @@ describe("handler validation and transcript output", () => {
     expect(result.isError).toBe(true);
     expect(result).not.toHaveProperty("structuredContent");
     expect(JSON.parse(result.content[0].text).code).toBe("UNKNOWN_ERROR");
+  });
+
+  it("bridges the MCP abort signal to transcript work and keeps the error text-only", async () => {
+    const controller = new AbortController();
+    mockGetVideoTranscriptData.mockImplementationOnce(
+      (...args: unknown[]) =>
+        new Promise((_resolve, reject) => {
+          const signal = args.at(-1) as AbortSignal;
+          signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("aborted", "AbortError")),
+            { once: true },
+          );
+        }),
+    );
+
+    const handler = getCallToolHandler();
+    const pending = handler(
+      {
+        method: "tools/call",
+        jsonrpc: "2.0",
+        id: 61,
+        params: {
+          name: "get_video_transcript",
+          arguments: { bvid_or_url: "BV1T6PQzQErF" },
+        },
+      },
+      { signal: controller.signal },
+    );
+    controller.abort();
+    const result = await pending;
+
+    expect(mockGetVideoTranscriptData.mock.calls[0].at(-1)).toBe(
+      controller.signal,
+    );
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("UNKNOWN_ERROR");
+  });
+
+  it("does not reflect an oversized unknown tool name into the response or bounded log", async () => {
+    const marker = `ATTACK_MARKER-${"x".repeat(1_024)}`;
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const handler = getCallToolHandler();
+      const result = await handler({
+        method: "tools/call",
+        jsonrpc: "2.0",
+        id: 62,
+        params: { name: marker, arguments: {} },
+      });
+
+      const response = JSON.stringify(result);
+      expect(result.isError).toBe(true);
+      expect(result).not.toHaveProperty("structuredContent");
+      expect(JSON.parse(result.content[0].text).code).toBe("UNKNOWN_ERROR");
+      expect(response).not.toContain("ATTACK_MARKER");
+      expect(response).not.toContain(marker);
+
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      const serializedLog = String(logSpy.mock.calls[0][0]);
+      expect(Buffer.byteLength(serializedLog, "utf8")).toBeLessThanOrEqual(
+        SECURITY_LIMITS.logEntryBytes,
+      );
+      expect(serializedLog).not.toContain("ATTACK_MARKER");
+      expect(serializedLog).not.toContain(marker);
+      expect(JSON.parse(serializedLog)).toMatchObject({
+        message: "Error processing MCP tool",
+        data: {
+          error: {
+            name: "Error",
+            message: "Unknown MCP tool",
+          },
+        },
+      });
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 
   it("get_video_chapters with out-of-range page returns VALIDATION_ERROR via generic error handler", async () => {
@@ -471,5 +608,89 @@ describe("favorites handler validation and output", () => {
     const payload = JSON.parse(result.content[0].text);
     expect(payload.code).toBe("VALIDATION_ERROR");
     expect(payload.message).toContain("restart without a cursor");
+  });
+});
+
+describe("BVID tools reject non-string bvid_or_url", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const businessMocks: Record<string, ReturnType<typeof vi.fn>> = {
+    get_video_info: mockGetVideoInfoWithSubtitle,
+    get_video_comments: mockGetVideoCommentsData,
+    get_video_transcript: mockGetVideoTranscriptData,
+    get_video_metadata: mockGetVideoMetadataData,
+    get_video_chapters: mockGetVideoChaptersData,
+  };
+
+  // Tool x input matrix: every BVID tool with number, boolean, and object
+  // bvid_or_url must return the same stable typed error and never reach the
+  // corresponding business mock.
+  const matrix: Array<[string, string, unknown]> = [
+    ["get_video_info", "number", 12345],
+    ["get_video_info", "boolean", true],
+    ["get_video_info", "object", { bvid: "BV1T6PQzQErF" }],
+    ["get_video_comments", "number", 12345],
+    ["get_video_comments", "boolean", true],
+    ["get_video_comments", "object", { bvid: "BV1T6PQzQErF" }],
+    ["get_video_transcript", "number", 12345],
+    ["get_video_transcript", "boolean", true],
+    ["get_video_transcript", "object", { bvid: "BV1T6PQzQErF" }],
+    ["get_video_metadata", "number", 12345],
+    ["get_video_metadata", "boolean", true],
+    ["get_video_metadata", "object", { bvid: "BV1T6PQzQErF" }],
+    ["get_video_chapters", "number", 12345],
+    ["get_video_chapters", "boolean", true],
+    ["get_video_chapters", "object", { bvid: "BV1T6PQzQErF" }],
+  ];
+
+  it.each(matrix)(
+    "%s with %s bvid_or_url returns a typed VALIDATION_ERROR before any business call",
+    async (toolName, _inputKind, bvidOrUrl) => {
+      const handler = getCallToolHandler();
+      const result = await handler({
+        method: "tools/call",
+        jsonrpc: "2.0",
+        id: 71,
+        params: {
+          name: toolName,
+          arguments: { bvid_or_url: bvidOrUrl },
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result).not.toHaveProperty("structuredContent");
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload.code).toBe("VALIDATION_ERROR");
+      expect(payload.message).toBe("bvid_or_url must be a string");
+      expect(JSON.stringify(result)).not.toContain("includes");
+      expect(businessMocks[toolName]).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe("buildValidationErrorPayload genericization", () => {
+  it("keeps the controlled message of a typed ValidationError", async () => {
+    const { ValidationError } = await import("../src/utils/errors.js");
+    const { buildValidationErrorPayload } = await import(
+      "../src/server/error-response.js"
+    );
+    const payload = buildValidationErrorPayload(
+      new ValidationError("bvid_or_url must be a string"),
+    );
+    expect(payload.code).toBe("VALIDATION_ERROR");
+    expect(payload.message).toBe("bvid_or_url must be a string");
+  });
+
+  it("genericizes unexpected exceptions without leaking engine wording", async () => {
+    const { buildValidationErrorPayload } = await import(
+      "../src/server/error-response.js"
+    );
+    const payload = buildValidationErrorPayload(
+      new Error("includes is not a function"),
+    );
+    expect(payload.code).toBe("VALIDATION_ERROR");
+    expect(payload.message).toBe("Invalid input");
   });
 });

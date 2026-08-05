@@ -5,6 +5,11 @@ const mockGetVideoSubtitle = vi.fn();
 const mockGetSubtitleContent = vi.fn();
 const mockCheckLoginStatus = vi.fn();
 const mockResolvePartCid = vi.fn();
+const mockTranscribeVideoPart = vi.fn();
+
+vi.mock("../src/asr/transcription.js", () => ({
+  transcribeVideoPart: (...args: unknown[]) => mockTranscribeVideoPart(...args),
+}));
 
 vi.mock("../src/bilibili/client.js", () => ({
   getVideoInfo: (...args: unknown[]) => mockGetVideoInfo(...args),
@@ -56,6 +61,7 @@ beforeEach(() => {
   mockGetSubtitleContent.mockReset();
   mockCheckLoginStatus.mockReset();
   mockResolvePartCid.mockReset();
+  mockTranscribeVideoPart.mockReset();
 
   mockGetVideoInfo.mockResolvedValue({
     title: "Test Video",
@@ -84,10 +90,42 @@ beforeEach(() => {
   );
 
   mockCheckLoginStatus.mockResolvedValue({ isLogin: true });
+  mockTranscribeVideoPart.mockResolvedValue({
+    language: "zh",
+    segments: [
+      { from: 0, to: 1, content: "ASR Hello" },
+      { from: 1, to: 2, content: "ASR World" },
+    ],
+  });
 });
 
+function getTranscriptWithAsr(
+  options: {
+    fallbackToDescription?: boolean;
+    page?: number;
+    includeTimestamps?: boolean;
+    startSeconds?: number;
+    endSeconds?: number;
+    search?: TranscriptSearchOptions;
+    signal?: AbortSignal;
+  } = {},
+) {
+  return getVideoTranscriptData(
+    "BV1T6PQzQErF",
+    undefined,
+    options.fallbackToDescription ?? false,
+    options.page,
+    options.includeTimestamps,
+    options.startSeconds,
+    options.endSeconds,
+    options.search,
+    true,
+    options.signal,
+  );
+}
+
 describe("getVideoInfoWithSubtitle - transient subtitle errors", () => {
-  it("retries subtitle retrieval after a temporary error fallback", async () => {
+  it("keeps a temporary subtitle error visible and allows a later retry", async () => {
     mockGetVideoSubtitle
       .mockRejectedValueOnce(new Error("Temporary network failure"))
       .mockResolvedValueOnce(
@@ -101,10 +139,11 @@ describe("getVideoInfoWithSubtitle - transient subtitle errors", () => {
         ]),
       );
 
-    const firstResult = await getVideoInfoWithSubtitle("BV1R6PQzQErF");
+    await expect(
+      getVideoInfoWithSubtitle("BV1R6PQzQErF"),
+    ).rejects.toThrow("Temporary network failure");
     const secondResult = await getVideoInfoWithSubtitle("BV1R6PQzQErF");
 
-    expect(firstResult.data_source).toBe("description");
     expect(secondResult.data_source).toBe("subtitle");
     expect(mockGetVideoSubtitle).toHaveBeenCalledTimes(2);
   });
@@ -129,6 +168,147 @@ describe("getVideoTranscriptData - subtitle success", () => {
     expect(result.title).toBe("Test Video");
     expect(result.bvid).toBe("BV1T6PQzQErF");
     expect(result.language).toBe("zh-Hans");
+  });
+
+  it("does not inspect ASR when fallback_to_asr is omitted", async () => {
+    await getVideoTranscriptData("BV1T6PQzQErF");
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("keeps native subtitles ahead of explicitly requested ASR", async () => {
+    const result = await getTranscriptWithAsr();
+    expect(result.data_source).toBe("subtitle");
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("never invokes ASR for get_video_info when subtitles are absent", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(makeFakeSubtitles([]));
+
+    const result = await getVideoInfoWithSubtitle("BV1R6PQzQErF");
+
+    expect(result.data_source).toBe("description");
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+});
+
+describe("getVideoTranscriptData - explicit ASR fallback", () => {
+  it("uses ASR only after an authenticated empty subtitle list", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(makeFakeSubtitles([]));
+
+    const result = await getTranscriptWithAsr();
+
+    expect(mockCheckLoginStatus).toHaveBeenCalledOnce();
+    expect(mockTranscribeVideoPart).toHaveBeenCalledWith({
+      bvid: "BV1T6PQzQErF",
+      cid: 12345,
+      durationSeconds: 120,
+    });
+    expect(result).toMatchObject({
+      data_source: "asr",
+      language: "zh",
+      transcript: "ASR Hello\nASR World",
+      page: 1,
+    });
+  });
+
+  it("passes the same caller AbortSignal to ASR after confirmed subtitle absence", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(makeFakeSubtitles([]));
+    const controller = new AbortController();
+
+    await expect(
+      getTranscriptWithAsr({ signal: controller.signal }),
+    ).resolves.toMatchObject({ data_source: "asr" });
+
+    expect(mockTranscribeVideoPart).toHaveBeenCalledWith(
+      {
+        bvid: "BV1T6PQzQErF",
+        cid: 12345,
+        durationSeconds: 120,
+      },
+      {},
+      controller.signal,
+    );
+  });
+
+  it("uses ASR after a definitively empty subtitle body", async () => {
+    mockGetSubtitleContent.mockResolvedValue(makeFakeSubtitleContent([]));
+
+    await expect(getTranscriptWithAsr()).resolves.toMatchObject({ data_source: "asr" });
+    expect(mockTranscribeVideoPart).toHaveBeenCalledOnce();
+  });
+
+  it("reuses timestamps and range filtering for ASR segments", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(makeFakeSubtitles([]));
+    mockTranscribeVideoPart.mockResolvedValue({
+      language: "en",
+      segments: [
+        { from: 0, to: 5, content: "early" },
+        { from: 5, to: 10, content: "middle" },
+        { from: 10, to: 15, content: "late" },
+      ],
+    });
+
+    const result = await getTranscriptWithAsr({
+      includeTimestamps: true,
+      startSeconds: 6,
+      endSeconds: 12,
+    });
+
+    expect(result.transcript).toContain("middle");
+    expect(result.transcript).toContain("late");
+    expect(result.transcript).not.toContain("early");
+    expect(result.transcript).toContain("[00:00:05 --> 00:00:10]");
+  });
+
+  it("reuses keyword, context, source, and timestamp URLs for ASR segments", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(makeFakeSubtitles([]));
+    mockTranscribeVideoPart.mockResolvedValue({
+      language: "en",
+      segments: [
+        { from: 0, to: 2, content: "before" },
+        { from: 2, to: 4, content: "ASR MATCH" },
+        { from: 4, to: 6, content: "after" },
+      ],
+    });
+
+    const result = await getTranscriptWithAsr({ search: searchOpts("match") });
+
+    expect(result.data_source).toBe("asr");
+    expect(result.total_matches).toBe(1);
+    expect(result.matches?.[0].context).toContain("before");
+    expect(result.matches?.[0].context).toContain("after");
+    expect(result.matches?.[0].timestamp_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/?t=2");
+  });
+
+  it("never treats generic subtitle/network failure as ASR input", async () => {
+    mockGetVideoSubtitle.mockRejectedValue(new Error("network failed"));
+
+    await expect(getTranscriptWithAsr({ fallbackToDescription: true })).rejects.toThrow("network failed");
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("propagates Cookie failure without ASR", async () => {
+    mockGetVideoSubtitle.mockRejectedValue(new BilibiliAPIError("expired", "COOKIE_EXPIRED"));
+
+    await expect(getTranscriptWithAsr()).rejects.toMatchObject({ code: "COOKIE_EXPIRED" });
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("uses description only when both fallbacks are explicit and playback has a valid empty audio set", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(makeFakeSubtitles([]));
+    mockTranscribeVideoPart.mockResolvedValue(null);
+
+    await expect(getTranscriptWithAsr({ fallbackToDescription: true })).resolves.toMatchObject({
+      data_source: "description",
+      transcript: "Video description text",
+    });
+  });
+
+  it("keeps ASR readiness and execution errors visible instead of using description", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(makeFakeSubtitles([]));
+    mockTranscribeVideoPart.mockRejectedValue(new Error("ASR not ready"));
+
+    await expect(getTranscriptWithAsr({ fallbackToDescription: true })).rejects.toThrow("ASR not ready");
   });
 });
 
@@ -228,13 +408,12 @@ describe("getVideoTranscriptData - fallback enabled", () => {
     expect(result.data_source).toBe("description");
   });
 
-  it("returns description on general fetch error", async () => {
+  it("keeps a general fetch error visible even when description fallback is enabled", async () => {
     mockGetVideoSubtitle.mockRejectedValue(new Error("Network down"));
 
-    const result = await getVideoTranscriptData("BV1T6PQzQErF", undefined, true);
-
-    expect(result.data_source).toBe("description");
-    expect(result.transcript).toBe("Video description text");
+    await expect(
+      getVideoTranscriptData("BV1T6PQzQErF", undefined, true),
+    ).rejects.toThrow("Network down");
   });
 });
 
@@ -550,6 +729,37 @@ describe("getVideoTranscriptData - keyword search", () => {
     expect(result.total_matches).toBe(5);
     expect(result.truncated).toBe(true);
     expect(result.matches).toHaveLength(3);
+  });
+
+  it("keeps dense overlapping search output under the aggregate budget", async () => {
+    mockGetSubtitleContent.mockResolvedValue(
+      makeFakeSubtitleContent(
+        Array.from({ length: 20 }, (_, index) => ({
+          from: index,
+          to: index + 1,
+          content: `hit-${index}-${"x".repeat(10_000)}`,
+        })),
+      ),
+    );
+
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      undefined,
+      false,
+      undefined,
+      false,
+      undefined,
+      undefined,
+      searchOpts("hit", 20, 5),
+    );
+
+    expect(result.total_matches).toBe(20);
+    expect(result.returned_matches).toBeLessThan(20);
+    expect(result.returned_matches).toBe(result.matches?.length);
+    expect(result.truncated).toBe(true);
+    expect(Buffer.byteLength(JSON.stringify(result), "utf8")).toBeLessThanOrEqual(
+      512 * 1024,
+    );
   });
 
   it("returns empty matches and transcript on no match", async () => {
@@ -872,13 +1082,12 @@ describe("getVideoTranscriptData - evidence links", () => {
     expect(result.source_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/");
   });
 
-  it("includes source_url on general-error description fallback", async () => {
+  it("does not convert a general error into source-linked description data", async () => {
     mockGetVideoSubtitle.mockRejectedValue(new Error("Network down"));
 
-    const result = await getVideoTranscriptData("BV1T6PQzQErF", undefined, true);
-
-    expect(result.data_source).toBe("description");
-    expect(result.source_url).toBe("https://www.bilibili.com/video/BV1T6PQzQErF/");
+    await expect(
+      getVideoTranscriptData("BV1T6PQzQErF", undefined, true),
+    ).rejects.toThrow("Network down");
   });
 });
 

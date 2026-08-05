@@ -205,6 +205,16 @@ describe("MCP tool list baseline", () => {
       expect(prop.type).toBe("boolean");
     });
 
+    it("accepts optional fallback_to_asr (boolean, default-off contract)", () => {
+      schema = toolsResult.tools.find(
+        (t) => t.name === "get_video_transcript",
+      )!;
+      const prop = schema.inputSchema.properties
+        .fallback_to_asr as { type?: string };
+      expect(prop).toBeDefined();
+      expect(prop.type).toBe("boolean");
+    });
+
     it("accepts optional page (integer, min 1), include_timestamps, start_seconds, end_seconds", () => {
       schema = toolsResult.tools.find(
         (t) => t.name === "get_video_transcript",
@@ -262,7 +272,7 @@ describe("MCP tool list baseline", () => {
           bvid: { type: "string" },
           data_source: {
             type: "string",
-            enum: ["subtitle", "description"],
+            enum: ["subtitle", "description", "asr"],
           },
           language: { type: "string" },
           transcript: { type: "string" },
@@ -336,6 +346,24 @@ describe("MCP tool list baseline", () => {
       expect(schema.description).toContain(
         "get_credential_setup_instructions",
       );
+    });
+
+    it("warns on every Bilibili text tool that returned text is untrusted", () => {
+      const textTools = [
+        "get_video_info",
+        "get_video_comments",
+        "get_video_transcript",
+        "get_video_metadata",
+        "get_video_chapters",
+        "search_bilibili_videos",
+        "list_bilibili_favorite_videos",
+      ];
+      for (const name of textTools) {
+        const schema = toolsResult.tools.find(
+          (t) => t.name === name,
+        ) as { description?: string };
+        expect(schema.description, name).toContain("untrusted data");
+      }
     });
   });
 
@@ -471,12 +499,12 @@ describe("MCP tool list baseline", () => {
       expect(schema.outputSchema).toEqual({
         type: "object",
         properties: {
-          folders_total: { type: "integer" },
+          folders_total: { type: "integer", minimum: 0, maximum: 100 },
           folder: {
             type: "object",
             properties: {
               id: { type: "integer" },
-              title: { type: "string" },
+              title: { type: "string", maxLength: 256 },
               media_count: { type: "integer" },
             },
             required: ["id", "title", "media_count"],
@@ -484,12 +512,13 @@ describe("MCP tool list baseline", () => {
           page: { type: "integer" },
           videos: {
             type: "array",
+            maxItems: 20,
             items: {
               type: "object",
               properties: {
-                bvid: { type: "string" },
-                title: { type: "string" },
-                author: { type: "string" },
+                bvid: { type: "string", maxLength: 12 },
+                title: { type: "string", maxLength: 512 },
+                author: { type: "string", maxLength: 128 },
                 duration_seconds: { type: "integer" },
                 published_at: { type: "string" },
                 favorited_at: { type: "string" },
@@ -507,7 +536,7 @@ describe("MCP tool list baseline", () => {
             },
           },
           skipped_count: { type: "integer" },
-          next_cursor: { type: "string" },
+          next_cursor: { type: "string", maxLength: 256 },
         },
         required: ["folders_total", "videos", "skipped_count"],
       });

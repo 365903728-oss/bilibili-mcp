@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { logger, redactSecrets } from "../src/utils/logger.js";
 import { withRetry } from "../src/utils/retry.js";
+import { SECURITY_LIMITS } from "../src/security/limits.js";
 
 function restoreDebugEnv(previous: string | undefined) {
   if (previous === undefined) {
@@ -130,12 +131,42 @@ describe("logger secret redaction", () => {
 
       const output = spy.mock.calls.map((call) => call.join(" ")).join("\n");
 
-      expect(output).toContain("SESSDATA=***");
-      expect(output).toContain("bili_jct=***");
-      expect(output).toContain("DedeUserID=***");
+      expect(output).toContain("Attempt 0 failed; retry scheduled.");
       expect(output).not.toContain("real-sess");
       expect(output).not.toContain("real-jct");
       expect(output).not.toContain("123456");
+      expect(output).not.toContain("SESSDATA");
+      expect(output).not.toContain("bili_jct");
+      expect(output).not.toContain("DedeUserID");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("emits one valid bounded JSON record for oversized multibyte input", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const secret = "SYNTHETIC_TOKEN_DO_NOT_LOG";
+
+    try {
+      logger.error(
+        `${"🙂".repeat(20_000)}\u0000\u001b Authorization: Bearer ${secret}`,
+        {
+          nested: Array.from({ length: 200 }, (_, index) => ({
+            index,
+            value: `${"界".repeat(5_000)} token=${secret}`,
+          })),
+        },
+      );
+
+      expect(spy).toHaveBeenCalledOnce();
+      const line = String(spy.mock.calls[0][0]);
+      expect(Buffer.byteLength(line, "utf8")).toBeLessThanOrEqual(
+        SECURITY_LIMITS.logEntryBytes,
+      );
+      expect(() => JSON.parse(line)).not.toThrow();
+      expect(line).not.toContain(secret);
+      expect(line).not.toContain("\u0000");
+      expect(line).not.toContain("\u001b");
     } finally {
       spy.mockRestore();
     }

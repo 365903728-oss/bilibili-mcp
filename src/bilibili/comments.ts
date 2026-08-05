@@ -5,12 +5,19 @@ import {
   CommentOptions,
   ProcessedComment,
   CommentDetailLevel,
-  CommentsResponse,
 } from "./types.js";
 import { extractBVId } from "../utils/bvid.js";
 import { cacheManager } from "../utils/cache.js";
-import { CommentsDisabledError } from "../utils/errors.js";
+import {
+  CommentsDisabledError,
+  ResourceLimitError,
+} from "../utils/errors.js";
 import { logger, redactSecrets } from "../utils/logger.js";
+import { SECURITY_LIMITS, utf8ByteLength } from "../security/limits.js";
+import {
+  boundedFiniteInteger,
+  boundedRemoteText,
+} from "../utils/bounded-text.js";
 
 export interface CommentData {
   comments: ProcessedComment[];
@@ -18,6 +25,82 @@ export interface CommentData {
     total_comments: number;
     comments_with_timestamp: number;
   };
+}
+
+const MAX_COMMENT_AUTHOR_BYTES = 128;
+const MAX_COMMENT_MESSAGE_BYTES = 4_000;
+const MAX_REPLIES_PER_COMMENT = 3;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeRemoteComment(
+  value: unknown,
+  includeReplies: boolean,
+): Comment | undefined {
+  if (!isRecord(value)) return undefined;
+  const member = isRecord(value.member) ? value.member : undefined;
+  const content = isRecord(value.content) ? value.content : undefined;
+  if (
+    typeof member?.uname !== "string" ||
+    typeof content?.message !== "string"
+  ) {
+    return undefined;
+  }
+  if (
+    Buffer.byteLength(member.uname, "utf8") > MAX_COMMENT_AUTHOR_BYTES
+  ) {
+    throw new ResourceLimitError(
+      "Comment author exceeded its byte limit",
+      "comment_author",
+      MAX_COMMENT_AUTHOR_BYTES,
+    );
+  }
+  if (
+    Buffer.byteLength(content.message, "utf8") > MAX_COMMENT_MESSAGE_BYTES
+  ) {
+    throw new ResourceLimitError(
+      "Comment content exceeded its byte limit",
+      "comment_content",
+      MAX_COMMENT_MESSAGE_BYTES,
+    );
+  }
+
+  const replies: Comment[] = [];
+  if (includeReplies && Array.isArray(value.replies)) {
+    for (const rawReply of value.replies.slice(0, MAX_REPLIES_PER_COMMENT)) {
+      const reply = normalizeRemoteComment(rawReply, false);
+      if (reply) replies.push(reply);
+    }
+  }
+
+  return {
+    rpid: boundedFiniteInteger(value.rpid),
+    member: {
+      uname: member.uname,
+      avatar: "",
+    },
+    content: {
+      message: content.message,
+    },
+    like: boundedFiniteInteger(value.like),
+    replies,
+  };
+}
+
+function acceptCommentPage(
+  data: unknown,
+  remainingItems: number,
+  includeReplies: boolean,
+): Comment[] {
+  if (!isRecord(data) || !Array.isArray(data.replies)) return [];
+  const accepted: Comment[] = [];
+  for (const rawComment of data.replies.slice(0, remainingItems)) {
+    const comment = normalizeRemoteComment(rawComment, includeReplies);
+    if (comment) accepted.push(comment);
+  }
+  return accepted;
 }
 
 
@@ -53,10 +136,15 @@ function processComment(
   comment: Comment,
   includeReplies: boolean = false
 ): ProcessedComment {
-  const author = comment.member?.uname || "匿名用户";
-  const rawContent = comment.content?.message || "";
+  const author =
+    boundedRemoteText(comment.member?.uname, MAX_COMMENT_AUTHOR_BYTES) ||
+    "匿名用户";
+  const rawContent = boundedRemoteText(
+    comment.content?.message,
+    MAX_COMMENT_MESSAGE_BYTES,
+  );
   const filteredContent = filterEmojis(rawContent);
-  const likes = comment.like || 0;
+  const likes = boundedFiniteInteger(comment.like);
   const timestamp = extractTimestamp(filteredContent);
 
   return {
@@ -134,28 +222,36 @@ export async function getVideoCommentsData(
     // 获取评论：limit ≤ 20 单次请求，> 20 顺序分页拉取
     let rawComments: Comment[];
     if (commentCount <= 20) {
-      const commentsData = (await getVideoComments(
+      const commentsData = await getVideoComments(
         bvidOrUrl,
         1,
         commentCount,
         sort,
         includeReplies,
-      )) as CommentsResponse;
-      rawComments = commentsData?.replies || [];
+      );
+      rawComments = acceptCommentPage(
+        commentsData,
+        commentCount,
+        includeReplies,
+      );
     } else {
       rawComments = [];
       let page = 1;
       let remaining = commentCount;
       while (remaining > 0) {
         const pageSize = Math.min(remaining, 20);
-        const pageData = (await getVideoComments(
+        const pageData = await getVideoComments(
           bvidOrUrl,
           page,
           pageSize,
           sort,
           includeReplies,
-        )) as CommentsResponse;
-        const pageReplies = pageData?.replies || [];
+        );
+        const pageReplies = acceptCommentPage(
+          pageData,
+          pageSize,
+          includeReplies,
+        );
         if (pageReplies.length === 0) break;
         rawComments.push(...pageReplies);
         if (pageReplies.length < pageSize) break;
@@ -176,7 +272,10 @@ export async function getVideoCommentsData(
       for (const comment of rawComments) {
         if (comment.replies && comment.replies.length > 0) {
           // 取前3条高赞回复
-          const topReplies = comment.replies.slice(0, 3);
+          const topReplies = comment.replies.slice(
+            0,
+            MAX_REPLIES_PER_COMMENT,
+          );
           replies.push(...topReplies);
         }
       }
@@ -203,6 +302,16 @@ export async function getVideoCommentsData(
         comments_with_timestamp: commentsWithTimestamp,
       },
     };
+    if (
+      utf8ByteLength(JSON.stringify(result)) >
+      SECURITY_LIMITS.commentResultBytes
+    ) {
+      throw new ResourceLimitError(
+        "Comment result exceeded its byte limit",
+        "comment_result",
+        SECURITY_LIMITS.commentResultBytes,
+      );
+    }
 
     // 存入缓存
     cacheManager.setCommentInfo(cacheKey, result);

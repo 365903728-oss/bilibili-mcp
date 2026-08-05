@@ -10,6 +10,7 @@ vi.mock("../src/bilibili/client.js", () => ({
 }));
 
 import { getVideoCommentsData } from "../src/bilibili/comments.js";
+import { SECURITY_LIMITS } from "../src/security/limits.js";
 import { cacheManager } from "../src/utils/cache.js";
 
 function makeFakeReplies(overrides: Record<string, unknown> = {}) {
@@ -379,5 +380,131 @@ describe("getVideoCommentsData - pagination for limits above 20", () => {
     // 50 top-level + 50 expanded replies = 100
     expect(result.comments).toHaveLength(100);
     expect(result.summary.total_comments).toBe(100);
+  });
+});
+
+describe("getVideoCommentsData - hostile upstream bounds", () => {
+  it("slices an over-returned page to the caller-visible main-comment limit", async () => {
+    mockGetVideoComments.mockResolvedValue({
+      replies: Array.from({ length: 7 }, (_, index) => ({
+        rpid: index + 1,
+        member: { uname: `User${index + 1}` },
+        content: { message: `Comment ${index + 1}` },
+        like: index,
+        replies: [],
+      })),
+    });
+
+    const result = await getVideoCommentsData("BV1T6PQzQErF", {
+      limit: 1,
+      includeReplies: false,
+    });
+
+    expect(result.comments).toHaveLength(1);
+    expect(result.summary.total_comments).toBe(1);
+  });
+
+  it("retains at most three replies per accepted main comment", async () => {
+    mockGetVideoComments.mockResolvedValue({
+      replies: [
+        {
+          rpid: 1,
+          member: { uname: "Main" },
+          content: { message: "Main comment" },
+          like: 1,
+          replies: Array.from({ length: 8 }, (_, index) => ({
+            rpid: index + 10,
+            member: { uname: `Reply${index}` },
+            content: { message: `Reply ${index}` },
+            like: index,
+          })),
+        },
+      ],
+    });
+
+    const result = await getVideoCommentsData("BV1T6PQzQErF", {
+      detailLevel: "detailed",
+      limit: 1,
+      includeReplies: true,
+    });
+
+    expect(result.comments).toHaveLength(4);
+    expect(result.comments.map((item) => item.content)).not.toContain(
+      "Reply 3",
+    );
+  });
+
+  it.each([
+    [
+      "author",
+      {
+        rpid: 1,
+        member: { uname: "界".repeat(43) },
+        content: { message: "ok" },
+        like: 0,
+        replies: [],
+      },
+      "comment_author",
+      128,
+    ],
+    [
+      "content",
+      {
+        rpid: 1,
+        member: { uname: "ok" },
+        content: { message: "🙂".repeat(1_001) },
+        like: 0,
+        replies: [],
+      },
+      "comment_content",
+      4_000,
+    ],
+  ])(
+    "fails closed when a remote %s exceeds its UTF-8 budget",
+    async (_label, row, resource, limit) => {
+      mockGetVideoComments.mockResolvedValue({ replies: [row] });
+
+      await expect(
+        getVideoCommentsData("BV1T6PQzQErF", {
+          limit: 1,
+          includeReplies: false,
+        }),
+      ).rejects.toMatchObject({
+        name: "ResourceLimitError",
+        resource,
+        limit,
+      });
+    },
+  );
+
+  it("rejects an aggregate comment result above one MiB before caching it", async () => {
+    mockGetVideoComments.mockImplementation(
+      async (_url: string, page: number, pageSize: number) => ({
+        replies: Array.from({ length: pageSize }, (_, index) => ({
+          rpid: (page - 1) * pageSize + index + 1,
+          member: { uname: "Bounded author" },
+          content: { message: "x".repeat(4_000) },
+          like: 0,
+          replies: [],
+        })),
+      }),
+    );
+    const cacheWrite = vi.spyOn(cacheManager, "setCommentInfo");
+
+    try {
+      await expect(
+        getVideoCommentsData("BV1T6PQzQErF", {
+          limit: 300,
+          includeReplies: false,
+        }),
+      ).rejects.toMatchObject({
+        name: "ResourceLimitError",
+        resource: "comment_result",
+        limit: SECURITY_LIMITS.commentResultBytes,
+      });
+      expect(cacheWrite).not.toHaveBeenCalled();
+    } finally {
+      cacheWrite.mockRestore();
+    }
   });
 });

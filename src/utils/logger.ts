@@ -1,6 +1,8 @@
 /**
  * 统一日志系统
  */
+import { SECURITY_LIMITS } from "../security/limits.js";
+import { truncateUtf8 } from "./bounded-text.js";
 
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
@@ -16,23 +18,47 @@ const SENSITIVE_KEY_PATTERN =
   /cookie|authorization|sessdata|bili_jct|dedeuserid|token|secret|(?:^|_)(?:mid|media_id|folder_id)$/i;
 
 function redactString(value: string): string {
-  return value
-    .replace(/(SESSDATA=)[^;\s",]+/gi, "$1***")
-    .replace(/(bili_jct=)[^;\s",]+/gi, "$1***")
-    .replace(/(DedeUserID=)[^;\s",]+/gi, "$1***")
-    .replace(/(BILIBILI_SESSDATA=)[^;\s",]+/gi, "$1***")
-    .replace(/(BILIBILI_BILI_JCT=)[^;\s",]+/gi, "$1***")
-    .replace(/(BILIBILI_DEDEUSERID=)[^;\s",]+/gi, "$1***")
+  const prebounded = truncateUtf8(
+    value,
+    SECURITY_LIMITS.logStringBytes * 2,
+    "",
+  ).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  const redacted = prebounded
     .replace(
-      /([?&](?:up_mid|media_id|folder_id)=)[^&\s"',]+/gi,
+      /((?:BILIBILI_)?(?:SESSDATA|BILI_JCT|DEDEUSERID)\s*=\s*["']?)[^"';\s,]+/gi,
       "$1***",
-    );
+    )
+    .replace(
+      /(["'](?:SESSDATA|bili_jct|DedeUserID|BILIBILI_SESSDATA|BILIBILI_BILI_JCT|BILIBILI_DEDEUSERID|authorization|token|secret)["']\s*:\s*["'])[^"']*/gi,
+      "$1***",
+    )
+    .replace(
+      /(\bAuthorization\s*[:=]\s*(?:Bearer\s+)?)[^\s"',;]+/gi,
+      "$1***",
+    )
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer ***")
+    .replace(
+      /([?&](?:up_mid|media_id|folder_id|w_rid|upsig|deadline|expires|token|sign|wsSecret|wsTime)=)[^&\s"',]+/gi,
+      "$1***",
+    )
+    .replace(/(https?:\/\/)[^/\s:@]+:[^@\s/]+@/gi, "$1***:***@")
+    .replace(/\b[A-Za-z]:\\(?:[^\\\r\n]+\\)+[^\\\r\n]*/g, "[PRIVATE_PATH]")
+    .replace(/\/(?:Users|home)\/[^/\s]+\/[^\s"',]*/g, "[PRIVATE_PATH]");
+  return truncateUtf8(redacted, SECURITY_LIMITS.logStringBytes);
 }
 
-export function redactSecrets(value: unknown, seen = new WeakSet<object>()): unknown {
+export function redactSecrets(
+  value: unknown,
+  seen = new WeakSet<object>(),
+  depth = 0,
+): unknown {
   if (typeof value === "string") {
     return redactString(value);
   }
+
+  if (typeof value === "bigint") return `${value.toString()}n`;
+  if (typeof value === "symbol") return "[Symbol]";
+  if (typeof value === "function") return "[Function]";
 
   if (value === null || typeof value !== "object") {
     return value;
@@ -41,24 +67,39 @@ export function redactSecrets(value: unknown, seen = new WeakSet<object>()): unk
   if (seen.has(value)) {
     return "[Circular]";
   }
+  if (depth >= 8) {
+    return "[MaxDepth]";
+  }
   seen.add(value);
 
   if (value instanceof Error) {
     return {
-      name: value.name,
+      name: redactString(value.name),
       message: redactString(value.message),
     };
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => redactSecrets(item, seen));
+    const bounded = value
+      .slice(0, 100)
+      .map((item) => redactSecrets(item, seen, depth + 1));
+    if (value.length > bounded.length) bounded.push("[Truncated]");
+    return bounded;
   }
 
+  const record = value as Record<string, unknown>;
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => [
-      key,
-      SENSITIVE_KEY_PATTERN.test(key) ? "***" : redactSecrets(entryValue, seen),
-    ]),
+    Object.keys(record)
+      .slice(0, 100)
+      .map((key) => {
+        const boundedKey = truncateUtf8(key, 256);
+        return [
+          boundedKey,
+          SENSITIVE_KEY_PATTERN.test(key)
+            ? "***"
+            : redactSecrets(record[key], seen, depth + 1),
+        ];
+      }),
   );
 }
 
@@ -77,8 +118,19 @@ export class Logger {
       context: redactSecrets(context) as Record<string, unknown> | undefined,
     };
 
+    let serialized = JSON.stringify(entry);
+    if (Buffer.byteLength(serialized, "utf8") > SECURITY_LIMITS.logEntryBytes) {
+      serialized = JSON.stringify({
+        timestamp: entry.timestamp,
+        level,
+        message: truncateUtf8(redactString(message), 512),
+        data: "[Log entry truncated]",
+        context: { type: "bounded-log" },
+      } satisfies LogEntry);
+    }
+
     // 使用 console.error 确保输出到 stderr，避免干扰 MCP 协议
-    console.error(JSON.stringify(entry));
+    console.error(serialized);
   }
 
   static info(message: string, data?: unknown, context?: Record<string, unknown>) {

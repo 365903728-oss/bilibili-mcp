@@ -172,7 +172,7 @@ export interface TranscriptMatch {
 // 视频转录数据类型
 export interface VideoTranscriptData {
   bvid: string;
-  data_source: "subtitle" | "description";
+  data_source: "subtitle" | "description" | "asr";
   language?: string;
   transcript: string;
   title: string;

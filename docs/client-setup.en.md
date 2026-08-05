@@ -8,7 +8,7 @@ This page is the single complete source for end-user Bilibili MCP installation a
 
 ## Requirements
 
-- Node.js 18 or later
+- Node.js 20 or later
 - `npx`, included with Node.js
 
 ### Recommended: run the latest release on demand
@@ -46,7 +46,7 @@ Please help me install the Bilibili MCP server: @xzxzzx/bilibili-mcp.
    Find the configuration location and format for this specific client.
    Do not assume every client uses mcpServers JSON.
 
-3. Confirm that Node.js 18+ and npx are available, then add the server using
+3. Confirm that Node.js 20+ and npx are available, then add the server using
    the matching guide section. This is the launch baseline, not a universal
    client configuration format:
    - server name: bilibili-mcp
@@ -59,12 +59,23 @@ Please help me install the Bilibili MCP server: @xzxzzx/bilibili-mcp.
 
 5. Guide me to run these commands interactively in my own local terminal:
 
-   npx -y @xzxzzx/bilibili-mcp@latest config
+   npx -y @xzxzzx/bilibili-mcp@latest setup
    npx -y @xzxzzx/bilibili-mcp@latest check
 
-   I must enter config values locally; do not collect or display Cookies.
+   I must enter setup values locally; do not collect or display Cookies.
    check confirms only that local credentials can be loaded. It does not
    validate the Bilibili login.
+   If you need machine-readable local status, use:
+   npx -y @xzxzzx/bilibili-mcp@latest doctor --json
+
+   After credentials are configured, setup asks whether to install the optional
+   local ASR model. This is a local-only operation — do not answer for me or
+   handle model files; let me follow the prompt, type y to continue or press
+   Enter to skip [y/N]. After choosing to install, three model options are
+   shown; I select on my own or press Enter for the recommended small.
+   After installation, I may explicitly set fallback_to_asr=true on
+   get_video_transcript when I need no-subtitle fallback. Default calls never
+   run ASR, and MCP calls never download or switch models.
 
 6. After configuration, restart or reconnect this MCP server so it reloads
    the credentials.
@@ -434,7 +445,7 @@ You can also choose Fill in Config Manually, set Server Type to STDIO, and enter
 - Server Name: `bilibili-mcp`
 - Command: `npx -y @xzxzzx/bilibili-mcp@latest`
 
-After adding it, confirm the server is enabled under Custom Servers and expand it to inspect available tools. Do not write real Cookie values in Qoder / QoderWork MCP config; configure credentials with `bilibili-mcp config` or environment variables.
+After adding it, confirm the server is enabled under Custom Servers and expand it to inspect available tools. Do not write real Cookie values in Qoder / QoderWork MCP config; configure credentials with `bilibili-mcp setup` or environment variables.
 
 ### Kimi Code / Kimi Code CLI
 
@@ -473,7 +484,7 @@ kimi mcp list
 kimi mcp test bilibili-mcp
 ```
 
-Do not write real Cookie values in Kimi Code `mcp.json`, `env`, or command arguments. Configure credentials with `bilibili-mcp config` or environment variables.
+Do not write real Cookie values in Kimi Code `mcp.json`, `env`, or command arguments. Configure credentials with `bilibili-mcp setup` or environment variables.
 
 ### Antigravity / Antigravity CLI
 
@@ -546,7 +557,7 @@ If you already configured MCP in Cursor, Claude Code, Codex, Windsurf, or simila
 pi-mcp-adapter init
 ```
 
-Pi connects MCP servers lazily by default, so a server starts only when a tool is actually used. In Pi, run `/mcp` to inspect server status and available tools. Do not write real Cookie values in Pi MCP config; configure credentials with `bilibili-mcp config` or environment variables.
+Pi connects MCP servers lazily by default, so a server starts only when a tool is actually used. In Pi, run `/mcp` to inspect server status and available tools. Do not write real Cookie values in Pi MCP config; configure credentials with `bilibili-mcp setup` or environment variables.
 
 ### Oh My Pi
 
@@ -917,7 +928,7 @@ Add:
 }
 ```
 
-Windsurf/Cascade supports `stdio`, Streamable HTTP, and SSE MCP. This project uses a local stdio server, so do not write real Bilibili Cookie values in this config file; configure credentials with `bilibili-mcp config` or environment variables.
+Windsurf/Cascade supports `stdio`, Streamable HTTP, and SSE MCP. This project uses a local stdio server, so do not write real Bilibili Cookie values in this config file; configure credentials with `bilibili-mcp setup` or environment variables.
 
 ### Zed
 
@@ -1036,23 +1047,62 @@ nanobot's MCP config is compatible with Claude Desktop / Cursor style config. It
 
 Use Cookies from your own Bilibili login for reliable video search, subtitles, transcripts, and comments. Public video metadata may still work without a login.
 
+### Finding credential fields in your browser
+
+1. Sign in to your own account at [https://www.bilibili.com](https://www.bilibili.com).
+2. Open browser DevTools (`F12`) and locate Cookies:
+   - Chrome / Edge: **Application** → **Storage** → **Cookies** → `https://www.bilibili.com`
+   - Firefox: **Storage** → **Cookies** → `https://www.bilibili.com`
+3. Copy only the exact values of `SESSDATA`, `bili_jct`, and `DedeUserID`.
+4. If you can't find them, refresh the logged-in Bilibili page and confirm the selected domain is `https://www.bilibili.com`.
+5. Paste the values only into the local hidden-input `setup` prompts. Never paste them into chat, screenshots, client config, Issues, PRs, logs, or examples.
+
 ### Recommended: interactive local setup
 
 ```bash
-npx -y @xzxzzx/bilibili-mcp@latest config
+npx -y @xzxzzx/bilibili-mcp@latest setup
 npx -y @xzxzzx/bilibili-mcp@latest check
 ```
 
-- `config` collects `SESSDATA`, `bili_jct`, and `DedeUserID` interactively in your local terminal without echoing the input.
+- `setup` collects `SESSDATA`, `bili_jct`, and `DedeUserID` interactively in your local terminal without echoing the input. When no credentials are configured it guides you through setup; when already configured it shows current state.
+- `config` also provides interactive configuration but skips the already-configured check; use it when you need to force reconfiguration.
 - Credentials are saved in the local global config, not in the repository or MCP client configuration.
 - `check` confirms only that the current process can load credentials; it does not prove that the Bilibili login is still valid.
+- After credentials are configured, `setup` asks whether to install an optional local ASR speech-recognition model (defaults to No `[y/N]`).
+
+`doctor --json` is a local-only diagnostic tool with exit codes `0/1/2` (ok / needs setup or credentials not loadable / internal error). It makes no network requests and cannot replace `check_bilibili_credentials` for live login validation. Agents or non-interactive environments can use:
+
+```bash
+npx -y @xzxzzx/bilibili-mcp@latest doctor --json
+```
 
 If the package is installed globally, you can instead run:
 
 ```bash
-bilibili-mcp config
+bilibili-mcp setup
 bilibili-mcp check
 ```
+
+### Optional ASR speech-recognition model
+
+After credentials are configured, `setup` asks whether to install an optional local ASR model (defaults to No `[y/N]`).
+
+- After choosing Yes, three model choices are displayed:
+  - `1. tiny` (~78.2 MB) — smallest footprint
+  - `2. base` (~148 MB)
+  - `3. small` (~486 MB) — [recommended], selected on Enter
+- Enter `1/2/3` or `tiny/base/small` to choose; invalid input re-prompts without starting installation.
+- Runtime is fixed at `faster-whisper==1.2.1` plus runtime library overhead.
+- Requires Python 3.9+ on the machine. Set the `BILIBILI_ASR_PYTHON` environment variable to override the Python executable.
+- Installation lives in the user-managed `~/.bilibili-mcp/asr/` directory; it does not mutate the system Python.
+- One active model per directory; switching models clears the old ready state.
+- After installation, the model is verified through a CPU INT8 load; system FFmpeg is not required (PyAV bundles the relevant FFmpeg libraries).
+- A failed installation leaves no ready marker; partial downloads are preserved and `setup` can resume from them.
+- The `doctor --json` `asr.status` and `asr.model` fields are informational only; they do not affect credential exit codes.
+- MCP calls never download or switch models; they use only the current model reported ready by `doctor --json`.
+- `get_video_transcript` runs ASR only with explicit `fallback_to_asr: true` after subtitles are definitively unavailable. Native subtitles and Cookie/API/network failures never trigger it.
+- ASR processes one resolved Part, capped at two hours and 128 MiB of temporary audio, with one active job and no queue.
+- The Cookie goes only to Bilibili's playback API, never the temporary CDN or Python child. Signed URLs are not logged or returned, and the unique temp directory is removed after success, failure, or timeout.
 
 ### Docker, local development, or a controlled runtime
 
@@ -1063,6 +1113,8 @@ You may instead provide these variables in the MCP server runtime environment:
 | `BILIBILI_SESSDATA` | `SESSDATA` from your own Bilibili login Cookie |
 | `BILIBILI_BILI_JCT` | `bili_jct` from your own Bilibili login Cookie |
 | `BILIBILI_DEDEUSERID` | Your Bilibili user ID |
+
+Inherited process environment variables work as expected, but the recommended `npx` path does not automatically load a project `.env` file. `setup` is the normal installation path; inherited process variables work only when a controlled shell, service, or secret runtime supplies them. The local `.env` example applies to source `npm start` / `dist/index.js`, or to a runtime that explicitly loads it.
 
 Local `.env` example:
 

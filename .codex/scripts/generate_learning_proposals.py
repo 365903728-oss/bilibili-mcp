@@ -2,18 +2,25 @@
 import argparse
 import datetime as dt
 import json
+import math
 import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 from plan_tracker import resolve_active_work, task_section_completed_count
+from hook_safety import (
+    read_bounded_json_object,
+    read_bounded_jsonl,
+    safe_agent,
+    safe_category,
+    safe_tool_class,
+    write_bounded_text,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 PROPOSAL_PATH = ROOT / "docs" / "agent-memory" / "pending-learning-proposals.md"
-SECRET_RE = re.compile(
-    r"(?i)(SESSDATA|bili_jct|DedeUserID|Cookie|Authorization|access_token|api[_-]?key|token)\s*[:=]\s*[^;\s\"']+"
-)
+CANDIDATE_ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
 
 def now_date() -> str:
@@ -35,43 +42,38 @@ def runtime_dir(source: str) -> Path:
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    rows: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(row, dict):
-            rows.append(row)
-    return rows
-
-
-def redact(text: Any) -> str:
-    value = "" if text is None else str(text)
-    value = SECRET_RE.sub(lambda match: f"{match.group(1)}=[REDACTED]", value)
-    if len(value) > 500:
-        return value[:500] + "...[truncated]"
-    return value
+    return read_bounded_jsonl(path)
 
 
 def stable_candidates() -> list[dict[str, Any]]:
     candidates = read_jsonl(codex_memory() / "candidates.jsonl") + read_jsonl(claude_memory() / "candidates.jsonl")
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for item in candidates:
-        combined = f"{item.get('command', '')}\n{item.get('stderr', '')}".lower()
-        if "synthetic" in combined:
+        cid = item.get("candidate_id")
+        if not isinstance(cid, str) or not CANDIDATE_ID_RE.fullmatch(cid):
             continue
-        cid = item.get("candidate_id") or f"{item.get('category')}:{item.get('command')}:{item.get('stderr')}"
-        grouped[str(cid)].append(item)
+        grouped[cid].append(item)
 
     proposals: list[dict[str, Any]] = []
     for cid, items in grouped.items():
         latest = items[-1]
-        evidence_count = max(len(items), int(latest.get("evidence_count") or 1))
-        confidence = float(latest.get("confidence") or 0.4)
-        if evidence_count < 2 and confidence < 0.7 and not latest.get("promote_after_review"):
+        try:
+            recorded_evidence = int(latest.get("evidence_count") or 1)
+        except (TypeError, ValueError, OverflowError):
+            recorded_evidence = 1
+        evidence_count = min(10_000, max(len(items), recorded_evidence, 1))
+        try:
+            confidence = float(latest.get("confidence") or 0.4)
+        except (TypeError, ValueError, OverflowError):
+            confidence = 0.4
+        if not math.isfinite(confidence):
+            confidence = 0.4
+        confidence = min(1.0, max(0.0, confidence))
+        if (
+            evidence_count < 2
+            and confidence < 0.7
+            and latest.get("promote_after_review") is not True
+        ):
             continue
         proposals.append(
             {
@@ -80,10 +82,14 @@ def stable_candidates() -> list[dict[str, Any]]:
                 "target": "docs/agent-memory/lessons-learned.md",
                 "confidence": max(confidence, 0.7 if evidence_count >= 2 else confidence),
                 "evidence_count": evidence_count,
-                "agents": sorted({str(item.get("agent", "unknown")) for item in items}),
-                "category": latest.get("category", "unknown"),
-                "command": redact(latest.get("command")),
-                "stderr": redact(latest.get("stderr")),
+                "agents": sorted(
+                    {safe_agent(item.get("agent", "unknown")) for item in items}
+                )[:32],
+                "category": safe_category(latest.get("category")),
+                "tool": safe_tool_class(latest.get("tool")),
+                "exit_code": latest.get("exit_code")
+                if isinstance(latest.get("exit_code"), int)
+                else None,
                 "status": "pending",
             }
         )
@@ -98,40 +104,46 @@ def phase_boundary_message(source: str, proposal_count: int) -> str | None:
 
     previous_work = None
     previous = 0
-    if state_path.exists():
-        try:
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-            previous = int(state.get("completed_phase_count", 0))
-            previous_work = state.get("active_work") or state.get("active_plan")
-        except (ValueError, json.JSONDecodeError, AttributeError):
-            previous = 0
+    state = read_bounded_json_object(state_path, 16 * 1024)
+    try:
+        previous = min(10_000, max(0, int(state.get("completed_phase_count", 0))))
+    except (TypeError, ValueError, OverflowError):
+        previous = 0
+    raw_previous_work = state.get("active_work") or state.get("active_plan")
+    previous_work = (
+        Path(raw_previous_work).name
+        if isinstance(raw_previous_work, str)
+        else None
+    )
 
     active_work = resolve_active_work()
     completed = task_section_completed_count(active_work)
-    if previous_work and Path(str(previous_work)) != active_work:
+    if previous_work and previous_work != active_work.name:
         previous = 0
 
-    state_path.write_text(
+    write_bounded_text(
+        state_path,
         json.dumps(
             {
                 "completed_phase_count": completed,
                 "updated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-                "active_work": str(active_work),
+                "active_work": active_work.name,
             },
             ensure_ascii=False,
             indent=2,
         )
         + "\n",
-        encoding="utf-8",
+        16 * 1024,
     )
 
     if completed > previous and proposal_count > 0:
         message = (
             f"Learning proposal review reminder: completed plan phases increased "
-            f"from {previous} to {completed} for {active_work.name}. Review {PROPOSAL_PATH} and approve with "
+            f"from {previous} to {completed} for {active_work.name}. Review "
+            "docs/agent-memory/pending-learning-proposals.md and approve with "
             "the agreed approval phrase if the proposals should be promoted."
         )
-        reminder_path.write_text(message + "\n", encoding="utf-8")
+        write_bounded_text(reminder_path, message + "\n", 8 * 1024)
         return message
     return None
 
@@ -177,12 +189,12 @@ def render(proposals: list[dict[str, Any]]) -> str:
                 "### Evidence",
                 "",
                 f"- Category: `{proposal['category']}`",
-                f"- Command: `{proposal['command']}`",
-                f"- Error preview: `{proposal['stderr']}`",
+                f"- Tool class: `{proposal['tool']}`",
+                f"- Exit code: `{proposal['exit_code']}`",
                 "",
                 "### Proposed Entry",
                 "",
-                f"- Lesson: `{proposal['command']}` has produced repeated `{proposal['category']}` failures in agent runtime observations.",
+                f"- Lesson: repeated `{proposal['category']}` failures were observed for the bounded tool class `{proposal['tool']}`.",
                 f"- Evidence: Candidate `{proposal['candidate_id']}` appeared {proposal['evidence_count']} time(s) across {', '.join(proposal['agents'])}.",
                 "- Future behavior: Before promoting this lesson, Codex should confirm the failure is not synthetic, transient, or already covered by existing project memory.",
                 "",
@@ -205,7 +217,7 @@ def main() -> int:
 
     proposals = stable_candidates()
     PROPOSAL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PROPOSAL_PATH.write_text(render(proposals), encoding="utf-8")
+    write_bounded_text(PROPOSAL_PATH, render(proposals), 128 * 1024)
     reminder = phase_boundary_message(args.source, len(proposals))
     print(json.dumps({"suppressOutput": True}, ensure_ascii=False))
     return 0

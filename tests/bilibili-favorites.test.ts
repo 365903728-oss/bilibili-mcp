@@ -705,3 +705,111 @@ describe("listBilibiliFavoriteVideos defensive normalization", () => {
     await expect(listBilibiliFavoriteVideos()).rejects.toBe(error);
   });
 });
+
+describe("listBilibiliFavoriteVideos hostile upstream bounds", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    credentialMocks.getAuthHeaders.mockReturnValue({
+      Cookie: "configured=1",
+    });
+    httpMocks.fetchWithoutWBI.mockReset();
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(navResponse());
+  });
+
+  it("fails closed before a resource request when folder count exceeds 100", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce({
+      count: 101,
+      list: Array.from({ length: 101 }, (_, index) =>
+        folderRow(index + 1, 1),
+      ),
+    });
+
+    await expect(
+      listBilibiliFavoriteVideos(),
+    ).rejects.toMatchObject({
+      name: "ResourceLimitError",
+      resource: "favorite_folder_count",
+      limit: 100,
+    });
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails closed when one resource page over-returns more than 20 rows", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce({
+      count: 1,
+      list: [folderRow(101, 21)],
+    });
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce({
+      has_more: false,
+      medias: Array.from({ length: 21 }, (_, index) =>
+        videoRow("BV1T6PQzQERF", `Video ${index}`),
+      ),
+    });
+
+    await expect(
+      listBilibiliFavoriteVideos(),
+    ).rejects.toMatchObject({
+      name: "ResourceLimitError",
+      resource: "favorite_video_page_items",
+      limit: 20,
+    });
+  });
+
+  it.each([
+    [
+      "folder title",
+      {
+        folders: [{ ...folderRow(101, 1), title: "界".repeat(86) }],
+        medias: undefined,
+      },
+      "favorite_folder_title",
+      256,
+    ],
+    [
+      "video title",
+      {
+        folders: [folderRow(101, 1)],
+        medias: [
+          videoRow("BV1T6PQzQERF", "🙂".repeat(129)),
+        ],
+      },
+      "favorite_video_title",
+      512,
+    ],
+    [
+      "video author",
+      {
+        folders: [folderRow(101, 1)],
+        medias: [
+          videoRow("BV1T6PQzQERF", "Title", {
+            upper: { name: "界".repeat(43) },
+          }),
+        ],
+      },
+      "favorite_video_author",
+      128,
+    ],
+  ])(
+    "fails closed when remote %s exceeds its UTF-8 budget",
+    async (_label, fixture, resource, limit) => {
+      httpMocks.fetchWithoutWBI.mockResolvedValueOnce({
+        count: fixture.folders.length,
+        list: fixture.folders,
+      });
+      if (fixture.medias !== undefined) {
+        httpMocks.fetchWithoutWBI.mockResolvedValueOnce({
+          has_more: false,
+          medias: fixture.medias,
+        });
+      }
+
+      await expect(
+        listBilibiliFavoriteVideos(),
+      ).rejects.toMatchObject({
+        name: "ResourceLimitError",
+        resource,
+        limit,
+      });
+    },
+  );
+});

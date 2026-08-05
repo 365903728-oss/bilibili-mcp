@@ -267,3 +267,138 @@
 - Decision: Preserve Favorite Membership rather than globally deduplicating BVIDs, and document traversal as live-state best effort rather than a snapshot.
 - Reason: The same Video can be intentionally saved in multiple Folders; Folder context is meaningful, while concurrent account changes can legitimately alter later pages.
 - Evidence: The two-Folder duplicate-BVID regression and bilingual tool-reference semantics.
+
+- Decision: Split CLI onboarding into human-facing `setup` and Agent-facing `doctor --json`.
+- Reason: Cookie entry must remain hidden and interactive, while automation needs a deterministic, local-only, secret-free status surface. A redundant non-interactive setup mode would duplicate doctor without safely configuring credentials.
+- Evidence: `src/cli.ts`, the frozen CLI task ticket, bilingual setup guides, and 30 focused CLI/entrypoint tests.
+
+- Decision: Keep ASR runtime and model installation outside this CLI refactor.
+- Reason: The current task establishes a reliable installer-facing command seam first; model selection, downloads, transcription runtime, and MCP fallback behavior require their own bounded architecture and acceptance contract.
+- Evidence: `docs/agent-memory/handoffs/2026-07-27-cli-setup-doctor-task-ticket.md` and its completed verification.
+
+- Decision: Let the bilingual READMEs carry the minimum universal install-and-verification path while keeping exhaustive client-specific configuration in the canonical setup guides.
+- Reason: Both Agent-assisted and manual users need a visible first-success path on the homepage, but duplicating 30-plus client configurations would recreate documentation drift. The homepage therefore contains the Node.js 20+ prerequisite, stdio launch baseline, local `setup`/`check`/`doctor` gates, reconnect step, and live-login check only.
+- Evidence: `README.md`, `README_EN.md`, `docs/client-setup.md`, `docs/client-setup.en.md`, and the completed README redesign task ticket.
+
+- Decision: Use paired, hand-authored static SVGs for the README installation flow instead of generated raster artwork.
+- Reason: The flow is procedural UI documentation whose text must stay bilingual, versionable, accessible, GitHub-safe, and readable at both 900px and 360px.
+- Evidence: `assets/readme/install-flow.svg`, `assets/readme/install-flow-en.svg`, and the independent render review.
+
+- Decision: Treat Agent-assisted installation and human manual installation as two independently complete README paths.
+- Reason: An Agent needs a copyable, credential-safe execution contract with explicit stop-and-handoff points, while a person needs an end-to-end path that includes Node verification, MCP client configuration, browser credential-field discovery, local hidden input, reconnection, and live login validation.
+- Evidence: `README.md`, `README_EN.md`, `docs/client-setup.md`, `docs/client-setup.en.md`, and the user-comprehension acceptance addendum in the README task ticket.
+
+- Decision: Order the landing-page story as project definition → core capabilities → prominent use cases → installation → tool detail.
+- Reason: A specific Favorites workflow is useful proof but cannot explain the whole package; first-time visitors need the broad product boundary before deciding whether an example or installation path matters to them.
+- Evidence: The user's information-architecture correction, the `beautify-github-readme` first-screen test, and the completed information-architecture addendum in the README task ticket.
+
+- Decision: Introduce ASR in phases, beginning with a default-off fixed `faster-whisper-small` installer inside the existing `setup` command.
+- Reason: A single recommended path keeps the first installation experience understandable while establishing the managed Python environment, pinned model revision, readiness state, and local diagnostics needed by a later selector and transcription fallback.
+- Evidence: `docs/asr-model-install-prd.md`, `src/asr/installer.ts`, `src/asr/state.ts`, and `docs/qa/2026-07-27-asr-model-install-phase1.md`.
+
+- Decision: Keep ASR files in the user's `~/.bilibili-mcp/asr/` directory, use a managed virtual environment, verify the model through CPU INT8 loading before recording `ready`, and treat ASR doctor status as informational.
+- Reason: The package must not mutate global Python, package model weights into npm, trust a stale marker, or make optional ASR change existing credential exit-code semantics.
+- Evidence: The Phase 1 task ticket, installer/state tests, built CLI probes, and independent final-diff review.
+
+- Decision: Limit the Phase 2 ASR selector to pinned multilingual `tiny`, `base`, and `small` models, default Enter to recommended `small`, and retain only one active model in the existing managed directory.
+- Reason: Three bounded choices expose useful storage and CPU tradeoffs without accepting arbitrary remote repositories, adding model-management commands, migrating the state schema, or complicating the first-run path. The one-active-model rule reuses the Phase 1 layout until retaining several models becomes a demonstrated need.
+- Evidence: `docs/asr-model-selector-prd.md`, the literal allowlist in `src/asr/state.ts`, selector and switch regressions, and `docs/qa/2026-07-27-asr-model-selector-phase2.md`.
+
+- Decision: Keep persisted ASR state at version 1 and derive the public model key from the exact pinned repository/revision pair.
+- Reason: Phase 1 already persisted enough information to identify `small`; deriving the key preserves compatibility and prevents a second source of truth while allowing `doctor --json` to report `tiny`, `base`, `small`, or `null`.
+- Evidence: `readAsrState`, `modelKeyForRepo`, Phase 1 compatibility tests, cross-pair rejection tests, and built doctor output.
+
+## 2026-07-29
+
+- Decision: Treat MCP `2026-07-28` and TypeScript SDK v2 support as a future, independent compatibility initiative after the current ASR and CLI work reaches a stable boundary.
+- Reason: The existing ten-tool stdio server remains usable and already adopts the `2025-06-18` structured-output pattern where it provides clear value. The 2026 protocol changes are cross-cutting and should not be approximated by adding isolated fields to the SDK v1 implementation.
+- Evidence: `docs/research/2026-07-29-mcp-protocol-update.md`, `docs/research/2026-07-29-mcp-tools-evolution.md`, and the 2026-07-29 entries in `docs/agent-memory/project-facts.md`.
+
+- Decision: Make a real wire-level stdio compatibility test the first step of future MCP modernization, then freeze a dual-era acceptance matrix before changing the SDK or server architecture.
+- Reason: Current tests call SDK-private `_requestHandlers`; validating the public legacy flow (`initialize` → `tools/list` → `tools/call`) is the smallest reusable safety net and provides a baseline for later `server/discover` plus legacy-fallback verification.
+- Evidence: `tests/helpers/mcp.ts`, `tests/mcp-server-smoke.test.ts`, and the local tool-surface audit summarized in `docs/research/2026-07-29-mcp-tools-evolution.md`.
+
+- Decision: Add tool annotations, titles, icons, more structured-output schemas, Tasks, MRTR, or HTTP-specific `x-mcp-header` only when a concrete product or client requirement appears.
+- Reason: These optional metadata and extension capabilities do not repair a current defect. Tasks and MRTR do not match the present bounded read-only tool calls, and `x-mcp-header` does not apply to the current stdio-only transport.
+- Evidence: The applicability and decision-impact sections of `docs/research/2026-07-29-mcp-tools-evolution.md`.
+
+- Decision: Add ASR only as explicit `fallback_to_asr` on `get_video_transcript`, default it to `false`, keep native subtitles first, and trigger it only after a definite empty/unsuitable subtitle result.
+- Reason: ASR changes latency, CPU cost, and media handling. Credential, HTTP, timeout, parse, or anti-bot errors must remain distinguishable from legitimate subtitle absence, and `get_video_info` must stay free of hidden heavy work.
+- Evidence: Phase 3 PRD, transcript gating tests, schema/order tests, and public wire-level stdio test.
+
+- Decision: Run Phase 3 through the already-ready managed venv/model with CPU INT8, one resolved Part/CID, one active job and no queue, unique OS temp storage, strict bounded NDJSON, and no runtime model install or switch.
+- Reason: This keeps expensive work opt-in and deterministic, preserves the Phase 1/2 trust boundary, prevents uncontrolled CPU/memory/disk use, and makes every cleanup target locally provable.
+- Evidence: `src/asr/transcription.ts`, playback/runtime/cleanup/concurrency tests, and post-test zero-residue verification.
+
+- Decision: Accept only provider-specific Bilibili audio CDN host suffixes and distinguish a missing/malformed DASH object from a valid explicit empty audio array.
+- Reason: Generic CDN ownership assumptions are too broad, while treating malformed responses as empty would silently convert upstream errors into fallback behavior.
+- Evidence: `src/bilibili/playback.ts`, risk review findings, and malformed-versus-empty playback tests.
+
+## 2026-07-30
+
+- Decision: Close the 38 scan findings through shared, fixed process-local
+  security budgets instead of adding caller-configurable security limits.
+- Reason: stdio framing, successful serialization, outbound HTTP, bootstrap
+  concurrency, caches, logs, and ASR resource ceilings are containment
+  invariants. Letting an MCP caller raise them would recreate the original
+  source-to-sink paths.
+- Evidence: `src/security/limits.ts`, bounded transport/response/HTTP/cache/log
+  implementations, and the 38-row remediation matrix.
+
+- Decision: A cancelling MCP caller stops its own Bilibili/ASR operation, while
+  one caller cancelling a shared fingerprint, WBI, or update refresh does not
+  abort work still needed by other bounded waiters.
+- Reason: cancellation must release expensive per-call resources without
+  allowing one waiter to poison a process-owned single-flight refresh.
+- Evidence: `src/security/operation-context.ts`,
+  `tests/bootstrap-single-flight.test.ts`, HTTP cancellation tests, MCP signal
+  propagation tests, and ASR download/runtime cancellation tests.
+
+- Decision: Resolve playback media through provider-specific HTTPS allowlists,
+  validate every DNS answer as public, pin one approved address at connection
+  time, retain the original hostname for TLS, and strip credential-bearing
+  headers at the final sink.
+- Reason: hostname string validation alone is insufficient against DNS rebinding
+  or mixed public/private answers, and signed CDN URLs must never inherit the
+  first-party Cookie.
+- Evidence: `src/security/pinned-https.ts` and
+  `tests/pinned-https.test.ts`.
+
+- Decision: Pin publish Actions to the currently verified full commit SHAs,
+  while leaving the package version, dependency graph, and release state
+  unchanged.
+- Reason: immutable workflow execution closes the validated supply-chain
+  finding without broadening remediation into a release or dependency update.
+- Evidence: `.github/workflows/publish.yml`,
+  `tests/publish-workflow-pins.test.ts`, and official GitHub ref resolution
+  cached in the 2026-07-30 research note.
+
+- Decision: Keep the Hono advisory as a named residual rather than upgrading
+  the MCP SDK inside this remediation or calling the audit clean.
+- Reason: current imports do not reach the SDK Streamable HTTP/static-file
+  module, but changing the SDK/lockfile is a separate compatibility and release
+  decision.
+- Evidence:
+  `docs/research/2026-07-30-security-remediation-dependency-and-action-pins.md`.
+
+- Decision: Honor the user's direct-Codex executor choice for all remediation
+  edits and validation; do not invoke Paseo.
+- Reason: executor selection was explicit and does not weaken the frozen task,
+  test, security, Git, or release boundaries.
+- Evidence:
+  `docs/agent-memory/handoffs/2026-07-30-deep-security-remediation-task-ticket.md`.
+
+## 2026-08-05
+
+- Decision: Execute the validated Strix follow-up security fixes through one
+  Paseo-managed Claude Code implementation agent using the live
+  `providers.impl` preference, then require Codex to review the report, diff,
+  and verification evidence.
+- Reason: The user explicitly changed the executor choice for this new
+  follow-up task and asked Codex to operate Claude Code through Paseo. This
+  supersedes only the 2026-07-30 task-specific direct-Codex choice and preserves
+  the single-agent, frozen-scope, no-Git-action model.
+- Evidence:
+  `docs/agent-memory/handoffs/2026-08-05-strix-deepseek-security-remediation-task-ticket.md`,
+  the matching Codex-to-Claude handoff, and the live Paseo preference resolving
+  `providers.impl` to `claude/deepseek-v4-flash`.

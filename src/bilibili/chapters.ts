@@ -2,9 +2,9 @@
 import { getPlayerData, matchPartIdentity, resolvePartCid } from "./client.js";
 import { extractBVId } from "../utils/bvid.js";
 import type { ChapterInfo, VideoChaptersData } from "./types.js";
+import { boundedRemoteText } from "../utils/bounded-text.js";
 
-const MAX_CHAPTER_TITLE_LENGTH = 500;
-const MAX_CHAPTERS = 200;
+const MAX_CHAPTER_TITLE_BYTES = 500;
 
 /**
  * 获取 Bilibili 提供的视频章节（进度条分段）。
@@ -25,9 +25,12 @@ export async function getVideoChaptersData(
   const chapters: ChapterInfo[] = [];
 
   if (viewPoints && viewPoints.length > 0) {
-    for (const vp of viewPoints.slice(0, MAX_CHAPTERS)) {
+    for (const vp of viewPoints) {
       chapters.push({
-        title: ((vp as Record<string, unknown>).content as string || vp.title || "").slice(0, MAX_CHAPTER_TITLE_LENGTH),
+        title: boundedRemoteText(
+          vp.content || vp.title,
+          MAX_CHAPTER_TITLE_BYTES,
+        ),
         start_seconds: vp.from,
         end_seconds: vp.to,
       });
@@ -38,7 +41,7 @@ export async function getVideoChaptersData(
     bvid,
     page: displayPage,
     cid,
-    title: displayTitle,
+    title: boundedRemoteText(displayTitle, 512),
     chapters,
   };
 }

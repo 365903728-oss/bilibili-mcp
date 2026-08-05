@@ -3,8 +3,8 @@ import { config } from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { server } from "./server.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { redactSecrets } from "./utils/logger.js";
+import { BoundedStdioServerTransport } from "./server/bounded-stdio-transport.js";
 
 // 获取当前文件的目录
 const __filename = fileURLToPath(import.meta.url);
@@ -23,7 +23,7 @@ export default server;
 
 // 启动服务器的入口点
 async function main() {
-  const transport = new StdioServerTransport();
+  const transport = new BoundedStdioServerTransport();
   await server.connect(transport);
   console.error("Bilibili MCP server running on stdio");
 }

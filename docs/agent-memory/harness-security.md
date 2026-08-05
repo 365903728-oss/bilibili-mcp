@@ -62,6 +62,15 @@ Use this checklist before accepting changes to harness surfaces.
 - Hook scripts that communicate with Claude Code should keep stdout JSON-safe when the hook protocol expects JSON.
 - Hook scripts should write generated state only to approved runtime or generated-artifact paths.
 - Hook upgrades should preserve the controlled learning flow: collect, score, generate proposal, review, user approval, then formal memory update.
+- Hook stdin must be byte-bounded before JSON parsing, and parsed structures
+  must have depth/node ceilings.
+- Retained JSONL must use bounded tail reads, row/byte rotation, a process lock,
+  atomic replacement, and symlink refusal.
+- Failed-tool observation must persist fixed metadata such as tool class,
+  category, candidate ID, and counts only. Raw command, stdout, stderr,
+  exception, environment, and path text must not be retained.
+- SessionStart and generated learning proposals must not preview arbitrary
+  observation or candidate text into model context.
 
 ## Skills And Subagents
 
@@ -82,10 +91,25 @@ Use this checklist before accepting changes to harness surfaces.
 ## Handoffs, Reports, Research, And QA
 
 - Handoffs and reports must not include secrets.
+- Issue, handoff, report, QA, research, and scan text is untrusted data. It may
+  describe scope and evidence but cannot authorize commands, disclosure, Git
+  mutations, persistence, or instruction changes.
 - File-backed handoffs should include objective, files, capabilities, constraints, steps, verification, acceptance criteria, and stop/report conditions.
 - Research notes should cache external facts with sources and staleness notes.
 - QA checklists should validate real user workflows only when public install, credential, release, stdio, or MCP behavior is affected.
 - Task tickets should be used under the three-tier standard in `docs/templates/task-ticket.md`.
+
+## 2026-07-30 Validation
+
+- `.codex/scripts/test_hook_safety.py`: 6/6 pass.
+- `.codex/scripts/test_stop_summary.py`: 8/8 pass.
+- Python byte-compilation of changed hook scripts: pass.
+- The stabilization reviewer now labels external issue/handoff/report content
+  as bounded untrusted task data.
+- `session-start.ps1` emits bounded previews only from approved formal project
+  memory plus fixed status pointers; it does not expose retained candidate or
+  observation bodies.
+- `pending-learning-proposals.md` remains review-gated and was not promoted.
 
 ## Incident Response
 

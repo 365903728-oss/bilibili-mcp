@@ -266,3 +266,117 @@
 - README: `README.md` and `README_EN.md` publish the Favorites capability in the landing-page summary and tool reference.
 - Scope boundary: `pending-learning-proposals.md` remained unstaged and unpromoted, Issue #20 was unchanged, and no dependency or publish-workflow edit entered the release tag.
 - Follow-up: The successful run warned that the v4 checkout/setup-node actions target the deprecated Node 20 action runtime and were forced to Node 24. Refresh those action versions in a separate bounded workflow-maintenance task.
+
+## 2026-07-27 CLI Setup And Doctor
+
+- Owner: Codex froze the task ticket and file-backed handoff, then used Paseo-managed Claude Code with the user's DeepSeek route. GLM was stopped after the user reported exhausted quota; the stale DeepSeek `[1m]` model suffix and global GLM settings were bypassed through the current `deepseek-v4-pro` model and an isolated Claude config directory without storing provider credentials in the repository.
+- Objective: Remove duplicate CLI dispatch, preserve existing commands and no-argument stdio, add human-facing `setup`, and add Agent-facing local `doctor --json` without ASR or installer scaffolding.
+- Review: Independent final-diff review found import-time stdio startup, expired-credential setup misclassification, and the missing doctor exit-code-2 path. Claude repaired the core findings; Codex completed narrow test-seam, temporary-directory, version-dispatch, and verification corrections.
+- Result: Build, 30 focused tests, all 431 tests, the 138-file package boundary, built CLI probes, diff checks, and scoped secret scanning pass. The report is `docs/agent-memory/handoffs/2026-07-27-cli-setup-doctor-claude-report.md`. No commit, push, version bump, tag, release, publication, or ASR work occurred.
+
+## 2026-07-27 Bilingual README Full Redesign
+
+- Owner: Codex applied the user-selected `beautify-github-readme` workflow, froze the full-redesign ticket/handoff, and used Paseo-managed Claude Code through the user's DeepSeek route. The first agent produced the redesign; a second bounded DeepSeek session completed two same-scope factual and mobile-readability repair rounds after the original provider session closed.
+- Objective: Rewrite both READMEs against the current ten-tool project and Unreleased CLI, correct the Favorites Hero claims, add paired static install-flow SVGs, and align the canonical setup guides without changing runtime or publishing.
+- Review: Independent fact, story, and final-diff reviewers found false AI-summary wording, incomplete fallback/privacy/doctor boundaries, Agent-only onboarding, mobile SVG text, English Hero overflow, and QA/release-binding gaps. Claude repaired all findings; Codex independently rendered every SVG at 900px/360px and reran documentation, security, build, test, CLI, and package gates.
+- Result: The completed report is `docs/agent-memory/handoffs/2026-07-27-readme-install-flow-claude-report.md`. Both README audits, 30 focused tests, all 431 tests, the 140-file package boundary, local-link/SVG/UTF-8/secret scans, and built CLI probes pass. npm latest remains 1.10.1, so the README and CLI remain uncommitted and unpublished until a later version also resolves the Node engine-floor mismatch.
+
+## 2026-07-27 README User Comprehension Repair
+
+- Owner: Codex converted the user's three comprehension criteria into a frozen task-ticket addendum, then used the bounded Paseo DeepSeek agent `dc1f8bb0-a38d-4df2-a048-3a31330c59b7` for the same-scope bilingual documentation repair.
+- Objective: Make the Agent path executable without exposing Cookie values, make the manual path complete for a Windows user who starts from the README, and preserve a concise, accurate project overview for either reader.
+- Review: Independent Agent and manual-install persona reviewers found no remaining blocker after repairs. A final fact review additionally caught a missing complete `doctor --json` command in both landing pages; Codex added it to both installation paths and kept its local-only boundary explicit. Codex verified the copyable prompt, client identification, local terminal handoff, browser credential-field steps, reconnect gate, MCP-tool wording, three failure branches, bilingual parity, package boundary, and zero high-confidence secret findings.
+- Result: The existing Claude report and README task artifacts now include the comprehension repair. Runtime, SVGs, tests, package metadata, version, and publishing remain unchanged; no commit, push, tag, release, or publication occurred.
+
+## 2026-07-27 README Information Architecture Correction
+
+- Owner: Codex applied the user-selected `beautify-github-readme` README mode as a small same-scope documentation correction; no new implementation agent or task file was needed.
+- Objective: Replace the workflow-first opening with project definition → core capabilities → prominent use cases, while retaining complete Agent/manual installation and factual project boundaries.
+- Review: Independent reviewers confirmed the new order and caught two wording defects. Codex narrowed the Favorites example to best-effort traversal with `skipped_count` and changed the English transcript prompt to the literal verified keyword `函数`.
+- Result: The existing Favorites SVG is reused under its matching example, no asset was rebuilt, and runtime/package/release scope remains unchanged.
+
+## 2026-07-27 DeepSeek README Logic Rewrite
+
+- Owner: Codex froze the README-only execution contract and launched Paseo agent `929da6b1-7446-4639-8dc3-1388c4c6cb1e` with provider `deepseek` and model `deepseek-v4-pro[1m]`, as the user explicitly requested.
+- Skill use: DeepSeek personally read `C:\Users\ZX\.agents\skills\beautify-github-readme\SKILL.md` and its required README-mode references before writing; the skill was referenced in place because it was not installed under `.claude\skills`.
+- Result: DeepSeek replaced the duplicated five-row capability table with three narrative paths—Favorites, topic search, and BVID—and retained three prominent copyable examples, both complete installation journeys, all ten tools, limits, privacy, development, and support.
+- Review: Independent narrative review returned no blocker. Independent fact review found one overbroad playback-link claim; DeepSeek repaired both languages to state that only keyword matches include direct playback-moment links.
+- Boundary: Both README audits, section-order/tool/command/link/fact/secret checks, the 140-file package boundary, and `git diff --check` pass. No SVG, runtime, tests, package metadata/version, dependency, lockfile, workflow, QA checklist, codemap, or pending learning proposal changed; no commit, push, tag, release, or publication occurred.
+
+## 2026-07-27 DeepSeek README Reader-First Repair
+
+- Owner: Codex sent two same-scope reader/fact review rounds to the existing Paseo DeepSeek agent `929da6b1-7446-4639-8dc3-1388c4c6cb1e`; DeepSeek re-read `beautify-github-readme` and its README content-architecture reference before editing.
+- Objective: Make the second rewrite genuinely scannable for a new human or Agent: product outcomes before configuration, prerequisites before commands, numbered installation before collapsed detail, natural bilingual terms, and exact Favorites/comment boundaries.
+- Review: Independent narrative and implementation-fact reviewers found no blocker after repair. Their earlier findings about hidden prerequisites, configuration presented as a product feature, `skipped_count` scope, and final comment order were all corrected.
+- Result: The final order is introduction → three product outcomes → install/verify → three copyable examples → ten-tool reference → limits/privacy/development/help. Both Agent/manual paths and all safety gates remain complete; no commit, push, tag, release, or publication occurred.
+
+## 2026-07-27 Optional ASR Model Installation Phase 1
+
+- Owner: Codex froze the product/architecture boundary and file-backed handoff, then used the existing Paseo-managed DeepSeek agent for the user-authorized first phase.
+- Objective: Add one default-off `faster-whisper-small` installation choice to the existing `setup` command, a managed user-scoped Python runtime/model directory, and secret-free local ASR readiness in `doctor`; exclude model selection and transcription.
+- Review: Codex and an independent final-diff reviewer required the venv Python to own every post-creation operation, wired the Python override into production, prevented stale-state false readiness, added artifact validation, isolated Python imports from the working directory, repaired test isolation, and confirmed the credential doctor contract remains unchanged.
+- Result: Build, 95 focused tests, all 496 tests, built CLI probes, a real temporary-venv smoke, the 148-file package boundary, diff checks, and scoped secret review pass. No real model download, commit, push, version bump, tag, release, or publication occurred.
+
+## 2026-07-27 ASR Model Selector Phase 2
+
+- Owner: Codex froze the Phase 2 PRD, source research, task ticket, and file-backed handoff, then reused the Paseo-managed DeepSeek agent `5383ebff-2bb7-4bb0-b183-812cf550695d` under the user's current provider preference.
+- Objective: Add exactly three pinned model choices after the existing ASR Yes gate, default Enter to `small`, preserve Phase 1 state and installer behavior, and expose the derived active model in local doctor output without adding transcription.
+- Review: Codex and independent read-only reviewers caught stale Phase 1 README claims, missing failed-switch and zero-mutation regressions, a manually duplicated model-key type, inaccurate test counts and runtime-immutability wording, unchecked acceptance records, stale project memory, an overbroad environment-filter claim, and a test that did not construct the state named in its title. DeepSeek completed three same-scope repair rounds and invoked `test-baseline-builder`; the earlier `risk-reviewer` attempt stalled and was replaced by top-level plus independent review.
+- Result: The literal allowlist, selector, state compatibility, idempotent reinstall, fail-closed model switch, and doctor model field pass 169 focused tests and 570 full tests. Build, 148-file pack, CLI probes, scoped secret review, and diff integrity also pass. No real model download, Git action, version change, release, publication, MCP tool change, or Phase 3 transcription work occurred.
+
+## 2026-07-29 ASR Transcription Fallback Phase 3
+
+- Owner: Codex froze the Phase 3 product/system design, research, ticket, QA, and file-backed handoff, then implemented directly because the existing Paseo daemon was stale/unreachable and repository rules prohibited restarting it without explicit approval.
+- Objective: Add explicit default-off ASR fallback only to `get_video_transcript`, with native-first gating, one-Part playback, ready managed CPU INT8 runtime, bounded temporary audio, strict child output, complete cleanup, and no change to the ten-tool order or legacy transport.
+- Review: Top-level risk review found and repaired malformed-DASH/empty-set confusion, overbroad CDN host acceptance, uncancelled redirect bodies, partial-write handling, custom-port and unsafe-backup acceptance, loose blank-line protocol handling, unsafe temp-destination assumptions, and test-fixture directory residue. The Codex Security app setup did not complete after two bounded waits, so no independent app scan result is claimed; the handoff-authorized top-level risk-review fallback was used.
+- Result: Build, 10 focused files / 356 tests, 29 files / 629 full tests, a 156-file package dry run, doctor/CLI/public stdio checks, scoped secret review, and final diff/docs gates pass. A follow-up 126-test ASR run leaves zero temp directories. No ready model existed, so no live ASR smoke or model download occurred. No commit, stage, push, PR, tag, version change, release, publication, SDK migration, or learning-proposal promotion occurred.
+
+## 2026-07-30 Codex Security 38-Finding Remediation
+
+- Owner: Codex implemented directly after the user explicitly said not to use
+  Paseo. No Claude Code or Paseo process edited the worktree. Three bounded
+  Codex test/review subtasks added only deterministic test evidence after the
+  product-source remediation.
+- Objective: close the 4 Medium and 34 Low validated findings from scan
+  `6949ea8e-a129-43d6-9104-6edf7413a1ff` across stdio, MCP responses,
+  Bilibili networking/content, caches/logging, ASR download/runtime/installer,
+  harness hooks, and the npm publish workflow without changing the ten-tool
+  product boundary.
+- Review: each finding has a closing-control/test row in
+  `docs/qa/2026-07-30-deep-security-remediation.md`. Direct review included
+  exact byte/deadline/cancellation behavior, all-answer DNS pinning, child-tree
+  containment, installer staging, fixed-metadata hook retention, immutable
+  Action refs, package contents, and dependency reachability.
+- Local result: 22 files / 407 focused tests, 38 files / 721 full tests,
+  TypeScript build, built CLI/public stdio smoke, 6 hook-safety tests, 8
+  stop-summary tests, and the 180-file package boundary pass. Secret
+  classification has zero suspicious unclassified or high-confidence package
+  matches.
+- Residual: the production audit remains nonzero for an installed Hono
+  static-file advisory that is unreachable from current stdio imports. No
+  ready ASR model exists, so live ASR end-to-end behavior remains untested.
+- Completion boundary: official CLI scan
+  `c93dd212-6e9c-4ed0-a0c6-36bc93f9769b` used version 0.1.3 and failed before
+  canonical artifact collection; its output directory is empty. A fresh
+  official CLI 0.1.4 deep scan against the exact `0a1b` worktree and review of
+  its sealed report/artifacts are required before final closure.
+- Git/release boundary: no stage, commit, push, PR, tag, version, release,
+  publication, model operation, real Cookie use, or learning-proposal promotion
+  occurred.
+
+## 2026-08-05 Strix + DeepSeek Security Remediation
+
+- Owner: Codex froze ticket `SEC-2026-08-05-STRIX`, launched Paseo agent
+  `c0741a3c-2849-4e4d-bc49-f9e393b98625` with the live
+  `claude/deepseek-v4-flash` provider, and retained review/acceptance ownership.
+- Objective: close the validated Strix follow-up findings without changing the
+  ten-tool legacy stdio boundary or weakening the prior 38-finding controls.
+- Review: independent standards/spec review found incomplete ASR root mutation
+  guards, missing file/directory type validation, incomplete BVID tool/input
+  matrix coverage, and a newly compatible `fast-uri@3.1.5` resolution. The same
+  Paseo agent completed four bounded repair rounds; Codex reran every final gate.
+- Result: build, 803 full tests, 95 focused stdio/tool/handler tests, zero-advisory
+  production audit, 180-file package boundary, diff/secret/temp checks, and Git
+  scope checks pass. The final Claude report and QA record contain the exact
+  evidence. No commit, push, tag, version, release, publication, real Cookie,
+  live Bilibili request, or model operation occurred.

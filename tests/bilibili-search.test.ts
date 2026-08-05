@@ -104,7 +104,7 @@ describe("searchBilibiliVideos", () => {
           duration_seconds: 7_408,
           published_at: "2023-11-14T22:13:20.000Z",
           view_count: 12_345,
-          description: `${"🙂".repeat(200)}…`,
+          description: `${"🙂".repeat(127)}…`,
           source_url: "https://www.bilibili.com/video/BV1T6PQzQErF/",
         },
         {

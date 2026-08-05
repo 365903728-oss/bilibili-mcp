@@ -261,3 +261,107 @@
 - Fact: `v1.10.1` is the current npm latest and GitHub Release, publishing the Favorites-first bilingual README and four-step cursor-traversal Hero SVGs without runtime, schema, test, dependency, or workflow changes.
 - Evidence: Release commit `3aee13d`, annotated tag `v1.10.1`, successful Actions run `30233179604`, npm integrity/shasum and SLSA provenance metadata, isolated exact-package CLI version/help smoke, and the public non-draft/non-prerelease GitHub Release.
 - Impact: Install/update guidance may target `@xzxzzx/bilibili-mcp@1.10.1` or `@latest`. The package still exposes the same ten MCP tools; Issue #20 remains a separate compatibility follow-up.
+
+- Fact: The verified post-v1.10.1 working tree replaces the duplicated CLI dispatch with one Commander interface and adds interactive `setup` plus local-only `doctor --json`.
+- Evidence: `src/cli.ts`, 19 focused CLI unit tests, 11 built-entrypoint/MCP smoke cases, 431 passing tests, and `docs/qa/2026-07-27-cli-setup-doctor.md`.
+- Impact: People can use hidden-input `setup`; Agents can inspect a stable secret-free local status object and distinguish locally ready, missing credentials, and internal failures through exit codes 0, 1, and 2. Live Bilibili login still requires `check_bilibili_credentials`. This working tree is not committed, versioned, or published yet.
+
+- Fact: The post-v1.10.1 working tree fully redesigns both landing pages around a plain two-sentence outcome introduction, three product outcomes (browse current visible Favorites, search by topic, and explore a selected Video), a visible Node prerequisite and four-step install/login path before examples, three prominent real use cases, ten task-oriented MCP tools, explicit product limits, and local credential safety.
+- Evidence: `README.md`, `README_EN.md`, four SVGs under `assets/readme/`, the paired setup guides, and `docs/agent-memory/handoffs/2026-07-27-readme-install-flow-claude-report.md`.
+- Impact: The homepage now moves from product capability to a scannable installation path and then concrete use, with the Favorites visual scoped to its matching example rather than the whole project identity. It serves Agent-assisted and manual users without claiming AI summarization, ASR, audio download, automatic notes, guaranteed normalization of every upstream row, snapshot traversal, stable newest-comment ordering, or access bypass. Detailed client configuration and tool schemas remain in their canonical guides.
+
+- Fact: npm latest remains `1.10.1` and does not contain the working-tree `setup` or `doctor` commands; Commander 14.0.3 requires Node `>=20` while the root package still declares Node `>=18.0.0`.
+- Evidence: Live `npm view @xzxzzx/bilibili-mcp version`, live `npm view commander@14.0.3 engines`, `package.json`, and the built local CLI probes on 2026-07-27.
+- Impact: The CLI implementation and rewritten documentation must ship together in a later version. Resolve the package engine floor before that release; do not publish the README alone or claim current `@latest` already supports the new onboarding commands.
+
+- Fact: The post-v1.10.1 onboarding documentation now provides two independently complete first-run paths.
+- Evidence: The copyable Agent prompt in both READMEs, the manual-install sections, the browser credential-field instructions in both setup guides, and the passing Agent/manual persona walkthroughs.
+- Impact: An Agent can configure the correct MCP client while leaving private credential entry to the user, and a person can complete Node verification, client configuration, hidden local credential entry, reconnection, and live MCP login validation without inventing an omitted step.
+
+- Fact: Phase 1 of the verified post-v1.10.1 working tree added optional ASR installation to `setup` with No as the default and one fixed `Systran/faster-whisper-small` model revision.
+- Evidence: `src/asr/`, `src/cli.ts`, 95 focused tests, 27 files / 496 full tests, a clean TypeScript build, a 148-file package dry run, built help/doctor probes, and `docs/qa/2026-07-27-asr-model-install-phase1.md`.
+- Impact: Choosing Yes creates a user-scoped managed Python environment, installs pinned `faster-whisper==1.2.1`, downloads the approximately 486 MB model snapshot, verifies CPU INT8 loading, and records readiness. Choosing No performs no ASR command, network, or filesystem work. At Phase 1 acceptance, model selection was still absent; the Phase 2 fact below supersedes that limitation. Audio retrieval, transcription, and subtitle fallback remain unimplemented.
+
+- Fact: Phase 2 adds a three-model allowlisted selector (tiny 78 MB / base 148 MB / small 486 MB, Enter defaults to small) to the ASR setup flow. `AsrModelKey` and `AsrModelSpec` are derived from a literal `as const` allowlist.
+- Evidence: `src/asr/state.ts` (allowlist, `resolveModelSpec`, `isAllowlistedModel`, `modelKeyForRepo`, derived `modelKey` in `readAsrState`), `src/asr/installer.ts` (model-key-aware idempotency and switch behavior), `src/cli.ts` (`parseModelChoice`, model selector UI, `asr.model` in doctor), 158 focused tests / 570 full tests, clean build, 148-file pack dry-run, built doctor JSON with `asr.model`, and `docs/qa/2026-07-27-asr-model-selector-phase2.md`.
+- Impact: One active model in the existing shared directory; same-model idempotent, different-model switches and re-verifies. Audio retrieval, transcription, and subtitle fallback remain Phase 3.
+
+- Fact: Node `>=20.0.0` is now the working-tree package engine floor, and the Phase 1 doctor reports ASR as `not_installed`, `incomplete`, or `ready` without changing credential readiness or its exit code.
+- Evidence: `package.json`, `package-lock.json`, `src/asr/state.ts`, `src/cli.ts`, and focused CLI tests.
+- Impact: The earlier Node engine mismatch is resolved in source, but npm latest remains `1.10.1`; none of these working-tree changes are committed, versioned, or published.
+
+## 2026-07-29
+
+- Fact: This worktree remains a legacy-era stdio MCP server after the stable `2026-07-28` protocol release: it uses the monolithic TypeScript SDK v1 line, a singleton low-level `Server`, and direct `StdioServerTransport` connections.
+- Evidence: `package.json`, `package-lock.json`, `src/server.ts`, `src/index.ts`, `src/cli.ts`, the official dated specification and TypeScript SDK migration guidance summarized in `docs/research/2026-07-29-mcp-protocol-update.md`, and live npm registry checks showing `@modelcontextprotocol/sdk` latest `1.30.0` versus split-package v2 `2.0.0`.
+- Impact: Existing dual-era clients may continue through legacy fallback. Claiming `2026-07-28` support requires a separate SDK v2 migration and explicit `serveStdio(factory)` entry with both modern `server/discover` and legacy `initialize` verification; do not infer modern conformance from a package upgrade alone.
+
+- Fact: The current ten-tool surface implements the original MCP discovery/call/error model and the `2025-06-18` structured-output addition for three tools (`get_video_transcript`, `search_bilibili_videos`, and `list_bilibili_favorite_videos`), while keeping a deterministic static tool order.
+- Evidence: `src/server.ts`, `src/server/tool-schemas.ts`, `src/server/tool-handlers.ts`, `src/server/error-response.ts`, `tests/server-tools.test.ts`, and the dated specification history summarized in `docs/research/2026-07-29-mcp-tools-evolution.md`.
+- Impact: The project already uses the historical tool improvement most relevant to machine-readable Bilibili evidence. Tool annotations, icons, task augmentation, MRTR, discovery caching, and `x-mcp-header` remain unimplemented or inapplicable optional/new-era features; their absence alone is not evidence of a broken tool surface.
+
+- Fact: ASR Phase 3 is implemented in the working tree as an explicit, default-off `fallback_to_asr` option on `get_video_transcript`; the ten-tool order and legacy stdio transport are unchanged.
+- Evidence: `src/bilibili/playback.ts`, `src/asr/transcription.ts`, `src/bilibili/subtitle.ts`, schemas/handlers/types/errors, 10 focused files / 356 tests, 29 files / 629 full tests, and the public wire-level stdio smoke.
+- Impact: Native subtitles always win. Only confirmed no-subtitle, no-selected-subtitle, or empty-subtitle-body states may invoke ASR for one resolved Part/CID; credential, HTTP, timeout, parse, and anti-bot errors remain visible and never become ASR gates.
+
+- Fact: Phase 3 audio and runtime execution are bounded and fail closed: Bilibili-specific HTTPS CDN candidates, at most three redirects/candidates, 128 MiB audio, two-hour Part duration, 30-minute child timeout, 2 MiB stdout, 10,000 segments, 500,000 transcript characters, one active job with no queue, strict NDJSON, and guarded unique-temp cleanup.
+- Evidence: `src/bilibili/playback.ts`, `src/asr/transcription.ts`, deterministic playback/transcription tests, scoped secret scan, and zero ASR temp directories after the 126-test ASR installer/transcription run.
+- Impact: Cookies are sent only to the first-party playback API, never CDN/Python; signed URLs and private paths do not enter results or diagnostics; MCP calls cannot install or switch models.
+
+- Fact: The current machine still reports `asr.status: not_installed` and `asr.model: null`.
+- Evidence: built `doctor --json` after Phase 3 acceptance.
+- Impact: No model was downloaded or changed and no live end-to-end ASR transcription was run; automated injectable coverage is the acceptance evidence until a user-managed ready model already exists.
+
+## 2026-07-30
+
+- Fact: The current uncommitted working tree implements closing controls for
+  all 38 validated findings from Codex Security scan
+  `6949ea8e-a129-43d6-9104-6edf7413a1ff` without changing the fixed ten-tool
+  order or adding a tool. Successful in-limit response shapes remain
+  compatible, while the Favorites output schema now declares tighter
+  collection and string bounds.
+- Evidence: The 38-row matrix in
+  `docs/qa/2026-07-30-deep-security-remediation.md`, 22 files / 407 focused
+  tests, 38 files / 721 full tests, clean TypeScript build, built stdio smoke,
+  hook tests, and package inspection.
+- Impact: Security limits are now enforced at shared stdio, MCP serialization,
+  HTTP, bootstrap, cache, logger, playback, ASR, installer, hook, and publish
+  boundaries. These changes remain uncommitted and unpublished.
+
+- Fact: Shared process-local stdio, MCP, HTTP, cache, and log budgets are
+  centralized in `src/security/limits.ts`; ASR- and installer-specific budgets
+  remain owned by those modules. Request cancellation context lives in
+  `src/security/operation-context.ts`; playback HTTPS performs public-address
+  DNS validation and connection pinning in `src/security/pinned-https.ts`; and
+  stdio uses `src/server/bounded-stdio-transport.ts`.
+- Evidence: Exact boundary, cancellation, mixed-DNS, credential stripping,
+  SNI, and oversized response/frame regressions in
+  `tests/bounded-stdio-transport.test.ts`,
+  `tests/mcp-response-budget.test.ts`, and `tests/pinned-https.test.ts`.
+- Impact: Future network, response, or transport work must reuse these shared
+  controls rather than reintroduce per-call unbounded paths.
+
+- Fact: The npm package dry run contains 180 expected entries and no source,
+  tests, internal security reports, hooks, agent memory, local config, model,
+  audio, or credential files.
+- Evidence: `npm pack --dry-run --json --ignore-scripts`, structural-path
+  validation, and package-content private-key/GitHub/npm/AWS-token scanning.
+- Impact: Runtime credential modules remain included as compiled code, but no
+  credential values or private configuration are packaged.
+
+- Fact: Production audit is not clean: the installed
+  `@modelcontextprotocol/sdk@1.27.1` brings
+  `@hono/node-server@1.19.14`, producing two moderate audit nodes for
+  GHSA-frvp-7c67-39w9.
+- Evidence: `npm audit --omit=dev --json`, `npm ls`, live npm metadata, and
+  import reachability showing Hono only in the SDK Streamable HTTP module while
+  this project imports stdio/shared server paths.
+- Impact: Treat this as installed-but-unreachable residual risk. Re-open it if
+  an HTTP/static-file transport appears or in a separate SDK compatibility
+  upgrade; do not claim a zero-advisory audit.
+
+- Fact: The user explicitly selected direct Codex remediation and rejected
+  Paseo for this task.
+- Evidence: Current user instruction and the task ticket status.
+- Impact: No Paseo or other implementation agent is part of the 38-finding
+  remediation evidence.

@@ -1,18 +1,26 @@
 import fs from "fs";
+import { SECURITY_LIMITS } from "../security/limits.js";
+import {
+  createAbortError,
+  getOperationSignal,
+  linkAbortSignal,
+  throwIfAborted,
+} from "../security/operation-context.js";
+import { parseBoundedJsonResponse } from "./bounded-response.js";
+import { ResourceLimitError } from "./errors.js";
 
 const PACKAGE_NAME = "@xzxzzx/bilibili-mcp";
 const LATEST_PACKAGE_SPEC = `${PACKAGE_NAME}@latest`;
 const NPM_LATEST_URL = `https://registry.npmjs.org/${encodeURIComponent(PACKAGE_NAME)}/latest`;
+const UPDATE_TIMEOUT_MS = 5_000;
+const UPDATE_CACHE_MS = 5 * 60 * 1_000;
 
-type FetchLike = (
-  input: string,
-  init?: { headers?: Record<string, string> },
-) => Promise<{
-  ok: boolean;
-  status: number;
-  statusText: string;
-  json: () => Promise<unknown>;
-}>;
+type FetchLike = typeof fetch;
+let cachedUpdate:
+  | { expiresAt: number; value: PackageUpdateInfo }
+  | undefined;
+let inFlightUpdate: Promise<PackageUpdateInfo> | null = null;
+let activeUpdateWaiters = 0;
 
 export interface PackageUpdateInfo {
   package_name: typeof PACKAGE_NAME;
@@ -100,23 +108,39 @@ function buildBaseInfo(currentVersion: string): Omit<
   };
 }
 
-export async function buildPackageUpdateInfo(
-  fetchImpl: FetchLike = fetch,
+async function fetchPackageUpdateInfo(
+  fetchImpl: FetchLike,
+  callerSignal?: AbortSignal,
 ): Promise<PackageUpdateInfo> {
+  throwIfAborted(callerSignal);
   const currentVersion = readCurrentVersion();
   const baseInfo = buildBaseInfo(currentVersion);
+  const controller = new AbortController();
+  const unlinkAbort = linkAbortSignal(callerSignal, controller);
+  const timer = setTimeout(() => controller.abort(), UPDATE_TIMEOUT_MS);
 
   try {
     const response = await fetchImpl(NPM_LATEST_URL, {
       headers: { Accept: "application/json" },
+      redirect: "manual",
+      signal: controller.signal,
     });
 
     if (!response.ok) {
-      throw new Error(`npm registry returned HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`npm registry returned HTTP ${response.status}`);
     }
 
-    const payload = (await response.json()) as { version?: unknown };
-    const latestVersion = typeof payload.version === "string" ? payload.version : null;
+    const payload = await parseBoundedJsonResponse<{ version?: unknown }>(
+      response,
+      SECURITY_LIMITS.updateCheckBytes,
+      "npm_update_json",
+    );
+    const latestVersion =
+      typeof payload.version === "string" &&
+      payload.version.length <= 64 &&
+      parseVersion(payload.version) !== null
+        ? payload.version
+        : null;
 
     return {
       ...baseInfo,
@@ -125,6 +149,9 @@ export async function buildPackageUpdateInfo(
         latestVersion === null ? null : isNewerVersion(latestVersion, currentVersion),
     };
   } catch {
+    if (callerSignal?.aborted) {
+      throw createAbortError();
+    }
     return {
       ...baseInfo,
       latest_version: null,
@@ -142,5 +169,90 @@ export async function buildPackageUpdateInfo(
         "无法连接 npm registry；请稍后重试，或运行 npm view @xzxzzx/bilibili-mcp version。",
       ],
     };
+  } finally {
+    clearTimeout(timer);
+    unlinkAbort();
+    controller.abort();
   }
+}
+
+function waitForCaller<T>(
+  promise: Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) {
+    return Promise.reject(createAbortError());
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(createAbortError());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function waitForSharedUpdate(
+  promise: Promise<PackageUpdateInfo>,
+  signal?: AbortSignal,
+): Promise<PackageUpdateInfo> {
+  throwIfAborted(signal);
+  if (activeUpdateWaiters >= SECURITY_LIMITS.updateCheckWaiters) {
+    throw new ResourceLimitError(
+      "Package update check waiter capacity is full",
+      "update_check_waiters",
+      SECURITY_LIMITS.updateCheckWaiters,
+    );
+  }
+  activeUpdateWaiters += 1;
+  try {
+    return await waitForCaller(promise, signal);
+  } finally {
+    activeUpdateWaiters -= 1;
+  }
+}
+
+export async function buildPackageUpdateInfo(
+  fetchImpl: FetchLike = globalThis.fetch,
+  signal?: AbortSignal,
+): Promise<PackageUpdateInfo> {
+  const operationSignal = getOperationSignal(signal);
+  throwIfAborted(operationSignal);
+  const useSharedState = fetchImpl === globalThis.fetch;
+  if (!useSharedState) {
+    return await waitForCaller(
+      fetchPackageUpdateInfo(fetchImpl, operationSignal),
+      operationSignal,
+    );
+  }
+
+  if (cachedUpdate && cachedUpdate.expiresAt > Date.now()) {
+    return cachedUpdate.value;
+  }
+  if (!inFlightUpdate) {
+    // The underlying single-flight is process-owned. Cancelling one caller
+    // releases only that waiter and must not abort work still needed by others.
+    inFlightUpdate = fetchPackageUpdateInfo(fetchImpl)
+      .then((value) => {
+        cachedUpdate = {
+          expiresAt: Date.now() + UPDATE_CACHE_MS,
+          value,
+        };
+        return value;
+      })
+      .finally(() => {
+        inFlightUpdate = null;
+      });
+  }
+  return await waitForSharedUpdate(inFlightUpdate, operationSignal);
 }

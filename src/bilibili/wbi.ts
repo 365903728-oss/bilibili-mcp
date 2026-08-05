@@ -4,10 +4,19 @@ import { config } from "../config.js";
 import {
   BilibiliAPIError,
   NetworkError,
+  ResourceLimitError,
   TimeoutError,
 } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
-import { withRetry } from "../utils/retry.js";
+import { SECURITY_LIMITS } from "../security/limits.js";
+import {
+  createAbortError,
+  getOperationSignal,
+  linkAbortSignal,
+  runWithOperationSignal,
+  throwIfAborted,
+} from "../security/operation-context.js";
+import { parseBoundedJsonResponse } from "../utils/bounded-response.js";
 
 // WBI 缓存
 let cachedWBI: {
@@ -16,6 +25,12 @@ let cachedWBI: {
   mixKey: string;
   expireTime: number;
 } | null = null;
+let inFlightWBI: Promise<{
+  imgKey: string;
+  subKey: string;
+  mixKey: string;
+}> | null = null;
+let activeWbiWaiters = 0;
 
 const REQUEST_TIMEOUT_MS = config.requestTimeoutMs;
 const BASE_URL = config.baseUrl;
@@ -47,13 +62,195 @@ function md5Hash(str: string): string {
 /**
  * 获取 WBI 签名密钥
  */
-export async function getWBI(): Promise<{
+interface WbiOperationContext {
+  signal?: AbortSignal;
+  deadlineAt?: number;
+}
+
+async function fetchAndCacheWBI(
+  operation: WbiOperationContext = {},
+): Promise<{
   imgKey: string;
   subKey: string;
   mixKey: string;
 }> {
-  // 检查缓存是否有效（1小时过期）
+  const signal = getOperationSignal(operation.signal);
+  throwIfAborted(signal);
+  const controller = new AbortController();
+  const unlinkAbort = linkAbortSignal(signal, controller);
+  const timeoutMs = Math.min(
+    REQUEST_TIMEOUT_MS,
+    operation.deadlineAt === undefined
+      ? REQUEST_TIMEOUT_MS
+      : Math.max(0, operation.deadlineAt - Date.now()),
+  );
+  if (timeoutMs <= 0) {
+    unlinkAbort();
+    throw new TimeoutError("WBI request deadline exceeded", REQUEST_TIMEOUT_MS);
+  }
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+  try {
+    const navRes = await fetch(`${BASE_URL}/x/web-interface/nav`, {
+      headers: {
+        "User-Agent": config.userAgent,
+        Referer: config.referer,
+      },
+      redirect: "manual",
+      signal: controller.signal,
+    });
+
+    if (!navRes.ok) {
+      throw new NetworkError(
+        `Failed to fetch WBI: ${navRes.status}`,
+        undefined,
+        undefined,
+        navRes.status,
+      );
+    }
+
+    const navData = await parseBoundedJsonResponse<{
+      data?: { wbi_img?: { img_url?: unknown; sub_url?: unknown } };
+    }>(navRes, SECURITY_LIMITS.wbiBootstrapBytes, "wbi_bootstrap_json");
+    const wbiImg = navData.data?.wbi_img;
+    if (
+      !wbiImg ||
+      typeof wbiImg.img_url !== "string" ||
+      typeof wbiImg.sub_url !== "string" ||
+      wbiImg.img_url.length > 2_048 ||
+      wbiImg.sub_url.length > 2_048
+    ) {
+      throw new BilibiliAPIError(
+        "WBI image data was invalid",
+        "WBI_DATA_MISSING",
+      );
+    }
+
+    const imgKeyMatch = wbiImg.img_url.match(/([^\/_]+)(?=\.[a-zA-Z]+$)/);
+    const subKeyMatch = wbiImg.sub_url.match(/([^\/_]+)(?=\.[a-zA-Z]+$)/);
+    const imgKey = imgKeyMatch?.[0];
+    const subKey = subKeyMatch?.[0];
+    if (
+      !imgKey ||
+      !subKey ||
+      !/^[A-Za-z0-9]{32}$/.test(imgKey) ||
+      !/^[A-Za-z0-9]{32}$/.test(subKey)
+    ) {
+      throw new BilibiliAPIError(
+        "Failed to extract valid WBI keys",
+        "WBI_KEY_EXTRACT_FAILED",
+      );
+    }
+
+    const mixKey = getMixKey(imgKey, subKey);
+    cachedWBI = {
+      imgKey,
+      subKey,
+      mixKey,
+      expireTime: Date.now() + CACHE_EXPIRATION_MS,
+    };
+    return { imgKey, subKey, mixKey };
+  } catch (error) {
+    if (signal?.aborted) {
+      throw createAbortError();
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new TimeoutError(
+        `WBI request timeout: ${REQUEST_TIMEOUT_MS}ms`,
+        REQUEST_TIMEOUT_MS,
+      );
+    }
+    if (error instanceof TypeError) {
+      throw new NetworkError("Network request failed", error);
+    }
+    logger.error(
+      "Error getting WBI",
+      { error: error instanceof Error ? error.name : "UnknownError" },
+      { type: "wbi-error" },
+    );
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    unlinkAbort();
+    controller.abort();
+  }
+}
+
+function waitForCaller<T>(
+  promise: Promise<T>,
+  signal?: AbortSignal,
+  deadlineAt?: number,
+): Promise<T> {
+  throwIfAborted(signal);
+  const remainingMs =
+    deadlineAt === undefined ? undefined : deadlineAt - Date.now();
+  if (remainingMs !== undefined && remainingMs <= 0) {
+    return Promise.reject(
+      new TimeoutError("WBI request deadline exceeded", REQUEST_TIMEOUT_MS),
+    );
+  }
+  if (!signal && remainingMs === undefined) return promise;
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const timer =
+      remainingMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            signal?.removeEventListener("abort", onAbort);
+            reject(
+              new TimeoutError(
+                "WBI request deadline exceeded",
+                REQUEST_TIMEOUT_MS,
+              ),
+            );
+          }, remainingMs);
+    const cleanup = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(createAbortError());
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
+export async function getWBI(
+  operation: WbiOperationContext = {},
+): Promise<{
+  imgKey: string;
+  subKey: string;
+  mixKey: string;
+}> {
+  const signal = getOperationSignal(operation.signal);
+  throwIfAborted(signal);
   const now = Date.now();
+  if (operation.deadlineAt !== undefined && now >= operation.deadlineAt) {
+    throw new TimeoutError(
+      "WBI request deadline exceeded",
+      REQUEST_TIMEOUT_MS,
+    );
+  }
   if (cachedWBI && cachedWBI.expireTime > now) {
     return {
       imgKey: cachedWBI.imgKey,
@@ -61,109 +258,30 @@ export async function getWBI(): Promise<{
       mixKey: cachedWBI.mixKey,
     };
   }
-
+  if (!inFlightWBI) {
+    inFlightWBI = runWithOperationSignal(
+      undefined,
+      async () => await fetchAndCacheWBI(),
+    ).finally(() => {
+        inFlightWBI = null;
+      });
+  }
+  if (activeWbiWaiters >= SECURITY_LIMITS.bootstrapWaiters) {
+    throw new ResourceLimitError(
+      "WBI waiter capacity is full",
+      "wbi_waiters",
+      SECURITY_LIMITS.bootstrapWaiters,
+    );
+  }
+  activeWbiWaiters += 1;
   try {
-    return await withRetry(
-      async () => {
-        // 获取 nav 数据中的 wbi_img 字段
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          REQUEST_TIMEOUT_MS,
-        );
-
-        let navRes: Response;
-        try {
-          navRes = await fetch(`${BASE_URL}/x/web-interface/nav`, {
-            headers: {
-              "User-Agent": config.userAgent,
-              Referer: config.referer,
-            },
-            signal: controller.signal,
-          });
-        } catch (error) {
-          if (error instanceof TypeError) {
-            throw new NetworkError("Network request failed", error);
-          }
-          throw error;
-        } finally {
-          clearTimeout(timeoutId);
-        }
-
-        if (!navRes.ok) {
-          throw new NetworkError(
-            `Failed to fetch WBI: ${navRes.status}`,
-            undefined,
-            `${BASE_URL}/x/web-interface/nav`,
-            navRes.status,
-          );
-        }
-
-        const navData = await navRes.json();
-        const wbiImg = navData.data?.wbi_img;
-
-        if (!wbiImg) {
-          throw new BilibiliAPIError(
-            "WBI image data not found",
-            "WBI_DATA_MISSING",
-          );
-        }
-
-        // 提取 img_key 和 sub_key
-        const imgKeyMatch = wbiImg.img_url?.match(
-          /([^\/_]+)(?=\.[a-zA-Z]+$)/,
-        );
-        const subKeyMatch = wbiImg.sub_url?.match(
-          /([^\/_]+)(?=\.[a-zA-Z]+$)/,
-        );
-
-        if (!imgKeyMatch || !subKeyMatch) {
-          throw new BilibiliAPIError(
-            "Failed to extract WBI keys",
-            "WBI_KEY_EXTRACT_FAILED",
-          );
-        }
-
-        const imgKey = imgKeyMatch[0];
-        const subKey = subKeyMatch[0];
-        const mixKey = getMixKey(imgKey, subKey);
-
-        // 缓存 WBI
-        cachedWBI = {
-          imgKey,
-          subKey,
-          mixKey,
-          expireTime: now + CACHE_EXPIRATION_MS,
-        };
-
-        return { imgKey, subKey, mixKey };
-      },
-      {
-        maxRetries: 3,
-        baseDelay: 1000,
-        maxDelay: 10000,
-        retryableStatusCodes: [408, 429, 500, 502, 503, 504],
-        retryableErrorTypes: ["NetworkError", "TimeoutError", "AbortError"],
-      },
+    return await waitForCaller(
+      inFlightWBI,
+      signal,
+      operation.deadlineAt,
     );
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new TimeoutError(
-        `WBI request timeout: ${REQUEST_TIMEOUT_MS}ms`,
-        REQUEST_TIMEOUT_MS,
-      );
-    }
-    logger.error(
-      "Error getting WBI",
-      { error: error instanceof Error ? error.message : error },
-      { type: "wbi-error" },
-    );
-    throw new NetworkError(
-      "Failed to fetch WBI",
-      error instanceof Error ? error : undefined,
-      `${BASE_URL}/x/web-interface/nav`,
-      error instanceof NetworkError ? error.statusCode : undefined,
-    );
+  } finally {
+    activeWbiWaiters -= 1;
   }
 }
 

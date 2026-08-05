@@ -3,11 +3,11 @@ import argparse
 import datetime as dt
 import json
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
 from plan_tracker import resolve_active_work
+from hook_safety import read_bounded_stdin_object, write_bounded_text
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -22,29 +22,32 @@ def agent_base(agent: str) -> Path:
     return ROOT / ".claude"
 
 
-def run_git(args: list[str]) -> str:
+def git_status_count() -> int:
     try:
         result = subprocess.run(
-            ["git", "-C", str(ROOT), *args],
+            [
+                "git",
+                "-C",
+                str(ROOT),
+                "status",
+                "--short",
+                "--untracked-files=no",
+            ],
             check=False,
             capture_output=True,
             text=True,
             timeout=5,
         )
     except Exception as exc:
-        return f"git unavailable: {exc}"
-    return result.stdout.strip() or result.stderr.strip()
+        return 0
+    return min(10_000, len([line for line in result.stdout.splitlines() if line]))
 
 
 def read_payload() -> dict[str, Any]:
-    raw = sys.stdin.read()
-    if not raw.strip():
-        return {}
     try:
-        payload = json.loads(raw)
-        return payload if isinstance(payload, dict) else {"payload": payload}
-    except json.JSONDecodeError:
-        return {"raw_preview": raw[:500]}
+        return read_bounded_stdin_object()
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        return {}
 
 
 def main() -> int:
@@ -56,25 +59,23 @@ def main() -> int:
     runtime = base / "runtime"
     runtime.mkdir(parents=True, exist_ok=True)
 
-    payload = read_payload()
-    branch = run_git(["branch", "--show-current"])
-    status = run_git(["status", "--short"])
+    read_payload()
+    dirty_count = git_status_count()
     active_work = resolve_active_work()
 
     lines = [
         f"# {args.agent} pre-compact checkpoint",
         f"Generated: {now_iso()}",
-        f"Repository: {ROOT}",
-        f"Branch: {branch or 'unknown'}",
+        "Repository: current bilibili-mcp worktree",
         "",
         "## Current Goal",
-        str(payload.get("trigger") or payload.get("event") or "PreCompact triggered"),
+        "PreCompact triggered.",
         "",
         "## Git Status",
-        status or "Clean or unavailable.",
+        f"Tracked changed paths: {dirty_count}",
         "",
         "## Active Work",
-        str(active_work),
+        active_work.name,
         "",
         "## Resume Guidance",
         "- Re-read AGENTS.md, CLAUDE.md, and docs/agent-memory before substantial work.",
@@ -83,7 +84,11 @@ def main() -> int:
     ]
 
     output = "\n".join(lines) + "\n"
-    (runtime / "pre-compact-checkpoint.md").write_text(output, encoding="utf-8")
+    write_bounded_text(
+        runtime / "pre-compact-checkpoint.md",
+        output,
+        64 * 1024,
+    )
     print(json.dumps({"suppressOutput": True}, ensure_ascii=False))
     return 0
 

@@ -1,18 +1,18 @@
 // MCP 服务器定义
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import fs from "fs";
-import { redactSecrets } from "./utils/logger.js";
+import { logger } from "./utils/logger.js";
 import { toolSchemas } from "./server/tool-schemas.js";
 import { handleToolCall } from "./server/tool-handlers.js";
 import {
   buildGenericErrorPayload,
   toErrorTextContent,
 } from "./server/error-response.js";
+import { runWithOperationSignal } from "./security/operation-context.js";
 
 const packageJson = JSON.parse(
   fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")
@@ -37,16 +37,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 }));
 
 // 注册工具调用处理器
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   const { name, arguments: args } = request.params;
 
   try {
-    return await handleToolCall(
-      name,
-      args as Record<string, unknown> | undefined,
+    return await runWithOperationSignal(
+      extra?.signal,
+      async () => await handleToolCall(
+        name,
+        args as Record<string, unknown> | undefined,
+        extra?.signal,
+      ),
     );
   } catch (error) {
-    console.error(`Error processing tool ${name}:`, redactSecrets(error));
+    logger.error(
+      "Error processing MCP tool",
+      { error },
+      { type: "mcp-tool-error" },
+    );
     return toErrorTextContent(buildGenericErrorPayload(error));
   }
 });

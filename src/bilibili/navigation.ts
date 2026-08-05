@@ -2,6 +2,7 @@
 import { getVideoInfo } from "./video-api.js";
 import { extractBVId } from "../utils/bvid.js";
 import { ValidationError } from "../utils/errors.js";
+import { boundedRemoteText } from "../utils/bounded-text.js";
 import type { PartInfo, RawPageEntry } from "./types.js";
 
 /**
@@ -12,7 +13,7 @@ export function normalizePages(rawPages: RawPageEntry[] | undefined): PartInfo[]
   return rawPages.map((p) => ({
     page: p.page,
     cid: p.cid,
-    title: p.part || `P${p.page}`,
+    title: boundedRemoteText(p.part, 256) || `P${p.page}`,
     duration: p.duration,
   }));
 }
@@ -62,5 +63,5 @@ export function matchPartIdentity(
 ): { page: number; title: string } {
   const match = pages.find((p) => p.cid === cid);
   if (match) return { page: match.page, title: match.title };
-  return { page: 1, title: fallbackTitle };
+  return { page: 1, title: boundedRemoteText(fallbackTitle, 512) };
 }

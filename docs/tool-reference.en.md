@@ -11,7 +11,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 | Start from a topic without a video link | `search_bilibili_videos` | Up to 10 normal Video candidates with reusable BVIDs; no automatic subtitle or comment retrieval |
 | Start from my Bilibili Favorites | `list_bilibili_favorite_videos` | One bounded page of videos from the current account's created Favorite Folders (at most 20 rows); follow `next_cursor` until absent; no subtitles, comments, or downloads |
 | Summarize a video | `get_video_info` | Subtitles first; falls back to title, description, tags |
-| Get clean transcript text or locate keywords | `get_video_transcript` | Plain subtitle text, language, data source; supports timestamps, range filtering, and keyword search |
+| Get clean transcript text or locate keywords | `get_video_transcript` | Native subtitles first, explicit ASR fallback; supports timestamps, ranges, and keyword search |
 | See structured metadata | `get_video_metadata` | Title, author, duration, publish date, tags, stats, multi-Part listing |
 | View audience reactions | `get_video_comments` | Popular comments, timestamped highlights, optional replies |
 | See video Chapters | `get_video_chapters` | Chapter titles, start/end seconds; empty list when absent |
@@ -40,13 +40,14 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
   - `include_replies`: Whether to include top replies (default `true`).
 
 ### 3. Video Transcript (`get_video_transcript`)
-- Returns clean subtitle text, joined by newlines.
+- Returns newline-joined native subtitles or explicitly requested local ASR transcription.
 - Supports preferred language selection (defaults to `zh-Hans` > `ai-zh` > `zh-CN` > `zh-Hant` > `en` priority).
 - Supports multi-Part selection, timestamp output, time-range filtering, and optional keyword search.
 - Successful calls return both the backward-compatible formatted JSON text and the same data as MCP `structuredContent`.
 - Optional parameters:
   - `preferred_lang`: Preferred subtitle language code.
   - `fallback_to_description`: Fall back to video description if subtitles unavailable (default `false`).
+  - `fallback_to_asr`: Run ready local ASR only after subtitles are definitively unavailable (default `false`).
   - `page`: Multi-Part video page number (1-based positive integer).
   - `include_timestamps`: Prefix each line with `[HH:MM:SS --> HH:MM:SS]`.
   - `start_seconds` / `end_seconds`: Only return segments overlapping this range.
@@ -54,6 +55,10 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
   - `max_matches`: Maximum matches to return (1-20, default 10).
   - `context_segments`: Context segments per match side (0-5, default 1).
 - By default, returns `SUBTITLE_UNAVAILABLE` error when no subtitles exist.
+- Precedence is fixed: native subtitles → explicit ASR → description only when both fallbacks are explicit and playback returns a valid empty audio set.
+- ASR starts only for a confirmed empty subtitle list, selected subtitle, or subtitle body. Cookie, HTTP, timeout, parse, anti-bot, and other API errors remain visible.
+- ASR uses the ready setup-managed model on CPU INT8 and one temporary audio file. MCP calls never download or switch models.
+- Bounds: one Part up to 7,200 seconds; 128 MiB audio; 3 candidate URLs with 3 redirects each; 120-second download; 30-minute transcription; 2 MiB stdout; 10,000 segments; one active job and no queue.
 - Timestamps/range filtering/keyword search is incompatible with description fallback.
 - Cookie expiration always returns `COOKIE_EXPIRED`, never silently falls back.
 - Evidence links:
@@ -144,7 +149,7 @@ Field meaning:
 
 - `error` / `message` / `code` / `next_steps`: backward-compatible fields; `next_steps` mirrors `next_steps_en`.
 - `message_en` / `message_zh` / `next_steps_en` / `next_steps_zh`: explicit English and Chinese copies for clients that render by language.
-- `category`: classification (`validation` / `credentials` / `content` / `network` / `access` / `rate_limit` / `api` / `unknown`).
+- `category`: classification (`validation` / `credentials` / `content` / `network` / `access` / `rate_limit` / `api` / `runtime` / `unknown`).
 - `retryable`: whether automatic retry is reasonable.
 - `user_action_required`: whether the user must act before the call can succeed.
 - `details`: optional metadata such as HTTP status, timeout in milliseconds, or Bilibili API code; never includes Cookie values or full URLs.
@@ -156,6 +161,13 @@ Supported error codes:
 | `VALIDATION_ERROR` | Invalid input parameter | Fix the `bvid_or_url` or other parameter |
 | `COOKIE_EXPIRED` | Cookie expired or not logged in | User should refresh/rotate Bilibili credentials |
 | `SUBTITLE_UNAVAILABLE` | No subtitles available for this video | For `get_video_transcript`, retry with `fallback_to_description: true` |
+| `ASR_NOT_READY` | Local ASR is not ready | Run local `setup`, then confirm ready with `doctor --json` |
+| `ASR_AUDIO_UNAVAILABLE` | Safe temporary audio is unavailable | Retry later; Bilibili playback URLs are temporary |
+| `ASR_LIMIT_EXCEEDED` | Part, audio, or output exceeds a safety bound | Choose a shorter Part or use native subtitles |
+| `ASR_BUSY` | One local ASR job is already active | Retry after it finishes; requests are not queued |
+| `ASR_TRANSCRIPTION_TIMEOUT` | Local transcription exceeded 30 minutes | Retry later or choose a shorter Part |
+| `ASR_TRANSCRIPTION_FAILED` | Managed Python/model execution failed | Check `doctor --json`, then retry |
+| `ASR_OUTPUT_INVALID` | Managed ASR returned invalid or oversized NDJSON | Check local ASR state and report repeated failures |
 | `NETWORK_ERROR` | Network request failed (HTTP 5xx, connection errors, etc.) | Retry later; check network/proxy/firewall if it keeps happening |
 | `NETWORK_TIMEOUT` | Request to Bilibili timed out | Retry later; check network/proxy/firewall if it keeps happening |
 | `API_RATE_LIMITED` | Bilibili API rate limit hit (HTTP 429) | Wait and retry; reduce request frequency or raise `BILIBILI_RATE_LIMIT_MS` |
@@ -272,14 +284,31 @@ Request:
   "arguments": {
     "bvid_or_url": "https://www.bilibili.com/video/BV1xx411c7mD",
     "preferred_lang": "en",
-    "fallback_to_description": false
+    "fallback_to_description": false,
+    "fallback_to_asr": false
   }
 }
 ```
 
-Returns: `bvid`, `title`, `language`, `transcript` (newline-joined), `data_source` (`subtitle` or `description`), `page`.
+Returns: `bvid`, `title`, `language`, `transcript` (newline-joined), `data_source` (`subtitle`, `asr`, or `description`), `page`.
 
 > Returns `SUBTITLE_UNAVAILABLE` when no subtitles exist. Set `fallback_to_description: true` to fall back.
+
+**Explicit ASR fallback example**:
+
+```json
+{
+  "name": "get_video_transcript",
+  "arguments": {
+    "bvid_or_url": "BV1xx411c7mD",
+    "page": 1,
+    "fallback_to_asr": true,
+    "include_timestamps": true
+  }
+}
+```
+
+Native subtitles always win. Only a definitively subtitle-free Video with a model reported ready by `doctor --json` can return `data_source: "asr"`. ASR segments reuse the same ranges, keyword/context search, `source_url`, and `timestamp_url` pipeline.
 
 **Keyword search example**:
 

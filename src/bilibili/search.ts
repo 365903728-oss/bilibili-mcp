@@ -1,11 +1,21 @@
 import { credentialManager } from "../utils/credentials.js";
-import { BilibiliAPIError } from "../utils/errors.js";
+import {
+  BilibiliAPIError,
+  ResourceLimitError,
+} from "../utils/errors.js";
 import { isValidBVId } from "../utils/bvid.js";
 import type { VideoSearchCandidate, VideoSearchData } from "./types.js";
 import { checkLoginStatus, fetchWithoutWBI } from "./http.js";
+import {
+  boundedRemoteText,
+  truncateUtf8,
+} from "../utils/bounded-text.js";
 
 const VIDEO_SEARCH_PATH = "/x/web-interface/wbi/search/type";
-const DESCRIPTION_LIMIT = 200;
+const MAX_SEARCH_ROWS = 100;
+const MAX_SEARCH_TITLE_BYTES = 512;
+const MAX_SEARCH_AUTHOR_BYTES = 128;
+const MAX_SEARCH_DESCRIPTION_BYTES = 512;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -20,9 +30,13 @@ function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null;
 }
 
-function cleanSearchText(value: unknown): string {
+function cleanSearchText(value: unknown, maxBytes: number): string {
   if (typeof value !== "string") return "";
-  return value.replace(/<\/?em\b[^>]*>/gi, "").trim();
+  const prebounded = truncateUtf8(value, Math.max(maxBytes * 4, 2_048), "");
+  return boundedRemoteText(
+    prebounded.replace(/<\/?em\b[^>]*>/gi, ""),
+    maxBytes,
+  );
 }
 
 function parseDurationSeconds(value: unknown): number {
@@ -69,10 +83,7 @@ function toViewCount(value: unknown): number {
 }
 
 function truncateDescription(value: unknown): string {
-  const description = cleanSearchText(value);
-  const codePoints = Array.from(description);
-  if (codePoints.length <= DESCRIPTION_LIMIT) return description;
-  return `${codePoints.slice(0, DESCRIPTION_LIMIT).join("")}…`;
+  return cleanSearchText(value, MAX_SEARCH_DESCRIPTION_BYTES);
 }
 
 function normalizeCandidate(value: unknown): VideoSearchCandidate | undefined {
@@ -81,13 +92,13 @@ function normalizeCandidate(value: unknown): VideoSearchCandidate | undefined {
     return undefined;
   }
 
-  const title = cleanSearchText(value.title);
+  const title = cleanSearchText(value.title, MAX_SEARCH_TITLE_BYTES);
   if (!title) return undefined;
 
   return {
     bvid: value.bvid,
     title,
-    author: cleanSearchText(value.author),
+    author: cleanSearchText(value.author, MAX_SEARCH_AUTHOR_BYTES),
     duration_seconds: parseDurationSeconds(value.duration),
     published_at: toPublishedAt(value.pubdate),
     view_count: toViewCount(value.play),
@@ -126,8 +137,14 @@ export async function searchBilibiliVideos(
     authHeaders,
   );
 
-  const rows =
-    isRecord(data) && Array.isArray(data.result) ? data.result : [];
+  const rows = isRecord(data) && Array.isArray(data.result) ? data.result : [];
+  if (rows.length > MAX_SEARCH_ROWS) {
+    throw new ResourceLimitError(
+      "Video search response exceeded its item limit",
+      "video_search_items",
+      MAX_SEARCH_ROWS,
+    );
+  }
   const results: VideoSearchCandidate[] = [];
 
   for (const row of rows) {

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const savedRateLimit = process.env.BILIBILI_RATE_LIMIT_MS;
+const savedRequestTimeout = process.env.BILIBILI_REQUEST_TIMEOUT_MS;
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -14,6 +15,11 @@ afterEach(() => {
     delete process.env.BILIBILI_RATE_LIMIT_MS;
   } else {
     process.env.BILIBILI_RATE_LIMIT_MS = savedRateLimit;
+  }
+  if (savedRequestTimeout === undefined) {
+    delete process.env.BILIBILI_REQUEST_TIMEOUT_MS;
+  } else {
+    process.env.BILIBILI_REQUEST_TIMEOUT_MS = savedRequestTimeout;
   }
 });
 
@@ -77,6 +83,93 @@ describe("throttledFetch", () => {
     expect(starts).toHaveLength(2);
     expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(500);
   });
+
+  it("rejects excess queued requests before retaining an unbounded backlog", async () => {
+    process.env.BILIBILI_RATE_LIMIT_MS = "1";
+    process.env.BILIBILI_REQUEST_TIMEOUT_MS = "100000";
+    vi.resetModules();
+    const { throttledFetch } = await import("../src/bilibili/http.js");
+
+    const calls = Array.from({ length: 33 }, () =>
+      throttledFetch(async () => "ok"),
+    );
+    const settledPromise = Promise.allSettled(calls);
+    await vi.runAllTimersAsync();
+    const settled = await settledPromise;
+
+    expect(settled.slice(0, 32).every((item) => item.status === "fulfilled")).toBe(
+      true,
+    );
+    expect(settled[32]).toMatchObject({
+      status: "rejected",
+      reason: {
+        name: "ResourceLimitError",
+        resource: "http_operation_capacity",
+        limit: 32,
+      },
+    });
+  });
+
+  it("releases capacity when a queued caller cancels before dispatch", async () => {
+    process.env.BILIBILI_RATE_LIMIT_MS = "500";
+    process.env.BILIBILI_REQUEST_TIMEOUT_MS = "100000";
+    vi.resetModules();
+    const { throttledFetch } = await import("../src/bilibili/http.js");
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const secondController = new AbortController();
+    const secondCallback = vi.fn(async () => "second");
+    const thirdCallback = vi.fn(async () => "third");
+
+    const first = throttledFetch(async () => {
+      await firstGate;
+      return "first";
+    });
+    const second = throttledFetch(secondCallback, {
+      signal: secondController.signal,
+    });
+    secondController.abort();
+
+    await expect(second).rejects.toMatchObject({ name: "AbortError" });
+    expect(secondCallback).not.toHaveBeenCalled();
+    const third = throttledFetch(thirdCallback);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(third).resolves.toBe("third");
+    expect(thirdCallback).toHaveBeenCalledOnce();
+
+    releaseFirst();
+    await expect(first).resolves.toBe("first");
+  });
+
+  it("rejects admission past the caller deadline before invoking the callback", async () => {
+    process.env.BILIBILI_RATE_LIMIT_MS = "500";
+    process.env.BILIBILI_REQUEST_TIMEOUT_MS = "100000";
+    vi.resetModules();
+    const { throttledFetch } = await import("../src/bilibili/http.js");
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const callback = vi.fn(async () => "late");
+
+    const first = throttledFetch(async () => {
+      await firstGate;
+      return "first";
+    });
+    const late = throttledFetch(callback, {
+      deadlineAt: Date.now() + 100,
+    });
+
+    await expect(late).rejects.toMatchObject({
+      name: "ResourceLimitError",
+      resource: "http_admission_wait_ms",
+    });
+    expect(callback).not.toHaveBeenCalled();
+    releaseFirst();
+    await expect(first).resolves.toBe("first");
+  });
 });
 
 describe("checkLoginStatus", () => {
@@ -116,6 +209,31 @@ describe("checkLoginStatus", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe("Bilibili redirect policy", () => {
+  it("uses manual redirect mode and rejects a plain API redirect without a second request", async () => {
+    const { fetchWithoutWBI } = await import("../src/bilibili/http.js");
+    const fetchMock = vi.fn(async () =>
+      new Response(null, {
+        status: 302,
+        headers: { Location: "http://127.0.0.1/private" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const outcome = fetchWithoutWBI("/x/web-interface/nav").catch(
+      (error: unknown) => error,
+    );
+    await vi.runAllTimersAsync();
+
+    await expect(outcome).resolves.toMatchObject({
+      name: "NetworkError",
+      statusCode: 302,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ redirect: "manual" });
   });
 });
 

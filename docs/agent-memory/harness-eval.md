@@ -308,3 +308,64 @@ Remove or stop using:
 - One independent release verifier plus an explicit 11-file staged set was sufficient; the review-gated learning proposal stayed outside the commit and immutable tag.
 - The unchanged tag-triggered workflow passed 405 tests, build, trusted publication, provenance, remote tag dereference, and isolated exact-package CLI gates without repair.
 - Keep the current documentation-patch release sequence. The 360px Hero is an overview rather than a detail surface; adjacent Markdown and alt text preserve the complete workflow, so no extra mobile asset is justified unless users need the image itself to carry every label.
+
+### 2026-07-27 Harness Eval: ASR installation Phases 1 and 2
+
+- The two bounded phase contracts kept runtime installation, model choice, and future transcription separate; no audio or MCP fallback behavior entered the installer work.
+- The first implementation reports repeatedly drifted from the stable tree: stale README claims, old test counts, unchecked criteria, and an inaccurate test name survived until independent review. Re-running review only after the writer became idle prevented transient TypeScript and test failures from being accepted as final defects.
+- Keep: one Paseo implementation agent, pinned allowlists, fail-closed state tests, package/secret gates, and stable-tree independent review. Change: completion reports must be regenerated from the final command outputs and checked against task, PRD, QA, README, and project memory before claiming all findings are closed.
+- The project subagent attempt was useful for test-baseline review, but the risk-reviewer stall did not justify waiting indefinitely; independent Codex review covered the same bounded scope without spawning an autonomous implementation tree.
+
+### 2026-07-29 Harness Eval: ASR transcription fallback Phase 3
+
+- The full-thread handoff, scored PRD, task ticket, source research, and QA matrix kept a cross-network/subprocess/filesystem/MCP change within one explicit default-off tool option and excluded model download, SDK migration, Git, and release work.
+- The existing Paseo daemon was unavailable and could not be restarted without new authority. Direct Codex execution preserved the same file-backed contract; two unchanged Codex Security setup waits produced no submitted scan, so top-level bounded risk review supplied the required fallback without inventing an independent result.
+- The final review materially improved safety: it distinguished malformed DASH from valid empty audio, narrowed CDN hosts, canceled redirect bodies, guarded temp paths and cleanup, rejected custom ports/unsafe backups, tightened NDJSON, and found historical test-temp residue that ordinary assertions missed.
+- Keep: frozen phase artifacts, deterministic injection seams, exact focused/full/package/public-stdio gates, secret classification without printing values, and explicit live-model boundary. Change: after one repeated external setup failure, record capability unavailability and use the authorized local fallback instead of waiting again. Add temp-root before/after counts to future filesystem-heavy acceptance matrices.
+
+### 2026-07-30 Harness Eval: 38-finding security remediation
+
+- The original sealed Codex Security report supplied concrete source-to-sink
+  findings instead of a generic checklist. Converting all 38 IDs into one
+  ticket and one QA matrix prevented low-severity network, output, hook, and
+  installer issues from disappearing behind the four Medium items.
+- The user explicitly selected direct Codex execution. Keeping the same frozen
+  ticket, test gates, project memory, and Git/release exclusions made that
+  executor change safe; Paseo would have added delay without adding authority.
+- Shared enforcement points materially reduced review surface: one limits
+  module, operation-cancellation context, bounded response parser, bounded
+  stdio transport, and pinned HTTPS sink close multiple findings and make
+  boundary tests reusable.
+- The Desktop scan setup gate timed out without submission and cannot be
+  automated. The newly public official Codex Security CLI provided a
+  non-UI, same-vendor full-worktree scan path using stored credentials. The
+  first 0.1.3 run exposed a completion-order bug and produced no artifacts;
+  package 0.1.4 corrects the order to prepare, collect/validate, then complete.
+  Each CLI scan remains independent and must not be described as completing
+  the earlier Desktop scan ID.
+- The package and audit gates prevented two misleading conclusions. Compiled
+  `credentials.*` modules are expected runtime code, not packaged credential
+  files; conversely, the unreachable Hono sink still means the production
+  audit is nonzero and must remain a named residual.
+- Keep: original-scan ID binding, 38-row closure matrix, focused plus full
+  tests, built wire-level stdio acceptance, value-free secret classification,
+  pack inspection, and independent sealed re-scan before completion.
+- Change: when the native scan UI requires a human confirmation, tell the user
+  once and continue local work. If an official CLI is available and the user
+  selects it, validate with dry-run, use a fresh empty artifact directory,
+  place logs beside it, pin the intended CLI version, validate canonical
+  artifacts before acceptance, and preserve the existing Desktop workspace.
+- Remove: do not repeatedly reopen setup, create duplicate Desktop workspaces,
+  or treat an unsubmitted workspace as a running scan.
+
+Candidate metrics:
+
+- validated findings remediated locally: 38
+- Medium / Low: 4 / 34
+- focused security tests: 407
+- full tests: 721
+- hook tests: 14
+- package entries: 180
+- product-source implementation agents: 0
+- bounded Codex test/review subtasks: 3
+- generated learning proposals promoted: 0

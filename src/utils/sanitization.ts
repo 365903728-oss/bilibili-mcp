@@ -3,6 +3,8 @@
  * 提供输入字符过滤和清理功能
  */
 
+import { ValidationError } from "./errors.js";
+
 /**
  * 安全字符集：只允许字母、数字、常见符号
  */
@@ -19,7 +21,7 @@ export function sanitizeInput(input: string): string {
   
   // 验证安全字符集
   if (!SAFE_CHARACTERS.test(sanitized)) {
-    throw new Error('Input contains unsafe characters');
+    throw new ValidationError('Input contains unsafe characters');
   }
   
   return sanitized;

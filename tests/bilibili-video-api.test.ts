@@ -215,6 +215,97 @@ describe("getSubtitleContent", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("sanitizes subtitle lines while preserving CJK, emoji, tabs, and newlines", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        body: [
+          {
+            from: 0,
+            to: 1,
+            location: 2,
+            content:
+              "你好" +
+              String.fromCharCode(0x202e) +
+              "世界" +
+              String.fromCharCode(0x200b),
+          },
+          {
+            from: 1,
+            to: 2,
+            location: 2,
+            content:
+              "a" +
+              String.fromCharCode(0x0080) +
+              "b" +
+              String.fromCharCode(0x009f) +
+              "c",
+          },
+          {
+            from: 2,
+            to: 3,
+            location: 2,
+            content:
+              "tab" +
+              String.fromCharCode(0x09) +
+              "and" +
+              String.fromCharCode(0x0a) +
+              "emoji😀" +
+              String.fromCharCode(0x2066),
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getSubtitleContent(
+      "//aisubtitle.hdslb.com/subtitle.json",
+    );
+
+    expect(result.body[0].content).toBe("你好世界");
+    expect(result.body[1].content).toBe("abc");
+    expect(result.body[2].content).toBe(
+      "tab" +
+        String.fromCharCode(0x09) +
+        "and" +
+        String.fromCharCode(0x0a) +
+        "emoji😀",
+    );
+  });
+
+  it("sanitizes long subtitle lines without truncation", async () => {
+    const longLine = "中".repeat(3_000) + String.fromCharCode(0x202e);
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        body: [{ from: 0, to: 1, location: 2, content: longLine }],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getSubtitleContent(
+      "//aisubtitle.hdslb.com/subtitle.json",
+    );
+
+    expect(result.body[0].content).toBe("中".repeat(3_000));
+  });
+
+  it.each([
+    "https://aisubtitle.hdslb.com:8443/subtitle.json",
+    "//aisubtitle.hdslb.com:8443/subtitle.json",
+    "https://user:pass@aisubtitle.hdslb.com/subtitle.json",
+    "//user:pass@aisubtitle.hdslb.com/subtitle.json",
+  ])(
+    "rejects a subtitle URL with a custom port or userinfo before fetch: %s",
+    async (url) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(getSubtitleContent(url)).rejects.toThrow(
+        "Unsupported subtitle URL port or userinfo",
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("does not allow subtitle fetch redirects to bypass the host allowlist", async () => {
     const fetchMock = vi.fn(async () => new Response(null, {
       status: 302,

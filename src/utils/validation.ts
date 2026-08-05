@@ -3,6 +3,8 @@
  * 提供统一的输入验证功能
  */
 
+import { ValidationError } from "./errors.js";
+
 export interface ValidationOptions {
   maxLength?: number;
   minLength?: number;
@@ -19,16 +21,16 @@ export function validateLength(
   const { maxLength = 256, minLength = 1, required = true } = options;
   
   if (required && !input) {
-    throw new Error('Input is required');
+    throw new ValidationError('Input is required');
   }
   
   if (input) {
     if (input.length < minLength) {
-      throw new Error(`Input must be at least ${minLength} characters long`);
+      throw new ValidationError(`Input must be at least ${minLength} characters long`);
     }
     
     if (input.length > maxLength) {
-      throw new Error(`Input must not exceed ${maxLength} characters`);
+      throw new ValidationError(`Input must not exceed ${maxLength} characters`);
     }
   }
 }
@@ -36,7 +38,11 @@ export function validateLength(
 /**
  * 验证BV号或URL输入
  */
-export function validateBVInput(input: string): void {
+export function validateBVInput(input: unknown): void {
+  if (typeof input !== "string") {
+    throw new ValidationError("bvid_or_url must be a string");
+  }
+
   validateLength(input, {
     maxLength: 256,
     minLength: 1,
@@ -45,7 +51,7 @@ export function validateBVInput(input: string): void {
   
   // 基本格式验证
   if (!input.includes('BV') && !input.includes('bilibili.com') && !input.includes('b23.tv')) {
-    throw new Error('Input must contain BV ID or Bilibili URL');
+    throw new ValidationError('Input must contain BV ID or Bilibili URL');
   }
 }
 
@@ -62,7 +68,7 @@ export function validateLanguage(lang?: string): void {
     
     // 语言代码格式验证
     if (!/^[a-z]{2}(-[A-Za-z]{2,})?$/.test(lang)) {
-      throw new Error('Invalid language code format');
+      throw new ValidationError('Invalid language code format');
     }
   }
 }
@@ -72,7 +78,7 @@ export function validateLanguage(lang?: string): void {
  */
 export function validateDetailLevel(level?: string): void {
   if (level && !['brief', 'detailed'].includes(level)) {
-    throw new Error('Invalid detail level: must be "brief" or "detailed"');
+    throw new ValidationError('Invalid detail level: must be "brief" or "detailed"');
   }
 }
 
@@ -83,11 +89,11 @@ export function validateCommentLimit(limit?: number): void {
   if (limit === undefined) return;
 
   if (typeof limit !== "number" || !Number.isInteger(limit)) {
-    throw new Error("Comment limit must be an integer between 1 and 50");
+    throw new ValidationError("Comment limit must be an integer between 1 and 50");
   }
 
   if (limit < 1 || limit > 50) {
-    throw new Error("Comment limit must be between 1 and 50");
+    throw new ValidationError("Comment limit must be between 1 and 50");
   }
 }
 
@@ -98,7 +104,7 @@ export function validateCommentSort(sort?: string): void {
   if (sort === undefined) return;
 
   if (!["hot", "time"].includes(sort)) {
-    throw new Error('Invalid comment sort: must be "hot" or "time"');
+    throw new ValidationError('Invalid comment sort: must be "hot" or "time"');
   }
 }
 
@@ -109,7 +115,7 @@ export function validatePage(page: unknown): void {
   if (page === undefined) return;
 
   if (typeof page !== "number" || !Number.isInteger(page) || page < 1) {
-    throw new Error("page must be a positive integer");
+    throw new ValidationError("page must be a positive integer");
   }
 }
 
@@ -122,13 +128,13 @@ export function validateTimestampRange(
 ): void {
   if (startSeconds !== undefined) {
     if (typeof startSeconds !== "number" || !isFinite(startSeconds) || startSeconds < 0) {
-      throw new Error("start_seconds must be a finite non-negative number");
+      throw new ValidationError("start_seconds must be a finite non-negative number");
     }
   }
 
   if (endSeconds !== undefined) {
     if (typeof endSeconds !== "number" || !isFinite(endSeconds) || endSeconds < 0) {
-      throw new Error("end_seconds must be a finite non-negative number");
+      throw new ValidationError("end_seconds must be a finite non-negative number");
     }
   }
 
@@ -137,7 +143,7 @@ export function validateTimestampRange(
     endSeconds !== undefined &&
     endSeconds < startSeconds
   ) {
-    throw new Error("end_seconds must be >= start_seconds");
+    throw new ValidationError("end_seconds must be >= start_seconds");
   }
 }
 
@@ -146,7 +152,7 @@ export function validateTimestampRange(
  */
 export function validateBoolean(value: unknown, name: string): void {
   if (value !== undefined && typeof value !== "boolean") {
-    throw new Error(`${name} must be a boolean`);
+    throw new ValidationError(`${name} must be a boolean`);
   }
 }
 
@@ -156,14 +162,14 @@ export function validateBoolean(value: unknown, name: string): void {
 export function validateQuery(query: unknown): void {
   if (query === undefined) return;
   if (typeof query !== "string") {
-    throw new Error("query must be a string");
+    throw new ValidationError("query must be a string");
   }
   const trimmed = query.trim();
   if (trimmed.length === 0) {
-    throw new Error("query must not be empty");
+    throw new ValidationError("query must not be empty");
   }
   if (trimmed.length > 100) {
-    throw new Error("query must not exceed 100 characters");
+    throw new ValidationError("query must not exceed 100 characters");
   }
 }
 
@@ -173,10 +179,10 @@ export function validateQuery(query: unknown): void {
 export function validateSearchLimit(value: unknown): void {
   if (value === undefined) return;
   if (typeof value !== "number" || !Number.isInteger(value)) {
-    throw new Error("limit must be an integer between 1 and 10");
+    throw new ValidationError("limit must be an integer between 1 and 10");
   }
   if (value < 1 || value > 10) {
-    throw new Error("limit must be between 1 and 10");
+    throw new ValidationError("limit must be between 1 and 10");
   }
 }
 
@@ -186,10 +192,10 @@ export function validateSearchLimit(value: unknown): void {
 export function validateMaxMatches(value: unknown): void {
   if (value === undefined) return;
   if (typeof value !== "number" || !Number.isInteger(value)) {
-    throw new Error("max_matches must be an integer between 1 and 20");
+    throw new ValidationError("max_matches must be an integer between 1 and 20");
   }
   if (value < 1 || value > 20) {
-    throw new Error("max_matches must be between 1 and 20");
+    throw new ValidationError("max_matches must be between 1 and 20");
   }
 }
 
@@ -199,10 +205,10 @@ export function validateMaxMatches(value: unknown): void {
 export function validateContextSegments(value: unknown): void {
   if (value === undefined) return;
   if (typeof value !== "number" || !Number.isInteger(value)) {
-    throw new Error("context_segments must be an integer between 0 and 5");
+    throw new ValidationError("context_segments must be an integer between 0 and 5");
   }
   if (value < 0 || value > 5) {
-    throw new Error("context_segments must be between 0 and 5");
+    throw new ValidationError("context_segments must be between 0 and 5");
   }
 }
 
@@ -214,12 +220,12 @@ export function validateContextSegments(value: unknown): void {
 export function validateFavoritesCursor(cursor: unknown): void {
   if (cursor === undefined) return;
   if (typeof cursor !== "string") {
-    throw new Error("cursor must be a string");
+    throw new ValidationError("cursor must be a string");
   }
   if (cursor.length < 1 || cursor.length > 256) {
-    throw new Error("cursor length must be between 1 and 256");
+    throw new ValidationError("cursor length must be between 1 and 256");
   }
   if (!/^[A-Za-z0-9_-]+$/.test(cursor)) {
-    throw new Error("cursor must contain only base64url characters");
+    throw new ValidationError("cursor must contain only base64url characters");
   }
 }

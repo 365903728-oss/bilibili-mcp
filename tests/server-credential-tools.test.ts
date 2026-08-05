@@ -102,12 +102,12 @@ describe("package update MCP tool", () => {
   it("returns safe @latest update guidance", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        statusText: "OK",
-        json: async () => ({ version: "9.9.9" }),
-      })),
+      vi.fn(async () =>
+        new Response(JSON.stringify({ version: "9.9.9" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
     );
 
     const response = await callTool("check_mcp_update");

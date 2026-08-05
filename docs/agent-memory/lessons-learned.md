@@ -169,3 +169,73 @@
 - Lesson: Debug logging can expose private identifiers even when credentials are correctly redacted.
 - Evidence: Shared HTTP debug output would have printed `up_mid`, `media_id`, and `folder_id` in params or URLs during Favorites traversal.
 - Future behavior: Treat account and private-container identifiers as sensitive in structured fields and query strings, and add redaction regressions whenever a new authenticated endpoint introduces identifier parameters.
+
+- Lesson: A README can explain the product correctly while still failing first-run installation comprehension.
+- Evidence: Persona walkthroughs found that the initial redesign linked to a long client guide but did not give Agents a complete safe prompt, did not show people how to locate the three browser Cookie fields, and could be read as asking users to run an MCP tool name in a shell.
+- Future behavior: Validate onboarding separately as an Agent journey and a human journey. Each must reach live MCP login verification without inferred steps, distinguish shell commands from MCP tool calls, keep Cookie values out of chat and client configuration, and include explicit recovery branches.
+
+- Lesson: A strong feature workflow is not automatically the right project introduction.
+- Evidence: Putting the Favorites-to-evidence workflow in the Hero and before the basic feature list made the package look like a single-purpose Favorites tool, while the actual surface also covers search, transcripts, metadata, Parts, Chapters, and comments.
+- Future behavior: Introduce the full user-visible capability boundary first, then use the strongest workflows as prominent proof. Keep workflow-specific visuals beside their matching examples.
+
+- Lesson: Product outcomes and installation mechanics need separate layers in a README.
+- Evidence: A rewrite still felt unclear when local configuration was presented as a core feature, Node.js was hidden inside collapsed manual instructions, and the quick start compressed registration, setup, reconnection, and live verification into one paragraph.
+- Future behavior: Present user outcomes first; show prerequisites before commands; use a short numbered install path before Agent/manual detail; reserve exact tool names and protocol fields for the reference and configuration sections.
+
+- Lesson: Subprocess environment tests must never inherit the real agent process environment.
+- Evidence: An early ASR test asserted against a real environment object, and its failure output expanded unrelated external credential values into local agent logs even though the repository and package remained clean.
+- Future behavior: Build child environments from synthetic fixtures in tests, filter sensitive keys again at the actual execution boundary, and never include full environment objects in assertion diagnostics.
+
+- Lesson: Fallback systems need a typed distinction between confirmed absence and malformed upstream data.
+- Evidence: Phase 3 risk review found that a missing DASH object could initially look like a valid empty audio set, which would have hidden an upstream response defect; the parser now accepts only an explicit empty `dash.audio` array as the no-audio condition.
+- Future behavior: Before adding any fallback, enumerate the exact absence states and make every transport, schema, auth, and parse failure fail closed.
+
+- Lesson: A host allowlist should name the provider-owned surface actually required, not a broader shared infrastructure domain.
+- Evidence: Phase 3 review narrowed audio retrieval from generic/shared CDN suffixes to Bilibili-specific `bilivideo.com` and `bilivideo.cn`, while redirect tests revalidate every hop.
+- Future behavior: Keep signed-resource allowlists provider-specific, reject custom ports/userinfo, and test unsafe primary and backup candidates independently.
+
+- Lesson: Passing temp-file tests can still leave harness residue when fixture cleanup removes files but not their containing directories.
+- Evidence: The final Phase 3 audit found 119 historical project-prefixed test directories. Adding suite-level directory cleanup, removing only validated direct children of the OS temp root, and rerunning 126 ASR tests produced zero residue.
+- Future behavior: Treat before/after temp-root residue counts as an acceptance gate for filesystem-heavy test suites, not just runtime `finally` assertions.
+
+## 2026-07-30
+
+- Lesson: Item-count limits do not contain serialized-byte amplification.
+- Evidence: Overlapping transcript context, long upstream strings, nested
+  replies, and two-copy MCP text/structured output could stay within row counts
+  while still producing multi-megabyte allocations.
+- Future behavior: Bound exact UTF-8 serialization at the final response/cache
+  boundary in addition to validating collections and individual fields.
+
+- Lesson: Cancellation semantics differ for per-request work and shared
+  single-flight work.
+- Evidence: Propagating one MCP signal directly into a shared fingerprint, WBI,
+  or update refresh would let one waiter abort every other caller; ignoring the
+  signal for ASR would leave download and native child resources running.
+- Future behavior: Link cancellation through per-request operation context,
+  isolate shared-refresh lifetime from individual waiters, bound waiter counts,
+  and test both cases together.
+
+- Lesson: A provider hostname allowlist is not a complete SSRF control.
+- Evidence: An allowlisted playback hostname could resolve to private, special,
+  empty, or mixed address sets, or change between validation and connection.
+- Future behavior: Validate every resolved address, reject mixed answers, pin an
+  approved address in the connection lookup, preserve the original TLS
+  hostname, and strip credentials again at the final network sink.
+
+- Lesson: Redacting arbitrary failed-command text after capture is weaker than
+  refusing to persist it.
+- Evidence: Hook state previously retained representation-dependent command and
+  diagnostic text that later crossed into generated proposals and SessionStart
+  context.
+- Future behavior: Store fixed enums, bounded IDs, counts, and booleans only;
+  cap hook input/state structurally; keep learning proposals review-gated; and
+  never preview raw candidate text into startup context.
+
+- Lesson: A security scan's output directory and its process logs are separate
+  trust and lifecycle surfaces.
+- Evidence: The official CLI correctly refused a first launch when redirected
+  log files made the requested output directory nonempty.
+- Future behavior: Give every scan a fresh empty artifact directory, place
+  stdout/stderr logs in a sibling path, and never delete or overwrite an
+  existing scan merely to retry startup.

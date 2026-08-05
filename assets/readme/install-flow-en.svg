@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1400" height="440" viewBox="0 0 1400 440"
+     role="img" aria-labelledby="if-title if-desc">
+  <title id="if-title">Bilibili MCP Installation Flow (shared by manual and Agent installs)</title>
+  <desc id="if-desc">Five shared phases: prepare the runtime, connect the server, take credential fields from your browser and store them locally via setup, reconnect and verify the login, then succeed on the first real call.</desc>
+
+  <rect width="1400" height="440" rx="24" fill="#faf7f8"/>
+
+  <!-- connecting lines (card vertical center y=205) -->
+  <line x1="289" y1="205" x2="309" y2="205" stroke="#c9879d" stroke-width="3"/>
+  <line x1="519" y1="205" x2="539" y2="205" stroke="#c9879d" stroke-width="3"/>
+  <line x1="859" y1="205" x2="879" y2="205" stroke="#c9879d" stroke-width="3"/>
+  <line x1="1099" y1="205" x2="1117" y2="205" stroke="#2e9e6b" stroke-width="3"/>
+
+  <!-- preparation bracket (phases 1-2) -->
+  <path d="M55 72 V62 H519 V72" fill="none" stroke="#c9b6bd" stroke-width="2"/>
+  <text x="287" y="52" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#a08a92">Preparation</text>
+
+  <!-- Phase 1: runtime (card center x=170) -->
+  <g id="phase-1">
+    <rect x="55" y="90" width="230" height="230" rx="16" fill="#ffffff" stroke="#e8dde1"/>
+    <circle cx="95" cy="128" r="17" fill="#fb7299"/>
+    <text x="95" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">1</text>
+    <text x="121" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#2b2b33">Runtime</text>
+    <rect x="110" y="160" width="120" height="66" rx="10" fill="#f6e9ee"/>
+    <text x="163" y="199" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="16" font-weight="700" fill="#d6336c">&gt;_</text>
+    <circle cx="226" cy="222" r="9" fill="#ffffff" stroke="#2e9e6b" stroke-width="2.5"/>
+    <path d="M221.5 222 l3.5 3.5 l6.5 -7.5" fill="none" stroke="#2e9e6b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="170" y="272" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#8a8f98">Node.js 20+</text>
+  </g>
+
+  <!-- Phase 2: connect (card center x=415) -->
+  <g id="phase-2">
+    <rect x="315" y="90" width="200" height="230" rx="16" fill="#ffffff" stroke="#e8dde1"/>
+    <circle cx="351" cy="128" r="17" fill="#fb7299"/>
+    <text x="351" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">2</text>
+    <text x="377" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#2b2b33">Connect</text>
+    <rect x="345" y="160" width="140" height="66" rx="10" fill="#eef6fd"/>
+    <text x="415" y="187" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="13" fill="#0b7285">"command": "npx"</text>
+    <text x="415" y="209" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="13" fill="#0b7285">"@xzxzzx/…"</text>
+    <text x="415" y="272" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#8a8f98">register in MCP client</text>
+  </g>
+
+  <!-- Phase 3: credentials (visual focus, card center x=700, icon band center y=193) -->
+  <g id="phase-3">
+    <rect x="545" y="90" width="310" height="230" rx="16" fill="#ffffff" stroke="#fb7299" stroke-width="2"/>
+    <circle cx="583" cy="128" r="17" fill="#fb7299"/>
+    <text x="583" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">3</text>
+    <text x="609" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#2b2b33">Credentials</text>
+
+    <!-- browser (logged into Bilibili) -->
+    <rect x="571" y="171" width="54" height="44" rx="8" fill="#eef6fd" stroke="#bcd7ee"/>
+    <circle cx="580" cy="180" r="2" fill="#9db8d2"/>
+    <circle cx="587" cy="180" r="2" fill="#9db8d2"/>
+    <rect x="578" y="189" width="38" height="6" rx="3" fill="#74c0fc" opacity="0.7"/>
+    <rect x="578" y="200" width="26" height="6" rx="3" fill="#74c0fc" opacity="0.45"/>
+
+    <path d="M633 193 h18 m-6 -5 l6 5 l-6 5" fill="none" stroke="#c9879d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- three credential fields -->
+    <rect x="659" y="175" width="42" height="8" rx="3" fill="#fb7299" opacity="0.9"/>
+    <rect x="659" y="189" width="42" height="8" rx="3" fill="#fb7299" opacity="0.6"/>
+    <rect x="659" y="203" width="42" height="8" rx="3" fill="#fb7299" opacity="0.35"/>
+
+    <path d="M709 193 h18 m-6 -5 l6 5 l-6 5" fill="none" stroke="#c9879d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- terminal setup -->
+    <rect x="735" y="171" width="54" height="44" rx="8" fill="#f6e9ee" stroke="#eec3d2"/>
+    <text x="762" y="199" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="15" font-weight="700" fill="#d6336c">&gt;_</text>
+
+    <path d="M797 193 h8" fill="none" stroke="#c9879d" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- stored locally only -->
+    <circle cx="823" cy="193" r="15" fill="#ffffff" stroke="#0b7285" stroke-width="2.5"/>
+    <text x="823" y="199" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#0b7285">🔒</text>
+
+    <text x="700" y="272" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#8a8f98">fields from browser → setup → stored locally</text>
+  </g>
+
+  <!-- Phase 4: verify (card center x=990) -->
+  <g id="phase-4">
+    <rect x="885" y="90" width="210" height="230" rx="16" fill="#ffffff" stroke="#e8dde1"/>
+    <circle cx="921" cy="128" r="17" fill="#fb7299"/>
+    <text x="921" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">4</text>
+    <text x="947" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#2b2b33">Verify</text>
+    <path d="M1006 196 a16 16 0 1 1 -4 -21" fill="none" stroke="#fb7299" stroke-width="3" stroke-linecap="round"/>
+    <path d="M994 168 l11 3.5 l-4.5 10 z" fill="#fb7299"/>
+    <text x="990" y="272" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#8a8f98">reconnect client</text>
+    <rect x="915" y="286" width="150" height="26" rx="8" fill="#eef6fd"/>
+    <text x="990" y="303" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="13" fill="#0b7285">logged_in: true</text>
+  </g>
+
+  <!-- Phase 5: success (card center x=1235) -->
+  <g id="phase-5">
+    <rect x="1125" y="90" width="220" height="230" rx="16" fill="#ffffff" stroke="#2e9e6b" stroke-width="2"/>
+    <circle cx="1161" cy="128" r="17" fill="#2e9e6b"/>
+    <text x="1161" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">5</text>
+    <text x="1187" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#2b2b33">Success</text>
+    <circle cx="1235" cy="193" r="26" fill="#e6f4ec" stroke="#2e9e6b" stroke-width="3"/>
+    <path d="M1223 193 l9 9 l16 -18" fill="none" stroke="#2e9e6b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="1175" y="233" width="120" height="24" rx="6" fill="#eef6fd"/>
+    <rect x="1185" y="241" width="60" height="8" rx="3" fill="#74c0fc"/>
+    <text x="1235" y="292" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#8a8f98">first call succeeds</text>
+  </g>
+
+  <!-- footer note -->
+  <text x="700" y="385" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#8a8f98">Cookie is entered only in your local terminal · never through the Agent or client config</text>
+</svg>

@@ -1,5 +1,9 @@
 import { credentialManager } from "../utils/credentials.js";
-import { BilibiliAPIError, ValidationError } from "../utils/errors.js";
+import {
+  BilibiliAPIError,
+  ResourceLimitError,
+  ValidationError,
+} from "../utils/errors.js";
 import { isValidBVId } from "../utils/bvid.js";
 import type {
   FavoriteFolder,
@@ -7,6 +11,10 @@ import type {
   FavoriteVideoPage,
 } from "./types.js";
 import { fetchWithoutWBI } from "./http.js";
+import {
+  boundedRemoteText,
+  boundedRemoteTextPreservingWhitespace,
+} from "../utils/bounded-text.js";
 
 const NAV_PATH = "/x/web-interface/nav";
 const FOLDERS_PATH = "/x/v3/fav/folder/created/list-all";
@@ -14,6 +22,10 @@ const RESOURCES_PATH = "/x/v3/fav/resource/list";
 const PAGE_SIZE = 20;
 const CURSOR_VERSION = 1;
 const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+export const MAX_FAVORITE_FOLDERS = 100;
+export const MAX_FAVORITE_FOLDER_TITLE_BYTES = 256;
+export const MAX_FAVORITE_VIDEO_TITLE_BYTES = 512;
+export const MAX_FAVORITE_AUTHOR_BYTES = 128;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -51,8 +63,8 @@ function toIsoFromUnixSeconds(value: unknown): string {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
 
-function cleanText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+function cleanText(value: unknown, maxCharacters: number): string {
+  return boundedRemoteText(value, maxCharacters);
 }
 
 function base64urlEncode(value: string): string {
@@ -157,6 +169,16 @@ function normalizeFolder(
   if (!isRecord(row)) return undefined;
   if (!isPositiveSafeInteger(row.id)) return undefined;
   if (typeof row.title !== "string") return undefined;
+  if (
+    Buffer.byteLength(row.title, "utf8") >
+    MAX_FAVORITE_FOLDER_TITLE_BYTES
+  ) {
+    throw new ResourceLimitError(
+      "Favorite folder title exceeded its byte limit",
+      "favorite_folder_title",
+      MAX_FAVORITE_FOLDER_TITLE_BYTES,
+    );
+  }
   const mediaCount = toNonNegativeInteger(row.media_count);
   if (mediaCount === undefined) return undefined;
   if (row.mid !== undefined && row.mid !== authenticatedMid) {
@@ -164,7 +186,10 @@ function normalizeFolder(
   }
   return {
     id: row.id,
-    title: row.title,
+    title: boundedRemoteTextPreservingWhitespace(
+      row.title,
+      MAX_FAVORITE_FOLDER_TITLE_BYTES,
+    ),
     media_count: mediaCount,
   };
 }
@@ -174,6 +199,13 @@ function normalizeFolderList(
   authenticatedMid: number,
 ): FavoriteFolder[] {
   if (!isRecord(data) || !Array.isArray(data.list)) return [];
+  if (data.list.length > MAX_FAVORITE_FOLDERS) {
+    throw new ResourceLimitError(
+      "Favorite folder list exceeded its item limit",
+      "favorite_folder_count",
+      MAX_FAVORITE_FOLDERS,
+    );
+  }
   const folders: FavoriteFolder[] = [];
   for (const row of data.list) {
     const folder = normalizeFolder(row, authenticatedMid);
@@ -193,11 +225,29 @@ function normalizeVideo(row: unknown): FavoriteVideo | undefined {
         : undefined;
   if (!bvid) return undefined;
 
-  const title = cleanText(row.title);
+  if (typeof row.title !== "string") return undefined;
+  if (Buffer.byteLength(row.title, "utf8") > MAX_FAVORITE_VIDEO_TITLE_BYTES) {
+    throw new ResourceLimitError(
+      "Favorite video title exceeded its byte limit",
+      "favorite_video_title",
+      MAX_FAVORITE_VIDEO_TITLE_BYTES,
+    );
+  }
+  const title = cleanText(row.title, MAX_FAVORITE_VIDEO_TITLE_BYTES);
   if (!title) return undefined;
 
   const upper = isRecord(row.upper) ? row.upper : undefined;
-  const author = cleanText(upper?.name);
+  if (
+    typeof upper?.name === "string" &&
+    Buffer.byteLength(upper.name, "utf8") > MAX_FAVORITE_AUTHOR_BYTES
+  ) {
+    throw new ResourceLimitError(
+      "Favorite video author exceeded its byte limit",
+      "favorite_video_author",
+      MAX_FAVORITE_AUTHOR_BYTES,
+    );
+  }
+  const author = cleanText(upper?.name, MAX_FAVORITE_AUTHOR_BYTES);
   const duration = toNonNegativeInteger(row.duration) ?? 0;
 
   return {
@@ -226,6 +276,13 @@ function normalizeVideoPage(data: unknown): NormalizedResourcePage {
       skippedCount: 0,
       isEmptyPage: true,
     };
+  }
+  if (data.medias.length > PAGE_SIZE) {
+    throw new ResourceLimitError(
+      "Favorite video page exceeded its item limit",
+      "favorite_video_page_items",
+      PAGE_SIZE,
+    );
   }
   const videos: FavoriteVideo[] = [];
   let skippedCount = 0;

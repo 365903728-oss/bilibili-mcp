@@ -8,6 +8,39 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.11.0] - 2026-08-05
+
+### Added
+- Added `setup` command: interactive credential setup that auto-guides when unconfigured and shows current state when already configured. Offers optional ASR model installation after credential setup (defaults to No).
+- Added `doctor` command and `doctor --json`: purely local status check (package info, runtime, credential loadability, ASR status) with no network requests. `--json` emits machine-readable output for Agents.
+- Added optional ASR model installation: default-off, offers three model choices (tiny 78 MB / base 148 MB / small 486 MB) with Enter defaulting to recommended small. Installs into a user-managed `~/.bilibili-mcp/asr/` directory, verified via CPU INT8 load.
+- Added explicit `fallback_to_asr` to `get_video_transcript` (default `false`). Native subtitles always win; only confirmed subtitle absence retrieves temporary audio for one resolved Part and transcribes it with the ready project-managed faster-whisper model. ASR returns `data_source: "asr"` and reuses timestamps, ranges, keyword/context search, and evidence links.
+
+### Fixed
+- Fixed duplicated `[command]` placeholder in CLI help output; unified to a single Commander dispatch path.
+- Fixed internal validation-error disclosure for non-string video input and tightened subtitle URL host, port, and userinfo validation.
+
+### Changed
+- Updated recommended setup commands in documentation from `config` to `setup` (`config` remains available for forced reconfiguration).
+- Raised package Node.js engine minimum to `>=20.0.0`.
+- Upgraded the MCP TypeScript SDK compatibly to `1.30.0` and refreshed the lockfile to a production dependency set with no known advisories.
+
+### Security
+- ASR accepts only Bilibili-specific HTTPS CDN hosts and revalidates up to three redirects. Cookies go only to the playback API, never the CDN or Python child; signed playback URLs are excluded from results, errors, and logs.
+- ASR uses a unique OS temp directory, hard 128 MiB / two-hour / 30-minute / 2 MiB / 10,000-segment bounds, one active job with no queue, an isolated child environment, strict NDJSON, and cleanup after success, failure, or timeout.
+- Added shared size, time, count, and concurrency budgets across stdio, MCP responses, Bilibili HTTP, caches, logs, playback audio, and ASR. Playback downloads validate public DNS answers, pin the connection, and strip credentials on every hop.
+- Sanitized control, bidirectional override, zero-width, and unpaired-surrogate content from Bilibili. ASR state uses owner-only directories, unpredictable exclusive temporary files, atomic replacement, and rejects symlinks or incorrect path types.
+
+### Documentation
+- Rewrote both READMEs with visible prerequisites, scannable install steps, and product-outcome feature groups. Corrected `skipped_count` to count only video entries; corrected comment ordering to prioritize timestamp-bearing and higher-liked comments. Chinese copy uses natural terms throughout; BVID explained at first use.
+- Added a text-free project overview Hero showing video discovery flowing through the local MCP server into transcript search, chapters, comments, and Favorites. Existing install-flow and Favorites-pagination illustrations remain scoped to their own sections.
+
+### Verified
+- ASR Phase 3 passes the TypeScript build, 10 focused files / 356 tests, 29 files / 629 full tests, a 156-file package dry run, public stdio initialize/list/call, scoped secret scanning, and zero post-test temp residue. No ready local model existed, so no model was downloaded and no live ASR transcription was run.
+- Final security regression passes the TypeScript build, 39 files / 803 tests, 95 focused stdio/tool/handler tests, a 180-file package dry run, zero `npm audit --omit=dev` vulnerabilities, value-free secret classification, and zero ASR state temporary-file residue.
+
+---
+
 ## [1.10.1] - 2026-07-27
 
 ### Documentation

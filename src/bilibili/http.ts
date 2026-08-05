@@ -5,34 +5,85 @@ import {
   CommentsDisabledError,
   NetworkError,
   PaidVideoError,
+  ResourceLimitError,
   TimeoutError,
 } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { withRetry } from "../utils/retry.js";
 import { credentialManager } from "../utils/credentials.js";
 import { generateWBISign, getWBI } from "./wbi.js";
+import { SECURITY_LIMITS } from "../security/limits.js";
+import {
+  abortableDelay,
+  createAbortError,
+  getOperationSignal,
+  linkAbortSignal,
+  throwIfAborted,
+} from "../security/operation-context.js";
+import { parseBoundedJsonResponse } from "../utils/bounded-response.js";
 
 const BASE_URL = config.baseUrl;
 
 // 请求限流 - 避免高频请求被 Bilibili 限制
 const RATE_LIMIT_MS = config.rateLimitMs;
 const REQUEST_TIMEOUT_MS = config.requestTimeoutMs;
-let lastRequestTime = 0;
-let admissionChain: Promise<void> = Promise.resolve();
+let lastRequestTime: number | null = null;
+let pendingAdmissions = 0;
+let activeAndQueuedOperations = 0;
 
-/**
- * 等待到下一个允许请求的时间
- */
-async function waitForRateLimit(): Promise<void> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
+export interface HttpOperationContext {
+  signal?: AbortSignal;
+  deadlineAt: number;
+}
 
-  if (timeSinceLastRequest < RATE_LIMIT_MS) {
-    const waitTime = RATE_LIMIT_MS - timeSinceLastRequest;
-    await new Promise<void>((resolve) => setTimeout(resolve, waitTime));
+async function reserveAdmission(
+  deadlineAt: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  throwIfAborted(signal);
+  if (pendingAdmissions >= SECURITY_LIMITS.httpAdmissionQueue) {
+    throw new ResourceLimitError(
+      "Bilibili request admission queue is full",
+      "http_admission_queue",
+      SECURITY_LIMITS.httpAdmissionQueue,
+    );
   }
 
-  lastRequestTime = Date.now();
+  const now = Date.now();
+  const scheduledAt =
+    lastRequestTime === null
+      ? now
+      : Math.max(now, lastRequestTime + RATE_LIMIT_MS);
+  const waitMs = scheduledAt - now;
+  const maxWaitMs = Math.min(
+    Math.max(0, deadlineAt - now),
+    SECURITY_LIMITS.httpAdmissionWaitMs,
+  );
+
+  if (waitMs > maxWaitMs) {
+    throw new ResourceLimitError(
+      "Bilibili request admission deadline exceeded",
+      "http_admission_wait_ms",
+      maxWaitMs,
+    );
+  }
+
+  lastRequestTime = scheduledAt;
+  pendingAdmissions += 1;
+  try {
+    if (waitMs > 0) {
+      await abortableDelay(waitMs, signal);
+    }
+    throwIfAborted(signal);
+    if (Date.now() >= deadlineAt) {
+      throw new TimeoutError(
+        `Request timeout: ${REQUEST_TIMEOUT_MS}ms`,
+        REQUEST_TIMEOUT_MS,
+      );
+    }
+  } finally {
+    pendingAdmissions -= 1;
+  }
 }
 
 /**
@@ -40,28 +91,64 @@ async function waitForRateLimit(): Promise<void> {
  */
 export async function throttledFetch<T>(
   fetchFn: (controller: AbortController) => Promise<T>,
+  options: {
+    signal?: AbortSignal;
+    deadlineAt?: number;
+  } = {},
 ): Promise<T> {
-  const previousTurn = admissionChain;
-  const myTurn = previousTurn.then(() => waitForRateLimit());
-  admissionChain = myTurn.catch(() => {});
-  await previousTurn;
-
-  // 创建 AbortController 用于超时控制
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    logger.error(
-      `Request timeout after ${REQUEST_TIMEOUT_MS}ms`,
-      {},
-      { type: "request-timeout" },
+  const signal = getOperationSignal(options.signal);
+  throwIfAborted(signal);
+  if (
+    activeAndQueuedOperations >= SECURITY_LIMITS.httpConcurrentOperations
+  ) {
+    throw new ResourceLimitError(
+      "Bilibili request capacity is full",
+      "http_operation_capacity",
+      SECURITY_LIMITS.httpConcurrentOperations,
     );
-  }, REQUEST_TIMEOUT_MS);
+  }
+  activeAndQueuedOperations += 1;
+  const deadlineAt = options.deadlineAt ??
+    (Date.now() + REQUEST_TIMEOUT_MS);
+
+  let controller: AbortController | undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let unlinkAbort = () => {};
+  let timedOut = false;
 
   try {
-    await myTurn;
+    await reserveAdmission(deadlineAt, signal);
+    throwIfAborted(signal);
+    const remainingMs = deadlineAt - Date.now();
+    if (remainingMs <= 0) {
+      throw new TimeoutError(
+        `Request timeout: ${REQUEST_TIMEOUT_MS}ms`,
+        REQUEST_TIMEOUT_MS,
+      );
+    }
+
+    // 创建 AbortController 用于总操作截止时间控制
+    controller = new AbortController();
+    unlinkAbort = linkAbortSignal(signal, controller);
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller?.abort();
+      logger.error(
+        `Request timeout after ${REQUEST_TIMEOUT_MS}ms`,
+        {},
+        { type: "request-timeout" },
+      );
+    }, remainingMs);
     return await fetchFn(controller);
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (signal?.aborted) {
+      throw createAbortError();
+    }
+    if (
+      timedOut &&
+      error instanceof Error &&
+      error.name === "AbortError"
+    ) {
       throw new TimeoutError(
         `Request timeout: ${REQUEST_TIMEOUT_MS}ms`,
         REQUEST_TIMEOUT_MS,
@@ -72,22 +159,34 @@ export async function throttledFetch<T>(
     }
     throw error;
   } finally {
-    clearTimeout(timeoutId);
-    controller.abort(); // 确保 AbortController 被清理
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    unlinkAbort();
+    controller?.abort(); // 确保 AbortController 被清理
+    activeAndQueuedOperations -= 1;
   }
 }
 
 /**
  * 带重试机制的请求包装器
  */
-export async function retryableFetch<T>(fetchFn: () => Promise<T>): Promise<T> {
-  return withRetry(() => fetchFn(), {
+export async function retryableFetch<T>(
+  fetchFn: (context: HttpOperationContext) => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  const operationSignal = getOperationSignal(signal);
+  const deadlineAt = Date.now() + REQUEST_TIMEOUT_MS;
+  return withRetry(
+    () => fetchFn({ signal: operationSignal, deadlineAt }),
+    {
     maxRetries: 3,
     baseDelay: 1000,
     maxDelay: 10000,
     retryableStatusCodes: [408, 429, 500, 502, 503, 504],
-    retryableErrorTypes: ["NetworkError", "TimeoutError", "AbortError"],
-  });
+    retryableErrorTypes: ["NetworkError", "TimeoutError"],
+    signal: operationSignal,
+    deadlineAt,
+    },
+  );
 }
 
 /**
@@ -107,21 +206,26 @@ export async function fetchWithWBI(
   path: string,
   params: Record<string, string | number>,
   additionalHeaders: Record<string, string> = {},
+  signal?: AbortSignal,
 ): Promise<unknown> {
-  return retryableFetch(async () => {
+  const baseParams = { ...params };
+  return retryableFetch(async (operation) => {
+    throwIfAborted(operation.signal);
+    const { mixKey } = await getWBI(operation);
     return throttledFetch(async (controller) => {
       try {
-        const { mixKey } = await getWBI();
-
         // 添加时间戳参数（WBI 要求 Unix 秒级时间戳，不是毫秒）
-        params = { ...params, timestamp: Math.floor(Date.now() / 1000) };
+        const attemptParams = {
+          ...baseParams,
+          timestamp: Math.floor(Date.now() / 1000),
+        };
 
         // 生成签名
-        const w_rid = generateWBISign(params, mixKey);
+        const w_rid = generateWBISign(attemptParams, mixKey);
 
         // 构建 URL
         const url = new URL(path, BASE_URL);
-        Object.entries({ ...params, w_rid }).forEach(([key, value]) => {
+        Object.entries({ ...attemptParams, w_rid }).forEach(([key, value]) => {
           url.searchParams.append(key, String(value));
         });
 
@@ -143,6 +247,7 @@ export async function fetchWithWBI(
 
         const response = await fetch(url.toString(), {
           headers: finalHeaders,
+          redirect: "manual",
           signal: controller.signal,
         });
 
@@ -161,7 +266,15 @@ export async function fetchWithWBI(
           throw new NetworkError(errorMsg, undefined, url.toString(), response.status);
         }
 
-        const data = await response.json();
+        const data = await parseBoundedJsonResponse<{
+          code?: unknown;
+          message?: unknown;
+          data?: unknown;
+        }>(
+          response,
+          SECURITY_LIMITS.httpJsonBytes,
+          "bilibili_wbi_json",
+        );
 
         if (data.code !== 0) {
           // Detect specific error types
@@ -186,7 +299,7 @@ export async function fetchWithWBI(
                 code: data.code,
                 message: data.message,
                 url: url.toString(),
-                params,
+                params: attemptParams,
               },
               { type: "bilibili-http", operation: "fetchWithWBI" },
             );
@@ -206,7 +319,7 @@ export async function fetchWithWBI(
               { type: "bilibili-http", operation: "fetchWithWBI" },
             );
             throw new BilibiliAPIError(
-              data.message || "访问权限不足，请检查登录凭证是否有效",
+              "Bilibili denied access to this resource.",
               "ACCESS_DENIED",
               undefined,
               data,
@@ -219,12 +332,12 @@ export async function fetchWithWBI(
               code: data.code,
               message: data.message,
               url: url.toString(),
-              params,
+              params: attemptParams,
             },
             { type: "bilibili-http", operation: "fetchWithWBI" },
           );
           throw new BilibiliAPIError(
-            data.message || "Unknown error",
+            "Bilibili API returned an error.",
             "API_ERROR",
             undefined,
             data,
@@ -235,7 +348,7 @@ export async function fetchWithWBI(
       } catch (error) {
         // 构建URL用于错误日志
         const tempUrl = new URL(path, BASE_URL);
-        Object.entries(params).forEach(([key, value]) => {
+        Object.entries(baseParams).forEach(([key, value]) => {
           tempUrl.searchParams.append(key, String(value));
         });
 
@@ -244,7 +357,7 @@ export async function fetchWithWBI(
           {
             error: error instanceof Error ? error.message : String(error),
             path,
-            params,
+            params: baseParams,
             url: tempUrl.toString(),
           },
           { type: "bilibili-http", operation: "fetchWithWBI" },
@@ -257,8 +370,8 @@ export async function fetchWithWBI(
         );
         throw error;
       }
-    });
-  });
+    }, operation);
+  }, signal);
 }
 
 /**
@@ -268,13 +381,15 @@ export async function fetchWithoutWBI(
   path: string,
   params?: Record<string, string | number>,
   additionalHeaders: Record<string, string> = {},
+  signal?: AbortSignal,
+  maxResponseBytes: number = SECURITY_LIMITS.httpJsonBytes,
 ): Promise<unknown> {
   logger.debug(
     "fetchWithoutWBI request",
     { path, params },
     { type: "bilibili-http", operation: "fetchWithoutWBI" },
   );
-  return retryableFetch(async () => {
+  return retryableFetch(async (operation) => {
     return throttledFetch(async (controller) => {
       try {
         const url = new URL(path, BASE_URL);
@@ -296,6 +411,7 @@ export async function fetchWithoutWBI(
             Accept: "application/json",
             ...additionalHeaders,
           },
+          redirect: "manual",
           signal: controller.signal,
         });
 
@@ -308,7 +424,15 @@ export async function fetchWithoutWBI(
           );
         }
 
-        const data = await response.json();
+        const data = await parseBoundedJsonResponse<{
+          code?: unknown;
+          message?: unknown;
+          data?: unknown;
+        }>(
+          response,
+          Math.min(maxResponseBytes, SECURITY_LIMITS.httpJsonBytes),
+          "bilibili_plain_json",
+        );
 
         if (data.code !== 0) {
           // Detect specific error types
@@ -337,7 +461,7 @@ export async function fetchWithoutWBI(
             );
           }
           throw new BilibiliAPIError(
-            data.message || "Unknown error",
+            "Bilibili API returned an error.",
             "API_ERROR",
             undefined,
             data,
@@ -353,6 +477,6 @@ export async function fetchWithoutWBI(
         );
         throw error;
       }
-    });
-  });
+    }, operation);
+  }, signal);
 }

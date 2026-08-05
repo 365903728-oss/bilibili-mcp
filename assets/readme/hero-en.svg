@@ -1,102 +1,78 @@
 <svg xmlns="http://www.w3.org/2000/svg"
-     width="1200" height="420" viewBox="0 0 1200 420"
-     role="img" aria-labelledby="title desc">
-  <title id="title">Bilibili MCP</title>
-  <desc id="desc">Automatically discover every Favorite Folder created by the authenticated account. Start without a cursor, read at most 20 videos per call, and keep passing next_cursor into the next call until that field is absent.</desc>
+     width="1400" height="440" viewBox="0 0 1400 440"
+     role="img" aria-labelledby="fav-title fav-desc">
+  <title id="fav-title">Bilibili MCP Favorites Traversal Flow</title>
+  <desc id="fav-desc">Four phases: list every Favorite Folder created by the account and currently visible; each call reads one upstream page of up to 20 videos; pass the returned next_cursor into the next call; when next_cursor is absent the traversal is done, with titles, BVIDs, and skipped_count grouped per folder.</desc>
 
-  <rect width="1200" height="420" rx="28" fill="#090b10"/>
-  <path d="M0 206H1200" stroke="#232936"/>
+  <rect width="1400" height="440" rx="24" fill="#faf7f8"/>
 
-  <g id="title-block">
-    <text x="64" y="52" fill="#93a4b8"
-          font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-          font-size="18" letter-spacing="1.5">MODEL CONTEXT PROTOCOL · BILIBILI</text>
-    <text x="64" y="116" fill="#f8fafc"
-          font-family="Segoe UI, Arial, sans-serif"
-          font-size="60" font-weight="700">Bilibili MCP</text>
-    <rect x="64" y="138" width="92" height="4" rx="2" fill="#fb7299"/>
-    <text x="64" y="178" fill="#b8c5d3"
-          font-family="Segoe UI, Arial, sans-serif"
-          font-size="23">Read every Favorite Folder. Follow next_cursor until traversal is complete.</text>
+  <!-- connecting lines (card vertical center y=205) -->
+  <line x1="339" y1="205" x2="361" y2="205" stroke="#c9879d" stroke-width="3"/>
+  <line x1="629" y1="205" x2="651" y2="205" stroke="#c9879d" stroke-width="3"/>
+  <line x1="999" y1="205" x2="1021" y2="205" stroke="#2e9e6b" stroke-width="3"/>
+
+  <!-- pagination loop bracket (phases 2-3) -->
+  <path d="M365 72 V62 H995 V72" fill="none" stroke="#c9b6bd" stroke-width="2"/>
+  <text x="680" y="52" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#a08a92">Pagination loop</text>
+
+  <!-- Phase 1: folders (card center x=195) -->
+  <g id="phase-1">
+    <rect x="55" y="90" width="280" height="230" rx="16" fill="#ffffff" stroke="#e8dde1"/>
+    <circle cx="95" cy="128" r="17" fill="#fb7299"/>
+    <text x="95" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">1</text>
+    <text x="121" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#2b2b33">Folders</text>
+    <!-- back folder -->
+    <rect x="159" y="166" width="96" height="48" rx="8" fill="#f6e9ee" opacity="0.6" stroke="#eec3d2"/>
+    <!-- front folder -->
+    <path d="M147 184 a8 8 0 0 1 8 -8 h26 l10 10 h44 a8 8 0 0 1 8 8 v22 a8 8 0 0 1 -8 8 h-80 a8 8 0 0 1 -8 -8 z" fill="#f6e9ee" stroke="#fb7299" stroke-width="2"/>
+    <polygon points="195,193 197.5,199.5 204.5,199.9 199.1,204.3 200.9,211.1 195,207.3 189.1,211.1 190.9,204.3 185.5,199.9 192.5,199.5" fill="#fb7299"/>
+    <text x="195" y="272" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#8a8f98">created by you, visible now</text>
   </g>
 
-  <g id="status" transform="translate(852 52)">
-    <rect width="284" height="96" rx="18" fill="#11151d" stroke="#303746"/>
-    <circle cx="28" cy="30" r="6" fill="#22c55e"/>
-    <text x="46" y="31" dominant-baseline="middle" fill="#86efac"
-          font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-          font-size="18">MCP READY</text>
-    <path d="M24 50H260" stroke="#29303c"/>
-    <text x="142" y="73" dominant-baseline="middle" text-anchor="middle" fill="#93a4b8"
-          font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-          font-size="18">FAVORITES · PAGE ≤ 20</text>
+  <!-- Phase 2: read one page (card center x=495) -->
+  <g id="phase-2">
+    <rect x="365" y="90" width="260" height="230" rx="16" fill="#ffffff" stroke="#e8dde1"/>
+    <circle cx="401" cy="128" r="17" fill="#fb7299"/>
+    <text x="401" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">2</text>
+    <text x="427" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#2b2b33">Read page</text>
+    <rect x="425" y="160" width="140" height="66" rx="10" fill="#eef6fd"/>
+    <rect x="437" y="174" width="18" height="8" rx="3" fill="#fb7299" opacity="0.9"/>
+    <rect x="461" y="174" width="90" height="8" rx="3" fill="#74c0fc" opacity="0.5"/>
+    <rect x="437" y="189" width="18" height="8" rx="3" fill="#fb7299" opacity="0.6"/>
+    <rect x="461" y="189" width="90" height="8" rx="3" fill="#74c0fc" opacity="0.35"/>
+    <rect x="437" y="204" width="18" height="8" rx="3" fill="#fb7299" opacity="0.35"/>
+    <rect x="461" y="204" width="90" height="8" rx="3" fill="#74c0fc" opacity="0.25"/>
+    <circle cx="561" cy="222" r="9" fill="#ffffff" stroke="#2e9e6b" stroke-width="2.5"/>
+    <path d="M556.5 222 l3.5 3.5 l6.5 -7.5" fill="none" stroke="#2e9e6b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="495" y="272" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#8a8f98">one page per call · up to 20</text>
   </g>
 
-  <g id="favorites-flow" transform="translate(64 232)">
-    <g id="start">
-      <rect width="244" height="140" rx="18" fill="#11151d" stroke="#303746"/>
-      <text x="20" y="26" dominant-baseline="middle" fill="#fb7299"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">01 · START</text>
-      <path d="M20 44H224" stroke="#29303c"/>
-      <text x="20" y="78" dominant-baseline="middle" fill="#f8fafc"
-            font-family="Segoe UI, Arial, sans-serif"
-            font-size="19" font-weight="600">DISCOVER ALL FOLDERS</text>
-      <text x="20" y="112" dominant-baseline="middle" fill="#93a4b8"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">NO CURSOR TO START</text>
-    </g>
-
-    <path d="M256 70H264M257 63L264 70L257 77"
-          fill="none" stroke="#fb7299" stroke-width="2"/>
-
-    <g id="read-page" transform="translate(276 0)">
-      <rect width="244" height="140" rx="18" fill="#11151d" stroke="#00aeec"/>
-      <text x="20" y="26" dominant-baseline="middle" fill="#7dd3fc"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">02 · READ PAGE</text>
-      <path d="M20 44H224" stroke="#29303c"/>
-      <text x="20" y="78" dominant-baseline="middle" fill="#f8fafc"
-            font-family="Segoe UI, Arial, sans-serif"
-            font-size="18" font-weight="600">CURRENT FOLDER + PAGE</text>
-      <text x="20" y="112" dominant-baseline="middle" fill="#93a4b8"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">VIDEOS[] · UP TO 20</text>
-    </g>
-
-    <path d="M532 70H540M533 63L540 70L533 77"
-          fill="none" stroke="#00aeec" stroke-width="2"/>
-
-    <g id="continue" transform="translate(552 0)">
-      <rect width="244" height="140" rx="18" fill="#11151d" stroke="#fb7299"/>
-      <text x="20" y="26" dominant-baseline="middle" fill="#fb7299"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">03 · CONTINUE</text>
-      <path d="M20 44H224" stroke="#29303c"/>
-      <text x="20" y="78" dominant-baseline="middle" fill="#f8fafc"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">RETURNED next_cursor</text>
-      <text x="20" y="112" dominant-baseline="middle" fill="#93a4b8"
-            font-family="Segoe UI, Arial, sans-serif"
-            font-size="18">PASS INTO NEXT CALL</text>
-    </g>
-
-    <path d="M808 70H816M809 63L816 70L809 77"
-          fill="none" stroke="#22c55e" stroke-width="2"/>
-
-    <g id="complete" transform="translate(828 0)">
-      <rect width="244" height="140" rx="18" fill="#0d2118" stroke="#237f50"/>
-      <text x="20" y="26" dominant-baseline="middle" fill="#86efac"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">04 · COMPLETE</text>
-      <circle cx="216" cy="26" r="7" fill="#22c55e"/>
-      <path d="M20 44H224" stroke="#244a37"/>
-      <text x="20" y="78" dominant-baseline="middle" fill="#f8fafc"
-            font-family="Cascadia Mono, Consolas, SFMono-Regular, Menlo, monospace"
-            font-size="18">NO next_cursor</text>
-      <text x="20" y="112" dominant-baseline="middle" fill="#b8c5d3"
-            font-family="Segoe UI, Arial, sans-serif"
-            font-size="19">ALL TITLES + BVIDS</text>
-    </g>
+  <!-- Phase 3: next_cursor (card center x=825) -->
+  <g id="phase-3">
+    <rect x="655" y="90" width="340" height="230" rx="16" fill="#ffffff" stroke="#fb7299" stroke-width="2"/>
+    <circle cx="691" cy="128" r="17" fill="#fb7299"/>
+    <text x="691" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">3</text>
+    <text x="717" y="134" font-family="Cascadia Mono, Consolas, monospace" font-size="18" font-weight="700" fill="#2b2b33">next_cursor</text>
+    <path d="M784 196 a16 16 0 1 1 -4 -21" fill="none" stroke="#fb7299" stroke-width="3" stroke-linecap="round"/>
+    <path d="M772 168 l11 3.5 l-4.5 10 z" fill="#fb7299"/>
+    <rect x="806" y="171" width="170" height="44" rx="10" fill="#f6e9ee" stroke="#eec3d2"/>
+    <text x="891" y="199" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="13" fill="#d6336c">next_cursor: "…"</text>
+    <text x="825" y="272" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#8a8f98">pass it into the next call</text>
   </g>
+
+  <!-- Phase 4: complete (card center x=1185) -->
+  <g id="phase-4">
+    <rect x="1025" y="90" width="320" height="230" rx="16" fill="#ffffff" stroke="#2e9e6b" stroke-width="2"/>
+    <circle cx="1061" cy="128" r="17" fill="#2e9e6b"/>
+    <text x="1061" y="134" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#ffffff">4</text>
+    <text x="1087" y="134" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" fill="#2b2b33">Complete</text>
+    <circle cx="1185" cy="193" r="26" fill="#e6f4ec" stroke="#2e9e6b" stroke-width="3"/>
+    <path d="M1173 193 l9 9 l16 -18" fill="none" stroke="#2e9e6b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="1185" y="272" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#8a8f98">titles + BVIDs grouped per folder</text>
+    <rect x="1100" y="286" width="170" height="26" rx="8" fill="#eef6fd"/>
+    <text x="1185" y="303" text-anchor="middle" font-family="Cascadia Mono, Consolas, monospace" font-size="13" fill="#0b7285">skipped_count: 0</text>
+  </g>
+
+  <!-- footer note -->
+  <text x="700" y="385" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#8a8f98">When next_cursor stops appearing, every Favorite Folder has been read</text>
 </svg>

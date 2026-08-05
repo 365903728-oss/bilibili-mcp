@@ -50,6 +50,24 @@ export class TimeoutError extends Error {
   }
 }
 
+export class ResourceLimitError extends Error {
+  constructor(
+    message: string,
+    public resource: string,
+    public limit: number,
+  ) {
+    super(message);
+    this.name = "ResourceLimitError";
+  }
+}
+
+export class UpstreamResponseError extends Error {
+  constructor(message: string = "Remote service returned an invalid response") {
+    super(message);
+    this.name = "UpstreamResponseError";
+  }
+}
+
 export class BilibiliAPIError extends Error {
   constructor(
     message: string,
@@ -73,6 +91,26 @@ export class NoSubtitleError extends Error {
   constructor(message: string = '该视频没有可用的字幕') {
     super(message);
     this.name = 'NoSubtitleError';
+  }
+}
+
+export type AsrErrorCode =
+  | "ASR_NOT_READY"
+  | "ASR_AUDIO_UNAVAILABLE"
+  | "ASR_LIMIT_EXCEEDED"
+  | "ASR_BUSY"
+  | "ASR_TRANSCRIPTION_TIMEOUT"
+  | "ASR_TRANSCRIPTION_FAILED"
+  | "ASR_OUTPUT_INVALID";
+
+export class AsrError extends Error {
+  constructor(
+    public code: AsrErrorCode,
+    message: string,
+    public retryable: boolean = false,
+  ) {
+    super(message);
+    this.name = "AsrError";
   }
 }
 

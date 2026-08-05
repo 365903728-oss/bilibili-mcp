@@ -15,6 +15,7 @@ import {
   validateSearchLimit,
   validateTimestampRange,
 } from "../src/utils/validation.js";
+import { ValidationError } from "../src/utils/errors.js";
 
 describe("validateBVInput", () => {
   it("accepts plain BV id", () => {
@@ -34,6 +35,23 @@ describe("validateBVInput", () => {
   it("rejects input without BV or bilibili URL", () => {
     expect(() => validateBVInput("hello")).toThrow(
       "Input must contain BV ID or Bilibili URL",
+    );
+  });
+});
+
+describe("validateBVInput non-string input", () => {
+  it.each([
+    ["number", 123],
+    ["boolean", true],
+    ["object", {}],
+    ["null", null],
+    ["array", ["BV1T6PQzQErF"]],
+  ])("rejects %s with a typed ValidationError", (_case, value) => {
+    expect(() => validateBVInput(value as unknown)).toThrowError(
+      ValidationError,
+    );
+    expect(() => validateBVInput(value as unknown)).toThrow(
+      "bvid_or_url must be a string",
     );
   });
 });

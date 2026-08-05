@@ -8,7 +8,7 @@
 
 ## 安装前要求
 
-- Node.js 18 或更高版本
+- Node.js 20 或更高版本
 - 随 Node.js 提供的 `npx`
 
 ### 推荐：按需运行最新版
@@ -45,7 +45,7 @@ bilibili-mcp --help
    找到与当前客户端匹配的配置位置和格式，不要假设所有客户端都使用
    mcpServers JSON。
 
-3. 确认本机已有 Node.js 18+ 和 npx，然后按指南添加 server。
+3. 确认本机已有 Node.js 20+ 和 npx，然后按指南添加 server。
    以下是启动基线，不是所有客户端通用的配置文件格式：
    - server 名称：bilibili-mcp
    - command：npx
@@ -58,11 +58,20 @@ bilibili-mcp --help
 
 5. 引导我本人在本地终端交互式运行：
 
-   npx -y @xzxzzx/bilibili-mcp@latest config
+   npx -y @xzxzzx/bilibili-mcp@latest setup
    npx -y @xzxzzx/bilibili-mcp@latest check
 
-   config 的输入必须由我在本地终端完成；不要代收或显示 Cookie。
+   setup 的输入必须由我在本地终端完成；不要代收或显示 Cookie。
    check 只确认本机凭证已加载，不等于已经验证 Bilibili 登录。
+   如果你需要机器可读的本地状态，使用：
+   npx -y @xzxzzx/bilibili-mcp@latest doctor --json
+
+   完成凭证配置后，setup 会询问是否安装可选的本地 ASR 模型。
+   这是纯本地操作——不要替我选择，也不要代收模型文件；让我自己按提示
+   输入 y 继续，或直接回车跳过 [y/N]。选择安装后会显示三个模型选项，
+   自行选择或按 Enter 选择推荐的 small。
+   安装完成后，可在明确需要无字幕回退时调用 get_video_transcript 并设置
+   fallback_to_asr=true；默认调用不会运行 ASR，也不会在 MCP 内下载或切换模型。
 
 6. 配置完成后，重启或重连这个 MCP server，使其重新加载凭证。
 
@@ -591,7 +600,7 @@ qodercli mcp list
 - Server Name: `bilibili-mcp`
 - Command: `npx -y @xzxzzx/bilibili-mcp@latest`
 
-添加后在 Custom Servers 中确认 server 已启用，并展开查看可用 tools。不要在 Qoder / QoderWork 的 MCP 配置中写真实 Cookie；凭证请使用 `bilibili-mcp config` 或环境变量配置。
+添加后在 Custom Servers 中确认 server 已启用，并展开查看可用 tools。不要在 Qoder / QoderWork 的 MCP 配置中写真实 Cookie；凭证请使用 `bilibili-mcp setup` 或环境变量配置。
 
 ### Kimi Code / Kimi Code CLI
 
@@ -630,7 +639,7 @@ kimi mcp list
 kimi mcp test bilibili-mcp
 ```
 
-不要在 Kimi Code 的 `mcp.json`、`env` 或命令参数中写真实 Cookie；凭证请用 `bilibili-mcp config` 或环境变量配置。
+不要在 Kimi Code 的 `mcp.json`、`env` 或命令参数中写真实 Cookie；凭证请用 `bilibili-mcp setup` 或环境变量配置。
 
 ### Antigravity / Antigravity CLI
 
@@ -703,7 +712,7 @@ Pi 还支持 Pi 专属覆盖文件：
 pi-mcp-adapter init
 ```
 
-Pi 默认 lazy 连接 MCP server，只有实际调用工具时才启动。进入 Pi 后使用 `/mcp` 查看 server 状态和工具列表。不要在 Pi 的 MCP 配置里写真实 Cookie；凭证请用 `bilibili-mcp config` 或环境变量配置。
+Pi 默认 lazy 连接 MCP server，只有实际调用工具时才启动。进入 Pi 后使用 `/mcp` 查看 server 状态和工具列表。不要在 Pi 的 MCP 配置里写真实 Cookie；凭证请用 `bilibili-mcp setup` 或环境变量配置。
 
 ### Oh My Pi
 
@@ -913,7 +922,7 @@ Windsurf 也支持 MCP deeplink；如果你在文档或网页中提供安装入�
 }
 ```
 
-Windsurf/Cascade 支持 `stdio`、Streamable HTTP 和 SSE MCP。本项目使用本地 stdio server，因此不要把真实 Bilibili Cookie 写进该配置文件；凭证请用 `bilibili-mcp config` 或环境变量配置。
+Windsurf/Cascade 支持 `stdio`、Streamable HTTP 和 SSE MCP。本项目使用本地 stdio server，因此不要把真实 Bilibili Cookie 写进该配置文件；凭证请用 `bilibili-mcp setup` 或环境变量配置。
 
 ### Zed
 
@@ -1032,23 +1041,62 @@ nanobot 的 MCP 配置兼容 Claude Desktop / Cursor 风格；也支持远程 MC
 
 为了稳定获取视频搜索、字幕、转录和评论，请使用自己的 Bilibili 登录 Cookie。公开视频元数据在未登录时可能仍可用。
 
+### 从浏览器获取凭证字段
+
+1. 用自己的账号登录 [https://www.bilibili.com](https://www.bilibili.com)。
+2. 打开浏览器开发者工具（`F12`），找到 Cookies：
+   - Chrome / Edge：**Application** → **Storage** → **Cookies** → `https://www.bilibili.com`
+   - Firefox：**Storage** → **Cookies** → `https://www.bilibili.com`
+3. 只复制 `SESSDATA`、`bili_jct` 和 `DedeUserID` 的精确值。
+4. 如果找不到，刷新已登录的 Bilibili 页面，确认选中的域是 `https://www.bilibili.com`。
+5. 将值只粘贴到本地 `setup` 的隐藏输入提示符中。绝不粘贴到聊天、截图、客户端配置、Issue、PR、日志或示例代码中。
+
 ### 推荐：本地交互式配置
 
 ```bash
-npx -y @xzxzzx/bilibili-mcp@latest config
+npx -y @xzxzzx/bilibili-mcp@latest setup
 npx -y @xzxzzx/bilibili-mcp@latest check
 ```
 
-- `config` 在本地终端交互式收集 `SESSDATA`、`bili_jct` 和 `DedeUserID`，输入不会回显。
+- `setup` 在本地终端交互式收集 `SESSDATA`、`bili_jct` 和 `DedeUserID`，输入不会回显。未配置凭证时自动引导配置，已配置时显示当前状态。
+- `config` 同样提供交互式配置，但不会检测已有凭证；适合需要强制重配的场景。
 - 凭证保存在本机全局配置中，不会写入项目或 MCP 客户端配置。
 - `check` 只确认当前进程能够加载凭证，不代表 Bilibili 登录仍然有效。
+- 凭证配置完成后，`setup` 会询问是否安装可选的本地 ASR 语音识别模型（默认为否 `[y/N]`）。
+
+`doctor --json` 是纯本地诊断工具，退出码 `0/1/2` 分别表示正常/需要配置或凭证不可加载/内部错误。它不发起网络请求，不能替代 `check_bilibili_credentials` 的实时登录验证。Agent 或非交互环境可使用：
+
+```bash
+npx -y @xzxzzx/bilibili-mcp@latest doctor --json
+```
 
 如果已全局安装，也可以运行：
 
 ```bash
-bilibili-mcp config
+bilibili-mcp setup
 bilibili-mcp check
 ```
+
+### 可选 ASR 语音识别模型安装
+
+完成凭证配置后，`setup` 会询问是否安装可选的本地 ASR 模型（默认为否 `[y/N]`）。
+
+- 选择 Yes 后，会显示三个可选模型：
+  - `1. tiny`（约 78.2 MB）— 最小体积
+  - `2. base`（约 148 MB）
+  - `3. small`（约 486 MB）— [推荐]，Enter 默认选择
+- 输入数字 `1/2/3` 或名称 `tiny/base/small` 选择；无效输入会重新提示，不会启动安装。
+- runtime 固定为 `faster-whisper==1.2.1`，加上运行时库的总磁盘开销。
+- 需要本机装有 Python 3.9+。可通过设置 `BILIBILI_ASR_PYTHON` 环境变量指定 Python 可执行文件。
+- 安装内容存放在用户管理的 `~/.bilibili-mcp/asr/` 中；不修改系统 Python。
+- 同一目录只保留一个活跃模型，切换模型时清空旧的就绪状态。
+- 安装完成后通过 CPU INT8 加载模型进行验证；不需要系统 FFmpeg（PyAV 已捆绑 FFmpeg 库）。
+- 安装失败不会留下就绪标记；已下载的部分文件保留，重新运行 `setup` 可从断点续传。
+- `doctor --json` 的 `asr.status` 和 `asr.model` 字段为纯信息字段，不影响凭证退出状态。
+- MCP 调用不会下载或切换模型；仅使用 `doctor --json` 显示 ready 的当前模型。
+- `get_video_transcript` 只有显式设置 `fallback_to_asr: true` 且确认无可用字幕时才运行 ASR；原生字幕、Cookie/API/网络错误都不会触发。
+- ASR 只处理一个已解析 Part，单 Part 最长 2 小时、临时音频最多 128 MiB，同时只允许一个转录任务且不排队。
+- Cookie 只用于 Bilibili 播放 API，不发送给临时 CDN 或 Python；签名地址不写入结果/日志，临时目录在成功、失败和超时后清理。
 
 ### Docker、本地开发或受控运行环境
 
@@ -1059,6 +1107,8 @@ bilibili-mcp check
 | `BILIBILI_SESSDATA` | 自己登录会话 Cookie 中的 `SESSDATA` |
 | `BILIBILI_BILI_JCT` | 自己登录会话 Cookie 中的 `bili_jct` |
 | `BILIBILI_DEDEUSERID` | 自己的 Bilibili 用户 ID |
+
+进程继承的环境变量可以正常工作；但推荐的 `npx` 路径不会自动加载项目目录下的 `.env` 文件。`setup` 是正常的安装路径；继承的进程变量仅在受控 shell、服务或密钥运行时提供时才有效。本地 `.env` 示例适用于源码 `npm start` / `dist/index.js`，或显式加载 `.env` 的运行时。
 
 本地 `.env` 示例：
 
