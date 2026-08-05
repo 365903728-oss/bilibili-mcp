@@ -1,26 +1,20 @@
 # Active Work
 
-Status: `v1.11.1` source preparation is complete and verified; publication is
-pending and owned by Codex. Preparation at HEAD `15bb5f8` bumped
-`package.json`/`package-lock.json` to `1.11.1` and added matching bilingual
-`v1.11.1` changelog sections crediting `@CYL-collab` (Issue #24, PR #25), plus
-the research note, QA record, and preparation-only memory records. All local
-gates passed: TypeScript build, 39 files / 803 tests, zero production audit
-findings, a 181-file package dry run, and diff/UTF-8/secret checks. Claude Code
-performed no Git or publication action; Codex owns commit, push, tag, Actions
-monitoring, npm verification, and the GitHub Release.
+Status: `v1.11.1` is published. Release commit `ce480f0` is a direct child of
+PR #25's merge commit `15bb5f8`; annotated tag `v1.11.1` points to the release
+commit, so the contributor's merged work remains intact. GitHub Actions run
+`31019814806` passed tests, build, and npm trusted publishing. npm `latest` is
+`1.11.1` with integrity, shasum, signature, and SLSA provenance, and the
+non-draft bilingual GitHub Release credits `@CYL-collab` for Issue #24 and
+PR #25.
 
-Baseline: `v1.11.0` is published. Release commit `e43c247` contains ASR Phase 1–3,
-the CLI setup/doctor flow, both security-remediation rounds, the bilingual
-documentation refresh, and the README overview Hero. Annotated tag `v1.11.0`
-points to that commit; GitHub Actions run `31003552987` passed and published npm
-through trusted publishing. The GitHub Release title and notes are bilingual.
-
-Release verification passed the TypeScript build, 39 files / 803 tests, 95
-focused stdio/tool/handler tests, production audit with zero vulnerabilities,
-an 181-file package containing all five README images and no forbidden paths,
-diff check, value-free secret classification, and zero ASR state temp residue.
-npm `latest` is 1.11.0 with registry integrity and SLSA provenance.
+Release verification passed the TypeScript build, 39 files / 803 tests,
+13 focused video-API tests, production audit with zero vulnerabilities, a
+181-file package with required dist entry points and no forbidden paths,
+diff/UTF-8/value-free secret checks, two independent read-only reviews, and an
+isolated exact-version CLI smoke exposing `setup`, `doctor`, and `config`.
+The main user worktree and its review-gated learning-proposal change remained
+outside the clean release worktree.
 
 The ten-tool product boundary and legacy stdio compatibility remain fixed. ASR
 is explicit, default-off, native-subtitle-first, and ready-state-only. The local

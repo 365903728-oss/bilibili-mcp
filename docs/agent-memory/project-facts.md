@@ -377,3 +377,14 @@
 - Impact: ASR Phase 1–3, CLI setup/doctor, both security-remediation rounds,
   SDK 1.30.0, and the bilingual README overview are public. MCP protocol
   modernization remains a separate inactive future direction.
+
+- Fact: `v1.11.1` is the current npm latest and GitHub Release, published from
+  release commit `ce480f0` through annotated tag `v1.11.1` and trusted-
+  publishing Actions run `31019814806`.
+- Evidence: the remote annotated tag dereferences to `ce480f0`; npm reports
+  version/latest `1.11.1`, integrity, shasum, signature, and SLSA provenance;
+  the isolated exact-version CLI smoke returned `1.11.1`; and the bilingual
+  non-draft Release credits `@CYL-collab` for Issue #24 and PR #25.
+- Impact: the AI subtitle large-ID validation fix from merged PR #25 is public.
+  `ce480f0` directly follows merge commit `15bb5f8`, so normal release delivery
+  did not overwrite or rewrite the contributor's work.

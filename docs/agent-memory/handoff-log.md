@@ -403,3 +403,19 @@
   all pass. Source, tests, dependencies, workflow, READMEs, tool surface, and
   `pending-learning-proposals.md` are unchanged. No commit, push, tag, npm
   publication, or GitHub Release was performed; publication remains Codex-owned.
+
+## 2026-08-05 v1.11.1 Publication
+
+- Owner: Codex reviewed the Paseo/Claude preparation, received PASS from the
+  independent `release-verifier` and `risk-reviewer`, and executed the
+  user-authorized Git and publication chain.
+- Git boundary: release commit `ce480f0` is a direct child of PR #25 merge
+  commit `15bb5f8`; it was fast-forward pushed to `master`. Annotated tag
+  `v1.11.1` dereferences to `ce480f0`; no force push or history rewrite occurred.
+- Publication: Actions run `31019814806` passed and published npm `1.11.1`
+  through trusted publishing. npm `latest`, integrity, shasum, signature,
+  provenance, and the isolated exact-version CLI smoke were verified.
+- Release: the public non-draft, non-prerelease bilingual GitHub Release thanks
+  `@CYL-collab` for Issue #24 and PR #25. No source, test, dependency, workflow,
+  README, MCP surface, credential, or unrelated main-worktree change entered
+  the release.

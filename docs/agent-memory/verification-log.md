@@ -1325,3 +1325,21 @@
   baseline U+FFFD wording) were corrected before commit.
 - Boundary: no Git commit, push, tag, npm publication, or GitHub Release was
   performed; publication remains Codex-owned and pending.
+
+## 2026-08-05 v1.11.1 Publication
+
+- Git: release commit `ce480f0` has PR #25 merge commit `15bb5f8` as its direct
+  parent and was fast-forward pushed to `origin/master`. Remote annotated tag
+  `v1.11.1` dereferences to `ce480f0`; PR #25 remains MERGED and Issue #24
+  remains CLOSED.
+- Automation: GitHub Actions run `31019814806` completed successfully; install,
+  803 tests, build, and npm trusted publishing all passed. The existing Node 20
+  action-runtime deprecation warning was non-blocking and caused no failed step.
+- Registry: npm exact version and `latest` are `1.11.1`; integrity, shasum,
+  tarball metadata, one signature, and SLSA provenance are present. Registry
+  file count is 181.
+- Public smoke: from an external temporary directory,
+  `npx -y @xzxzzx/bilibili-mcp@1.11.1 --version` returned `1.11.1`; help output
+  exposed `setup`, `doctor`, and `config`, and created no files in that directory.
+- Release: GitHub Release `v1.11.1` is public, non-draft, non-prerelease, and
+  bilingual; its notes thank `@CYL-collab` and link Issue #24 and PR #25.

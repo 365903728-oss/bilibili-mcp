@@ -245,6 +245,25 @@ Remove or stop using:
 - provider failures requiring documented fallback: 1
 - generated learning proposals promoted: 0
 
+### 2026-08-05 Harness Eval: v1.11.1 publication
+
+- The clean release worktree and exact fast-forward parent check kept the main
+  dirty worktree out while proving the release commit extended, rather than
+  overwrote, contributor PR #25.
+- Paseo's bounded `package-maintainer` preparation plus independent
+  `release-verifier` and `risk-reviewer` checks caught only two record-accuracy
+  issues (new-file count and baseline U+FFFD wording); both were corrected
+  before commit without expanding product scope.
+- The existing tag-triggered OIDC workflow passed 803 tests, build, trusted npm
+  publication, provenance, remote tag dereference, and isolated exact-version
+  CLI checks. The repeated Node 20 action-runtime deprecation warning remains a
+  separate workflow-maintenance concern, not a reason to modify an otherwise
+  successful patch release.
+- Keep: clean release worktrees for dirty repositories, direct PR-ancestor and
+  remote-SHA checks before fast-forward push, tag-after-version sequencing,
+  value-free secret classification, live npm provenance, and bilingual
+  contributor credit. No additional release layer is needed.
+
 #### Memory Updates Needed
 
 - [x] `project-facts.md`
