@@ -198,6 +198,21 @@
 - Evidence: The final Phase 3 audit found 119 historical project-prefixed test directories. Adding suite-level directory cleanup, removing only validated direct children of the OS temp root, and rerunning 126 ASR tests produced zero residue.
 - Future behavior: Treat before/after temp-root residue counts as an acceptance gate for filesystem-heavy test suites, not just runtime `finally` assertions.
 
+## 2026-08-06
+
+- Lesson: Official MCP Registry GitHub namespaces are case-sensitive even when
+  the corresponding GitHub account is commonly treated case-insensitively.
+- Evidence: lowercase v1.11.2 returned HTTP 403; the exact-cased v1.11.3 name
+  published successfully.
+- Future behavior: use the publisher-reported granted namespace verbatim.
+
+- Lesson: the Registry authentication token is short-lived and should be
+  acquired only after the npm artifact and metadata are ready.
+- Evidence: a corrected publish attempt encountered an expired token after the
+  preparation delay; re-authentication followed by immediate publish succeeded.
+- Future behavior: complete npm availability and validation first, then login
+  and publish without an avoidable delay.
+
 ## 2026-07-30
 
 - Lesson: Item-count limits do not contain serialized-byte amplification.

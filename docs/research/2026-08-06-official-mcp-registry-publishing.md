@@ -56,4 +56,4 @@ Does not apply:
 
 ## Follow-Up
 
-- [ ] Verify npm `1.11.3`, Registry status, and public metadata after publication.
+- [x] Verified npm `1.11.3`, active/latest Registry status, and public metadata.

@@ -388,3 +388,13 @@
 - Impact: the AI subtitle large-ID validation fix from merged PR #25 is public.
   `ce480f0` directly follows merge commit `15bb5f8`, so normal release delivery
   did not overwrite or rewrite the contributor's work.
+
+## 2026-08-06
+
+- Fact: `v1.11.3` is npm `latest`, a public GitHub Release, and the active latest
+  Official MCP Registry version under `io.github.XZXZZX-Ai/bilibili-mcp`.
+- Evidence: annotated tag `v1.11.3` at `ac58a4b`; Actions run `31032259381`;
+  npm integrity, signature, and SLSA provenance; exact-version npx smoke; and
+  the Official Registry API exact match with `status=active` and `isLatest=true`.
+- Impact: future Official Registry updates must preserve the case-sensitive
+  namespace and publish the matching npm version before Registry metadata.

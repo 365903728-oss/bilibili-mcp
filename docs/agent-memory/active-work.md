@@ -1,20 +1,18 @@
 # Active Work
 
-Status: `v1.11.1` is published. Release commit `ce480f0` is a direct child of
-PR #25's merge commit `15bb5f8`; annotated tag `v1.11.1` points to the release
-commit, so the contributor's merged work remains intact. GitHub Actions run
-`31019814806` passed tests, build, and npm trusted publishing. npm `latest` is
-`1.11.1` with integrity, shasum, signature, and SLSA provenance, and the
-non-draft bilingual GitHub Release credits `@CYL-collab` for Issue #24 and
-PR #25.
+Status: `v1.11.3` is published to npm, GitHub Releases, and the Official MCP
+Registry as `io.github.XZXZZX-Ai/bilibili-mcp`. Release commit `ac58a4b` is a
+descendant of PR #25's merge commit `15bb5f8`, so the contributor's merged work
+remains intact. GitHub Actions run `31032259381` passed tests, build, and npm
+trusted publishing. The Official Registry reports version `1.11.3` as `active`
+and `isLatest=true`.
 
 Release verification passed the TypeScript build, 39 files / 803 tests,
-13 focused video-API tests, production audit with zero vulnerabilities, a
-181-file package with required dist entry points and no forbidden paths,
+production audit with zero vulnerabilities, a 181-file package with required
+dist entry points and no forbidden paths, Registry metadata validation,
 diff/UTF-8/value-free secret checks, two independent read-only reviews, and an
-isolated exact-version CLI smoke exposing `setup`, `doctor`, and `config`.
-The main user worktree and its review-gated learning-proposal change remained
-outside the clean release worktree.
+isolated exact-version CLI smoke. The main user worktree and its review-gated
+learning-proposal change remained outside the clean release worktree.
 
 The ten-tool product boundary and legacy stdio compatibility remain fixed. ASR
 is explicit, default-off, native-subtitle-first, and ready-state-only. The local

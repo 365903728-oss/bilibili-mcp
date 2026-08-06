@@ -402,3 +402,15 @@
   `docs/agent-memory/handoffs/2026-08-05-strix-deepseek-security-remediation-task-ticket.md`,
   the matching Codex-to-Claude handoff, and the live Paseo preference resolving
   `providers.impl` to `claude/deepseek-v4-flash`.
+
+## 2026-08-06
+
+- Decision: Use the exact GitHub-owner casing
+  `io.github.XZXZZX-Ai/bilibili-mcp` in both `package.json.mcpName` and
+  `server.json.name`, and publish the matching npm version before Registry
+  metadata.
+- Reason: the live v1.11.2 publish attempt with a lowercase namespace returned
+  HTTP 403, while the publisher authorization explicitly granted
+  `io.github.XZXZZX-Ai/*`.
+- Evidence: the v1.11.2 403 response and the successful v1.11.3 publication and
+  exact-match Official Registry API response.

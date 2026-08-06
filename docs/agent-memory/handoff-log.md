@@ -419,3 +419,19 @@
   `@CYL-collab` for Issue #24 and PR #25. No source, test, dependency, workflow,
   README, MCP surface, credential, or unrelated main-worktree change entered
   the release.
+
+## 2026-08-06 Official MCP Registry Publication
+
+- Owner: Codex wrote ticket `REGISTRY-001`, delegated the bounded package
+  metadata preparation to one Paseo-managed Claude Code agent using the project
+  `package-maintainer` subagent, then reviewed and published the result.
+- Repair: the initial lowercase namespace produced a live HTTP 403; the same
+  bounded task was corrected to the exact authorized namespace and version
+  `1.11.3` without runtime, dependency, workflow, or tool changes.
+- Reports:
+  `docs/agent-memory/handoffs/2026-08-06-official-mcp-registry-claude-report.md`
+  and
+  `docs/agent-memory/handoffs/2026-08-06-official-mcp-registry-repair-claude-report.md`.
+- Result: source, npm, GitHub Release, and Official MCP Registry publication
+  succeeded; public Registry status is active/latest. The main user worktree
+  and review-gated learning proposal were not touched.

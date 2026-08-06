@@ -4,7 +4,7 @@
 
 - ID: `REGISTRY-001`
 - Title: Prepare version 1.11.3 for the Official MCP Registry
-- Status: `in_progress`
+- Status: `done`
 - Owner: `Claude Code`
 - Source: User request on 2026-08-06
 
@@ -50,13 +50,13 @@ Do not touch:
 
 ## Acceptance Criteria
 
-- [ ] `package.json.mcpName` and `server.json.name` both equal `io.github.XZXZZX-Ai/bilibili-mcp`.
-- [ ] Package, lockfile, server metadata, and changelogs use `1.11.3` where applicable.
-- [ ] Live 403 evidence from the v1.11.2 publish attempt recorded in the research note.
-- [ ] `server.json` points to `@xzxzzx/bilibili-mcp` with stdio transport.
-- [ ] Public MCP tool behavior and dependencies are unchanged.
-- [ ] No secret, Cookie, token, or `.env` content is printed or committed.
-- [ ] Codemap is checked and left unchanged because module ownership does not change.
+- [x] `package.json.mcpName` and `server.json.name` both equal `io.github.XZXZZX-Ai/bilibili-mcp`.
+- [x] Package, lockfile, server metadata, and changelogs use `1.11.3` where applicable.
+- [x] Live 403 evidence from the v1.11.2 publish attempt recorded in the research note.
+- [x] `server.json` points to `@xzxzzx/bilibili-mcp` with stdio transport.
+- [x] Public MCP tool behavior and dependencies are unchanged.
+- [x] No secret, Cookie, token, or `.env` content is printed or committed.
+- [x] Codemap is checked and left unchanged because module ownership does not change.
 
 ## Verification
 

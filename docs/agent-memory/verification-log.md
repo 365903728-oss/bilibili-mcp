@@ -1343,3 +1343,21 @@
   exposed `setup`, `doctor`, and `config`, and created no files in that directory.
 - Release: GitHub Release `v1.11.1` is public, non-draft, non-prerelease, and
   bilingual; its notes thank `@CYL-collab` and link Issue #24 and PR #25.
+
+## 2026-08-06 v1.11.3 Official MCP Registry Publication
+
+- Source: annotated tag `v1.11.3` points to release commit `ac58a4b`, which was
+  fast-forward pushed to `origin/master`; PR #25's merge commit remains an
+  ancestor.
+- Local gates: 39 files / 803 tests, TypeScript build, production audit with
+  zero vulnerabilities, 181-file package inspection, value-free secret-pattern
+  classification, and official `server.json` validation all passed.
+- Automation: Actions run `31032259381` passed install, tests, build, and npm
+  trusted publishing. npm reports `1.11.3` as `latest` with integrity, shasum,
+  signature, and SLSA provenance; isolated npx smoke returned `1.11.3`.
+- Release: GitHub Release `v1.11.3` is public, non-draft, and non-prerelease.
+- Registry: `mcp-publisher` v1.8.0 published
+  `io.github.XZXZZX-Ai/bilibili-mcp` version `1.11.3`; the public Registry API
+  returned one exact match with `status=active` and `isLatest=true`.
+- Boundary: npm v1.11.2 remains immutable but its lowercase Registry namespace
+  was rejected with HTTP 403. v1.11.3 is the corrected public latest version.

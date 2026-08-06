@@ -245,6 +245,19 @@ Remove or stop using:
 - provider failures requiring documented fallback: 1
 - generated learning proposals promoted: 0
 
+### 2026-08-06 Harness Eval: Official MCP Registry publication
+
+- The official publisher's live authorization response caught a namespace
+  casing assumption that local schema validation could not detect.
+- Keep: isolated release worktree, one bounded package-maintainer handoff,
+  official CLI validation, exact npm smoke, two independent reviews, and final
+  public Registry API verification.
+- Change: finish npm publication and metadata checks before Registry login,
+  then publish immediately because the authentication token is short-lived.
+- Remove: do not require `server.json` inside the npm tarball; the Registry
+  publisher reads repository metadata while npm ownership validation uses the
+  packed `package.json.mcpName`.
+
 ### 2026-08-05 Harness Eval: v1.11.1 publication
 
 - The clean release worktree and exact fast-forward parent check kept the main
