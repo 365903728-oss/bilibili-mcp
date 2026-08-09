@@ -1139,6 +1139,8 @@ BILIBILI_DEDEUSERID=<your_dedeuserid>
 | `USER_AGENT` | 项目默认值 | 覆盖请求使用的 User-Agent |
 | `BILIBILI_MCP_DEBUG` | 未启用 | 设为 `1` 时向 `stderr` 输出经过凭证脱敏的 debug 日志 |
 
+三个数值变量必须是完整的十进制正安全整数；空值、部分数字、`0`、负数及非安全整数会让 server 以配置错误拒绝启动。`BILIBILI_RATE_LIMIT_MS` 和 `BILIBILI_REQUEST_TIMEOUT_MS` 还不得超过 Node.js 计时器上限 `2147483647`。
+
 请求重试、缓存和错误语义的完整说明见[工具参考：请求控制与缓存](./tool-reference.md#请求控制与缓存)。
 
 ## 从源码开发

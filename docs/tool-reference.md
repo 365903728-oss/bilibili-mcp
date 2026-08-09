@@ -25,7 +25,7 @@
 - 优先获取视频的 CC 或 AI 字幕
 - 无字幕时自动降级为视频标题、简介和标签
 - 支持多语言字幕选择（默认优先简体中文）
-- 可手动指定偏好字幕语言（如 `en`, `zh-Hant` 等）
+- 可手动指定偏好字幕语言：`zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；`ai-zh` 会原样传入选择逻辑，未知值返回 `VALIDATION_ERROR`
 
 ### 2. 评论总结 (`get_video_comments`)
 - 获取视频热门评论，辅助判断视频真实口碑
@@ -35,7 +35,7 @@
   - `brief`: 10 条热门评论速览
   - `detailed`: 20 条热门评论 + 高赞连带回复
 - 可选参数：
-  - `limit`: 显式评论数量 `1-50`，覆盖 `detail_level` 的默认数量
+  - `limit`: 主评论数量，整数 `1-50`，覆盖 `detail_level` 的默认主评论数量；若包含子回复，扁平的 `comments[]` 总条数可超过 `limit`
   - `sort`: 排序方式 `"hot"`（按热度，默认）或 `"time"`（按时间）
   - `include_replies`: 是否包含高赞回复（默认 `true`）
 
@@ -46,7 +46,7 @@
 - 支持可选关键词搜索：返回带上下文的时间戳匹配列表（大小写不敏感字面匹配）
 - 成功调用会同时返回向后兼容的格式化 JSON 文本和内容相同的 MCP `structuredContent`
 - 可选参数：
-  - `preferred_lang`: 偏好字幕语言代码
+  - `preferred_lang`: 偏好字幕语言代码，支持 `zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；`ai-zh` 会原样传入选择逻辑，未知值返回 `VALIDATION_ERROR`
   - `fallback_to_description`: 字幕不可用时是否降级为视频描述（默认 `false`）
   - `fallback_to_asr`: 确认无可用字幕时是否运行已就绪的本地 ASR（默认 `false`）
   - `page`: 多P视频分集编号（从1开始的正整数）
@@ -173,7 +173,7 @@
 | `NETWORK_ERROR` | 网络请求失败（HTTP 5xx、连接错误等） | 稍后重试；如反复出现请检查网络/代理/防火墙 |
 | `NETWORK_TIMEOUT` | 请求 Bilibili 超时 | 稍后重试；如反复出现请检查网络/代理/防火墙 |
 | `API_RATE_LIMITED` | 触发 Bilibili API 频率限制（HTTP 429） | 等待一段时间后重试；降低调用频率或调大 `BILIBILI_RATE_LIMIT_MS` |
-| `ACCESS_DENIED` | Bilibili 拒绝访问（权限不足、私密、地区限制、已下架等） | 检查视频访问权限，必要时运行凭据检查 |
+| `ACCESS_DENIED` | Bilibili 拒绝访问资源（权限不足、私密、地区或账号限制、已下架等） | 检查资源与账号访问权限，必要时运行凭据检查 |
 | `PAID_VIDEO` | 视频可能需要付费、会员或额外权限 | 在 Bilibili 端确认；本 MCP 不会绕过付费或受限访问 |
 | `COMMENTS_DISABLED` | 视频评论已关闭或访问受限 | 改用字幕或元数据工具；也可在 Bilibili 页面确认 |
 | `BILIBILI_API_ERROR` | 其他 Bilibili API 错误 | 临时问题可稍后重试；持续出现请带错误码反馈 |
@@ -296,7 +296,7 @@
 
 返回内容：`bvid`、`title`、`language`、`transcript`（按行合并）、`data_source`（`subtitle`、`asr` 或 `description`）、`page`（分集编号）。
 
-> 默认无字幕时返回 `SUBTITLE_UNAVAILABLE`。如需降级，设置 `fallback_to_description: true`。
+> `preferred_lang` 仅接受 `zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；显式传入 `ai-zh` 不会被改写为其他语言，未知值返回 `VALIDATION_ERROR`。默认无字幕时返回 `SUBTITLE_UNAVAILABLE`。如需降级，设置 `fallback_to_description: true`。
 
 **显式 ASR 回退示例**：
 
@@ -397,7 +397,7 @@
 
 返回内容：`data_source`（`subtitle` 或 `description`）、`video_info`（标题、描述、标签、字幕文本、发布时间）。
 
-> 无字幕视频会自动降级返回描述和标签（即 `data_source: "description"`）。
+> `preferred_lang` 仅接受 `zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；显式传入 `ai-zh` 不会被改写为其他语言，未知值返回 `VALIDATION_ERROR`。无字幕视频会自动降级返回描述和标签（即 `data_source: "description"`）。
 
 ### `get_video_comments`
 
@@ -420,7 +420,7 @@
 
 返回内容：`comments[]`（含 `author`、`content`、`likes`、`timestamp`、`has_timestamp`）、`summary`（总数和时间戳评论数）。
 
-> Cookie 过期或未登录可能导致评论为空。`sort: "time"` 可获取最新评论，`include_replies: false` 不返回子回复。
+> `limit` 只限制主评论数量；当 `include_replies: true` 且 `detail_level: "detailed"` 时，扁平的 `comments[]` 还包含子回复，因此总条数可超过 `limit`。Cookie 过期或未登录可能导致评论为空。`sort: "time"` 可获取最新评论，`include_replies: false` 不返回子回复。
 
 ---
 
@@ -434,6 +434,8 @@
 - **超时控制**：默认 10 秒，可通过 `BILIBILI_REQUEST_TIMEOUT_MS` 调整。
 - **缓存容量**：默认 100 条，可通过 `BILIBILI_CACHE_SIZE` 调整。
 - **User-Agent**：可通过 `USER_AGENT` 覆盖默认请求头。
+
+三个数值变量必须是完整的十进制正安全整数；空值、部分数字、`0`、负数及非安全整数会触发配置错误并阻止启动。两个毫秒变量还必须不超过 Node.js 计时器上限 `2147483647`；缓存容量没有额外的人为上限。
 
 以上环境变量均在 MCP server 进程启动时读取，修改后需重启 MCP 客户端或重连 MCP server 才能生效。
 

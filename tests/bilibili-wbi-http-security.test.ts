@@ -27,7 +27,7 @@ function wbiNavResponse(): Response {
 
 beforeEach(() => {
   vi.resetModules();
-  process.env.BILIBILI_RATE_LIMIT_MS = "0";
+  process.env.BILIBILI_RATE_LIMIT_MS = "1";
   process.env.BILIBILI_REQUEST_TIMEOUT_MS = "1000";
 });
 

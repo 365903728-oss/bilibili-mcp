@@ -6,6 +6,8 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
 
 - `src/index.ts`: stdio startup entry point. Loads environment configuration
   and connects the reusable MCP server through the bounded stdio transport.
+- `src/load-env.ts`: first-evaluated entrypoint side effect that loads the
+  optional package-root `.env` before server dependencies freeze runtime config.
 - `src/server.ts`: reusable MCP `Server` instance. Registers `tools/list` and
   `tools/call`, delegates schemas and handlers, installs per-request
   cancellation context, and applies bounded secret-free response handling.
@@ -14,7 +16,9 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
   startup, and exposes `setup` (credentials plus optional ASR with three-model
   selector), `doctor` (credential and ASR status plus `asr.model` key),
   `config`, `check`, `check-update`, and `version`.
-- `src/config.ts`: runtime configuration (rate limits, timeouts, cache sizing) and preferred subtitle language normalization.
+- `src/config.ts`: runtime configuration with strict positive-safe-integer
+  validation for rate limits, timeouts, and cache sizing, plus canonical
+  supported-language selection that preserves `ai-zh` and rejects unknown values.
 
 ## Shared Security Boundaries
 
@@ -91,7 +95,8 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `src/bilibili/favorites.ts`: authenticated current-account Favorites discovery. Stateless opaque base64url cursor encode/decode (versioned Folder ID + page only), strict canonical pre-network decoding and safe-integer emission, nav→created/list-all→at most one resource/list page per call, defensive Folder/Video normalization, and reported-count/skipped-count behavior.
 - `src/bilibili/comments-api.ts`: raw comments API access.
 - `src/bilibili/comments.ts`: comments retrieval, filtering, and response shaping.
-- `src/bilibili/types.ts`: shared Bilibili-facing types.
+- `src/bilibili/types.ts`: shared Bilibili-facing types and the runtime
+  `SUPPORTED_LANGUAGES` tuple reused by config, validation, and public schemas.
 
 ## Utilities
 
@@ -112,7 +117,13 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 ## Tests
 
 - `tests/mcp-server-smoke.test.ts`: built `index.js`/`cli.js` stdio coverage, Agent-facing doctor/setup/version CLI probes, MCP handler smoke coverage, and a public JSON-clean `initialize` → `tools/list` → representative `tools/call` wire test.
-- `tests/cli.test.ts`: deterministic CLI tests for help output, `buildDoctorStatus` JSON contract (including ASR object), credential-source priority, and no-leak checks.
+- `tests/cli.test.ts`: deterministic CLI tests for help output,
+  `buildDoctorStatus` JSON contract (including ASR object), credential-source
+  priority, isolated blank-replacement protection, and no-leak checks.
+- `tests/config.test.ts`: canonical-language behavior and table-driven strict
+  validation for every user-facing numeric environment variable.
+- `tests/index-env-order.test.ts`: mocked dotenv regression proving the entrypoint
+  loads `.env` before runtime config is imported and validated.
 - `tests/asr-installer.test.ts`: deterministic installer/state tests. State read/validation/write, Python discovery (override/path/version), venv/pip/download/verify subprocess gating, and full orchestration success/failure. No tests invoke real Python, pip, network, or model download.
 - `tests/asr-installer-process.test.ts`: mocked default subprocess deadlines,
   output ceilings, argv, stdio, and platform process-group settings.

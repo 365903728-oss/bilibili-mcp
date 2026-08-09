@@ -323,12 +323,12 @@ export function buildStructuredErrorPayload(
       retryable: false,
       user_action_required: true,
       next_steps_en: [
-        "Check whether the video is private, region-restricted, removed, or requires a logged-in account.",
-        "Run the credential check if you expected your account to have access.",
+        "Check whether the requested Bilibili resource (such as a video or Favorite Folder) is private, restricted, removed, or requires a logged-in account.",
+        "Run the credential check if you expected this account to have access.",
       ],
       next_steps_zh: [
-        "请检查视频是否为私密、地区限制、已下架，或需要登录账号访问。",
-        "如果你认为账号应有权限，请先运行凭据检查。",
+        "请检查所请求的 Bilibili 资源（如视频或收藏夹）是否为私密、受限、已下架，或需要登录账号访问。",
+        "如果你认为当前账号应有权限，请先运行凭据检查。",
       ],
       details: { api_code: error.code, status_code: error.statusCode },
     });

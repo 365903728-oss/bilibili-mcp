@@ -179,6 +179,32 @@ describe("generic MCP error credential next_steps", () => {
     expect(JSON.stringify(payload)).not.toMatch(/SESSDATA|bili_jct|DedeUserID/i);
   });
 
+  it("returns resource-generic access guidance for Favorites access denial", async () => {
+    mockListBilibiliFavoriteVideos.mockRejectedValueOnce(
+      new BilibiliAPIError("Access denied", "ACCESS_DENIED"),
+    );
+
+    const handler = getCallToolHandler();
+    const response = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 5,
+      params: {
+        name: "list_bilibili_favorite_videos",
+        arguments: {},
+      },
+    });
+    const payload = JSON.parse(response.content[0].text);
+
+    expect(response.isError).toBe(true);
+    expectStructuredError(payload, "ACCESS_DENIED", {
+      retryable: false,
+      userActionRequired: true,
+    });
+    expect(payload.next_steps_en.join(" ")).toContain("resource");
+    expect(payload.next_steps_zh.join(" ")).toContain("资源");
+  });
+
   it("adds bilingual next_steps when transcript subtitles are unavailable", async () => {
     mockGetVideoTranscriptData.mockRejectedValueOnce(
       new NoSubtitleError("No subtitles"),

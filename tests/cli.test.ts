@@ -1,5 +1,6 @@
 import fs from "fs";
 import os from "os";
+import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -78,6 +79,108 @@ describe("CLI help and commands", () => {
     const cli = createCli();
     const versionCmd = cli.commands.find((c) => c.name() === "version");
     expect(versionCmd).toBeDefined();
+  });
+});
+
+describe("config credential replacement", () => {
+  const originalUserProfile = process.env.USERPROFILE;
+  const originalHome = process.env.HOME;
+  let tempHome: string;
+  let savedExitCode: typeof process.exitCode;
+
+  beforeEach(() => {
+    savedExitCode = process.exitCode;
+    process.exitCode = undefined;
+    tempHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), "bilibili-mcp-cli-config-test-"),
+    );
+    process.env.USERPROFILE = tempHome;
+    process.env.HOME = tempHome;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.resetModules();
+    if (originalUserProfile === undefined) {
+      delete process.env.USERPROFILE;
+    } else {
+      process.env.USERPROFILE = originalUserProfile;
+    }
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+    process.exitCode = savedExitCode;
+    fs.rmSync(tempHome, { recursive: true, force: true });
+  });
+
+  it.each([
+    ["SESSDATA", ["   ", "synthetic-replacement-csrf", "20002"]],
+    ["bili_jct", ["synthetic-replacement-session", "\t", "20002"]],
+    [
+      "DedeUserID",
+      ["synthetic-replacement-session", "synthetic-replacement-csrf", "\n"],
+    ],
+  ])("keeps existing credentials when %s is blank", async (_field, answers) => {
+    vi.resetModules();
+    const credentialsModule = await import("../src/utils/credentials.js");
+    const cliModule = await import("../src/cli.js");
+    const existingCredentials = {
+      sessdata: "synthetic-existing-session",
+      bili_jct: "synthetic-existing-csrf",
+      dedeuserid: "10001",
+      expiresAt: Date.now() + 86_400_000,
+    };
+    fs.mkdirSync(credentialsModule.GLOBAL_CONFIG_DIR, { recursive: true });
+    const originalFile = `${JSON.stringify(existingCredentials, null, 2)}\n`;
+    fs.writeFileSync(credentialsModule.GLOBAL_CONFIG_FILE, originalFile, "utf8");
+    credentialsModule.credentialManager.setCredentials(existingCredentials);
+    const askHiddenFn = vi.fn<(question: string) => Promise<string>>();
+    for (const answer of answers) {
+      askHiddenFn.mockResolvedValueOnce(answer);
+    }
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await cliModule.configureCredentials(askHiddenFn);
+
+    expect(result).toBe(false);
+    expect(process.exitCode).toBe(1);
+    expect(fs.readFileSync(credentialsModule.GLOBAL_CONFIG_FILE, "utf8")).toBe(
+      originalFile,
+    );
+    expect(credentialsModule.credentialManager.getCredentials()).toEqual(
+      existingCredentials,
+    );
+    expect(logSpy.mock.calls.flat().join("\n")).not.toContain("凭证配置成功");
+  });
+
+  it("trims and persists a complete synthetic credential set in the isolated home", async () => {
+    vi.resetModules();
+    const credentialsModule = await import("../src/utils/credentials.js");
+    const cliModule = await import("../src/cli.js");
+    const askHiddenFn = vi
+      .fn<(question: string) => Promise<string>>()
+      .mockResolvedValueOnce("  synthetic-new-session  ")
+      .mockResolvedValueOnce("  synthetic-new-csrf  ")
+      .mockResolvedValueOnce("  30003  ");
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await cliModule.configureCredentials(askHiddenFn);
+
+    expect(result).toBe(true);
+    expect(process.exitCode).toBeUndefined();
+    const saved = JSON.parse(
+      fs.readFileSync(credentialsModule.GLOBAL_CONFIG_FILE, "utf8"),
+    );
+    expect(saved).toMatchObject({
+      sessdata: "synthetic-new-session",
+      bili_jct: "synthetic-new-csrf",
+      dedeuserid: "30003",
+    });
+    expect(logSpy.mock.calls.flat().join("\n")).toContain("凭证配置成功");
   });
 });
 
@@ -414,10 +517,12 @@ describe("setup credential loadability", () => {
     process.stdin,
     "isTTY",
   );
+  const originalExitCode = process.exitCode;
 
   afterEach(() => {
     vi.restoreAllMocks();
     credentialManager.clearCredentials();
+    process.exitCode = originalExitCode;
     if (originalTtyDescriptor) {
       Object.defineProperty(process.stdin, "isTTY", originalTtyDescriptor);
     } else {
@@ -438,6 +543,27 @@ describe("setup credential loadability", () => {
     await setupCredentials(configure, runAsr, askHiddenFn);
 
     expect(configure).toHaveBeenCalledOnce();
+  });
+
+  it("stops before the ASR prompt when credential configuration reports failure", async () => {
+    Object.defineProperty(process.stdin, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
+    const configure = vi.fn(async () => false);
+    const runAsr = vi.fn(async () => ({ success: true }));
+    const askHiddenFn = vi.fn(async () => {
+      throw new Error("ASR prompt must not be reached after credential failure");
+    });
+    process.exitCode = undefined;
+
+    await setupCredentials(configure, runAsr, askHiddenFn);
+
+    expect(configure).toHaveBeenCalledOnce();
+    expect(askHiddenFn).not.toHaveBeenCalled();
+    expect(runAsr).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
   });
 
   it("default No does not call the ASR runner", async () => {

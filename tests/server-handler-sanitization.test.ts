@@ -91,6 +91,101 @@ describe("handler validation and transcript output", () => {
     vi.clearAllMocks();
   });
 
+  it("passes ai-zh unchanged to get_video_info subtitle selection", async () => {
+    mockGetVideoInfoWithSubtitle.mockResolvedValueOnce({
+      data_source: "subtitle",
+      video_info: { title: "AI subtitle fixture" },
+    });
+
+    const handler = getCallToolHandler();
+    await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 21,
+      params: {
+        name: "get_video_info",
+        arguments: {
+          bvid_or_url: "BV1T6PQzQErF",
+          preferred_lang: "ai-zh",
+        },
+      },
+    });
+
+    expect(mockGetVideoInfoWithSubtitle).toHaveBeenCalledWith(
+      "BV1T6PQzQErF",
+      "ai-zh",
+      undefined,
+    );
+  });
+
+  it("passes ai-zh unchanged to get_video_transcript subtitle selection", async () => {
+    mockGetVideoTranscriptData.mockResolvedValueOnce({
+      bvid: "BV1T6PQzQErF",
+      data_source: "subtitle",
+      language: "ai-zh",
+      transcript: "AI subtitle fixture",
+      title: "AI subtitle fixture",
+      source_url: "https://www.bilibili.com/video/BV1T6PQzQErF/",
+    });
+
+    const handler = getCallToolHandler();
+    await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 22,
+      params: {
+        name: "get_video_transcript",
+        arguments: {
+          bvid_or_url: "BV1T6PQzQErF",
+          preferred_lang: "ai-zh",
+        },
+      },
+    });
+
+    expect(mockGetVideoTranscriptData).toHaveBeenCalledWith(
+      "BV1T6PQzQErF",
+      "ai-zh",
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+    );
+  });
+
+  it.each([
+    ["get_video_info", mockGetVideoInfoWithSubtitle],
+    ["get_video_transcript", mockGetVideoTranscriptData],
+  ])(
+    "%s rejects a well-formed unsupported language before business work",
+    async (name, businessMock) => {
+      const handler = getCallToolHandler();
+      const result = await handler({
+        method: "tools/call",
+        jsonrpc: "2.0",
+        id: 23,
+        params: {
+          name,
+          arguments: {
+            bvid_or_url: "BV1T6PQzQErF",
+            preferred_lang: "fr",
+          },
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result).not.toHaveProperty("structuredContent");
+      expect(JSON.parse(result.content[0].text)).toMatchObject({
+        code: "VALIDATION_ERROR",
+        message:
+          "Unsupported language. Supported values: zh-Hans, zh-CN, zh-Hant, en, ja, ko, ai-zh",
+      });
+      expect(businessMock).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
     ["empty query", { query: "   " }],
     ["max_matches out of range", { query: "hello", max_matches: 999 }],

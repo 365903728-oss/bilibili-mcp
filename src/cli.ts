@@ -77,13 +77,21 @@ async function startServer() {
 }
 
 // Configure credentials
-async function configureCredentials() {
+export async function configureCredentials(
+  askHiddenFn: (question: string) => Promise<string> = askHidden,
+): Promise<boolean> {
   console.log("请输入您的 Bilibili 凭证信息（可从浏览器开发者工具中获取）：");
   console.log("输入内容不会在终端回显。");
 
-  const sessdata = await askHidden("SESSDATA: ");
-  const bili_jct = await askHidden("bili_jct: ");
-  const dedeuserid = await askHidden("DedeUserID: ");
+  const sessdata = (await askHiddenFn("SESSDATA: ")).trim();
+  const bili_jct = (await askHiddenFn("bili_jct: ")).trim();
+  const dedeuserid = (await askHiddenFn("DedeUserID: ")).trim();
+
+  if (!sessdata || !bili_jct || !dedeuserid) {
+    console.error("配置未保存：SESSDATA、bili_jct 和 DedeUserID 均不能为空；已有凭证保持不变。");
+    process.exitCode = 1;
+    return false;
+  }
 
   try {
     const credentials = {
@@ -104,6 +112,7 @@ async function configureCredentials() {
     console.log("");
     console.log("下次启动 MCP 服务器时将自动加载此凭证，无需重新配置。");
     console.log("⚠️  如需更新凭证，请重新运行 bilibili-mcp config");
+    return true;
   } catch (error) {
     console.error("配置失败：", redactSecrets(error));
     process.exit(1);
@@ -261,7 +270,7 @@ export function doctorCommand(
 }
 
 export async function setupCredentials(
-  configure: () => Promise<void> = configureCredentials,
+  configure: () => Promise<boolean | void> = configureCredentials,
   runAsr: (modelKey: AsrModelKey) => Promise<{ success: boolean; error?: string }> = async () => ({ success: false, error: "installer not injected" }),
   askHiddenFn: (question: string) => Promise<string> = askHidden,
 ) {
@@ -288,7 +297,11 @@ export async function setupCredentials(
     );
     // Fall through to ASR question even with existing credentials
   } else {
-    await configure();
+    const configured = await configure();
+    if (configured === false) {
+      process.exitCode = 1;
+      return;
+    }
   }
 
   // Optional ASR installation prompt
@@ -362,7 +375,9 @@ export function createCli() {
   cli
     .command("config")
     .description("配置 Bilibili 凭证信息")
-    .action(configureCredentials);
+    .action(async () => {
+      await configureCredentials();
+    });
 
   cli
     .command("check")

@@ -1,22 +1,9 @@
 // MCP 服务器入口
-import { config } from "dotenv";
+import "./load-env.js";
 import { fileURLToPath } from "url";
-import { dirname, resolve } from "path";
 import { server } from "./server.js";
 import { redactSecrets } from "./utils/logger.js";
 import { BoundedStdioServerTransport } from "./server/bounded-stdio-transport.js";
-
-// 获取当前文件的目录
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// 尝试加载.env文件
-const envPath = resolve(__dirname, "../.env");
-try {
-  config({ path: envPath, quiet: true });
-} catch (e) {
-  // .env is optional
-}
 
 // Reusable default server export for programmatic use
 export default server;

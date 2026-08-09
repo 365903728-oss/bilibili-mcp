@@ -128,8 +128,18 @@ export interface CommentsSummary {
   };
 }
 
-// 支持的语言类型
-export type SupportedLanguage = 'zh-Hans' | 'zh-CN' | 'zh-Hant' | 'en' | 'ja' | 'ko' | 'ai-zh';
+// 支持的语言列表与类型（运行时验证与公开 schema 共用）
+export const SUPPORTED_LANGUAGES = [
+  "zh-Hans",
+  "zh-CN",
+  "zh-Hant",
+  "en",
+  "ja",
+  "ko",
+  "ai-zh",
+] as const;
+
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 // 评论详细程度类型
 export type CommentDetailLevel = 'brief' | 'detailed';

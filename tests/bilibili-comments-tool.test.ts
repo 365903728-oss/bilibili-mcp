@@ -244,7 +244,76 @@ describe("getVideoCommentsData - cache key behavior", () => {
 });
 
 describe("getVideoCommentsData - pagination for limits above 20", () => {
-  it("limit: 50 fetches pages 1, 2, 3 with page sizes 20, 20, 10", async () => {
+  it("returns distinct main comments when the upstream honors pn/ps page semantics", async () => {
+    mockGetVideoComments.mockImplementation(
+      async (_url: string, page: number, pageSize: number, _sort: number, _includeReplies: boolean) => {
+        const start = (page - 1) * pageSize + 1;
+        return { replies: Array.from({ length: pageSize }, (_, i) => ({
+          rpid: start + i,
+          member: { uname: `User${start + i}`, avatar: "" },
+          content: { message: `Comment ${start + i}` },
+          like: start + i,
+          replies: [],
+        })) };
+      },
+    );
+
+    const result = await getVideoCommentsData("BV1T6PQzQErF", {
+      limit: 21,
+      includeReplies: false,
+    });
+    const contents = result.comments.map((comment) => comment.content);
+
+    expect(contents).toHaveLength(21);
+    expect(new Set(contents)).toHaveLength(21);
+    expect(contents).toContain("Comment 21");
+  });
+
+  it("finds a valid row after a rejected row when only one item remains", async () => {
+    mockGetVideoComments.mockImplementation(
+      async (_url: string, page: number, pageSize: number, _sort: number, _includeReplies: boolean) => {
+        if (page === 1) {
+          return { replies: Array.from({ length: pageSize }, (_, i) => ({
+            rpid: i + 1,
+            member: { uname: `User${i + 1}`, avatar: "" },
+            content: { message: `Comment ${i + 1}` },
+            like: i + 1,
+            replies: [],
+          })) };
+        }
+
+        return {
+          replies: [
+            {
+              rpid: 21,
+              content: { message: "Rejected row without a member" },
+              like: 0,
+              replies: [],
+            },
+            {
+              rpid: 22,
+              member: { uname: "User21", avatar: "" },
+              content: { message: "Comment 21" },
+              like: 21,
+              replies: [],
+            },
+          ],
+        };
+      },
+    );
+
+    const result = await getVideoCommentsData("BV1T6PQzQErF", {
+      limit: 21,
+      includeReplies: false,
+    });
+
+    expect(result.comments).toHaveLength(21);
+    expect(result.comments.map((comment) => comment.content)).toContain(
+      "Comment 21",
+    );
+  });
+
+  it("limit: 50 keeps the upstream page size fixed and slices locally", async () => {
     mockGetVideoComments.mockImplementation(
       async (_url: string, page: number, pageSize: number, _sort: number, _includeReplies: boolean) => {
         const start = (page - 1) * 20 + 1;
@@ -267,7 +336,7 @@ describe("getVideoCommentsData - pagination for limits above 20", () => {
     expect(calls[1][1]).toBe(2);
     expect(calls[1][2]).toBe(20);
     expect(calls[2][1]).toBe(3);
-    expect(calls[2][2]).toBe(10);
+    expect(calls[2][2]).toBe(20);
   });
 
   it("limit: 50 returns exactly 50 top-level comments", async () => {
@@ -312,32 +381,63 @@ describe("getVideoCommentsData - pagination for limits above 20", () => {
     expect(result.comments).toHaveLength(20);
   });
 
-  it("stops early when a page returns fewer than requested", async () => {
+  it("continues after a non-empty short page without exceeding the page bound", async () => {
     mockGetVideoComments.mockImplementation(
       async (_url: string, page: number, _pageSize: number, _sort: number, _includeReplies: boolean) => {
-        if (page === 1) {
-          return { replies: Array.from({ length: 20 }, (_, i) => ({
-            rpid: i + 1,
-            member: { uname: `User${i + 1}`, avatar: "" },
-            content: { message: `Comment ${i + 1}` },
-            like: i + 1,
-            replies: [],
-          })) };
-        }
-        return { replies: Array.from({ length: 5 }, (_, i) => ({
-          rpid: 21 + i,
-          member: { uname: `User${21 + i}`, avatar: "" },
-          content: { message: `Comment ${21 + i}` },
-          like: 21 + i,
+        const start = (page - 1) * 19 + 1;
+        return { replies: Array.from({ length: 19 }, (_, i) => ({
+          rpid: start + i,
+          member: { uname: `User${start + i}`, avatar: "" },
+          content: { message: `Comment ${start + i}` },
+          like: start + i,
           replies: [],
         })) };
       },
     );
 
     const result = await getVideoCommentsData("BV1T6PQzQErF", { limit: 50, includeReplies: false });
+    const contents = result.comments.map((comment) => comment.content);
 
-    expect(mockGetVideoComments).toHaveBeenCalledTimes(2);
-    expect(result.comments).toHaveLength(25);
+    expect(mockGetVideoComments).toHaveBeenCalledTimes(3);
+    expect(contents).toHaveLength(50);
+    expect(new Set(contents)).toHaveLength(50);
+    expect(contents).toContain("Comment 50");
+  });
+
+  it("continues after a non-empty page whose rows are all rejected", async () => {
+    mockGetVideoComments.mockImplementation(
+      async (_url: string, page: number, pageSize: number, _sort: number, _includeReplies: boolean) => {
+        const start = (page - 1) * pageSize + 1;
+        if (page === 1) {
+          return {
+            replies: Array.from({ length: pageSize }, (_, i) => ({
+              rpid: start + i,
+              content: { message: "Rejected row without a member" },
+              like: 0,
+              replies: [],
+            })),
+          };
+        }
+
+        return { replies: Array.from({ length: pageSize }, (_, i) => ({
+          rpid: start + i,
+          member: { uname: `User${start + i}`, avatar: "" },
+          content: { message: `Comment ${start + i}` },
+          like: start + i,
+          replies: [],
+        })) };
+      },
+    );
+
+    const result = await getVideoCommentsData("BV1T6PQzQErF", {
+      limit: 50,
+      includeReplies: false,
+    });
+    const contents = result.comments.map((comment) => comment.content);
+
+    expect(mockGetVideoComments).toHaveBeenCalledTimes(3);
+    expect(contents).toHaveLength(40);
+    expect(contents).toContain("Comment 60");
   });
 
   it("limit at or below 20 still makes a single request", async () => {
@@ -384,6 +484,17 @@ describe("getVideoCommentsData - pagination for limits above 20", () => {
 });
 
 describe("getVideoCommentsData - hostile upstream bounds", () => {
+  it("fails closed when the upstream replies container is malformed", async () => {
+    mockGetVideoComments.mockResolvedValue({ replies: "not-an-array" });
+
+    await expect(
+      getVideoCommentsData("BV1T6PQzQErF", {
+        limit: 1,
+        includeReplies: false,
+      }),
+    ).rejects.toMatchObject({ name: "UpstreamResponseError" });
+  });
+
   it("slices an over-returned page to the caller-visible main-comment limit", async () => {
     mockGetVideoComments.mockResolvedValue({
       replies: Array.from({ length: 7 }, (_, index) => ({
@@ -404,7 +515,7 @@ describe("getVideoCommentsData - hostile upstream bounds", () => {
     expect(result.summary.total_comments).toBe(1);
   });
 
-  it("retains at most three replies per accepted main comment", async () => {
+  it("treats limit: 1 as one main comment while preserving its replies", async () => {
     mockGetVideoComments.mockResolvedValue({
       replies: [
         {
@@ -428,7 +539,16 @@ describe("getVideoCommentsData - hostile upstream bounds", () => {
       includeReplies: true,
     });
 
+    expect(mockGetVideoComments).toHaveBeenCalledWith(
+      "BV1T6PQzQErF",
+      1,
+      1,
+      1,
+      true,
+    );
     expect(result.comments).toHaveLength(4);
+    expect(result.comments.map((item) => item.content)).toContain("Main comment");
+    expect(result.summary.total_comments).toBe(4);
     expect(result.comments.map((item) => item.content)).not.toContain(
       "Reply 3",
     );

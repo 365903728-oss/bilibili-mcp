@@ -69,6 +69,17 @@ describe("validateLanguage", () => {
     expect(() => validateLanguage("zh-Hans")).not.toThrow();
   });
 
+  it("accepts Bilibili AI-generated Chinese subtitles", () => {
+    expect(() => validateLanguage("ai-zh")).not.toThrow();
+  });
+
+  it("rejects a well-formed but unsupported language explicitly", () => {
+    expect(() => validateLanguage("fr")).toThrowError(ValidationError);
+    expect(() => validateLanguage("fr")).toThrow(
+      "Unsupported language. Supported values: zh-Hans, zh-CN, zh-Hant, en, ja, ko, ai-zh",
+    );
+  });
+
   it("rejects Chinese characters", () => {
     expect(() => validateLanguage("中文")).toThrow(
       "Invalid language code format",
