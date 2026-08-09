@@ -1524,3 +1524,50 @@
 - Boundary: candidate files are not yet committed, pushed, tagged, or published.
   The user explicitly authorized the full delivery/publication chain on
   2026-08-09; execution is now in progress behind the recorded gates.
+
+## 2026-08-09 — v1.11.4 Publication And Public Artifact Verification
+
+- Authorization: the user explicitly authorized commit, push, annotated tag,
+  npm, GitHub Release, and Official MCP Registry publication.
+- Git delivery: scoped release commit
+  `2a33520739aa96187ad25b36c1e4247dbf8ff640` has parent
+  `1067e02d3c906d62c4ec1bc48335b8e1dbec70f4` and was fast-forwarded to
+  `origin/master` without force. Annotated tag object `390cd8d` peels to the
+  release commit. A first HTTPS push attempt timed out before any remote write;
+  a live remote recheck still found the parent, and the bounded retry passed.
+- Trusted publication: GitHub Actions run `31296387097` concluded `success`.
+  Its `publish` job passed checkout, npm install, `npm ci`, 41 files / 862
+  tests, build, and `npm publish --provenance --access public`.
+- npm public state: `@xzxzzx/bilibili-mcp@1.11.4` is `latest`; integrity is
+  `sha512-B4SRRu4wYL5yGvVy/gp/XQSNvMW8UDk56Bx6WnU6YvTbislvg1EaQFwlqLkb/IyfOcEeusKSQpW4XXAaAEEXzg==`
+  and shasum is `f693ce356c81725c7093e61ce03465c5d041a868`. Registry
+  signature metadata is present, and the attestation predicate is
+  `https://slsa.dev/provenance/v1`.
+- Exact npm artifact: isolated installation added 97 packages. The
+  `npm audit signatures` command verified 97 registry signatures and 10
+  attestations. Node
+  `22.14.0` executed the published CLI at version `1.11.4`; official SDK stdio
+  reported server `bilibili-mcp-server` version `1.11.4` and the exact ten-tool
+  list. A credential-safe live `五道口纳什` call returned five results and
+  included the target author, with no Cookie value printed.
+- GitHub Release: `v1.11.4 - Contract and search response hardening` is public,
+  latest, non-draft, and non-prerelease at
+  `https://github.com/XZXZZX-Ai/bilibili-mcp/releases/tag/v1.11.4`.
+- Official Registry: official `mcp-publisher` `1.8.1` archive SHA-256 matched
+  upstream digest
+  `399ad0d6e00a50812b563a71d8bfbff5160c085e6b13aac6ec083d98d5ff7c45`.
+  The saved Registry JWT was expired and was refreshed through the documented
+  GitHub device flow without recording the device code or token. Publish then
+  succeeded. Public API verification reports `1.11.3` active/not-latest and
+  `1.11.4` active/latest, with the npm identifier and package version both
+  matching `@xzxzzx/bilibili-mcp@1.11.4`.
+- Non-blocking caveats: the successful Actions run warns that the pinned
+  checkout/setup-node action bundles target deprecated Node 20 and are forced
+  by GitHub to run on Node 24; the workflow still configures project commands
+  with Node `22.14.0`. Full-tree development audit retains eight transitive
+  dev-only findings, while production audit remains zero. Both belong to
+  separate maintenance work rather than this immutable patch release.
+- Result: `PASS`; every authorized public release surface is published and
+  independently queryable. The immutable release tag remains on `2a33520`;
+  this post-publication section belongs in a separate docs-only master update
+  and does not move the tag.

@@ -436,7 +436,7 @@
   succeeded; public Registry status is active/latest. The main user worktree
   and review-gated learning proposal were not touched.
 
-## 2026-08-09 v1.11.4 Local Release Preparation
+## 2026-08-09 v1.11.4 Release
 
 - Owner: Codex prepared the candidate directly in isolated branch
   `codex/release-v1.11.4-prep` from merged `origin/master` commit `1067e02`.
@@ -453,10 +453,25 @@
 - Live result: candidate MCP stdio reported version `1.11.4`, valid external
   login state, three stable `五道口纳什` searches, and real comment limits of 21
   and 50 without printing Cookie values.
-- Boundary: the candidate remains uncommitted and unpushed. No tag, Actions
-  run, npm version, GitHub Release, or Registry version `1.11.4` exists. The
-  user explicitly authorized the full delivery/publication chain on 2026-08-09;
-  execution is now in progress behind the recorded gates.
+- Delivery: after explicit user authorization, release commit `2a33520` was
+  fast-forwarded to `origin/master` without force. Annotated tag `v1.11.4`
+  peels to that commit; GitHub Actions run `31296387097` passed tests, build,
+  and OIDC npm publication.
+- Public result: npm `latest` is `1.11.4` with integrity, shasum, registry
+  signature, and SLSA provenance. The bilingual GitHub Release is public,
+  non-draft, non-prerelease, and latest.
+- Exact-artifact result: an isolated install verified 97 registry signatures
+  and 10 attestations. Under Node `22.14.0`, the published package reported
+  server version `1.11.4`, listed exactly ten tools, and completed an
+  authenticated live search without exposing credentials.
+- Registry result: official publisher `1.8.1` was downloaded from the upstream
+  release and matched SHA-256
+  `399ad0d6e00a50812b563a71d8bfbff5160c085e6b13aac6ec083d98d5ff7c45`.
+  After refreshing an expired Registry JWT through GitHub device auth, publish
+  succeeded; the public API reports `1.11.4` as `active` and `isLatest=true`.
+- Boundary: immutable tag `v1.11.4` remains at the release commit. These
+  post-publication records belong in a separate docs-only master commit and
+  must not move the tag; the dirty primary worktree remains untouched.
 - Review: complete-candidate release, standards/security, and specification
   reviewers returned PASS with no remaining P0-P3. The release-verifier's one
   initial P2 corrected encoding-gate wording before final acceptance.

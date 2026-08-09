@@ -1,23 +1,19 @@
 # Active Work
 
-Status: `v1.11.3` is published to npm, GitHub Releases, and the Official MCP
-Registry as `io.github.XZXZZX-Ai/bilibili-mcp`. Release commit `ac58a4b` is a
-descendant of PR #25's merge commit `15bb5f8`, so the contributor's merged work
-remains intact. GitHub Actions run `31032259381` passed tests, build, and npm
-trusted publishing. The Official Registry reports version `1.11.3` as `active`
-and `isLatest=true`.
+Status: `v1.11.4` is published to npm, GitHub Releases, and the Official MCP
+Registry as `io.github.XZXZZX-Ai/bilibili-mcp`. Release commit `2a33520`
+contains the five synchronized version fields, bilingual changelogs, and
+release records for merged PR #26 and PR #27. Annotated tag `v1.11.4` peels to
+that exact commit. GitHub Actions run `31296387097` passed tests, build, and npm
+trusted publishing; npm `latest` is `1.11.4` with registry signature and SLSA
+provenance. The public GitHub Release is non-draft/non-prerelease, and the
+Official Registry reports `1.11.4` as `active` and `isLatest=true`.
 
-Unreleased source delivery on 2026-08-09 comprises PR #26 for comments,
-language, credential, numeric-config, dotenv-order, and endpoint-aware `-403`
-contracts, plus PR #27 for fail-closed malformed search responses. Both are
-merged through `origin/master` commit `1067e02`. An isolated local branch,
-`codex/release-v1.11.4-prep`, now prepares five synchronized `1.11.4` version
-fields, matching bilingual changelogs, and scoped release records. The
-candidate is uncommitted and unpushed; npm, GitHub Releases, and the Official
-Registry still expose only the published `1.11.3` artifacts. The user explicitly
-authorized commit, push, annotated tag, npm, GitHub Release, and Official MCP
-Registry publication on 2026-08-09, and the gated publication chain is in
-progress.
+The release publishes PR #26 for comments, language, credential, numeric-
+config, dotenv-order, and endpoint-aware `-403` contracts, plus PR #27 for
+fail-closed malformed search responses. Both remain merged through base commit
+`1067e02`; the release metadata adds no runtime, dependency, workflow, README,
+or ten-tool boundary change.
 
 The local `1.11.4` candidate passed exact publish-runner Node `22.14.0` / npm
 `11.18.0` clean install, build, 41 files / 862 tests, 2 files / 19 focused
@@ -29,6 +25,13 @@ without printing Cookie values. Full development-tree audit findings remain
 separately recorded in the release QA and are not production dependencies.
 Independent release, standards/security, and specification reviews returned
 PASS with no remaining P0-P3.
+
+Post-publication verification installed exact npm package `1.11.4` in an
+isolated directory, verified all 97 installed-package registry signatures and
+10 attestations, and ran the package under Node `22.14.0`. MCP initialize
+reported server `bilibili-mcp-server` version `1.11.4`, listed exactly ten tools,
+and an authenticated live `五道口纳什` search returned five results containing
+the target author. No credential value was recorded.
 
 The published `v1.11.3` release verification passed the TypeScript build, 39 files / 803 tests,
 production audit with zero vulnerabilities, a 181-file package with required
