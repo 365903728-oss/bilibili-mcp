@@ -193,6 +193,25 @@ describe("MCP stdio entrypoint", () => {
       expect(JSON.parse(callResult.content[0].text)).not.toMatchObject({
         Cookie: expect.anything(),
       });
+
+      send({
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: {
+          name: "get_video_info",
+          arguments: {
+            bvid_or_url: "BV1T6PQzQErF",
+            preferred_lang: "fr",
+          },
+        },
+      });
+      const rejectedLanguage = await waitForId(4);
+      const rejectedLanguageResult = rejectedLanguage.result as CallToolResponse;
+      expect(rejectedLanguageResult.isError).toBe(true);
+      expect(JSON.parse(rejectedLanguageResult.content[0].text)).toMatchObject({
+        code: "VALIDATION_ERROR",
+      });
     } finally {
       child.stdin.end();
       const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));

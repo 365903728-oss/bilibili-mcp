@@ -1361,3 +1361,81 @@
   returned one exact match with `status=active` and `isLatest=true`.
 - Boundary: npm v1.11.2 remains immutable but its lowercase Registry namespace
   was rejected with HTTP 403. v1.11.3 is the corrected public latest version.
+
+## 2026-08-08 Contract Correctness Hardening (Uncommitted)
+
+- Baseline: detached isolated worktree at
+  `1b97183c70145eaf273bbddef4e0474e53bc177e`; Node `v25.6.1`, npm `11.16.0`.
+- TDD: focused failures reproduced the old comments number schema, missing
+  language enums, silent unsupported-language fallback, blank credential
+  mutation path, permissive numeric parsing, non-video `-403` paid mapping,
+  video-only access guidance, and late dotenv evaluation. Each targeted test
+  passed after the corresponding minimum fix.
+- Command: focused integrated Vitest run for comments, config, validation,
+  handlers, cache, CLI, HTTP, WBI, and error guidance.
+- Result: 10 files / 358 tests passed.
+- Command: `npm run build`.
+- Result: passed; TypeScript compiled the final source including
+  `src/load-env.ts`.
+- Command: `npm test`.
+- Result: 41 files / 853 tests passed.
+- Command: real child-process stdio protocol smoke for `initialize` → exact
+  `tools/list` → representative `tools/call` plus unsupported language.
+- Result: passed, 1 selected test / 11 skipped.
+- Command: `npm pack --dry-run --json --ignore-scripts`.
+- Result: 185 files, 1,088,165 packed bytes, 1,716,461 unpacked bytes; required
+  index, CLI, declarations, dotenv bootstrap, package metadata, and license
+  present; forbidden paths zero.
+- Command: `npm audit --omit=dev --json`.
+- Result: zero info/low/moderate/high/critical production vulnerabilities;
+  97 production dependencies reported.
+- Command: `git diff --check`, package-lock blob check, scoped secret-pattern
+  classification, and independent `risk-reviewer` review.
+- Result: diff check passed; `package-lock.json` remained
+  `70cee9306932ebb2d32bc1cce4016770cd2963d4`; no private-key, provider-token,
+  AWS-key, JWT, or real credential finding; reviewer returned PASS with no
+  P0/P1/P2 blocker.
+- Boundary: no live Bilibili/Cookie, ASR E2E, external desktop client, commit,
+  push, tag, Issue/PR write, release, publication, or deployment occurred.
+
+## 2026-08-09 Contract Correctness Hardening Review Correction
+
+- Review correction: a two-axis pre-delivery review found that the original
+  multi-page comments loop changed `ps` on its final request. Under Bilibili's
+  page-number/page-size semantics that overlapped earlier rows and could omit
+  requested main comments. The old mock's hard-coded 20-row offset had hidden
+  the defect.
+- TDD: a public-seam regression using real `pn`/`ps` offset semantics failed
+  with 20 unique rows for `limit: 21`, then passed after requests kept
+  `ps=20` and sliced locally. A second regression reproduced non-empty
+  19-row pages and passed after pagination stopped only on an empty page or
+  the bounded `ceil(limit / 20)` request count.
+- Normalization correction: final standards review found that normalized-empty
+  rows were still being used as the page-exhaustion signal. A `remaining=1`
+  case with a rejected first row and valid later row failed before the raw and
+  normalized states were separated, then passed. An all-rejected non-empty
+  page regression confirms traversal continues to later pages.
+- Malformed-container correction: a missing or non-array `replies` value first
+  reproduced a silent empty success, then failed closed as
+  `UpstreamResponseError`. Only an explicit empty array now represents
+  confirmed page exhaustion.
+- Refactor: supported-language membership and its error path now live in
+  `src/utils/validation.ts`; `src/config.ts` delegates to that shared path.
+  The task ticket status also uses the canonical `done` value.
+- Gates: TypeScript build passed; 41 files / 857 tests passed; the selected
+  real stdio JSON-RPC test passed; production audit reported zero
+  vulnerabilities across 97 dependencies; the 185-file dry-run package had
+  all required entrypoints and zero forbidden paths; `git diff --check`
+  passed; and `package-lock.json` retained blob
+  `70cee9306932ebb2d32bc1cce4016770cd2963d4`.
+- Secret classification: private-key, GitHub-token, npm-token, AWS-key, JWT,
+  and secret-filename checks were zero. Cookie-shaped matches were confined
+  to bilingual placeholders, verification prose, and synthetic CLI tests;
+  no credential value was printed or accepted as evidence.
+- Final review: independent standards and specification reviewers returned
+  PASS with no remaining P0-P3. Their final focused comments/error run passed
+  51/51 tests, and both confirmed the explicit-empty versus malformed-response
+  distinction at the public error boundary.
+- Delivery boundary: branch/commit/push/PR/merge was explicitly authorized;
+  version bumping, tags, npm publication, MCP Registry publication, and a
+  GitHub Release remain outside this work.

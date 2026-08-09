@@ -11,6 +11,7 @@ import { cacheManager } from "../utils/cache.js";
 import {
   CommentsDisabledError,
   ResourceLimitError,
+  UpstreamResponseError,
 } from "../utils/errors.js";
 import { logger, redactSecrets } from "../utils/logger.js";
 import { SECURITY_LIMITS, utf8ByteLength } from "../security/limits.js";
@@ -91,16 +92,23 @@ function normalizeRemoteComment(
 
 function acceptCommentPage(
   data: unknown,
-  remainingItems: number,
+  maxAcceptedItems: number,
+  maxRawItems: number,
   includeReplies: boolean,
-): Comment[] {
-  if (!isRecord(data) || !Array.isArray(data.replies)) return [];
+): { comments: Comment[]; rawIsEmpty: boolean } {
+  if (!isRecord(data) || !Array.isArray(data.replies)) {
+    throw new UpstreamResponseError(
+      "Bilibili returned an invalid comments response",
+    );
+  }
+  const rawReplies = data.replies.slice(0, maxRawItems);
   const accepted: Comment[] = [];
-  for (const rawComment of data.replies.slice(0, remainingItems)) {
+  for (const rawComment of rawReplies) {
+    if (accepted.length >= maxAcceptedItems) break;
     const comment = normalizeRemoteComment(rawComment, includeReplies);
     if (comment) accepted.push(comment);
   }
-  return accepted;
+  return { comments: accepted, rawIsEmpty: rawReplies.length === 0 };
 }
 
 
@@ -232,14 +240,19 @@ export async function getVideoCommentsData(
       rawComments = acceptCommentPage(
         commentsData,
         commentCount,
+        commentCount,
         includeReplies,
-      );
+      ).comments;
     } else {
       rawComments = [];
       let page = 1;
       let remaining = commentCount;
-      while (remaining > 0) {
-        const pageSize = Math.min(remaining, 20);
+      // Bilibili uses page-number/page-size pagination. Changing ps on the
+      // final request changes that page's offset, so keep ps stable and
+      // enforce the caller-visible limit locally.
+      const pageSize = 20;
+      const maxPages = Math.ceil(commentCount / pageSize);
+      while (remaining > 0 && page <= maxPages) {
         const pageData = await getVideoComments(
           bvidOrUrl,
           page,
@@ -247,15 +260,15 @@ export async function getVideoCommentsData(
           sort,
           includeReplies,
         );
-        const pageReplies = acceptCommentPage(
+        const acceptedPage = acceptCommentPage(
           pageData,
+          remaining,
           pageSize,
           includeReplies,
         );
-        if (pageReplies.length === 0) break;
-        rawComments.push(...pageReplies);
-        if (pageReplies.length < pageSize) break;
-        remaining -= pageReplies.length;
+        if (acceptedPage.rawIsEmpty) break;
+        rawComments.push(...acceptedPage.comments);
+        remaining -= acceptedPage.comments.length;
         page++;
       }
       rawComments = rawComments.slice(0, commentCount);

@@ -27,6 +27,10 @@ const BASE_URL = config.baseUrl;
 // 请求限流 - 避免高频请求被 Bilibili 限制
 const RATE_LIMIT_MS = config.rateLimitMs;
 const REQUEST_TIMEOUT_MS = config.requestTimeoutMs;
+const PAID_VIDEO_ENDPOINTS = new Set([
+  "/x/web-interface/view",
+  "/x/player/v2",
+]);
 let lastRequestTime: number | null = null;
 let pendingAdmissions = 0;
 let activeAndQueuedOperations = 0;
@@ -34,6 +38,14 @@ let activeAndQueuedOperations = 0;
 export interface HttpOperationContext {
   signal?: AbortSignal;
   deadlineAt: number;
+}
+
+function isExplicitPaidVideoDenial(path: string, message: unknown): boolean {
+  return (
+    PAID_VIDEO_ENDPOINTS.has(path) &&
+    typeof message === "string" &&
+    /(?:付费|购买后|需购买)/u.test(message)
+  );
 }
 
 async function reserveAdmission(
@@ -456,8 +468,16 @@ export async function fetchWithoutWBI(
             );
           }
           if (data.code === -403) {
-            throw new PaidVideoError(
-              "该视频为付费内容，无法获取完整信息",
+            if (isExplicitPaidVideoDenial(path, data.message)) {
+              throw new PaidVideoError(
+                "该视频为付费内容，无法获取完整信息",
+              );
+            }
+            throw new BilibiliAPIError(
+              "Bilibili denied access to this resource.",
+              "ACCESS_DENIED",
+              undefined,
+              data,
             );
           }
           throw new BilibiliAPIError(

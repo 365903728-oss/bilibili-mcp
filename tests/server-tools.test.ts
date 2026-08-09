@@ -93,9 +93,21 @@ describe("MCP tool list baseline", () => {
       expect(schema.inputSchema.required).toContain("bvid_or_url");
     });
 
-    it("accepts optional preferred_lang", () => {
+    it("publishes the supported preferred_lang values including ai-zh", () => {
       schema = toolsResult.tools.find((t) => t.name === "get_video_info")!;
-      expect(schema.inputSchema.properties).toHaveProperty("preferred_lang");
+      const prop = schema.inputSchema.properties.preferred_lang as {
+        type?: string;
+        enum?: string[];
+        description?: string;
+      };
+
+      expect(prop).toMatchObject({
+        type: "string",
+        enum: ["zh-Hans", "zh-CN", "zh-Hant", "en", "ja", "ko", "ai-zh"],
+      });
+      expect(prop.description).toContain("ai-zh");
+      expect(prop.description).toContain("未知值会被拒绝");
+      expect(prop.description).toContain("unsupported values are rejected");
     });
 
     it("accepts optional page with integer type and minimum 1", () => {
@@ -140,11 +152,26 @@ describe("MCP tool list baseline", () => {
       expect(prop.enum).toEqual(["brief", "detailed"]);
     });
 
-    it("accepts optional limit", () => {
+    it("defines limit as a 1-50 main-comment count and documents reply expansion", () => {
       schema = toolsResult.tools.find(
         (t) => t.name === "get_video_comments",
       )!;
-      expect(schema.inputSchema.properties).toHaveProperty("limit");
+      const prop = schema.inputSchema.properties.limit as {
+        type?: string;
+        minimum?: number;
+        maximum?: number;
+        description?: string;
+      };
+
+      expect(prop).toMatchObject({
+        type: "integer",
+        minimum: 1,
+        maximum: 50,
+      });
+      expect(prop.description).toContain("主评论");
+      expect(prop.description).toContain("main-comment");
+      expect(prop.description).toContain("comments[]");
+      expect(prop.description).toContain("超过 limit");
     });
 
     it("accepts optional sort with enum hot/time", () => {
@@ -188,11 +215,23 @@ describe("MCP tool list baseline", () => {
       expect(schema.inputSchema.required).toContain("bvid_or_url");
     });
 
-    it("accepts optional preferred_lang", () => {
+    it("publishes the supported preferred_lang values including ai-zh", () => {
       schema = toolsResult.tools.find(
         (t) => t.name === "get_video_transcript",
       )!;
-      expect(schema.inputSchema.properties).toHaveProperty("preferred_lang");
+      const prop = schema.inputSchema.properties.preferred_lang as {
+        type?: string;
+        enum?: string[];
+        description?: string;
+      };
+
+      expect(prop).toMatchObject({
+        type: "string",
+        enum: ["zh-Hans", "zh-CN", "zh-Hant", "en", "ja", "ko", "ai-zh"],
+      });
+      expect(prop.description).toContain("ai-zh");
+      expect(prop.description).toContain("未知值会被拒绝");
+      expect(prop.description).toContain("unsupported values are rejected");
     });
 
     it("accepts optional fallback_to_description (boolean)", () => {

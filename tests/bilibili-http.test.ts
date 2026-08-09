@@ -1,11 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const credentialsMock = vi.hoisted(() => ({
+  getAuthHeaders: vi.fn(() => ({})),
+}));
+
+vi.mock("../src/utils/credentials.js", () => ({
+  credentialManager: {
+    getAuthHeaders: credentialsMock.getAuthHeaders,
+  },
+}));
+
 const savedRateLimit = process.env.BILIBILI_RATE_LIMIT_MS;
 const savedRequestTimeout = process.env.BILIBILI_REQUEST_TIMEOUT_MS;
 
 beforeEach(async () => {
   vi.useFakeTimers();
   vi.resetModules();
+  credentialsMock.getAuthHeaders.mockClear();
   process.env.BILIBILI_RATE_LIMIT_MS = "500";
 });
 
@@ -210,6 +221,36 @@ describe("checkLoginStatus", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("maps a nav JSON -403 to ACCESS_DENIED instead of PAID_VIDEO", async () => {
+    const { checkLoginStatus } = await import("../src/bilibili/http.js");
+    const originalFetch = globalThis.fetch;
+    try {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: -403, message: "访问权限不足" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+      globalThis.fetch = fetchMock as typeof globalThis.fetch;
+
+      const outcome = checkLoginStatus().catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(500);
+
+      await expect(outcome).resolves.toMatchObject({
+        name: "BilibiliAPIError",
+        code: "ACCESS_DENIED",
+      });
+      await expect(outcome).resolves.not.toMatchObject({
+        name: "PaidVideoError",
+      });
+      expect(credentialsMock.getAuthHeaders).toHaveBeenCalledOnce();
+      const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      expect(new Headers(requestInit.headers).has("Cookie")).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
 
 describe("Bilibili redirect policy", () => {
@@ -234,6 +275,104 @@ describe("Bilibili redirect policy", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ redirect: "manual" });
+  });
+});
+
+describe("plain JSON -403 classification", () => {
+  it.each([
+    "/x/v3/fav/folder/created/list-all",
+    "/x/v3/fav/resource/list",
+  ])(
+    "maps %s JSON -403 to ACCESS_DENIED even when its message mentions payment",
+    async (path) => {
+      const { fetchWithoutWBI } = await import("../src/bilibili/http.js");
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              code: -403,
+              message: "付费内容不可访问",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        ) as typeof globalThis.fetch;
+
+        const outcome = fetchWithoutWBI(path).catch((error: unknown) => error);
+        await vi.advanceTimersByTimeAsync(500);
+
+        await expect(outcome).resolves.toMatchObject({
+          name: "BilibiliAPIError",
+          code: "ACCESS_DENIED",
+        });
+        await expect(outcome).resolves.not.toMatchObject({
+          name: "PaidVideoError",
+        });
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  );
+
+  it("does not infer payment from a video endpoint without an explicit paid message", async () => {
+    const { fetchWithoutWBI } = await import("../src/bilibili/http.js");
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ code: -403, message: "访问权限不足" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ) as typeof globalThis.fetch;
+
+      const outcome = fetchWithoutWBI("/x/player/v2", {
+        bvid: "BV1synthetic",
+        cid: 1,
+      }).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(500);
+
+      await expect(outcome).resolves.toMatchObject({
+        name: "BilibiliAPIError",
+        code: "ACCESS_DENIED",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("keeps PAID_VIDEO only for an explicitly paid video response", async () => {
+    const { fetchWithoutWBI } = await import("../src/bilibili/http.js");
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: -403,
+            message: "该视频为付费视频，请购买后观看",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ) as typeof globalThis.fetch;
+
+      const outcome = fetchWithoutWBI("/x/player/v2", {
+        bvid: "BV1synthetic",
+        cid: 1,
+      }).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(500);
+
+      await expect(outcome).resolves.toMatchObject({ name: "PaidVideoError" });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

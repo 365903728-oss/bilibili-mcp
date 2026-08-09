@@ -398,3 +398,51 @@
   the Official Registry API exact match with `status=active` and `isLatest=true`.
 - Impact: future Official Registry updates must preserve the case-sensitive
   namespace and publish the matching npm version before Registry metadata.
+
+## 2026-08-08
+
+- Fact: An isolated, uncommitted implementation worktree based on live master
+  `1b97183` hardens five public contracts: comments `limit` counts main
+  comments, `ai-zh` is canonical and preserved, blank credential replacement
+  is rejected without mutation, numeric runtime settings are strictly
+  validated, and plain JSON `-403` is classified by endpoint semantics.
+- Evidence: schemas, handlers, bilingual references, synthetic CLI/HTTP tests,
+  the public stdio language-validation assertion, 41 files / 853 full tests,
+  and `docs/qa/2026-08-08-contract-correctness-hardening.md`.
+- Impact: Child replies may legitimately make flat `comments[]` exceed
+  `limit`; unsupported languages and malformed numeric settings now fail
+  explicitly; Favorites/nav access denial no longer masquerades as paid video.
+
+- Fact: The stdio entrypoint now evaluates `src/load-env.ts` before importing
+  the server, so optional project-local `.env` numeric values are loaded before
+  runtime config is frozen and validated; the reusable default server export
+  remains unchanged.
+- Evidence: the old-order red and fixed-order green in
+  `tests/index-env-order.test.ts`, clean TypeScript build, real stdio smoke,
+  package inspection, and independent risk-reviewer PASS.
+- Impact: The documented source `npm start` / `dist/index.js` `.env` path is
+  now real for runtime settings. This work is not on master or npm until a
+  separately authorized commit and release occur.
+
+## 2026-08-09
+
+- Fact: Bilibili comments pagination must keep the upstream page size fixed;
+  incrementing `pn` while shrinking `ps` changes the offset and can overlap
+  rows. A non-empty short page is also not sufficient evidence of completion.
+- Evidence: public-seam `limit: 21` and 19-row-page regressions, both observed
+  red before the bounded fixed-`ps` implementation and green afterward; final
+  raw-exhaustion and malformed-container regressions; and final full suite 41
+  files / 857 tests.
+- Impact: Requests above 20 main comments use `ps=20`, stop on an empty page
+  or after `ceil(limit / 20)` pages, and slice locally. Child replies may still
+  expand the flat result beyond the requested main-comment limit. A page whose
+  raw rows are non-empty continues even when every row is rejected during
+  normalization; a missing or non-array `replies` container fails closed.
+
+- Fact: The 2026-08-09 delivery authorization covers an isolated branch,
+  commit, push, PR, and merge for the verified source changes only.
+- Evidence: user instruction in the active task and the delivery extension in
+  `docs/agent-memory/handoffs/2026-08-08-contract-correctness-hardening-task-ticket.md`.
+- Impact: package version remains `1.11.3`; tag, npm publication, Official MCP
+  Registry publication, GitHub Release, and deployment require a separate
+  release decision.

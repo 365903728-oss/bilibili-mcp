@@ -3,6 +3,10 @@
  * 提供统一的输入验证功能
  */
 
+import {
+  SUPPORTED_LANGUAGES,
+  type SupportedLanguage,
+} from "../bilibili/types.js";
 import { ValidationError } from "./errors.js";
 
 export interface ValidationOptions {
@@ -58,19 +62,33 @@ export function validateBVInput(input: unknown): void {
 /**
  * 验证语言参数
  */
-export function validateLanguage(lang?: string): void {
-  if (lang) {
-    validateLength(lang, {
-      maxLength: 10,
-      minLength: 2,
-      required: false
-    });
-    
-    // 语言代码格式验证
-    if (!/^[a-z]{2}(-[A-Za-z]{2,})?$/.test(lang)) {
-      throw new ValidationError('Invalid language code format');
-    }
+export function isSupportedLanguage(lang: string): lang is SupportedLanguage {
+  return SUPPORTED_LANGUAGES.some((supported) => supported === lang);
+}
+
+export function validateLanguage(
+  lang?: string,
+): SupportedLanguage | undefined {
+  if (lang === undefined) return undefined;
+
+  validateLength(lang, {
+    maxLength: 10,
+    minLength: 2,
+    required: true
+  });
+
+  // 语言代码格式验证
+  if (!/^[a-z]{2}(-[A-Za-z]{2,})?$/.test(lang)) {
+    throw new ValidationError('Invalid language code format');
   }
+
+  if (!isSupportedLanguage(lang)) {
+    throw new ValidationError(
+      `Unsupported language. Supported values: ${SUPPORTED_LANGUAGES.join(", ")}`,
+    );
+  }
+
+  return lang;
 }
 
 /**

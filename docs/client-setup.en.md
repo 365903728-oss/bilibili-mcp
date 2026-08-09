@@ -1145,6 +1145,8 @@ The MCP server reads these variables at process startup. Restart the client or r
 | `USER_AGENT` | Project default | Override the request User-Agent |
 | `BILIBILI_MCP_DEBUG` | Disabled | Set to `1` to emit credential-redacted debug logs to `stderr` |
 
+All three numeric variables must be complete decimal positive safe integers. Empty, partial, zero, negative, or unsafe-integer values make the server reject startup with a configuration error. `BILIBILI_RATE_LIMIT_MS` and `BILIBILI_REQUEST_TIMEOUT_MS` must also not exceed the Node.js timer limit of `2147483647`.
+
 See [Tool reference: Request controls and cache](./tool-reference.en.md#request-controls-and-cache) for retry, cache, and error semantics.
 
 ## Develop from source

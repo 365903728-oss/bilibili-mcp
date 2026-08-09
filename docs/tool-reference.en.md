@@ -25,7 +25,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Prioritizes retrieving CC or AI subtitles.
 - Automatically falls back to video title, description, and tags if no subtitles are available.
 - Supports multi-language subtitle selection (defaults to Simplified Chinese).
-- Supports manual preference for subtitle languages (e.g., `en`, `zh-Hant`).
+- Supports explicit subtitle languages `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, and `ai-zh`; `ai-zh` reaches selection unchanged, while unsupported values return `VALIDATION_ERROR`.
 
 ### 2. Comment Summarization (`get_video_comments`)
 - Retrieves popular comments to help gauge video sentiment.
@@ -35,7 +35,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
   - `brief`: 10 popular comments summary.
   - `detailed`: 20 popular comments + high-quality replies.
 - Optional parameters:
-  - `limit`: Explicit comment count `1-50`, overrides `detail_level` default.
+  - `limit`: Main-comment count, integer `1-50`; overrides the `detail_level` default. When replies are included, the flattened `comments[]` may contain more than `limit` items.
   - `sort`: Sort order `"hot"` (default) or `"time"`.
   - `include_replies`: Whether to include top replies (default `true`).
 
@@ -45,7 +45,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Supports multi-Part selection, timestamp output, time-range filtering, and optional keyword search.
 - Successful calls return both the backward-compatible formatted JSON text and the same data as MCP `structuredContent`.
 - Optional parameters:
-  - `preferred_lang`: Preferred subtitle language code.
+  - `preferred_lang`: Preferred subtitle language code: `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, or `ai-zh`. `ai-zh` reaches selection unchanged; unsupported values return `VALIDATION_ERROR`.
   - `fallback_to_description`: Fall back to video description if subtitles unavailable (default `false`).
   - `fallback_to_asr`: Run ready local ASR only after subtitles are definitively unavailable (default `false`).
   - `page`: Multi-Part video page number (1-based positive integer).
@@ -171,7 +171,7 @@ Supported error codes:
 | `NETWORK_ERROR` | Network request failed (HTTP 5xx, connection errors, etc.) | Retry later; check network/proxy/firewall if it keeps happening |
 | `NETWORK_TIMEOUT` | Request to Bilibili timed out | Retry later; check network/proxy/firewall if it keeps happening |
 | `API_RATE_LIMITED` | Bilibili API rate limit hit (HTTP 429) | Wait and retry; reduce request frequency or raise `BILIBILI_RATE_LIMIT_MS` |
-| `ACCESS_DENIED` | Bilibili denied access (permissions, private, region-locked, removed) | Verify the video access permissions; run the credential check if needed |
+| `ACCESS_DENIED` | Bilibili denied access to a resource (permissions, private, region/account restrictions, removed) | Verify the resource and account access permissions; run the credential check if needed |
 | `PAID_VIDEO` | Video may require payment, membership, or extra permissions | Confirm in Bilibili; this MCP will not bypass paid or restricted access |
 | `COMMENTS_DISABLED` | Comments are disabled or restricted | Use transcript or metadata tools; confirm on the Bilibili page |
 | `BILIBILI_API_ERROR` | Other Bilibili API errors | Retry if it looks temporary; include the code when reporting repeated issues |
@@ -292,7 +292,7 @@ Request:
 
 Returns: `bvid`, `title`, `language`, `transcript` (newline-joined), `data_source` (`subtitle`, `asr`, or `description`), `page`.
 
-> Returns `SUBTITLE_UNAVAILABLE` when no subtitles exist. Set `fallback_to_description: true` to fall back.
+> `preferred_lang` accepts only `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, or `ai-zh`. Explicit `ai-zh` is not rewritten to another language; unsupported values return `VALIDATION_ERROR`. The tool returns `SUBTITLE_UNAVAILABLE` when no subtitles exist. Set `fallback_to_description: true` to fall back.
 
 **Explicit ASR fallback example**:
 
@@ -393,7 +393,7 @@ Request:
 
 Returns: `data_source` (`subtitle` or `description`), `video_info` (title, description, tags, subtitle text, publish date).
 
-> Videos without subtitles automatically degrade to description and tags (`data_source: "description"`).
+> `preferred_lang` accepts only `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, or `ai-zh`. Explicit `ai-zh` is not rewritten to another language; unsupported values return `VALIDATION_ERROR`. Videos without subtitles automatically degrade to description and tags (`data_source: "description"`).
 
 ### `get_video_comments`
 
@@ -416,7 +416,7 @@ Request:
 
 Returns: `comments[]` (author, content, likes, timestamp, has_timestamp), `summary` (total count, timestamp count).
 
-> Expired or missing cookies may result in empty comments. Use `sort: "time"` for newest comments, `include_replies: false` to skip replies.
+> `limit` applies only to main comments. With `include_replies: true` and `detail_level: "detailed"`, the flattened `comments[]` also contains child replies and may therefore exceed `limit`. Expired or missing cookies may result in empty comments. Use `sort: "time"` for newest comments, `include_replies: false` to skip replies.
 
 ---
 
@@ -430,6 +430,8 @@ Built-in request controls reduce the chance of triggering Bilibili risk checks o
 - **Timeout**: defaults to 10 seconds, configurable with `BILIBILI_REQUEST_TIMEOUT_MS`.
 - **Cache capacity**: defaults to 100 entries, configurable with `BILIBILI_CACHE_SIZE`.
 - **User-Agent**: overridable via `USER_AGENT`.
+
+All three numeric variables must be complete decimal positive safe integers. Empty, partial, zero, negative, or unsafe-integer values raise a configuration error and prevent startup. The two millisecond variables must also not exceed the Node.js timer limit of `2147483647`; cache capacity has no additional arbitrary cap.
 
 All of the above environment variables are read at MCP server process startup. After changing them, restart the MCP client or reconnect the MCP server for the new values to take effect.
 

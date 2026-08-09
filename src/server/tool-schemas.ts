@@ -1,5 +1,7 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
+import { SUPPORTED_LANGUAGES } from "../bilibili/types.js";
+
 export const toolSchemas: Tool[] = [
   {
     name: "get_credential_setup_instructions",
@@ -44,8 +46,9 @@ export const toolSchemas: Tool[] = [
         },
         preferred_lang: {
           type: "string",
+          enum: [...SUPPORTED_LANGUAGES],
           description:
-            "可选参数，指定偏好字幕语言代码，如 'zh-Hans', 'zh-Hant', 'en' 等。默认按 zh-Hans -> zh-Hant -> en 顺序选择。",
+            "可选字幕语言。支持 zh-Hans、zh-CN、zh-Hant、en、ja、ko、ai-zh；ai-zh 会原样传入字幕选择，未知值会被拒绝。默认 zh-Hans。 Optional subtitle language; ai-zh is preserved and unsupported values are rejected.",
         },
         page: {
           type: "integer",
@@ -75,9 +78,11 @@ export const toolSchemas: Tool[] = [
           enum: ["brief", "detailed"],
         },
         limit: {
-          type: "number",
+          type: "integer",
+          minimum: 1,
+          maximum: 50,
           description:
-            "可选评论数量限制，整数 1-50。覆盖 detail_level 的默认数量。",
+            "可选，主评论数量，整数 1-50；覆盖 detail_level 的默认主评论数量。include_replies 为 true 时，扁平 comments[] 会包含子回复，因此总条数可超过 limit。 Optional main-comment count (integer 1-50); overrides the detail_level default. With include_replies=true, flattened comments[] may exceed limit because replies are included.",
         },
         sort: {
           type: "string",
@@ -107,8 +112,9 @@ export const toolSchemas: Tool[] = [
         },
         preferred_lang: {
           type: "string",
+          enum: [...SUPPORTED_LANGUAGES],
           description:
-            "可选，指定偏好字幕语言代码，如 'zh-Hans', 'en' 等。",
+            "可选字幕语言。支持 zh-Hans、zh-CN、zh-Hant、en、ja、ko、ai-zh；ai-zh 会原样传入字幕选择，未知值会被拒绝。默认 zh-Hans。 Optional subtitle language; ai-zh is preserved and unsupported values are rejected.",
         },
         fallback_to_description: {
           type: "boolean",
