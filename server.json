@@ -7,12 +7,12 @@
     "url": "https://github.com/XZXZZX-Ai/bilibili-mcp",
     "source": "github"
   },
-  "version": "1.11.3",
+  "version": "1.11.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@xzxzzx/bilibili-mcp",
-      "version": "1.11.3",
+      "version": "1.11.4",
       "transport": {
         "type": "stdio"
       }

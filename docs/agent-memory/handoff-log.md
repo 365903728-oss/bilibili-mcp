@@ -435,3 +435,28 @@
 - Result: source, npm, GitHub Release, and Official MCP Registry publication
   succeeded; public Registry status is active/latest. The main user worktree
   and review-gated learning proposal were not touched.
+
+## 2026-08-09 v1.11.4 Local Release Preparation
+
+- Owner: Codex prepared the candidate directly in isolated branch
+  `codex/release-v1.11.4-prep` from merged `origin/master` commit `1067e02`.
+- Objective: package the already-merged PR #26 contract corrections and PR #27
+  malformed-search-response hardening as the smallest `1.11.4` patch release.
+- Scope: five synchronized version fields, matching bilingual changelog
+  sections, and scoped task/research/QA/status/verification records. Runtime,
+  tests, dependencies, workflow, READMEs, and the ten-tool boundary are
+  unchanged.
+- Local result: exact Node `22.14.0` / npm `11.18.0` clean install, build,
+  41 files / 862 tests, 2 files / 19 stdio tests, 185-file package, zero-
+  finding production audit, live Registry schema validation, strict UTF-8 and
+  diff checks, and value-free secret classification passed.
+- Live result: candidate MCP stdio reported version `1.11.4`, valid external
+  login state, three stable `五道口纳什` searches, and real comment limits of 21
+  and 50 without printing Cookie values.
+- Boundary: the candidate remains uncommitted and unpushed. No tag, Actions
+  run, npm version, GitHub Release, or Registry version `1.11.4` exists. The
+  user explicitly authorized the full delivery/publication chain on 2026-08-09;
+  execution is now in progress behind the recorded gates.
+- Review: complete-candidate release, standards/security, and specification
+  reviewers returned PASS with no remaining P0-P3. The release-verifier's one
+  initial P2 corrected encoding-gate wording before final acceptance.

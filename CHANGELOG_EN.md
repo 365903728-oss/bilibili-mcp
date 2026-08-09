@@ -8,6 +8,17 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.11.4] - 2026-08-09
+
+### Fixed
+- Corrected top-level comment `limit` semantics with a fixed upstream `ps=20`, bounded pagination, and local truncation to the caller-visible limit; missing or non-array `replies` containers now fail closed instead of being treated as empty pages. Also standardized supported-language validation while preserving `ai-zh`, protected existing credentials from blank replacement, enforced strict numeric environment configuration, and made Bilibili JSON `-403` classification endpoint-aware. (PR #26)
+- Hardened search response shapes: explicit `result: []` remains a successful one-request empty result; missing or non-array `result` values receive one abort-aware shape retry before returning `UPSTREAM_RESPONSE_INVALID`. A valid second response recovers, while network, HTTP-status, and abort errors are not retried by the search layer. (PR #27)
+
+### Verified
+- The final automated suite passed 862 tests across 41 files, covering comment pagination boundaries, malformed reply containers, explicit-empty search results, malformed-search recovery, and MCP error mapping. TypeScript build, real MCP stdio protocol smoke, a 185-file npm package check, production dependency audit, and credential scanning also passed. Authenticated live smoke covered normal success paths: repeated searches returned stable results and comment limits of 21 and 50 reached their caller-visible caps. Malformed, explicit-empty, and upstream-error paths remain deterministically automation-backed. No Cookie value appeared in output.
+
+---
+
 ## [1.11.3] - 2026-08-06
 
 ### Fixed

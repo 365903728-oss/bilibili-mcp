@@ -1466,3 +1466,61 @@
   backoff regressions also pass, preventing nested retry multiplication.
 - Final review: risk, standards, and specification re-reviews returned PASS
   with no remaining P0-P3 after the local loop correction.
+
+## 2026-08-09 v1.11.4 Local Release Candidate
+
+- Baseline: isolated branch `codex/release-v1.11.4-prep` at unmodified HEAD
+  `1067e02d3c906d62c4ec1bc48335b8e1dbec70f4`; merge-base and live
+  `origin/master` match that commit.
+- Metadata: `package.json`, both root `package-lock.json` version fields, and
+  both `server.json` version fields report `1.11.4`; Registry name remains
+  `io.github.XZXZZX-Ai/bilibili-mcp`. Candidate package/lock blobs
+  `f42ace07d2f31859b2da1d773b4d7c9c001d35c4` and
+  `c83866634e37a1ba1761c9a09902399ea5be9f9d` remained stable across clean
+  install and build.
+- Environment: publish-workflow-equivalent Node `22.14.0` and npm `11.18.0`
+  on the Windows preflight host.
+- Commands: `npm ci`, `npm run build`, and `npm test` through those exact
+  runtime versions.
+- Result: clean install passed; TypeScript build passed; full Vitest passed
+  41 files / 862 tests; candidate CLI and MCP `initialize` each reported
+  `1.11.4`.
+- Stdio: `tests/mcp-server-smoke.test.ts` plus
+  `tests/bounded-stdio-transport.test.ts` passed 2 files / 19 tests. Candidate
+  `initialize` negotiated protocol `2025-06-18`; the exact ten-tool surface
+  and JSON-clean stdout boundary remain covered.
+- Package: exact-runtime `npm pack --dry-run --json --ignore-scripts` reported
+  185 files, 1,088,656 packed bytes, and 1,718,670 unpacked bytes. Required
+  index/types/CLI/package/license entries were present, forbidden paths were
+  zero, and no `.tgz` remained.
+- Audit: `npm audit --omit=dev --json` exited zero with 97 production
+  dependencies and zero findings. Full-tree audit separately exited one with
+  eight transitive dev-only findings: 1 moderate, 6 high, and 1 critical in
+  `brace-expansion`, `ip-address`, `js-yaml`, `nanoid`, `npm`, `postcss`,
+  `tar`, and `undici`; dependencies are unchanged in this patch release.
+- Registry: repository `server.json` passed the live official 2025-12-11 JSON
+  schema at version `1.11.4`, while its name matches packed
+  `package.json.mcpName`. The manifest stays outside the tarball by existing
+  publisher design.
+- Live MCP: Node `22.14.0` candidate stdio loaded external `global_config`
+  credentials and reported logged-in status. Three `五道口纳什` searches each
+  returned 5 candidates with the target author. `黑神话悟空` returned 5
+  candidates; public BVID `BV1AE4m1d7XT` returned 21 and 50 main comments for
+  the corresponding limits with replies disabled. No Cookie value was printed.
+- Secret and encoding boundary: changed release files and 183 package text
+  files had zero high-confidence private-key/provider-token/AWS/JWT/literal-
+  Cookie matches. The one tracked-tree literal-Cookie-shaped match is
+  `tests/cli.test.ts`, classified as isolated synthetic test data and excluded
+  from the package. All newly added files and candidate-added lines are strict
+  UTF-8, introduce no BOM, and add no replacement characters;
+  `verification-log.md` retains six historical baseline U+FFFD characters
+  unchanged. `git diff --check` passed.
+- Remote state: live checks found no tag, GitHub Release, or npm version
+  `1.11.4`; npm `latest` and the Official Registry remain `1.11.3`.
+- Final review: independent release-verifier, standards/security, and
+  specification reviews returned PASS with no remaining P0-P3. The initial
+  encoding-wording P2 was corrected and re-reviewed against zero replacement
+  characters in candidate-added lines and new files.
+- Boundary: candidate files are not yet committed, pushed, tagged, or published.
+  The user explicitly authorized the full delivery/publication chain on
+  2026-08-09; execution is now in progress behind the recorded gates.

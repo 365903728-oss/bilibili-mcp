@@ -9,13 +9,28 @@ and `isLatest=true`.
 
 Unreleased source delivery on 2026-08-09 comprises PR #26 for comments,
 language, credential, numeric-config, dotenv-order, and endpoint-aware `-403`
-contracts, plus PR #27 for fail-closed malformed search responses. Both keep
-the source package version at `1.11.3`; npm, GitHub Releases, and the Official
-Registry still expose the previously published `1.11.3` artifacts. Any public
-release of these source changes must use a new version such as `1.11.4` and
-requires separate release authorization.
+contracts, plus PR #27 for fail-closed malformed search responses. Both are
+merged through `origin/master` commit `1067e02`. An isolated local branch,
+`codex/release-v1.11.4-prep`, now prepares five synchronized `1.11.4` version
+fields, matching bilingual changelogs, and scoped release records. The
+candidate is uncommitted and unpushed; npm, GitHub Releases, and the Official
+Registry still expose only the published `1.11.3` artifacts. The user explicitly
+authorized commit, push, annotated tag, npm, GitHub Release, and Official MCP
+Registry publication on 2026-08-09, and the gated publication chain is in
+progress.
 
-Release verification passed the TypeScript build, 39 files / 803 tests,
+The local `1.11.4` candidate passed exact publish-runner Node `22.14.0` / npm
+`11.18.0` clean install, build, 41 files / 862 tests, 2 files / 19 focused
+stdio tests, a 185-file package, zero-vulnerability production audit, live
+official Registry schema validation, strict UTF-8/diff checks, and scoped
+credential scans. Credential-safe live MCP stdio calls reported a valid login,
+three stable searches for `五道口纳什`, and real comment limits of 21 and 50
+without printing Cookie values. Full development-tree audit findings remain
+separately recorded in the release QA and are not production dependencies.
+Independent release, standards/security, and specification reviews returned
+PASS with no remaining P0-P3.
+
+The published `v1.11.3` release verification passed the TypeScript build, 39 files / 803 tests,
 production audit with zero vulnerabilities, a 181-file package with required
 dist entry points and no forbidden paths, Registry metadata validation,
 diff/UTF-8/value-free secret checks, two independent read-only reviews, and an
