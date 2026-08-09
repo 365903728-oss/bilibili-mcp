@@ -50,6 +50,7 @@ const {
   NoSubtitleError,
   PaidVideoError,
   TimeoutError,
+  UpstreamResponseError,
 } = await import("../src/utils/errors.js");
 
 const { credentialManager } = await import("../src/utils/credentials.js");
@@ -148,6 +149,31 @@ describe("generic MCP error credential next_steps", () => {
       "npx -y @xzxzzx/bilibili-mcp@latest config",
     );
     expect(JSON.stringify(payload)).not.toContain("configured");
+  });
+
+  it("maps malformed search responses to a text-only upstream error", async () => {
+    mockSearchBilibiliVideos.mockRejectedValueOnce(
+      new UpstreamResponseError("Invalid search response"),
+    );
+
+    const handler = getCallToolHandler();
+    const response = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 3,
+      params: {
+        name: "search_bilibili_videos",
+        arguments: { query: "MCP" },
+      },
+    });
+    const payload = JSON.parse(response.content[0].text);
+
+    expect(response.isError).toBe(true);
+    expect(response).not.toHaveProperty("structuredContent");
+    expectStructuredError(payload, "UPSTREAM_RESPONSE_INVALID", {
+      retryable: false,
+      userActionRequired: false,
+    });
   });
 
   it("returns safe credential recovery guidance for authenticated favorites discovery", async () => {

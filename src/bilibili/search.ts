@@ -2,7 +2,13 @@ import { credentialManager } from "../utils/credentials.js";
 import {
   BilibiliAPIError,
   ResourceLimitError,
+  UpstreamResponseError,
 } from "../utils/errors.js";
+import {
+  abortableDelay,
+  getOperationSignal,
+  throwIfAborted,
+} from "../security/operation-context.js";
 import { isValidBVId } from "../utils/bvid.js";
 import type { VideoSearchCandidate, VideoSearchData } from "./types.js";
 import { checkLoginStatus, fetchWithoutWBI } from "./http.js";
@@ -16,6 +22,7 @@ const MAX_SEARCH_ROWS = 100;
 const MAX_SEARCH_TITLE_BYTES = 512;
 const MAX_SEARCH_AUTHOR_BYTES = 128;
 const MAX_SEARCH_DESCRIPTION_BYTES = 512;
+const SEARCH_SHAPE_RETRY_DELAY_MS = 500;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -107,6 +114,39 @@ function normalizeCandidate(value: unknown): VideoSearchCandidate | undefined {
   };
 }
 
+async function fetchSearchRows(
+  query: string,
+  limit: number,
+  authHeaders: Record<string, string>,
+): Promise<unknown[]> {
+  const signal = getOperationSignal();
+  const params = {
+    search_type: "video",
+    keyword: query,
+    page: 1,
+    page_size: limit,
+  };
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    throwIfAborted(signal);
+    const data = await fetchWithoutWBI(
+      VIDEO_SEARCH_PATH,
+      params,
+      authHeaders,
+    );
+    if (isRecord(data) && Array.isArray(data.result)) {
+      return data.result;
+    }
+    if (attempt === 0) {
+      await abortableDelay(SEARCH_SHAPE_RETRY_DELAY_MS, signal);
+    }
+  }
+
+  throw new UpstreamResponseError(
+    "Bilibili returned an invalid video search response",
+  );
+}
+
 export async function searchBilibiliVideos(
   query: string,
   limit = 5,
@@ -126,18 +166,8 @@ export async function searchBilibiliVideos(
     throw createCredentialError();
   }
 
-  const data = await fetchWithoutWBI(
-    VIDEO_SEARCH_PATH,
-    {
-      search_type: "video",
-      keyword: normalizedQuery,
-      page: 1,
-      page_size: limit,
-    },
-    authHeaders,
-  );
+  const rows = await fetchSearchRows(normalizedQuery, limit, authHeaders);
 
-  const rows = isRecord(data) && Array.isArray(data.result) ? data.result : [];
   if (rows.length > MAX_SEARCH_ROWS) {
     throw new ResourceLimitError(
       "Video search response exceeded its item limit",
