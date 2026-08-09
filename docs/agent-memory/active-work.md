@@ -7,6 +7,14 @@ remains intact. GitHub Actions run `31032259381` passed tests, build, and npm
 trusted publishing. The Official Registry reports version `1.11.3` as `active`
 and `isLatest=true`.
 
+Unreleased source delivery on 2026-08-09 comprises PR #26 for comments,
+language, credential, numeric-config, dotenv-order, and endpoint-aware `-403`
+contracts, plus PR #27 for fail-closed malformed search responses. Both keep
+the source package version at `1.11.3`; npm, GitHub Releases, and the Official
+Registry still expose the previously published `1.11.3` artifacts. Any public
+release of these source changes must use a new version such as `1.11.4` and
+requires separate release authorization.
+
 Release verification passed the TypeScript build, 39 files / 803 tests,
 production audit with zero vulnerabilities, a 181-file package with required
 dist entry points and no forbidden paths, Registry metadata validation,
