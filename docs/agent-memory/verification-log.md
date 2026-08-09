@@ -1439,3 +1439,30 @@
 - Delivery boundary: branch/commit/push/PR/merge was explicitly authorized;
   version bumping, tags, npm publication, MCP Registry publication, and a
   GitHub Release remain outside this work.
+
+## 2026-08-09 Search Response Hardening (Candidate)
+
+- Baseline: isolated branch from merge commit `741dcf0`, which delivered the
+  contract-correctness source changes through PR #26. Package version remains
+  `1.11.3` and no release metadata changed.
+- TDD: a missing `result` first reproduced the old successful-empty behavior,
+  then failed closed after exactly one search-specific retry. Explicit empty,
+  non-array, recovery-on-second-response, network-error, and public MCP error
+  boundary regressions all pass.
+- Result: focused 2 files / 36 tests; full 41 files / 862 tests; TypeScript
+  build; selected real stdio smoke; zero-vulnerability production audit; and
+  a 185-file package with required entrypoints and zero forbidden paths all
+  passed.
+- Boundary: an explicit `result: []` remains a one-request successful empty
+  result. The original transient envelope was not captured, so this change
+  does not claim that every observed empty array is an upstream defect.
+- Final checks: `git diff --check` passed; `package-lock.json` retained blob
+  `70cee9306932ebb2d32bc1cce4016770cd2963d4`; high-signal value-free scans
+  found no private key, provider token, AWS key, JWT, or secret filename.
+- Risk correction: an additional reviewer proved that shared `withRetry`
+  always retries raw `ECONNRESET`/`ETIMEDOUT` codes even with a narrow type
+  list. A raw-code regression failed at two calls, then passed at one after the
+  search layer adopted a local shape-only loop. HTTP 503 and abort-during-
+  backoff regressions also pass, preventing nested retry multiplication.
+- Final review: risk, standards, and specification re-reviews returned PASS
+  with no remaining P0-P3 after the local loop correction.

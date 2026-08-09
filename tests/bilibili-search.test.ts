@@ -23,6 +23,9 @@ vi.mock("../src/utils/credentials.js", () => ({
 const { BilibiliAPIError, NetworkError } = await import(
   "../src/utils/errors.js"
 );
+const { runWithOperationSignal } = await import(
+  "../src/security/operation-context.js"
+);
 const { searchBilibiliVideos } = await import("../src/bilibili/search.js");
 
 describe("searchBilibiliVideos", () => {
@@ -200,18 +203,85 @@ describe("searchBilibiliVideos", () => {
     httpMocks.fetchWithoutWBI.mockRejectedValue(error);
 
     await expect(searchBilibiliVideos("MCP", 5)).rejects.toBe(error);
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    ["missing result", {}],
-    ["non-array result", { result: "unexpected" }],
-    ["empty result", { result: [] }],
-  ])("returns a successful empty result for %s", async (_case, payload) => {
-    httpMocks.fetchWithoutWBI.mockResolvedValue(payload);
+  it("does not add an endpoint retry for a raw system-coded failure", async () => {
+    const error = Object.assign(new Error("Socket reset"), {
+      code: "ECONNRESET",
+    });
+    httpMocks.fetchWithoutWBI.mockRejectedValue(error);
+
+    await expect(searchBilibiliVideos("MCP", 5)).rejects.toBe(error);
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not add an endpoint retry for an HTTP status failure", async () => {
+    const error = new NetworkError(
+      "Service unavailable",
+      undefined,
+      undefined,
+      503,
+    );
+    httpMocks.fetchWithoutWBI.mockRejectedValue(error);
+
+    await expect(searchBilibiliVideos("MCP", 5)).rejects.toBe(error);
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts during shape-retry backoff without a second request", async () => {
+    const controller = new AbortController();
+    httpMocks.fetchWithoutWBI.mockResolvedValue({});
+
+    const searchPromise = runWithOperationSignal(controller.signal, () =>
+      searchBilibiliVideos("MCP", 5),
+    );
+    await vi.waitFor(() => {
+      expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+    });
+    controller.abort();
+
+    await expect(searchPromise).rejects.toMatchObject({ name: "AbortError" });
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns an explicit empty result without an extra request", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValue({ result: [] });
 
     await expect(searchBilibiliVideos("nothing", 5)).resolves.toEqual({
       query: "nothing",
       results: [],
     });
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a missing result once before failing closed", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValue({});
+
+    await expect(searchBilibiliVideos("nothing", 5)).rejects.toMatchObject({
+      name: "UpstreamResponseError",
+    });
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a non-array result once before failing closed", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValue({ result: "unexpected" });
+
+    await expect(searchBilibiliVideos("nothing", 5)).rejects.toMatchObject({
+      name: "UpstreamResponseError",
+    });
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(2);
+  });
+
+  it("recovers when the retry returns an explicit empty result", async () => {
+    httpMocks.fetchWithoutWBI
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ result: [] });
+
+    await expect(searchBilibiliVideos("nothing", 5)).resolves.toEqual({
+      query: "nothing",
+      results: [],
+    });
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(2);
   });
 });

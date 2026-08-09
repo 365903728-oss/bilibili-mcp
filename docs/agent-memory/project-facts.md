@@ -446,3 +446,13 @@
 - Impact: package version remains `1.11.3`; tag, npm publication, Official MCP
   Registry publication, GitHub Release, and deployment require a separate
   release decision.
+
+- Fact: The search adapter distinguishes an explicit empty result array from
+  a missing or non-array result container. Only the malformed shape receives
+  one endpoint-local retry and then fails as `UpstreamResponseError`.
+- Evidence: direct search regressions for explicit empty, missing, non-array,
+  transient recovery, NetworkError, HTTP 503, raw `ECONNRESET`, and abort
+  passthrough; plus the MCP text-only `UPSTREAM_RESPONSE_INVALID` regression.
+- Impact: malformed HTTP-200/code-0 search payloads can no longer silently
+  masquerade as no matches. Explicit empty arrays and non-empty arrays whose
+  rows all normalize away retain their previous successful-empty semantics.
