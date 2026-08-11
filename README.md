@@ -1,5 +1,7 @@
 # Bilibili MCP
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2FXZXZZX-Ai%2Fbilibili-mcp.svg)](https://mcptoplist.com/server/glama%2FXZXZZX-Ai%2Fbilibili-mcp)
+
 <p align="center">
   <a href="https://www.npmjs.com/package/@xzxzzx/bilibili-mcp"><img src="https://img.shields.io/npm/v/@xzxzzx/bilibili-mcp.svg" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@xzxzzx/bilibili-mcp"><img src="https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg" alt="npm downloads"></a>
