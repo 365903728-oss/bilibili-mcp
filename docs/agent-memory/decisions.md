@@ -414,3 +414,30 @@
   `io.github.XZXZZX-Ai/*`.
 - Evidence: the v1.11.2 403 response and the successful v1.11.3 publication and
   exact-match Official Registry API response.
+
+## 2026-08-11
+
+- Decision: Use one shared `RULES.md` constitutional/workflow core with thin
+  Codex and Claude adapter documents for `codex-direct`,
+  `codex-paseo-claude`, and `claude-direct`.
+- Reason: Security, authority, Git, acceptance, memory, and capability rules
+  need one source of truth while execution ownership remains adapter-specific.
+- Evidence: GitHub Issues #28/#29, the typed contract, clean host rule-discovery
+  smokes, and both final #29 reviewers.
+
+- Decision: Route both clients' Hook observations through one repository-local
+  Harness CLI and ignored worktree-scoped ledger; diagnose overlapping external
+  Hooks but never rewrite machine or primary-worktree configuration implicitly.
+- Reason: Dynamic Git attribution prevents cross-worktree state pollution, and
+  explicit migration preserves the user's local configuration and authority.
+- Evidence: replay/process-boundary tests, the trusted Codex lifecycle overlap
+  observation, real Claude failure lifecycle, and `harness doctor` reporting
+  tracked/primary/user Codex command counts `4/5/0` as `action-required`.
+
+- Decision: Preserve Matt Skills' native manual metadata. A missing invocation
+  blocks governed writes and receives one host-native reminder whose
+  check-and-append is atomic under the ledger lock.
+- Reason: The controller may remind the user, but cannot silently imitate a
+  phase-changing manual workflow or flood duplicate reminders under concurrency.
+- Evidence: `$implement` authorization for #29, host-bound contract tests, and
+  the 24-way concurrent reminder regression.

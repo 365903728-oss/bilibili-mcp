@@ -1571,3 +1571,38 @@
   independently queryable. The immutable release tag remains on `2a33520`;
   this post-publication section belongs in a separate docs-only master update
   and does not move the tag.
+
+## 2026-08-11 Harness v2 Issue #29
+
+- Scope: isolated branch `codex/harness-v2-session-spine-29` at base
+  `44ac1e717001aed59c4a3b475cf82f074d11e567`; shared rules, thin adapters,
+  typed contract, portable Hook translators, shared CLI, bounded runtime
+  ledger, capability diagnostics, replay fixtures, and project-memory updates.
+  Product `src/`, package metadata, dependencies, workflows, and `dist/` are
+  outside the diff.
+- Commands: Harness unittest discovery; legacy Hook-safety and Stop-summary
+  suites; Python compileall; `npm run build`; full Vitest; contract validation;
+  `harness doctor`; `npm pack --dry-run --json`; scoped high-confidence secret
+  scan; `git diff --check`; clean Codex/Claude rule-discovery smokes; Codex Hook
+  process-boundary tests; real Claude failure lifecycle; two final read-only
+  reviews.
+- Result: Harness 26/26, legacy 6/6 and 8/8, build, 41 files / 862 Vitest tests,
+  and typed contract validation passed. Package dry run contains 185 files,
+  required `dist` entrypoints, and zero Harness/rules/project-memory paths.
+  Thirty-seven changed files have zero high-confidence secret findings. Both
+  final reviewers returned PASS with no P0-P3.
+- Manual-Skill evidence: the user explicitly invoked `$implement` for #29.
+  Host-bound reminder tests pass; the concurrency regression produces exactly
+  one `reminder-emitted`, 23 `already-reminded`, and one ledger row.
+- Worktree evidence: the dirty primary checkout remains at HEAD `ab4dd028…`
+  with status 68 / `a4bbfb6d…`, tracked diff `78271fe3…`, untracked 44 / manifest
+  `cf938aa3…`, and no `.harness`; all six values match the resume baseline.
+- Caveat: a trusted normal-config Codex smoke proved live lifecycle dispatch but
+  also triggered the primary worktree's legacy Hook in the linked worktree. Its
+  date-only queue mutation was restored from the captured baseline and all
+  primary-checkout fingerprints then matched exactly. `harness doctor` now
+  reports this overlap as `action-required` and never rewrites it.
+- Boundary: Issue #29 deliberately does not implement adapter execution loops,
+  accepted-evidence memory projection, Harness evolution, remote Issue changes,
+  push, PR, release, or publication. Full three-adapter pilot/release
+  conformance belongs to #36.

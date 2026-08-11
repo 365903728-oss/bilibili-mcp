@@ -187,9 +187,18 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
 
 ## Agent Harness
 
-- `AGENTS.md`: Codex/project-wide operating rules, fixed skill/MCP/CLI/subagent triggers, and Codex-to-Claude collaboration model.
-- `CLAUDE.md`: Claude Code execution rules, fixed skill/subagent triggers, and report expectations.
-- `docs/agent-memory/agent-communication.md`: file-backed Codex handoff and Claude report protocol, including the required `Harness Artifacts` report section.
+- `RULES.md`: single shared constitutional/workflow core for all three execution adapters.
+- `AGENTS.md`: thin Codex adapter for `codex-direct` and Codex's controller/acceptance role in `codex-paseo-claude`.
+- `CLAUDE.md`: thin Claude adapter; imports `RULES.md` and defines `claude-direct` plus Paseo-managed writer behavior.
+- `harness/cli.py`: shared diagnostics, typed-contract validation, hook ingestion/replay, and manual-Skill gate CLI.
+- `harness/contracts.py`: three-mode owners, writer lease, authority, state, terminal, and no-switch invariants.
+- `harness/context.py`: dynamic Git repository/worktree attribution and opaque IDs.
+- `harness/events.py`: Codex/Claude payload projection into `harness.hook-event/v1`.
+- `harness/safe_io.py`: bounded JSON/JSONL, rotation, lock, atomic write, and symlink-safe file primitives.
+- `harness/capabilities.py`: provider/model-neutral adapter, Skill, and agent discovery plus deduplicated native-manual-Skill reminders.
+- `harness/fixtures/`, `harness/tests/`: replay/conformance fixtures and stdlib-only Harness tests.
+- `docs/agent-memory/agent-communication.md`: three-mode execution/handoff/report protocol.
+- `docs/agent-memory/executions/`: unified execution and acceptance reports.
 - `docs/agent-memory/handoffs/`: durable Codex-to-Claude handoffs, Claude reports, and task-ticket-backed handoff artifacts.
 - `docs/agent-memory/project-facts.md`: durable current facts.
 - `docs/agent-memory/decisions.md`: durable workflow and technical decisions.
@@ -215,11 +224,14 @@ Claude reports must include a `Harness Artifacts` section covering task ticket, 
 
 ## Hooks And Runtime Memory
 
-- `.claude/settings.local.json`: Claude Code project hook registration.
-- `.codex/hooks.json`: Codex app hook registration.
-- `.codex/scripts/`: shared hook scripts and local harness utilities.
-- `.codex/scripts/hook_safety.py`: bounded hook JSON/JSONL readers, locks,
-  atomic writes, state retention, and symlink refusal.
+- `.claude/settings.json`: tracked portable Claude Hook adapter using `${CLAUDE_PROJECT_DIR}`. Machine-local `bypassPermissions` remains in ignored settings.
+- `.codex/hooks.json`: portable Codex Hook adapter that resolves `git rev-parse --show-toplevel` at invocation time.
+- `python -m harness doctor`: inventories both Codex Skill roots and reports
+  overlapping primary/user Codex or machine-local Claude Hook registrations
+  without echoing commands or rewriting external configuration.
+- `.harness/runtime/<worktree-id>/<session-id>/events.jsonl`: ignored, redacted, bounded runtime ledger scoped to the invoking worktree.
+- `.codex/scripts/`: legacy Hook utilities retained for compatibility while registrations use the shared CLI.
+- `.codex/scripts/hook_safety.py`: compatibility re-export of the canonical `harness/safe_io.py` safety implementation.
 - `.codex/scripts/test_hook_safety.py`: deterministic hook input, retention,
   prompt-injection, and fixed-metadata regressions.
 - `.codex/scripts/plan_tracker.py`: active implementation-plan tracking for phase-gated learning reminders.
@@ -230,10 +242,8 @@ Claude reports must include a `Harness Artifacts` section covering task ticket, 
 - `.codex/scripts/pre_compact.py`: pre-compact checkpoint support.
 - `.codex/scripts/post_tool_use.py`: failed shell observation capture and candidate scoring.
 
-Runtime observations are intentionally separate from formal memory:
-
-- Codex runtime observations: `C:\Users\ZX\.codex\memories\bilibili-mcp\`.
-- Claude runtime observations: `.claude\memory\` and `.claude\runtime\`.
+Runtime observations are intentionally separate from formal memory and are now
+attributed to the invoking worktree rather than a machine-specific main checkout.
 
 ## Project Agents And Skills
 
@@ -252,9 +262,15 @@ Codex custom agents:
 - `.codex/agents/risk-reviewer.toml`: focused risk review.
 - `.codex/agents/release-verifier.toml`: release readiness verification.
 
-Fixed skill trigger details live in `AGENTS.md` and `CLAUDE.md`. Do not assume Codex skills, `.agents\skills`, and Claude Code skills are shared unless the skill exists in the target runtime.
+Fixed phase routing and manual-Skill boundaries live in `RULES.md`; adapter
+deltas live in `AGENTS.md` and `CLAUDE.md`. Do not assume Codex skills,
+`.agents\skills`, and Claude Code skills are shared unless the Skill is
+discovered in the target runtime.
 
-Matt Pocock workflow skills are installed in both Codex and Claude Code. GitHub Issues hold Matt specs and tickets, substantial Claude implementation continues through file-backed handoffs, and Codex uses Paseo CLI to launch one bounded implementation agent. Do not invoke Superpowers skills; project Git, security, verification, and no-autonomous-team rules override conflicting skill defaults.
+Matt Pocock workflow Skills remain native manual when their metadata says so.
+The Harness emits one reminder but never imitates them. GitHub Issues hold Matt
+specs/tickets. Do not invoke Superpowers or `ai-coding-harness` Skills unless
+the user explicitly reintroduces them.
 
 ## Common Change Routes
 

@@ -1,5 +1,27 @@
 # Active Work
 
+## Harness v2
+
+GitHub Issue #28 is the approved Harness v2 specification. Issues #29-#36 are
+the dependency-ordered implementation tickets. Issue #29, `Portable session
+spine and constitutional adapters`, is accepted in `codex-direct`; the focused
+local commit containing this record is its acceptance commit. The remote Issue
+remains open because no close/push/PR authority was granted.
+
+The current dependency frontier is #30, `Codex Direct accepted-ticket loop`.
+Its execution mode has not been selected and its manual `implement` phase has
+not been invoked. Before #30's first implementation write, ask the user once to
+choose a mode, then require the native manual invocation for that new ticket.
+No adapter fallback is authorized.
+
+The Harness target is one `RULES.md` core with `codex-direct`,
+`codex-paseo-claude`, and `claude-direct` adapters. Local commit is automatic
+after acceptance; push/PR/tag/release/publish remain separate user gates.
+Manual Matt Skills stay native manual and receive one deduplicated reminder
+when required but not invoked.
+
+## Published Product Baseline
+
 Status: `v1.11.4` is published to npm, GitHub Releases, and the Official MCP
 Registry as `io.github.XZXZZX-Ai/bilibili-mcp`. Release commit `2a33520`
 contains the five synchronized version fields, bilingual changelogs, and
@@ -46,10 +68,11 @@ doctor reports no ready model, so no model was downloaded or switched and no
 live ASR end-to-end smoke was run. This is a documented validation boundary,
 not unfinished Phase 3 implementation.
 
-The pre-existing, review-gated `docs/agent-memory/pending-learning-proposals.md`
-modification remains uncommitted and excluded from the release. Controlled
-learning proposals remain manual. Files under `docs/superpowers/` are historical
-records only and must not trigger any `superpowers:*` skill.
+The pre-existing learning-proposal queue is legacy v1 state and remains outside
+the clean #29 worktree. Typed accepted-evidence memory automation is scoped to
+#33; #29 hooks only write ignored redacted events. Files under
+`docs/superpowers/` are historical records only and must not trigger any
+`superpowers:*` skill.
 
 ## Future Direction — Not Active
 

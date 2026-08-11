@@ -1,0 +1,39 @@
+{
+  "schema": "harness.task-contract/v1",
+  "task": {
+    "id": "github:#29",
+    "source": "https://github.com/XZXZZX-Ai/bilibili-mcp/issues/29"
+  },
+  "execution": {
+    "mode": "codex-direct",
+    "canonical_worktree": "C:/absolute/path/to/worktree",
+    "base_sha": "0000000000000000000000000000000000000000",
+    "adapter_switch_policy": "stop-and-report"
+  },
+  "writer_lease": {
+    "holder": "codex",
+    "state": "active"
+  },
+  "acceptance_owner": "codex",
+  "authority": {
+    "local_read_write_test": "allowed",
+    "local_commit": "after-acceptance",
+    "push_pr_tag_release_publish": "user-approval-required",
+    "credentials_ssh_broad_delete_history_rewrite": "blocked"
+  },
+  "state": "executing",
+  "terminal_states": [
+    "accepted",
+    "blocked",
+    "cancelled",
+    "recovery-required"
+  ],
+  "required_manual_skills": [
+    {
+      "name": "implement",
+      "host": "codex",
+      "status": "invoked",
+      "invocation": "$implement"
+    }
+  ]
+}

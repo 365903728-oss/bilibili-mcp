@@ -20,8 +20,10 @@ Thumbs.db
 .claude/*
 !.claude/agents/
 !.claude/agents/*.md
+!.claude/settings.json
 .codex/memory/
 .codex/runtime/
+.harness/
 
 # 临时文件
 *.tmp

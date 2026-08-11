@@ -6,9 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/ZX/bilibili-mcp/.codex/scripts/session-start.ps1",
+            "command": "python -c \"import os,runpy,subprocess,sys; root=subprocess.check_output(['git','rev-parse','--show-toplevel'],text=True).strip(); script=os.path.join(root,'harness','cli.py'); sys.argv=[script,*sys.argv[1:]]; runpy.run_path(script,run_name='__main__')\" hook ingest --adapter codex --event session-start --cwd .",
             "timeout": 15,
-            "statusMessage": "Loading bilibili-mcp project memory"
+            "statusMessage": "Recording portable Harness session start"
           }
         ]
       }
@@ -19,9 +19,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/ZX/bilibili-mcp/.codex/scripts/post_tool_use.py --agent codex",
+            "command": "python -c \"import os,runpy,subprocess,sys; root=subprocess.check_output(['git','rev-parse','--show-toplevel'],text=True).strip(); script=os.path.join(root,'harness','cli.py'); sys.argv=[script,*sys.argv[1:]]; runpy.run_path(script,run_name='__main__')\" hook ingest --adapter codex --event post-tool-use --cwd .",
             "timeout": 15,
-            "statusMessage": "Recording failed shell observations"
+            "statusMessage": "Recording redacted Harness event"
           }
         ]
       }
@@ -31,9 +31,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/ZX/bilibili-mcp/.codex/scripts/pre_compact.py --agent codex",
+            "command": "python -c \"import os,runpy,subprocess,sys; root=subprocess.check_output(['git','rev-parse','--show-toplevel'],text=True).strip(); script=os.path.join(root,'harness','cli.py'); sys.argv=[script,*sys.argv[1:]]; runpy.run_path(script,run_name='__main__')\" hook ingest --adapter codex --event pre-compact --cwd .",
             "timeout": 15,
-            "statusMessage": "Saving pre-compact checkpoint"
+            "statusMessage": "Recording redacted Harness checkpoint"
           }
         ]
       }
@@ -43,15 +43,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/ZX/bilibili-mcp/.codex/scripts/stop_summary.py --agent codex",
+            "command": "python -c \"import os,runpy,subprocess,sys; root=subprocess.check_output(['git','rev-parse','--show-toplevel'],text=True).strip(); script=os.path.join(root,'harness','cli.py'); sys.argv=[script,*sys.argv[1:]]; runpy.run_path(script,run_name='__main__')\" hook ingest --adapter codex --event stop --cwd .",
             "timeout": 15,
-            "statusMessage": "Saving hook observation summary"
-          },
-          {
-            "type": "command",
-            "command": "python C:/Users/ZX/bilibili-mcp/.codex/scripts/generate_learning_proposals.py --source codex",
-            "timeout": 15,
-            "statusMessage": "Generating pending learning proposals"
+            "statusMessage": "Recording redacted Harness stop event"
           }
         ]
       }

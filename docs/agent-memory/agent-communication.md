@@ -1,111 +1,120 @@
 # Agent Communication
 
-This file defines the Markdown-based communication protocol between Codex and Claude Code for `@xzxzzx/bilibili-mcp`.
+This file defines the evidence and handoff protocol shared by all three Harness
+adapters. `RULES.md` remains normative.
 
-Codex orchestrates Claude Code through the Paseo CLI after the user has authorized the task or development direction. This protocol authorizes one bounded implementation agent, not autonomous teams or scope expansion.
+## Mode Flows
 
-## Default Flow
+### `codex-direct`
 
-1. Codex writes a bounded Markdown handoff.
-2. Codex reads the live Paseo orchestration preferences and launches one Claude Code implementation agent with the handoff path.
-3. Claude Code executes the handoff and writes the requested Markdown report.
-4. Codex reviews the report, diff, and verification evidence.
-5. Durable outcomes are summarized in `docs/agent-memory/handoff-log.md`, `verification-log.md`, `decisions.md`, or `lessons-learned.md` as appropriate.
+Codex plans, writes, verifies, reviews, accepts, and creates the accepted local
+commit. Subagents are read-only unless explicitly assigned the one writer
+lease. Substantial work uses a unified execution report; no synthetic
+Codex-to-Codex handoff is required.
 
-When Matt Pocock skills produced a GitHub specification or ticket, the issue is the planning source and the file-backed Codex handoff references it while adding repository-specific files, checks, rollback, and stop conditions. Do not create a duplicate local task ticket.
+### `claude-direct`
 
-## Paseo Launch Contract
+Claude Code plans, writes, verifies, reviews, accepts, and creates the accepted
+local commit. Project subagents remain bounded and cannot introduce a second
+writer. Substantial work uses a unified execution report.
 
-- Read `C:\Users\ZX\.paseo\orchestration-preferences.json` before each launch and use `providers.impl` unless the user explicitly selected another Claude provider.
-- Check Paseo availability, but never restart its daemon without explicit user approval.
-- Launch one bounded implementation agent and reference the absolute repository path, handoff path, and GitHub Issue when present.
-- Keep the handoff self-contained; do not rely on Codex chat context.
-- Claude Code must write the expected report before finishing. Codex then reviews the report, actual diff, and checks.
-- A same-scope repair may be sent through Paseo without asking the user to operate Claude Code. New scope, public behavior, Git actions, releases, or other new authority still require user approval.
+### `codex-paseo-claude`
 
-## Active Handoff Location
+1. Codex creates a bounded handoff referencing the GitHub Issue and typed
+   contract.
+2. Codex reads live Paseo preferences and launches one Claude writer.
+3. Claude returns a report and uncommitted diff.
+4. Codex reviews the actual diff/evidence and accepts or returns same-scope
+   repair to the same writer.
+5. Only after Codex acceptance is a focused local commit created.
 
-For substantial implementation work, Codex should create a focused handoff file under:
+Paseo failure produces a Recovery Bundle and stop. It never causes an automatic
+adapter switch.
+
+## Artifact Locations
+
+Unified execution and acceptance reports:
+
+```text
+docs/agent-memory/executions/YYYY-MM-DD-<task>-<mode>-report.md
+```
+
+Collaboration-only handoffs and Claude reports:
 
 ```text
 docs/agent-memory/handoffs/YYYY-MM-DD-<topic>-codex-to-claude.md
-```
-
-Claude Code should return its execution report in Markdown. If it writes a file, use:
-
-```text
 docs/agent-memory/handoffs/YYYY-MM-DD-<topic>-claude-report.md
 ```
 
-Short tasks may use chat Markdown only, but release, package, credential, MCP tool, and multi-file implementation work should use a file-backed handoff.
+Narrow tasks may report in chat. Multi-file, security, MCP, package, release,
+Harness, or delegated tasks use file-backed evidence. A GitHub Issue remains the
+planning source; do not duplicate it as a local prose ticket.
 
-## Codex Handoff Template
+## Handoff Template (`codex-paseo-claude` only)
 
 ```markdown
 # Codex To Claude Handoff: <topic>
 
-## Objective
+## Typed Contract
+- Task/source:
+- Mode: codex-paseo-claude
+- Canonical worktree/base:
+- Writer lease: claude
+- Acceptance owner: codex
+- Authority/repair bound:
+- Required manual Skill evidence:
 
-## Current State
-
-## Files To Inspect
-
-## Files To Edit
-
-## Required Capability
-
-## Constraints
-
+## Objective And Acceptance Criteria
+## Current State And Files To Inspect
+## Files To Edit / Do Not Touch
+## Required Capabilities
 ## Execution Steps
-
 ## Verification Commands
-
-## Acceptance Criteria
-
-## Things Not To Change
-
+## Risks And Rollback
 ## Stop And Report If
-
-## Expected Claude Report
+## Expected Report
 ```
 
-## Claude Report Template
+## Unified Execution Report Template
 
 ```markdown
-# Claude To Codex Report: <topic>
+# Execution Report: <task>
+
+## Contract
+- Task/source:
+- Mode:
+- Canonical worktree/base:
+- Writer/acceptance owner:
+- Terminal state:
 
 ## Summary
-
-## Files Changed
-
-## Commands Run
-
-## Results
-
-## Diff Notes
-
-## Risks Or Skipped Checks
+## Files Changed And Diff Scope
+## Commands And Results
+## Acceptance Criteria
+## Repairs And Failure Fingerprints
+## Risks, Skipped Checks, Recovery Bundle
+## Capabilities Used
+- Manual Skills and invocation evidence:
+- Model-invoked Skills:
+- Agents/reviewers:
+- MCP/tools/CLI:
 
 ## Harness Artifacts
+- Research:
+- Security:
+- Codemap:
+- Memory:
+- Harness eval:
 
-- Task ticket: used / not required, reason
-- Research note: created / not required, reason
-- QA checklist: created / not required, reason
-- Codemap: updated / checked unchanged / not applicable
-- Harness security: reviewed / not applicable
-- Harness eval: updated / deferred / not applicable
-
-## Decision Points
-
-## Suggested Codex Review Focus
+## Local Commit
 ```
 
-## Rules
+## Evidence Rules
 
-- Markdown handoffs must be specific enough that Claude Code does not need hidden chat context.
-- Include exact verification commands and expected pass/fail meaning.
-- Name required skills, subagents, MCP/tool connectors, or CLI commands when fixed triggers apply.
-- Claude reports must include the `Harness Artifacts` section so Codex can verify whether task tickets, research notes, QA checklists, codemap updates, harness-security review, and harness-eval were considered.
-- Do not include secrets, full Cookie values, `.env` contents, npm tokens, GitHub tokens, or private credentials.
-- Do not use handoff files as uncontrolled scratchpads. Keep one handoff focused on one task or phase.
-- If Claude Code changes scope, discovers a decision point, or cannot run a required check, it should stop and report that in Markdown instead of guessing.
+- Reports derive from the final diff and actual command results.
+- Include skipped checks and unresolved risk; do not accept an executor's
+  unsupported "done" claim.
+- Runtime event logs are not completion reports and `Stop` is not acceptance.
+- Handoffs/reports cannot expand scope or authority.
+- Never include secrets, raw Cookies, `.env` values, tokens, SSH material,
+  private credentials, or unredacted runtime payloads.

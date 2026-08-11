@@ -456,3 +456,19 @@
 - Impact: malformed HTTP-200/code-0 search payloads can no longer silently
   masquerade as no matches. Explicit empty arrays and non-empty arrays whose
   rows all normalize away retain their previous successful-empty semantics.
+
+- Fact: Harness v2 Issue #29 supersedes the earlier path-bound Hook/runtime
+  layout with one shared `RULES.md`, thin Codex/Claude adapters, tracked
+  portable Hook registrations, and a worktree-scoped `.harness/runtime/`
+  ledger using opaque worktree and session IDs.
+- Evidence: `RULES.md`, `AGENTS.md`, `CLAUDE.md`, `.codex/hooks.json`,
+  `.claude/settings.json`, `harness/`, replay/conformance tests, clean Codex and
+  Claude rule-discovery smokes, all four Codex translator process-boundary
+  tests, a trusted Codex lifecycle observation, and a real Claude failure
+  lifecycle in the isolated #29 worktree.
+- Impact: Earlier facts naming `C:\Users\ZX\.codex\memories\bilibili-mcp\`,
+  `.claude\memory\`, or `.claude\runtime\` describe the legacy v1 collectors,
+  not the v2 canonical event ledger. Existing primary/user Codex Hooks and
+  ignored `.claude/settings.local.json` Hooks are not rewritten automatically;
+  when they conflict with tracked Hooks, `harness doctor` reports
+  `action-required` so the legacy registration can be migrated before rollout.

@@ -4,7 +4,9 @@ This directory is the repository-local learning and memory system for `@xzxzzx/b
 
 It exists so Codex and Claude Code can preserve durable project facts, decisions, lessons, handoffs, and verification history across update cycles.
 
-Project-local hooks are enabled as a later upgrade. They can load bounded startup context and write runtime observation candidates, but they must not auto-promote entries into this directory.
+Project-local hooks project bounded metadata through the shared Harness CLI.
+They write ignored runtime observations but cannot accept tasks or promote
+entries into this directory.
 
 ## Files
 
@@ -17,7 +19,9 @@ Project-local hooks are enabled as a later upgrade. They can load bounded startu
 - `harness-security.md`: security baseline and review checklist for agent harness surfaces such as rules, hooks, skills, subagents, MCP/tool config, memory, handoffs, templates, research, and QA notes.
 - `harness-eval.md`: periodic evaluation record for whether skills, subagents, hooks, templates, memory, handoffs, and fixed triggers improve the workflow or add unnecessary process.
 - `context-budget-report.md`: lightweight context overhead audit for always-relevant agent docs and project hooks.
-- `pending-learning-proposals.md`: generated review queue for candidate lessons that require Codex and user approval before promotion.
+- `executions/`: unified execution and acceptance reports for all three adapters.
+- `handoffs/`: collaboration-only Codex/Paseo/Claude handoffs and reports.
+- `pending-learning-proposals.md`: legacy v1 generated proposal queue; not formal memory.
 
 ## Update When
 
@@ -52,16 +56,17 @@ Use dated entries:
 
 Keep entries concise and evidence-backed.
 
-## Controlled Learning
+## Memory Projection Status
 
-Runtime hooks can generate `pending-learning-proposals.md` automatically from Codex and Claude Code candidate observations.
+Runtime events remain non-authoritative. During Harness v2 ticket #29 they are
+not automatically promoted. Verified durable facts, decisions, lessons, and
+navigation changes may be written by the task's acceptance owner as scoped
+artifacts.
 
-Promotion remains manual:
+Ticket #33 will replace the legacy proposal-only path with typed,
+acceptance-owned projection, supersession, deduplication, and automatic
+rejection of unsafe or unverified candidates. That future automation does not
+give hooks or raw observations instruction authority.
 
-1. Codex reviews the proposal.
-2. The user approves with `批准本轮 learning proposals`.
-3. Codex writes the approved entry into the correct formal memory file.
-
-Do not treat pending proposals as formal memory.
-
-The active-work pointer is `docs/agent-memory/active-work.md`. Because Matt work is tracked in GitHub Issues instead of a local phase plan, phase-count reminders remain inactive; proposal review and promotion are still manual.
+The active-work pointer is `docs/agent-memory/active-work.md`. GitHub Issues are
+the planning source.

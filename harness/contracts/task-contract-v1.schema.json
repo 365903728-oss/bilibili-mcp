@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/XZXZZX-Ai/bilibili-mcp/harness/contracts/task-contract-v1.schema.json",
+  "title": "Harness Task Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "task",
+    "execution",
+    "writer_lease",
+    "acceptance_owner",
+    "authority",
+    "state",
+    "terminal_states",
+    "required_manual_skills"
+  ],
+  "properties": {
+    "schema": { "const": "harness.task-contract/v1" },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "source": { "type": "string", "minLength": 1, "maxLength": 2048 }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "canonical_worktree", "base_sha", "adapter_switch_policy"],
+      "properties": {
+        "mode": {
+          "enum": ["codex-direct", "codex-paseo-claude", "claude-direct"]
+        },
+        "canonical_worktree": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "base_sha": { "type": "string", "pattern": "^[0-9a-fA-F]{40}$" },
+        "adapter_switch_policy": { "const": "stop-and-report" }
+      }
+    },
+    "writer_lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder", "state"],
+      "properties": {
+        "holder": { "type": ["string", "null"], "enum": ["codex", "claude", null] },
+        "state": { "enum": ["inactive", "active", "released"] }
+      }
+    },
+    "acceptance_owner": { "enum": ["codex", "claude"] },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local_read_write_test",
+        "local_commit",
+        "push_pr_tag_release_publish",
+        "credentials_ssh_broad_delete_history_rewrite"
+      ],
+      "properties": {
+        "local_read_write_test": { "const": "allowed" },
+        "local_commit": { "const": "after-acceptance" },
+        "push_pr_tag_release_publish": { "const": "user-approval-required" },
+        "credentials_ssh_broad_delete_history_rewrite": { "const": "blocked" }
+      }
+    },
+    "state": {
+      "enum": [
+        "draft",
+        "ready",
+        "mode-frozen",
+        "baselined",
+        "executing",
+        "verifying",
+        "reviewing",
+        "repairing",
+        "accepted",
+        "blocked",
+        "cancelled",
+        "recovery-required"
+      ]
+    },
+    "terminal_states": {
+      "const": ["accepted", "blocked", "cancelled", "recovery-required"]
+    },
+    "required_manual_skills": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "host", "status"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "host": { "enum": ["codex", "claude"] },
+          "status": { "enum": ["required", "reminded", "invoked"] },
+          "invocation": { "type": "string", "maxLength": 66 }
+        }
+      }
+    }
+  }
+}

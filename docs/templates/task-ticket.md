@@ -14,12 +14,25 @@ Use a light ticket for medium tasks by filling only objective, scope, files, acc
 
 - ID:
 - Title:
-- Status: `backlog | ready | in_progress | blocked | review | done`
-- Owner: `Codex | Claude Code | user | external`
+- State: `draft | ready | mode-frozen | baselined | executing | verifying | reviewing | repairing | accepted | blocked | cancelled | recovery-required`
 - Source:
 - Parent plan or PRD:
 - Blocking tickets:
 - Blocked by:
+
+## Execution Contract
+
+- Execution adapter: `codex-direct | codex-paseo-claude | claude-direct`
+- Canonical worktree (absolute):
+- Base SHA (full):
+- Active writer lease: `none | codex | claude`
+- Acceptance owner: `codex | claude`
+- Adapter switch policy: `stop-and-report`
+- Repair bound and early-stop fingerprint:
+- Required manual Skills, host (`codex | claude`), and native invocation evidence:
+- Authority: local read/write/build/test allowed; local commit after acceptance;
+  push/PR/tag/release/publish require user approval; credentials/SSH/broad
+  deletion/history rewrite blocked.
 
 ## Objective
 
@@ -117,6 +130,8 @@ Stop before editing or continue only after user/Codex decision if:
 - required verification fails for unclear reasons
 - the task requires a broader refactor than the ticket describes
 - a required capability or subagent is unavailable and no safe fallback exists
+- the frozen execution adapter fails or would need to change
+- the active writer lease cannot be proven exclusive
 
 ## Completion Report
 
@@ -128,3 +143,5 @@ Return:
 - subagent/skill/tool capabilities used
 - codemap update status
 - unresolved risks or decision points
+- selected adapter, base SHA, canonical worktree, writer, and acceptance owner
+- acceptance-criteria judgment and local commit status

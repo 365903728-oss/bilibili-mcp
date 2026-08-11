@@ -401,3 +401,33 @@ Candidate metrics:
 - product-source implementation agents: 0
 - bounded Codex test/review subtasks: 3
 - generated learning proposals promoted: 0
+
+### 2026-08-11 Harness Eval: Harness v2 Issue #29 session spine
+
+- The shared CLI and replay seam exposed host-shape mistakes without duplicating
+  normalization logic. Independent Spec and Standards review caught two real
+  cross-boundary defects that ordinary green tests missed: linked-worktree
+  primary Codex Hook overlap and non-atomic one-shot manual reminders.
+- Keep: one constitutional core, thin adapters, typed contract, worktree-scoped
+  redacted ledger, real process-boundary fixtures, dirty-primary fingerprints,
+  package exclusion, and risk-weighted independent review.
+- Change: run `harness doctor` before any normal-config live client smoke. Use a
+  user-config-disabled session only for clean rule discovery, and require a
+  concurrent regression whenever runtime state promises one-shot behavior.
+- Remove: do not use a normal client smoke as proof of isolation until external
+  Hook layers are inventoried; do not implement read-check-write deduplication
+  outside the existing ledger lock.
+- Residual: the primary checkout's legacy Codex Hooks require an explicit later
+  migration. Issue #29 reports the gate but correctly leaves external
+  configuration untouched; the complete three-adapter pilot remains #36.
+
+Candidate metrics:
+
+- shared Harness tests: 26
+- legacy Hook compatibility tests: 14
+- product tests: 862
+- package entries / forbidden Harness entries: 185 / 0
+- independent final reviewers: 2
+- accepted repair findings: 2
+- product-source files changed: 0
+- remote operations performed: 0
