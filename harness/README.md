@@ -1,4 +1,4 @@
-# Harness v2 Session Spine
+# Harness v2
 
 This package is repository-local tooling, not part of the published
 `@xzxzzx/bilibili-mcp` npm package.
@@ -25,6 +25,44 @@ conflict flags; it does not echo commands or rewrite external configuration.
 Claude's separate `PostToolUse` and `PostToolUseFailure` events project into the
 same canonical tool-completion event without treating ordinary response
 `message` fields as failures.
+
+## Codex Direct
+
+An executable contract adds `execution.branch` plus a typed `plan` containing
+owned paths, acceptance criteria, verification commands, repair limits, and
+stop conditions. The process-boundary loop is:
+
+```text
+python -m harness codex-direct start .harness/tasks/github-30/contract.json
+python -m harness codex-direct guard --task github-30 --action edit --path harness/codex_direct.py
+python -m harness codex-direct advance --task github-30 --to verifying
+python -m harness codex-direct record-check --task github-30 --source command --exit-code 0 ...
+python -m harness codex-direct advance --task github-30 --to reviewing
+python -m harness codex-direct judge --task github-30 ...
+python -m harness codex-direct accept --task github-30
+python -m harness codex-direct status --task github-30
+```
+
+`repair` stops at the ticket limit or on a repeated failure fingerprint with
+no new diff/evidence. `recover` writes a metadata-only Recovery Bundle and
+never switches adapters. Guards classify fixed action names rather than raw
+commands. The frozen canonical worktree/branch and source digest identify the
+only writer. A repository-scoped named OS mutex on Windows, or a non-mutating
+advisory lock on the existing Git config on POSIX, serializes the scan of
+sibling worktrees' task state; identity probes fail closed if that existing
+file changes. Per-task lease/run records and transaction locks still live only
+under each worktree's `.harness/runtime/`. This rejects task-ID aliases and
+concurrent altered contracts without a common-Git marker or config rewrite.
+Evidence records an append-only bounded result log plus current check state and
+diff digest without retaining commands or private paths.
+Acceptance requires current review evidence and automatically creates the one
+scoped local commit.
+That commit uses an isolated temporary Git directory/index, frozen-base
+attributes, `commit-tree`, a compare-and-swap `update-ref`, and Git's native
+`index.lock`; configured filters, Hooks, signing, and a mutable caller index do
+not enter the protected effect. It verifies the exact accepted index, path set,
+snapshot, branch, parent, trailer, and clean postcondition. The retained
+`commit` command is only an idempotent crash-recovery seam.
 
 ## Conformance
 

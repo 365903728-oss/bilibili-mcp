@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
 import time
 from collections import deque
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Iterator
 
 
 MAX_STDIN_BYTES = 256 * 1024
@@ -25,22 +27,38 @@ SAFE_CATEGORIES = {"build", "test", "lint", "package", "git", "shell"}
 SAFE_AGENTS = {"codex", "claude"}
 
 
-def _validate_shape(value: Any, depth: int = 0, budget: list[int] | None = None) -> None:
+def _validate_shape(
+    value: Any,
+    depth: int = 0,
+    budget: list[int] | None = None,
+    max_depth: int = MAX_JSON_DEPTH,
+) -> None:
     if budget is None:
         budget = [MAX_JSON_NODES]
     budget[0] -= 1
-    if budget[0] < 0 or depth > MAX_JSON_DEPTH:
+    if budget[0] < 0 or depth > max_depth:
         raise ValueError("hook JSON exceeds structural limits")
     if isinstance(value, dict):
         for key, item in value.items():
             if not isinstance(key, str) or len(key) > 256:
                 raise ValueError("hook JSON contains an invalid key")
-            _validate_shape(item, depth + 1, budget)
+            _validate_shape(item, depth + 1, budget, max_depth)
     elif isinstance(value, list):
         for item in value:
-            _validate_shape(item, depth + 1, budget)
+            _validate_shape(item, depth + 1, budget, max_depth)
     elif isinstance(value, str) and len(value.encode("utf-8")) > MAX_STDIN_BYTES:
         raise ValueError("hook JSON contains an oversized string")
+
+
+def validate_json_shape(
+    value: Any,
+    *,
+    max_nodes: int = MAX_JSON_NODES,
+    max_depth: int = MAX_JSON_DEPTH,
+) -> None:
+    if max_nodes <= 0 or max_depth < 0:
+        raise ValueError("JSON structural limits must be positive")
+    _validate_shape(value, budget=[max_nodes], max_depth=max_depth)
 
 
 def read_bounded_json_stream(stream: BinaryIO) -> dict[str, Any]:
@@ -111,11 +129,11 @@ def ensure_no_link_components(boundary: Path, target: Path) -> None:
     except ValueError as exc:
         raise ValueError("runtime path escapes its worktree boundary") from exc
     current = boundary_abs
-    if current.exists() and _is_link_like(current):
+    if _is_link_like(current):
         raise ValueError("runtime boundary cannot be a link")
     for part in relative.parts:
         current = current / part
-        if current.exists() and _is_link_like(current):
+        if _is_link_like(current):
             raise ValueError("runtime path cannot traverse a link")
 
 
@@ -177,22 +195,49 @@ def read_bounded_jsonl(
     return rows
 
 
-def read_bounded_json_object(path: Path, max_bytes: int) -> dict[str, Any]:
-    if (
-        max_bytes <= 0
-        or not path.exists()
-        or path.is_symlink()
-        or not path.is_file()
-        or path.stat().st_size > max_bytes
-    ):
+def read_bounded_bytes(path: Path, max_bytes: int) -> bytes | None:
+    if max_bytes <= 0:
+        return None
+    descriptor: int | None = None
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        opened = os.fstat(descriptor)
+        visible = os.stat(path, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_size > max_bytes
+            or _is_link_like(path)
+            or (opened.st_dev, opened.st_ino) != (visible.st_dev, visible.st_ino)
+        ):
+            return None
+        with os.fdopen(descriptor, "rb") as handle:
+            descriptor = None
+            raw = handle.read(max_bytes + 1)
+        if len(raw) > max_bytes:
+            return None
+        return raw
+    except OSError:
+        return None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def read_bounded_json_object(
+    path: Path,
+    max_bytes: int,
+    *,
+    max_nodes: int = MAX_JSON_NODES,
+    max_depth: int = MAX_JSON_DEPTH,
+) -> dict[str, Any]:
+    raw = read_bounded_bytes(path, max_bytes)
+    if raw is None:
         return {}
     try:
-        raw = path.read_bytes()
-        if len(raw) > max_bytes:
-            return {}
         parsed = json.loads(raw.decode("utf-8", errors="strict"))
-        _validate_shape(parsed)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        validate_json_shape(parsed, max_nodes=max_nodes, max_depth=max_depth)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
         return {}
     return parsed if isinstance(parsed, dict) else {}
 
@@ -221,11 +266,11 @@ def _unlock_descriptor(descriptor: int) -> None:
         fcntl.flock(descriptor, fcntl.LOCK_UN)
 
 
-def _acquire_lock(lock_path: Path) -> int | None:
+def _acquire_lock(lock_path: Path, *, create: bool = True) -> int | None:
     for _ in range(200):
         if _is_link_like(lock_path):
             return None
-        flags = os.O_CREAT | os.O_RDWR
+        flags = os.O_RDWR | (os.O_CREAT if create else 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         try:
@@ -233,7 +278,20 @@ def _acquire_lock(lock_path: Path) -> int | None:
         except OSError:
             return None
         try:
-            if os.fstat(descriptor).st_size == 0:
+            opened = os.fstat(descriptor)
+            current = os.stat(lock_path, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or _is_link_like(lock_path)
+                or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+            ):
+                os.close(descriptor)
+                return None
+            if opened.st_size == 0:
+                if not create:
+                    os.close(descriptor)
+                    return None
                 os.write(descriptor, b"0")
                 os.fsync(descriptor)
             _lock_descriptor(descriptor)
@@ -242,6 +300,27 @@ def _acquire_lock(lock_path: Path) -> int | None:
             os.close(descriptor)
             time.sleep(0.025)
     return None
+
+
+@contextmanager
+def bounded_file_lock(lock_path: Path, *, create: bool = True) -> Iterator[None]:
+    """Serialize one bounded runtime-state transaction."""
+    if create:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+    elif not lock_path.is_file():
+        raise ValueError("existing lock file is unavailable")
+    if _is_link_like(lock_path):
+        raise ValueError("runtime lock path cannot be a link")
+    descriptor = _acquire_lock(lock_path, create=create)
+    if descriptor is None:
+        raise ValueError("runtime lock is unavailable")
+    try:
+        yield
+    finally:
+        try:
+            _unlock_descriptor(descriptor)
+        finally:
+            os.close(descriptor)
 
 
 def append_bounded_jsonl(

@@ -10,6 +10,7 @@ from harness.contracts import (
     EXECUTION_MODES,
     WRITERS,
     ContractError,
+    validate_codex_direct_contract,
     validate_task_contract,
 )
 
@@ -70,6 +71,36 @@ class TaskContractTests(unittest.TestCase):
         self.assertEqual(normalized["execution"]["mode"], "codex-direct")
         self.assertEqual(normalized["writer_lease"]["holder"], "codex")
 
+    def test_codex_direct_execution_requires_frozen_plan_and_owned_paths(self) -> None:
+        contract = valid_contract()
+        contract["execution"]["branch"] = "codex/issue-30"  # type: ignore[index]
+        contract["writer_lease"] = {"holder": "codex", "state": "inactive"}
+        contract["state"] = "ready"
+        contract["plan"] = {
+            "objective": "Complete one approved ticket.",
+            "owned_paths": ["harness/"],
+            "acceptance_criteria": [
+                {"id": "criterion", "description": "The ticket is accepted."}
+            ],
+            "verification_plan": [
+                {"id": "tests", "command": "python -m unittest", "required": True}
+            ],
+            "repair_policy": {"max_attempts": 2},
+            "stop_conditions": ["adapter-failure"],
+        }
+        normalized = validate_codex_direct_contract(contract)
+        self.assertEqual(normalized["plan"]["owned_paths"], ["harness/"])
+
+        contract["plan"]["owned_paths"] = ["../README.md"]  # type: ignore[index]
+        with self.assertRaisesRegex(ContractError, "repository-relative"):
+            validate_codex_direct_contract(contract)
+
+    def test_typed_identifiers_reject_noncanonical_whitespace(self) -> None:
+        contract = valid_contract()
+        contract["task"]["id"] = " pilot-30 "  # type: ignore[index]
+        with self.assertRaisesRegex(ContractError, "unsafe characters"):
+            validate_task_contract(contract)
+
     def test_contract_rejects_wrong_writer_or_acceptance_owner(self) -> None:
         wrong_writer = valid_contract()
         wrong_writer["writer_lease"]["holder"] = "claude"  # type: ignore[index]
@@ -124,6 +155,12 @@ class TaskContractTests(unittest.TestCase):
         wrong_host["required_manual_skills"][0]["host"] = "claude"  # type: ignore[index]
         with self.assertRaisesRegex(ContractError, "host"):
             validate_task_contract(wrong_host)
+
+        invalid_name = copy.deepcopy(valid_contract())
+        invalid_name["required_manual_skills"][0]["name"] = "bad#skill"  # type: ignore[index]
+        invalid_name["required_manual_skills"][0]["invocation"] = "$bad#skill"  # type: ignore[index]
+        with self.assertRaisesRegex(ContractError, "native"):
+            validate_task_contract(invalid_name)
 
         collaboration = copy.deepcopy(valid_contract())
         collaboration["execution"]["mode"] = "codex-paseo-claude"  # type: ignore[index]

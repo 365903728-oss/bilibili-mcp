@@ -158,6 +158,55 @@ Use this checklist before accepting changes to harness surfaces.
   credentials/SSH, broad deletion, history rewriting, and scope expansion are
   still constitutional gates.
 
+## 2026-08-11 Codex Direct Validation
+
+- The complete input contract is validated at the process boundary and then
+  represented by a SHA-256 digest plus bounded typed metadata. Runtime state
+  excludes the absolute canonical path, task source/objective/descriptions,
+  raw verification commands, prompts, command output, environment, and secret
+  values.
+- Per-task runtime updates use one OS-released bounded lock around the complete
+  load-modify-save transaction. Writes preflight the controller's declared
+  byte/node limit before the atomic shared writer and are read back with the
+  same limit before success is reported. Malformed, oversized, symlinked, or
+  structurally invalid existing state is never treated as a new task and does
+  not replace the last readable state.
+- The frozen contract names one canonical worktree/branch and retains a digest
+  of the task source. Start takes a repository-scoped named OS mutex on Windows
+  or a non-creating advisory lock on the existing nonempty repository config on
+  POSIX while it scans every linked worktree's bounded local task state. It
+  checks the existing config identity before and after acquisition and fails
+  closed on malformed sibling identity. Regressions prove task-ID aliases and
+  concurrent altered contracts yield exactly one writer while config bytes stay
+  unchanged. Every generated task/lease record and transaction lock remains
+  under the owner worktree's ignored `.harness/runtime/`; no common-Git marker
+  or content is created.
+- Verification records retain a bounded append-only evidence log plus current
+  check state: status, typed source/sensitivity, bounded exit code when a
+  command actually ran, result digest, reason code, and current diff digest.
+  Acceptance requires every required pass and criterion reference to match the
+  current diff plus at least one current review-sourced pass; repairs invalidate
+  prior criteria and risks while no-progress detection includes the complete
+  evidence log.
+- Accepted commit recovery compares branch, parent, opaque task trailer, exact
+  path set, empty index/working tree, and the accepted per-path content/type/
+  mode snapshot. A staged accepted snapshot over a different HEAD and a same-
+  path commit with changed content are both rejected.
+- Adapter failure is fingerprinted without raw error data, writes the same
+  metadata-only Recovery Bundle, preserves the active writer/no-switch policy,
+  and stops. Tests exercise pre-commit failure without performing a remote or
+  protected effect.
+- Protected actions are fixed semantic names. The automatic accepted commit
+  never invokes repository `git add` or `git commit`: it uses a temporary Git
+  directory/index, frozen-base attributes, disabled system/global config and
+  attribute sources, allowlisted built-in EOL/file-mode semantics, native
+  `index.lock`, `commit-tree`, and compare-and-swap `update-ref`. Late filters,
+  configured Hooks/signing, and concurrent caller-index entries therefore have
+  no execution/injection path. Descriptor identity, regular-file, symlink/
+  reparse, and hardlink checks protect bounded state locks. No raw shell command
+  is parsed or persisted, and no test or pilot performs push, PR, tag, release,
+  publish, credential/SSH access, broad deletion, or history rewrite.
+
 ## Incident Response
 
 If a harness change exposes a secret, executes unexpected external code, breaks hooks, corrupts memory, or causes an agent to follow untrusted external instructions:

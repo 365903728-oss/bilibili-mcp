@@ -431,3 +431,47 @@ Candidate metrics:
 - accepted repair findings: 2
 - product-source files changed: 0
 - remote operations performed: 0
+
+### 2026-08-11 Harness Eval: Harness v2 Issue #30 Codex Direct loop
+
+- The public process-boundary seam kept adapter behavior testable without
+  launching another writer. Disposable repositories exposed state, Git, and
+  authority effects directly; linked-worktree fixtures forced the writer state
+  back under the frozen canonical worktree while a Windows named mutex/POSIX
+  existing-config advisory lock makes the source-bound sibling-state scan
+  atomic without a common-Git marker.
+- Initial green behavior was insufficient. Two-axis review and focused red
+  regressions found that raw contract persistence, unlocked state updates,
+  caller-asserted command results, stale diff evidence, and trailer-only commit
+  recovery could all produce false auditability or false acceptance.
+- Keep: one frozen typed contract, fixed action classes, diff-bound typed
+  evidence, current review gate, bounded fingerprint repair, metadata-only
+  Recovery Bundle, exact automatic local commit, real Harness-only pilot,
+  dirty-primary fingerprints, package exclusion, and independent final risk
+  review.
+- Change: future adapter loops should reuse the shared lock, metadata projection,
+  frozen canonical/source-bound writer identity, append-only evidence/result
+  fields, hermetic index plus `commit-tree`/CAS `update-ref`, state preflight
+  limit, and accepted snapshot rather than rebuilding host-specific state. Run
+  the cross-worktree alias/malformed-state, concurrent-index, late-filter,
+  Hook/signing, crash-recovery, and maximum-state cases from the first red suite.
+- Remove: do not persist a complete executable contract as runtime history, do
+  not implement load-modify-save without one transaction lock, and do not treat
+  a task trailer or model-reported pass as sufficient evidence.
+- Residual: the primary legacy Codex Hook overlap remains a deliberate
+  `doctor=action-required` migration gate. A normal-config client smoke remains
+  skipped until that external configuration receives separate authority.
+
+Candidate metrics:
+
+- shared Harness tests: 92 (1 platform-permission skip)
+- legacy Hook compatibility tests: 14
+- product tests: 862
+- package entries / forbidden Harness entries: 185 / 0
+- real pilot repairs / user interventions / routine prompts: 0 / 0 / 0
+- accepted pilot commits / remotes: 1 / 0
+- implementation-client handoffs / handoff overhead: 0 / 0
+- context cost: not measured
+- final independent review axes: 2, both PASS with no P0-P2
+- product-source files changed: 0
+- remote operations performed: 0

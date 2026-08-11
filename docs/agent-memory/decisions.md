@@ -435,9 +435,55 @@
   tracked/primary/user Codex command counts `4/5/0` as `action-required`.
 
 - Decision: Preserve Matt Skills' native manual metadata. A missing invocation
-  blocks governed writes and receives one host-native reminder whose
-  check-and-append is atomic under the ledger lock.
+  blocks governed writes and receives one host-native reminder whose source-
+  bound marker is atomic under one shared lock and fails closed at 512 retained
+  ticket reminders.
 - Reason: The controller may remind the user, but cannot silently imitate a
   phase-changing manual workflow or flood duplicate reminders under concurrency.
-- Evidence: `$implement` authorization for #29, host-bound contract tests, and
-  the 24-way concurrent reminder regression.
+- Evidence: `$implement` authorization for #29/#30, host-bound contract tests,
+  24-way concurrent/cross-worktree regressions, collision coverage, and the
+  capacity regression that preserves an old ticket's one-shot marker.
+
+- Decision: Persist a digested Codex Direct runtime projection rather than the
+  complete input task contract, and serialize every state transaction under a
+  bounded per-task lock.
+- Reason: The controller needs typed plan identity, scope, exit/result/diff
+  evidence, and recovery state, but raw commands and an absolute private
+  checkout path are not required after validation. Load-modify-save without a
+  lock can also lose risks or accept against stale evidence.
+- Evidence: Issue #30 Standards review, metadata-only/symlink regressions,
+  24-way concurrent risk regression, read-back-verified persistence, and the
+  real pilot's raw-path/raw-command absence checks.
+
+- Decision: Bind the writer lease to the frozen canonical worktree and branch,
+  task source digest, and task ID; keep every generated record in that
+  worktree's ignored `.harness/runtime/`; serialize sibling-lease discovery
+  with a repository-scoped named OS mutex on Windows or a non-mutating advisory
+  lock on the existing repository config on POSIX; and make acceptance invoke
+  the exact local commit automatically while retaining `commit` only as an
+  idempotent crash-recovery seam.
+- Reason: The canonical-worktree check rejects replay of the frozen contract,
+  but two concurrently altered contracts for the same ticket also need an
+  atomic repository view, including aliases that change only the task ID. A
+  common-Git marker would violate the worktree-local runtime boundary; the OS
+  mutex/POSIX existing-file lock supplies exclusion while every lease/run
+  record stays local. Keeping accepted state separate from an optional ordinary
+  commit would also weaken the one-commit lifecycle.
+- Evidence: concurrent distinct-linked-contract and task-alias regressions,
+  malformed sibling-state fail-closed coverage, unchanged config-byte
+  assertion, same-worktree concurrency regression, and the v6 pilot's absence
+  of common-Git state.
+
+- Decision: Treat the automatic commit as a protected Harness effect: derive
+  the accepted tree in a temporary Git directory/index with frozen-base
+  attributes and allowlisted built-in conversion settings; hold Git's native
+  `index.lock`; create the commit with `commit-tree`; move only the frozen branch
+  with compare-and-swap `update-ref`; and verify branch, single parent, trailer,
+  index, paths, content/mode snapshot, and clean postcondition.
+- Reason: Configured Hooks, signing, filters, or a staged accepted snapshot on
+  the wrong HEAD can create remote/credential effects or make a different
+  commit look accepted without passing the authority gate.
+- Evidence: Hook/signing/filter regressions, late-filter and concurrent-index
+  injection red/green regressions, CRLF/symlink semantics, post-ref index crash
+  recovery, altered-owned-diff rejection, and the one-commit/no-remote v6
+  pilot.

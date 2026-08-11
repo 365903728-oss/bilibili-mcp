@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -13,10 +14,26 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from harness.capabilities import check_manual_skill, doctor_report
+from harness.codex_direct import (
+    GUARDED_ACTIONS,
+    CodexDirectAdapterError,
+    CodexDirectError,
+    accept_codex_direct,
+    advance_codex_direct,
+    begin_repair,
+    codex_direct_status,
+    commit_codex_direct,
+    enter_recovery,
+    guard_codex_direct,
+    judge_criterion,
+    record_check,
+    record_risk,
+    start_codex_direct,
+)
 from harness.context import WorktreeError, discover_worktree
 from harness.contracts import ContractError, validate_task_contract
 from harness.events import ADAPTERS, HOOK_EVENTS, normalize_hook_event, persist_hook_event
-from harness.safe_io import read_bounded_json_stream
+from harness.safe_io import read_bounded_bytes, read_bounded_json_stream
 
 
 def _print_json(value: Any) -> None:
@@ -24,10 +41,11 @@ def _print_json(value: Any) -> None:
 
 
 def _load_json_file(path: Path, max_bytes: int = 256 * 1024) -> dict[str, Any]:
-    if not path.is_file() or path.is_symlink() or path.stat().st_size > max_bytes:
+    raw = read_bounded_bytes(path, max_bytes)
+    if raw is None:
         raise ValueError("JSON file is unavailable, unsafe, or oversized")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(raw.decode("utf-8", errors="strict"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("JSON file is invalid") from exc
     if not isinstance(value, dict):
@@ -68,6 +86,70 @@ def _build_parser() -> argparse.ArgumentParser:
     check.add_argument("--host", choices=("codex", "claude"))
     check.add_argument("--skill", required=True)
     check.add_argument("--invoked", action="store_true")
+
+    codex_direct = subcommands.add_parser(
+        "codex-direct", help="run the Codex Direct accepted-ticket loop"
+    )
+    codex_sub = codex_direct.add_subparsers(dest="codex_command", required=True)
+    start = codex_sub.add_parser("start")
+    start.add_argument("path", type=Path)
+    start.add_argument("--cwd", type=Path, default=Path.cwd())
+    guard = codex_sub.add_parser("guard")
+    guard.add_argument("--cwd", type=Path, default=Path.cwd())
+    guard.add_argument("--task", required=True)
+    guard.add_argument("--action", choices=sorted(GUARDED_ACTIONS), required=True)
+    guard.add_argument("--path")
+    advance = codex_sub.add_parser("advance")
+    advance.add_argument("--cwd", type=Path, default=Path.cwd())
+    advance.add_argument("--task", required=True)
+    advance.add_argument("--to", choices=("verifying", "reviewing"), required=True)
+    evidence = codex_sub.add_parser("record-check")
+    evidence.add_argument("--cwd", type=Path, default=Path.cwd())
+    evidence.add_argument("--task", required=True)
+    evidence.add_argument("--check", required=True)
+    evidence.add_argument("--status", choices=("pass", "fail", "skipped"), required=True)
+    evidence.add_argument("--source", choices=("command", "inspection", "review"), required=True)
+    evidence.add_argument("--exit-code", type=int)
+    evidence.add_argument(
+        "--sensitivity", choices=("public", "metadata", "secret-free"), required=True
+    )
+    evidence.add_argument("--digest", required=True)
+    evidence.add_argument("--reason-code")
+    judge = codex_sub.add_parser("judge")
+    judge.add_argument("--cwd", type=Path, default=Path.cwd())
+    judge.add_argument("--task", required=True)
+    judge.add_argument("--criterion", required=True)
+    judge.add_argument("--status", choices=("pass", "fail"), required=True)
+    judge.add_argument("--evidence-digest", required=True)
+    risk = codex_sub.add_parser("risk")
+    risk.add_argument("--cwd", type=Path, default=Path.cwd())
+    risk.add_argument("--task", required=True)
+    risk.add_argument("--risk", required=True)
+    risk.add_argument("--severity", choices=("low", "medium", "high", "critical"), required=True)
+    risk.add_argument("--status", choices=("open", "accepted", "resolved"), required=True)
+    risk.add_argument("--digest", required=True)
+    accept = codex_sub.add_parser("accept")
+    accept.add_argument("--cwd", type=Path, default=Path.cwd())
+    accept.add_argument("--task", required=True)
+    accept.add_argument(
+        "--message", default="chore(harness): create accepted ticket commit"
+    )
+    repair = codex_sub.add_parser("repair")
+    repair.add_argument("--cwd", type=Path, default=Path.cwd())
+    repair.add_argument("--task", required=True)
+    repair.add_argument("--fingerprint", required=True)
+    recover = codex_sub.add_parser("recover")
+    recover.add_argument("--cwd", type=Path, default=Path.cwd())
+    recover.add_argument("--task", required=True)
+    recover.add_argument("--category", choices=("adapter-failure",), required=True)
+    recover.add_argument("--fingerprint", required=True)
+    commit = codex_sub.add_parser("commit")
+    commit.add_argument("--cwd", type=Path, default=Path.cwd())
+    commit.add_argument("--task", required=True)
+    commit.add_argument("--message", required=True)
+    status = codex_sub.add_parser("status")
+    status.add_argument("--cwd", type=Path, default=Path.cwd())
+    status.add_argument("--task", required=True)
     return parser
 
 
@@ -84,6 +166,8 @@ def _hook_control(*, recorded: bool, reason: str | None = None) -> dict[str, Any
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    context = None
+    recovery_task_id = None
     try:
         if args.command == "doctor":
             context = discover_worktree(args.repo)
@@ -141,7 +225,108 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             _print_json(result)
             return 0 if result["status"] == "invoked" else 3
-    except (ContractError, ValueError, WorktreeError, OSError) as exc:
+
+        if args.command == "codex-direct":
+            context = discover_worktree(args.cwd)
+            if args.codex_command == "start":
+                contract_value = _load_json_file(args.path)
+                candidate_task_id = contract_value.get("task", {}).get("id")
+                if isinstance(candidate_task_id, str):
+                    recovery_task_id = candidate_task_id
+                result, exit_code = start_codex_direct(
+                    context,
+                    contract_value,
+                )
+            elif args.codex_command == "guard":
+                result, exit_code = guard_codex_direct(
+                    context,
+                    task_id=args.task,
+                    action=args.action,
+                    path=args.path,
+                )
+            elif args.codex_command == "advance":
+                result = advance_codex_direct(
+                    context, task_id=args.task, target=args.to
+                )
+                exit_code = 0
+            elif args.codex_command == "record-check":
+                result = record_check(
+                    context,
+                    task_id=args.task,
+                    check_id=args.check,
+                    status=args.status,
+                    source=args.source,
+                    exit_code=args.exit_code,
+                    sensitivity=args.sensitivity,
+                    digest=args.digest,
+                    reason_code=args.reason_code,
+                )
+                exit_code = 0
+            elif args.codex_command == "judge":
+                result = judge_criterion(
+                    context,
+                    task_id=args.task,
+                    criterion_id=args.criterion,
+                    status=args.status,
+                    evidence_digest=args.evidence_digest,
+                )
+                exit_code = 0
+            elif args.codex_command == "risk":
+                result = record_risk(
+                    context,
+                    task_id=args.task,
+                    risk_id=args.risk,
+                    severity=args.severity,
+                    status=args.status,
+                    digest=args.digest,
+                )
+                exit_code = 0
+            elif args.codex_command == "accept":
+                result = accept_codex_direct(
+                    context, task_id=args.task, message=args.message
+                )
+                exit_code = 0
+            elif args.codex_command == "repair":
+                result, exit_code = begin_repair(
+                    context, task_id=args.task, fingerprint=args.fingerprint
+                )
+            elif args.codex_command == "recover":
+                result, exit_code = enter_recovery(
+                    context,
+                    task_id=args.task,
+                    category=args.category,
+                    fingerprint=args.fingerprint,
+                )
+            elif args.codex_command == "commit":
+                result = commit_codex_direct(
+                    context, task_id=args.task, message=args.message
+                )
+                exit_code = 0
+            else:
+                result = codex_direct_status(context, task_id=args.task)
+                exit_code = 0
+            _print_json(result)
+            return exit_code
+    except CodexDirectAdapterError as exc:
+        task_id = getattr(args, "task", None) or recovery_task_id
+        if args.command == "codex-direct" and isinstance(task_id, str):
+            fingerprint = hashlib.sha256(
+                f"adapter-failure-v1\0{exc}".encode("utf-8")
+            ).hexdigest()
+            try:
+                result, exit_code = enter_recovery(
+                    context or discover_worktree(args.cwd),
+                    task_id=task_id,
+                    category="adapter-failure",
+                    fingerprint=fingerprint,
+                )
+                _print_json(result)
+                return exit_code
+            except (CodexDirectError, ValueError, WorktreeError, OSError):
+                pass
+        _print_json({"schema": "harness.error/v1", "error": str(exc)})
+        return 2
+    except (CodexDirectError, ContractError, ValueError, WorktreeError, OSError) as exc:
         _print_json({"schema": "harness.error/v1", "error": str(exc)})
         return 2
     return 2

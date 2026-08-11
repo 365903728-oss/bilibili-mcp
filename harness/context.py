@@ -27,6 +27,22 @@ class WorktreeContext:
         return self.root / ".harness" / "runtime" / self.worktree_id
 
 
+def git_environment() -> dict[str, str]:
+    env = os.environ.copy()
+    for key in list(env):
+        if key.upper().startswith("GIT_") or key.upper() in {
+            "SSH_ASKPASS",
+            "GCM_INTERACTIVE",
+            "GCM_TRACE",
+        }:
+            env.pop(key, None)
+    env["GIT_LITERAL_PATHSPECS"] = "1"
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    return env
+
+
 def _git(cwd: Path, *args: str) -> str:
     try:
         result = subprocess.run(
@@ -36,6 +52,7 @@ def _git(cwd: Path, *args: str) -> str:
             text=True,
             encoding="utf-8",
             errors="strict",
+            env=git_environment(),
             timeout=10,
         )
     except (OSError, subprocess.SubprocessError) as exc:

@@ -1606,3 +1606,71 @@
   accepted-evidence memory projection, Harness evolution, remote Issue changes,
   push, PR, release, or publication. Full three-adapter pilot/release
   conformance belongs to #36.
+
+## 2026-08-11 Harness v2 Issue #30
+
+- Scope: isolated branch `codex/harness-v2-codex-direct-30` at exact parent
+  `0ed8968bf94ea5b468e97665baac99e00c3b979e`; executable Codex Direct contract,
+  state machine, canonical writer lease, action guards, typed evidence,
+  fingerprint-bounded repair, Recovery Bundle, current-diff acceptance, and
+  protected automatic local commit. Product `src/`, package/dependency/workflow,
+  tracked Hooks, external configuration, and remote GitHub state are excluded.
+- TDD/result: disposable repositories cover mode/base freeze, missing native
+  `$implement`, concurrent transactions, linked-worktree rejection, guards,
+  typed results/skips/risks/criteria, stale-diff review, repair fingerprint/
+  limit, automatic adapter-failure recovery, malformed/symlink state, declared
+  maximum state, bounded reminders, lock identity/hardlinks, task-source aliases,
+  malformed sibling state, external/late Git filters, concurrent caller-index
+  injection, Hook/signing suppression, CRLF/symlink conversion, exact index/
+  snapshot and post-ref crash recovery, and one-commit/no-remote postconditions.
+  Red races for two writers, executed late filters, and an injected staged path
+  are green at the shared boundary. Harness discovery ran 92 tests in
+  388.397s with `OK (skipped=1)` for one platform-permission symlink case;
+  legacy Hook safety passes
+  6/6; legacy Stop summary passes 8/8; compileall and example contract
+  validation pass. Final controller/test SHA-256 values are
+  `d2c21c9d9fbc301d5531f0038b21ffdf2e88f8659fbee30da98f6467b031e2f0` /
+  `cf07d4bb4368ed58b9435413ee7506adc73ca370eb3295372a7e2bed36a52f59`.
+- Product/package: `npm run build` passes; full Vitest passes 41 files / 862
+  tests. `npm pack --dry-run --json` reports 185 files, 1,088,657 packed bytes,
+  1,718,671 unpacked bytes, all three required `dist` entrypoints, zero
+  forbidden Harness/rules/project-memory paths, and no emitted tarball.
+- Real pilot: ignored disposable repository `github-30-real-v6` advanced from
+  base `3b93fe44379bd827e9c687ec59a219268648984b` to the single accepted commit
+  `1a326b9760ca9b23bb2ba25f6c0704941713b5b5`, changing only
+  `harness-only.txt`. It has zero remotes and a clean tree; repeated acceptance
+  is `already-committed`. The accepted snapshot digest is
+  `e8837d20c4ee3cbb6a196e44e4883bcc877ef7a7af923c4183af106a7d48db0c`,
+  accepted index digest is
+  `4763b2413f680cf415e1cba34e59f0c31fc30cfe44cb43ad10221f352630bd34`;
+  all required evidence binds to diff digest
+  `df61b7d467d241cd08dae76212cee52b6d81c454c1929a09752268f10e3e99ee`.
+  Runtime contains no canonical path/raw command and the common Git directory
+  contains no Harness lease marker.
+- Security/text: 21 candidate files have zero high-confidence token/private-key
+  matches, UTF-8 decode errors, or BOMs; added diff lines contain zero U+FFFD.
+  Historical verification commands intentionally retain U+FFFD as a search
+  sentinel, so the whole-file count is not used as a corruption claim.
+  `git diff --check` passes. Automatic commit tests prove configured Hooks/
+  signing and late filters have no execution path, caller-staged content cannot
+  enter the accepted tree, and post-ref index installation failure recovers
+  without a second commit.
+- Diagnostics: `python -m harness doctor --json` remains the expected
+  `action-required`, with tracked/primary/user Codex Hook command counts 4/5/0.
+  No external configuration was rewritten and the normal-config smoke stayed
+  skipped with reason `doctor-action-required`.
+- Dirty-primary isolation: `C:\Users\ZX\bilibili-mcp` remains at HEAD
+  `ab4dd02854f0483fc7668c713523b4be77de6cc7`, status count 68 / hash
+  `34ef9dee55da26ef977b54e795477f493e18dded`, tracked-diff hash
+  `c9a4daa32c34115d3d443a52afa81301416b6082`, untracked count 44 / hash
+  `2ec8b5fa42ed2cf4d684a5c7b9156998756abecb`, and staged count 0. All match
+  the #30 pre-write baseline.
+- Acceptance/review boundary: Spec review passed its final code axis; the final
+  Standards and adversarial security axes independently returned PASS with no
+  P0-P2 at the frozen controller/test hashes. A separate final risk-weighted
+  acceptance review also returned PASS with no executable P0-P2. The focused
+  commit containing this record exists only after the exact staged scope passes
+  reinspection. Before that commit, these results describe the accepted
+  candidate. No push, PR,
+  Issue close, tag, release, publish, credential/SSH action, history rewrite,
+  or broad deletion is authorized or performed.

@@ -190,13 +190,29 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
 - `RULES.md`: single shared constitutional/workflow core for all three execution adapters.
 - `AGENTS.md`: thin Codex adapter for `codex-direct` and Codex's controller/acceptance role in `codex-paseo-claude`.
 - `CLAUDE.md`: thin Claude adapter; imports `RULES.md` and defines `claude-direct` plus Paseo-managed writer behavior.
-- `harness/cli.py`: shared diagnostics, typed-contract validation, hook ingestion/replay, and manual-Skill gate CLI.
-- `harness/contracts.py`: three-mode owners, writer lease, authority, state, terminal, and no-switch invariants.
+- `harness/cli.py`: shared diagnostics, typed-contract validation, hook
+  ingestion/replay, manual-Skill gate, and Codex Direct control commands.
+- `harness/contracts.py`: three-mode owners, writer lease, authority, state,
+  terminal, no-switch, executable plan, owned-path, verification, and repair
+  invariants.
+- `harness/codex_direct.py`: persistent `codex-direct` ticket controller. It
+  freezes a clean canonical worktree/branch/base and Codex-only writer, uses a
+  repository-scoped Windows mutex or POSIX existing-config advisory lock to
+  scan source-bound sibling worktree leases atomically, guards fixed action
+  classes, records an append-only bounded evidence log plus current checks/
+  criteria/risks, bounds repairs by fingerprint and progress, writes Recovery
+  Bundles, accepts the exact owned snapshot, and creates one hermetic,
+  idempotent `commit-tree`/`update-ref` post-acceptance local commit.
 - `harness/context.py`: dynamic Git repository/worktree attribution and opaque IDs.
 - `harness/events.py`: Codex/Claude payload projection into `harness.hook-event/v1`.
-- `harness/safe_io.py`: bounded JSON/JSONL, rotation, lock, atomic write, and symlink-safe file primitives.
-- `harness/capabilities.py`: provider/model-neutral adapter, Skill, and agent discovery plus deduplicated native-manual-Skill reminders.
-- `harness/fixtures/`, `harness/tests/`: replay/conformance fixtures and stdlib-only Harness tests.
+- `harness/safe_io.py`: bounded JSON/JSONL, rotation, atomic replacement, and
+  descriptor-identity/link/hardlink-safe file-lock primitives.
+- `harness/capabilities.py`: provider/model-neutral adapter, Skill, and agent
+  discovery plus source-bound, concurrency-safe, count-bounded native-manual-
+  Skill reminder markers.
+- `harness/fixtures/`, `harness/tests/`: replay/conformance fixtures plus
+  stdlib-only disposable-Git tests for session events and the Codex Direct
+  state/lease/guard/recovery/acceptance/commit boundary.
 - `docs/agent-memory/agent-communication.md`: three-mode execution/handoff/report protocol.
 - `docs/agent-memory/executions/`: unified execution and acceptance reports.
 - `docs/agent-memory/handoffs/`: durable Codex-to-Claude handoffs, Claude reports, and task-ticket-backed handoff artifacts.

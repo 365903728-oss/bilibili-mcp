@@ -15,6 +15,7 @@ from harness.events import normalize_hook_event, persist_hook_event
 from harness.safe_io import (
     MAX_STDIN_BYTES,
     append_bounded_jsonl,
+    bounded_file_lock,
     read_bounded_json_stream,
     read_bounded_jsonl,
 )
@@ -151,6 +152,23 @@ class HookEventTests(unittest.TestCase):
                 sorted(row["index"] for row in read_bounded_jsonl(ledger)),
                 list(range(24)),
             )
+
+    def test_lock_initialization_rejects_hard_link_without_touching_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            external = root / "external.bin"
+            lock_path = root / "runtime" / "state.lock"
+            lock_path.parent.mkdir()
+            external.write_bytes(b"")
+            try:
+                os.link(external, lock_path)
+            except OSError as exc:
+                self.skipTest(f"hard links unavailable: {exc}")
+
+            with self.assertRaises(ValueError):
+                with bounded_file_lock(lock_path):
+                    self.fail("hard-linked lock must not be acquired")
+            self.assertEqual(external.read_bytes(), b"")
 
 
 if __name__ == "__main__":

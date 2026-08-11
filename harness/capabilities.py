@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
+import json
 import re
 import shutil
 import tomllib
@@ -11,11 +13,15 @@ from typing import Any
 
 from harness.contracts import EXECUTION_MODES
 from harness.safe_io import (
-    append_bounded_jsonl,
+    bounded_file_lock,
     ensure_no_link_components,
     read_bounded_json_object,
     safe_label,
+    write_bounded_text,
 )
+
+
+MAX_MANUAL_SKILL_REMINDERS = 512
 
 
 def _skill_names(root: Path) -> list[str]:
@@ -225,32 +231,47 @@ def check_manual_skill(
             raise ValueError("manual skill host does not match the direct adapter")
     elif host not in {"codex", "claude"}:
         raise ValueError("collaboration manual skill requires an explicit host")
-    safe_task = safe_label(task_id, "task", 96)
-    safe_skill = safe_label(skill, "skill", 64)
+    reminder_id = manual_skill_reminder_id(
+        task_id=task_id,
+        adapter=adapter,
+        host=host,
+        skill=skill,
+    )
     prefix = "/" if host == "claude" else "$"
-    native = f"{prefix}{safe_skill}"
+    native = f"{prefix}{skill}"
     base = {
         "schema": "harness.manual-skill-gate/v1",
-        "task_id": safe_task,
+        "task_id": task_id,
         "adapter": adapter,
         "host": host,
-        "skill": safe_skill,
+        "skill": skill,
         "native_invocation": native,
     }
     if invoked:
         return {**base, "status": "invoked", "message": None}
 
-    ledger = runtime_root / "manual-skill-reminders.jsonl"
-    ensure_no_link_components(worktree_root or runtime_root, ledger.parent)
-    reminder_id = hashlib.sha256(
-        f"v1\0{safe_task}\0{adapter}\0{host}\0{safe_skill}".encode("utf-8")
-    ).hexdigest()[:24]
+    marker_dir = runtime_root / "manual-skill-reminders"
+    marker = marker_dir / f"{reminder_id}.json"
+    ensure_no_link_components(worktree_root or runtime_root, marker_dir)
     row = {"schema": "harness.manual-skill-reminder/v1", "reminder_id": reminder_id}
-    appended = append_bounded_jsonl(ledger, row, unique_field="reminder_id")
-    if appended is None:
-        return {**base, "status": "already-reminded", "message": None}
-    if not appended:
-        raise ValueError("manual skill reminder ledger is locked or unsafe")
+    with bounded_file_lock(marker_dir / ".markers.lock"):
+        existing = read_bounded_json_object(marker, 1024)
+        if existing == row:
+            return {**base, "status": "already-reminded", "message": None}
+        if marker.exists() or marker.is_symlink():
+            raise ValueError("manual skill reminder marker is invalid")
+        markers = list(
+            itertools.islice(marker_dir.glob("*.json"), MAX_MANUAL_SKILL_REMINDERS + 1)
+        )
+        if len(markers) >= MAX_MANUAL_SKILL_REMINDERS:
+            raise ValueError("manual skill reminder capacity is exhausted")
+        write_bounded_text(
+            marker,
+            json.dumps(row, ensure_ascii=True, sort_keys=True, separators=(",", ":")),
+            1024,
+        )
+        if read_bounded_json_object(marker, 1024) != row:
+            raise ValueError("manual skill reminder marker was not durable")
     return {
         **base,
         "status": "reminder-emitted",
@@ -259,3 +280,19 @@ def check_manual_skill(
             "The Harness will not imitate or invoke the skill."
         ),
     }
+
+
+def manual_skill_reminder_id(
+    *, task_id: str, adapter: str, host: str, skill: str
+) -> str:
+    values = ((task_id, 128), (adapter, 64), (host, 16), (skill, 64))
+    if any(not isinstance(value, str) or not 1 <= len(value) <= limit for value, limit in values):
+        raise ValueError("manual skill reminder identity is invalid")
+    if safe_label(skill, "skill", 64) != skill:
+        raise ValueError("manual skill name is not a native invocation identifier")
+    digest = hashlib.sha256(b"manual-skill-reminder-v2")
+    for value, _ in values:
+        encoded = value.encode("utf-8")
+        digest.update(len(encoded).to_bytes(4, "big"))
+        digest.update(encoded)
+    return digest.hexdigest()[:24]

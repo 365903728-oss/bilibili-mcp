@@ -457,6 +457,8 @@
   masquerade as no matches. Explicit empty arrays and non-empty arrays whose
   rows all normalize away retain their previous successful-empty semantics.
 
+## 2026-08-11
+
 - Fact: Harness v2 Issue #29 supersedes the earlier path-bound Hook/runtime
   layout with one shared `RULES.md`, thin Codex/Claude adapters, tracked
   portable Hook registrations, and a worktree-scoped `.harness/runtime/`
@@ -472,3 +474,32 @@
   ignored `.claude/settings.local.json` Hooks are not rewritten automatically;
   when they conflict with tracked Hooks, `harness doctor` reports
   `action-required` so the legacy registration can be migrated before rollout.
+
+- Fact: Harness v2 Issue #30 adds the complete executable `codex-direct`
+  accepted-ticket loop on top of #29's shared session spine.
+- Evidence: 92 Harness tests (one platform-permission skip), 14 legacy Hook
+  tests, 862 product tests, a
+  185-file package with zero Harness paths, two-axis code review, independent
+  risk review, and the accepted real Harness-only pilot recorded in
+  `executions/2026-08-11-github-30-codex-direct-report.md`.
+- Impact: Codex Direct now freezes one typed canonical worktree/mode/base/branch
+  and Codex writer, atomically excludes same-source/task aliases in sibling
+  worktrees without common-Git state or config changes, serializes worktree-
+  local state, guards protected effects, binds an append-only evidence log and
+  current review to the current diff, bounds repair, produces Recovery Bundles,
+  and automatically creates one exact local accepted commit through an isolated
+  index plus `commit-tree`/CAS `update-ref`. Hooks, signing, external filters,
+  and caller-staged entries cannot enter that commit. Push, PR, tag, release,
+  publish, credentials/SSH, history rewrite, and broad delete remain outside
+  normal authority.
+
+- Fact: Codex Direct runtime persistence is metadata-only even though the
+  input task contract contains an absolute canonical worktree and verification
+  commands.
+- Evidence: runtime regressions reject malformed/symlink state, omit raw paths
+  and commands, retain only opaque worktree/repository IDs plus semantic
+  metadata/digests, preflight the declared maximum state before replacement,
+  and verify every state write by bounded read-back.
+- Impact: Recovery and acceptance remain auditable without copying private
+  checkout paths, command text, prompts, output, or credential-bearing values
+  into `.harness/runtime/`.

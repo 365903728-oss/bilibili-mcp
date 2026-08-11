@@ -11,7 +11,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from harness.capabilities import check_manual_skill, doctor_report
+from harness.capabilities import MAX_MANUAL_SKILL_REMINDERS, check_manual_skill, doctor_report
 from harness.cli import _hook_control, main
 from harness.context import discover_worktree
 from harness.events import normalize_hook_event
@@ -58,9 +58,37 @@ class CliAndAdapterTests(unittest.TestCase):
             self.assertIn("manually", first["message"].lower())
             self.assertEqual(second["status"], "already-reminded")
             self.assertIsNone(second["message"])
-            persisted = (runtime / "manual-skill-reminders.jsonl").read_text(encoding="utf-8")
+            markers = list((runtime / "manual-skill-reminders").glob("*.json"))
+            self.assertEqual(len(markers), 1)
+            persisted = markers[0].read_text(encoding="utf-8")
             self.assertNotIn("github-29", persisted)
             self.assertNotIn("implement", persisted)
+
+    def test_manual_skill_reminders_use_the_unsanitized_ticket_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runtime = Path(temp)
+            long_prefix = "x" * 100
+            first = check_manual_skill(
+                runtime_root=runtime,
+                task_id=f"{long_prefix}#30",
+                adapter="codex-direct",
+                host="codex",
+                skill="implement",
+                invoked=False,
+            )
+            second = check_manual_skill(
+                runtime_root=runtime,
+                task_id=f"{long_prefix}_30",
+                adapter="codex-direct",
+                host="codex",
+                skill="implement",
+                invoked=False,
+            )
+            self.assertEqual(first["status"], "reminder-emitted")
+            self.assertEqual(second["status"], "reminder-emitted")
+            self.assertEqual(
+                len(list((runtime / "manual-skill-reminders").glob("*.json"))), 2
+            )
 
     def test_concurrent_manual_skill_checks_emit_one_reminder(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -82,9 +110,48 @@ class CliAndAdapterTests(unittest.TestCase):
             self.assertEqual(statuses.count("reminder-emitted"), 1)
             self.assertEqual(statuses.count("already-reminded"), 23)
             self.assertEqual(
-                len(read_bounded_jsonl(runtime / "manual-skill-reminders.jsonl")),
-                1,
+                len(list((runtime / "manual-skill-reminders").glob("*.json"))), 1
             )
+
+    def test_manual_skill_reminder_is_not_evicted_by_later_tickets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runtime = Path(temp)
+            first = check_manual_skill(
+                runtime_root=runtime,
+                task_id="stable-ticket",
+                adapter="codex-direct",
+                host="codex",
+                skill="implement",
+                invoked=False,
+            )
+            for index in range(MAX_MANUAL_SKILL_REMINDERS - 1):
+                check_manual_skill(
+                    runtime_root=runtime,
+                    task_id=f"later-ticket-{index}",
+                    adapter="codex-direct",
+                    host="codex",
+                    skill="implement",
+                    invoked=False,
+                )
+            with self.assertRaisesRegex(ValueError, "capacity"):
+                check_manual_skill(
+                    runtime_root=runtime,
+                    task_id="over-capacity-ticket",
+                    adapter="codex-direct",
+                    host="codex",
+                    skill="implement",
+                    invoked=False,
+                )
+            repeated = check_manual_skill(
+                runtime_root=runtime,
+                task_id="stable-ticket",
+                adapter="codex-direct",
+                host="codex",
+                skill="implement",
+                invoked=False,
+            )
+            self.assertEqual(first["status"], "reminder-emitted")
+            self.assertEqual(repeated["status"], "already-reminded")
 
     def test_invoked_manual_skill_needs_no_reminder(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

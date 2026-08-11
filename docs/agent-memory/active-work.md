@@ -4,15 +4,25 @@
 
 GitHub Issue #28 is the approved Harness v2 specification. Issues #29-#36 are
 the dependency-ordered implementation tickets. Issue #29, `Portable session
-spine and constitutional adapters`, is accepted in `codex-direct`; the focused
-local commit containing this record is its acceptance commit. The remote Issue
-remains open because no close/push/PR authority was granted.
+spine and constitutional adapters`, is accepted. The focused local commit
+containing this record is #30's acceptance commit; before that commit exists in
+HEAD, #30 remains a final acceptance candidate. Both remote Issues remain open
+because no close/push/PR authority was granted.
 
-The current dependency frontier is #30, `Codex Direct accepted-ticket loop`.
-Its execution mode has not been selected and its manual `implement` phase has
-not been invoked. Before #30's first implementation write, ask the user once to
-choose a mode, then require the native manual invocation for that new ticket.
-No adapter fallback is authorized.
+#30 froze mode, baseline `0ed8968…`, Codex's sole writer/acceptance ownership,
+and the user's native `$implement` invocation before implementation. The
+executable loop now covers typed evidence, atomic cross-worktree writer
+exclusion by task/source with worktree-local lease records, guards, bounded
+repair, Recovery Bundle, current-diff review, and a hermetic temporary-index /
+`commit-tree` / CAS `update-ref` automatic ticket-owned local commit. The
+primary legacy Codex Hook overlap remains an explicit
+`doctor=action-required` rollout gate and was not rewritten.
+
+The dependency frontier is #31, `Codex-to-Paseo-to-Claude execution loop`, once
+HEAD contains this record; otherwise it remains #30. A new ticket still
+requires one frozen mode decision and its own native manual Skill evidence.
+#30 does not authorize Paseo restart, Claude writer launch, adapter fallback,
+or remote delivery for #31.
 
 The Harness target is one `RULES.md` core with `codex-direct`,
 `codex-paseo-claude`, and `claude-direct` adapters. Local commit is automatic
