@@ -1724,3 +1724,188 @@
   reinspection; before then these results describe the accepted candidate. No
   push, PR, Issue close, tag, release, publish, credential/SSH action, history
   rewrite, or broad deletion is authorized or performed.
+
+## 2026-08-12 Issue #32 Paseo Collaboration Verification
+
+- Command: `PATH="/d/Git/cmd:$PATH" python -m pytest harness/tests/test_paseo_collaboration.py -v`
+- Result: 36/36 passed in 115.11s (29 function tests + 7 CLI tracer tests).
+- Area: Paseo collaboration adapter focused suite.
+
+- Command: `python -m compileall -q harness .codex/scripts`
+- Result: Passed.
+- Area: Python byte-compilation of harness and hook scripts.
+
+- Command: `git diff --check`
+- Result: Passed (CRLF warnings only, expected on Windows).
+- Area: Whitespace/conflict validation.
+
+- Command: `git diff --stat`
+- Result: 3 tracked files, +289/-14. New untracked: `harness/paseo_collaboration.py` (1479 lines), `harness/tests/test_paseo_collaboration.py` (1705 lines).
+- Area: Diff scope.
+
+- Command: combined `test_paseo_collaboration.py + test_codex_direct.py + test_contracts.py + test_cli_and_adapters.py`
+- Result: **Blocked/hung**. The combined pytest process (PID 45224) hung in a Git child process and was terminated by Codex without touching the Paseo daemon or agent. Recorded as `blocked/hung`, pending Codex verification. The 36/36 focused collaboration suite, compileall, and diff-check remain valid writer evidence.
+- Area: Combined shared-controller acceptance gates.
+
+- Dead-code removal: `_validate_collaboration_contract` (~66 lines) removed from `paseo_collaboration.py`. This function duplicated shared `validate_task_contract()` checks. 36/36 tests continued to pass after removal.
+- Area: Slice 8 deduplication.
+
+- Remaining risks:
+  - Combined suite hang requires independent Codex investigation and rerun.
+  - Real Paseo-managed Claude pilot is Codex-owned and has not been launched.
+  - Full TypeScript/Vitest/pack suite not run (no product changes; Codex-owned).
+  - All changes remain uncommitted for Codex acceptance review.
+
+## 2026-08-12 Round 4 same-agent repair (scope-compressed closure)
+
+- Command: `python -m py_compile harness/codex_direct.py harness/paseo_collaboration.py harness/cli.py`
+- Result: Passed.
+- Area: Round 4 production changes (unlocked-core extraction, acceptance lock,
+  recovery bundle collaboration section, bounded subprocess/file reads).
+
+- Command: `PATH=/d/Git/cmd:$PATH python -m pytest harness/tests/test_paseo_collaboration.py -v`
+- Result: 52/52 passed in 251.37s (function tests + CLI tracer tests).
+- Area: Full focused Paseo collaboration suite after Round 4 changes.
+
+- Command: focused tracer selection (`-k "slice8_accept or slice35_repair or slice4_at_most"`)
+- Result: 3/3 passed in 18.57s (acceptance pending-dispatch block, repair
+  prepared-intent block, at-most-once dispatch).
+- Area: Strongest new dispatch/repair/acceptance regression proofs.
+
+- Round 4 production changes: extracted `_accept_codex_direct_unlocked` shared
+  seam (acceptance now holds `run.lock` in `collaboration_accept` and calls the
+  unlocked core — no TOCTOU precheck); `_enter_recovery_unlocked` emits a
+  bounded secret-free collaboration evidence section (last-persisted agent
+  identity/state, frozen bridge handoff digest, bridge + sidecar digests) for
+  `codex-paseo-claude` runs only; all four bootstrap failure sites route
+  through the shared recovery path so `recovery-required` always has a
+  durable bundle; raw failure text is never persisted in the run record
+  (hashed category/fingerprint only); `_run_paseo_cli` replaced
+  post-allocation capture with concurrent bounded drain + kill on overflow/
+  timeout and metadata-only errors; handoff/review/preferences reads use
+  `read_bounded_bytes`.
+- Area: Round 4 controller scope compression (Slices 3+5, 4+8, recovery).
+
+- Second controller audit fixes: removed `run["error"]` persistence in
+  `_bootstrap_recovery` (run shape has no error key; the reload in
+  `_enter_recovery_unlocked` rejected it, so inspect-failure bootstrap
+  exited 2 instead of 6); collaboration evidence now binds the frozen
+  `bridge_handoff_digest` and validates its strict 64-hex shape; evidence
+  identity is documented as last-persisted run-record state, not live.
+
+- Command: `PATH=/d/Git/cmd:$PATH python -m pytest harness/tests/test_paseo_collaboration.py -v -k "test_slice3_inspect_fail_closed_on_missing_field or test_recovery_bundle_roundtrip_status"`
+- Result: 2/2 passed in 15.72s (exit 6 without raw error persistence; full
+  collaboration evidence round-trip through the public status path).
+- Area: Second-audit targeted regression proof.
+
+- Command: `python -m py_compile harness/codex_direct.py harness/paseo_collaboration.py harness/tests/test_paseo_collaboration.py`
+- Result: Passed (re-run after second-audit fixes).
+
+- Remaining risks:
+  - Combined shared-controller suite not rerun; pending Codex verification.
+  - The 52/52 focused run predates the second-audit fixes; only the two
+    targeted tests were rerun after them (per controller instruction).
+  - Real Paseo pilot and full release gates are Codex-owned and not started.
+- All Round 4 changes remain uncommitted for Codex acceptance review.
+
+## 2026-08-13 Issue #32 final controller acceptance
+
+- Repair attempt 6: same original Paseo writer closed six independently
+  reviewed root findings. Six new focused proofs passed 6/6, `py_compile`
+  passed, and the then-full collaboration module passed 71/71 in 274.79s.
+- Repair attempt 7: the user explicitly changed the model freeze. The idle
+  original writer released its logical lease before replacement agent
+  `0bdef442-14db-4f35-9e0d-c1516bb38166` became the sole writer. Live inspect
+  proved `claude/deepseek-v4-pro[1m]`, thinking `max`,
+  `bypassPermissions`, and canonical cwd. The public-CLI malformed-contract
+  proof passed 1/1 in 2.27s, 1/1 in 2.00s on the max-thinking verification turn,
+  and 1/1 in 2.31s under independent Codex rerun. Both agents ended idle; the
+  replacement lease was released to Codex acceptance.
+- Independent acceptance and Standards re-reviews: PASS with no remaining
+  P0–P2 finding. The analogous Direct-start expression is unchanged from the
+  accepted #31 base and is recorded as a nonblocking follow-up, not expanded
+  into Issue #32.
+- Final staged review then found one actor-authority gap: an accepted Claude
+  caller could pass `local-commit` through the actor-agnostic shared guard. The
+  user authorized repair attempt 8 on the same DeepSeek V4 Pro writer at
+  thinking `max`. RED reproduced `AssertionError: 0 == 0` because Claude was
+  allowed. The minimum early denial made the new accepted-lifecycle proof PASS
+  1/1 in 17.19s and all seven guard tests PASS in 31.84s; `py_compile` passed.
+  Codex independently reran the proof 1/1 in 15.377s. The two reviewers that
+  found the gap independently reran/reviewed the repair and both returned PASS
+  with no P0–P2 blocker. The writer ended idle and released its lease.
+- Command: `python -m unittest discover -s harness/tests -p "test_*.py"`
+- Result: 177 tests ran in 845.622s; OK (skipped=1). This full-suite snapshot
+  includes the first 72 collaboration tests. The subsequent attempt-8 delta is
+  the isolated actor guard plus one focused regression described above; it was
+  intentionally not followed by another broad suite.
+- Command: `python -m compileall -q harness .codex/scripts`
+- Result: PASS.
+- Command: `python .codex/scripts/test_hook_safety.py`
+- Result: 6/6 PASS.
+- Command: `python .codex/scripts/test_stop_summary.py`
+- Result: 8/8 PASS.
+- Node/package evidence reuse: `git diff --quiet -- package.json
+  package-lock.json tsconfig.json src tests .github` returned zero, so the
+  already-passing build, 41 files / 862 Vitest tests, and 185-file pack remain
+  current. No product/package input changed.
+- Real pilot reconciliation: the zero-remote pilot predates attempts 6–7 and
+  is retained as real integration evidence for Paseo/provider resolution,
+  native `/implement`, bounded write/report, one accepted commit, and zero
+  remotes. Later changes are negative-path/input/metadata/guard hardening proven
+  by current public-process tests and the final suite; no hash-identical pilot
+  claim is made.
+- Diagnostics/isolation: `doctor` remains the expected `action-required`
+  legacy Hook-overlap state with no config rewrite. Base/parent/branch remain
+  `5e9de4b…` / `cbd31b9…` /
+  `codex/harness-v2-paseo-claude-32`. The dirty primary remains HEAD
+  `ab4dd028…`, status count 68, joined-line digest `a4bbfb6d…f8423`, staged
+  0. No daemon restart, push, PR, Issue close, tag, release, publish, SSH,
+  credential action, or history rewrite occurred.
+
+## 2026-08-13 Final review closure (repair attempt 4)
+
+Six release blockers fixed; one regression proof per root cause (new tests
+`test_fix1`–`test_fix5`):
+
+1. Preflight accepts Paseo 0.2.5 `connectedDaemon: reachable`; unreachable
+   still rejected (`test_fix1_preflight_accepts_reachable_daemon`).
+2. Dispatch/repair prompt files are ephemeral (removed in `finally` after
+   send); report nested objects (commands/skips/risks/evidence) allow exact
+   key sets only and persist normalized projections, never the caller's raw
+   object (`test_fix2_report_rejects_risk_extra_keys`). The fake Paseo now
+   captures the prompt at send time; `test_slice2_prompt_file_format` proves
+   format from the send event and that no prompt file survives.
+3. Repair delivery evidence is attempt-keyed (`repair-pending-{n}` /
+   `repair-dispatch-{n}`); a completed attempt never blocks the next,
+   a prepared current-attempt intent blocks replay, and acceptance blocks any
+   pending-N lacking dispatch-N (`test_fix3_two_sequential_repairs_attempt_keyed`).
+   Recovery folds the attempts into two logical sidecar digests
+   (`repair-pending-attempts` / `repair-dispatch-attempts`) over a canonical
+   sorted name→digest map.
+4. Acceptance binds launch/report/task/agent IDs and launch/bridge/handoff
+   digests to the frozen run record under the task lock; the expected agent
+   never comes from mutable launch.json alone
+   (`test_fix4_accept_rejects_tampered_launch_agent_id`). The launch digest
+   uses one shared serialization seam (`_launch_digest`).
+5. Post-launch malformed (list) inspect output routes to the shared Recovery
+   Bundle path with the candidate agent ID preserved; no AttributeError, no
+   raw error persisted (`test_fix5_bootstrap_inspect_list_enters_recovery`).
+   The two inspect CLI tracers now assert the no-raw-error contract.
+
+- Command: `python -m py_compile harness/paseo_collaboration.py harness/codex_direct.py harness/tests/test_paseo_collaboration.py`
+- Result: Passed.
+- Command: five fix proofs + three updated tracers (targeted): 8/8 passed.
+- Command: `PATH=/d/Git/cmd:$PATH python -m pytest harness/tests/test_paseo_collaboration.py -v`
+- Result: 58/58 passed in 186.35s (function tests + CLI tracer tests).
+- Command: `git diff --check`
+- Result: Passed after removing the stray blank line at EOF in
+  `docs/agent-memory/verification-log.md`.
+- Docs: codemap.md, active-work.md, project-facts.md, harness-eval.md, and
+  harness-security.md test/line counts updated to the final-review truth.
+
+- Remaining risks:
+  - Combined shared-controller suite not rerun; pending Codex verification.
+  - npm gates, `npm pack --dry-run`, and the real Paseo pilot remain
+    Codex-owned and were not run.
+  - All changes remain uncommitted for Codex acceptance review.

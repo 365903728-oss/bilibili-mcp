@@ -26,7 +26,9 @@ writer. Substantial work uses a unified execution report.
 3. Claude returns a report and uncommitted diff.
 4. Codex reviews the actual diff/evidence and accepts or returns same-scope
    repair to the same writer.
-5. Only after Codex acceptance is a focused local commit created.
+5. Only after Codex acceptance is a focused local commit created. The
+   collaboration guard rejects Claude `local-commit` in every lifecycle state;
+   only Codex may reach the shared accepted-state commit gate.
 
 Paseo failure produces a Recovery Bundle and stop. It never causes an automatic
 adapter switch.
@@ -108,6 +110,29 @@ planning source; do not duplicate it as a local prose ticket.
 
 ## Local Commit
 ```
+
+## Collaboration Closure Evidence
+
+For `codex-paseo-claude`, a bridge trigger proves only that Codex froze and
+recorded the intended native `/implement` ordering. Final acceptance also
+requires the Paseo/Claude activity record to show `/implement` on the Claude
+host, plus live inspection of the frozen agent ID/provider/model/mode/cwd.
+
+The controller validates the file-backed writer report against the current
+diff and frozen run. Raw handoff/review prompts are ephemeral: keep only their
+digests and prepared/sent sidecars, remove prompt files on every send exit, and
+enter recovery instead of automatically replaying an ambiguous send. A real
+closure pilot uses a disposable zero-remote Harness-only repository and proves
+one accepted local commit, exact changed paths, a released lease, and no remote
+effect.
+
+If the user explicitly changes provider/model after launch, treat it as a
+writer-lease transition. Paseo 0.2.5 can update thinking but not the model of an
+existing agent: require the current writer to be idle, release its logical
+lease, create exactly one replacement with the runtime override, live-inspect
+the exact provider/model/mode/cwd, then dispatch. Keep provider/model out of
+tracked contracts, rules, and config; execution reports may record the resolved
+route as evidence.
 
 ## Evidence Rules
 

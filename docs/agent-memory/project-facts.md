@@ -527,3 +527,50 @@
   implementation worktree, global settings, external Hooks, or remote state.
   The pilot required no manual Skill and therefore is not evidence of native
   `/implement`; that one-reminder/zero-write behavior is independently tested.
+
+## 2026-08-12
+
+- Fact: Harness v2 Issue #32 implements the `codex-paseo-claude` collaboration
+  adapter as a thin seam on the shared #30/#31 Direct controller.
+- Evidence: `harness/paseo_collaboration.py` (~2072 lines) reuses
+  `validate_task_contract()`, `start_direct`, `_commit_unlocked`,
+  `accept_codex_direct`, and shared safe-I/O/locking/recovery machinery. The
+  collaboration module has 73 tests. Its final proofs bind dispatch to the
+  frozen handoff digest, reports to the frozen writer, acceptance to the
+  current diff, every repair to delivery evidence, and runtime state to
+  metadata-only projections; both send paths remove ephemeral prompts on every
+  exit. A real public-path pilot used the live resolved
+  `claude/deepseek-v4-flash` writer, recorded native `/implement`, accepted one
+  exact `harness-only.txt` commit (`291ad721…`), released the lease, finished
+  clean, and retained zero remotes. The focused local Issue #32 commit is made
+  only after the full acceptance gates pass on branch
+  `codex/harness-v2-paseo-claude-32`.
+- Impact: Codex can now plan, freeze a collaboration contract, launch one
+  Paseo-managed Claude writer, receive a validated report, review diff/evidence,
+  accept, and create one exact local commit — all through the public CLI seam.
+  The adapter does not duplicate the Direct controller and does not persist
+  provider/model in tracked contracts, rules, or config. Push, PR, tag,
+  release, publish, and other
+  remote operations remain separate user authority gates.
+- Evidence: Repair attempt 7 used an explicit user-authorized sequential lease
+  transfer from the idle original writer to one live-inspected
+  `claude/deepseek-v4-pro[1m]` writer at thinking `max`. It added the final
+  public-CLI malformed-contract proof, changed only the authorized three-file
+  repair scope, returned idle, and released the lease to Codex acceptance.
+  This runtime route is not persisted in tracked contracts, rules, or config.
+- Evidence: Repair attempt 8 reused that same live-inspected writer at thinking
+  `max`. It added an accepted-lifecycle regression and the minimum adapter guard
+  that rejects Claude `local-commit` before shared delegation while preserving
+  Codex's accepted-state behavior. The focused proof, all seven guard tests,
+  Codex rerun, and both independent re-reviews passed; the writer returned idle.
+
+- Fact: The collaboration adapter uses vertical-slice CLI tracer tests with
+  disposable Git repositories and command-scoped `PATH` for Git resolution.
+- Evidence: All 7 CLI tracer tests (`test_slice1` through `test_slice5` plus
+  `test_cli_contract_validation` and `test_cli_subcommand_is_registered`) use
+  `PATH="/d/Git/cmd:$PATH"` prefixed on test commands only. No tracked file
+  hard-codes a machine-specific Git path. The fake Paseo CLI executable records
+  events and returns bounded JSON for daemon/provider/model/run/inspect.
+- Impact: Tests are portable across machines with different Git installations.
+  The command-scoped PATH pattern isolates Git resolution to the test command
+  without mutating global process state.

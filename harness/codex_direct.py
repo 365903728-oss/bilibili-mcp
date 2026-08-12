@@ -38,7 +38,7 @@ class CodexDirectAdapterError(CodexDirectError):
     """The active adapter failed after task execution began."""
 
 
-ORDINARY_ACTIONS = {"read", "edit", "build", "test", "lint", "package"}
+ORDINARY_ACTIONS = {"read", "edit", "write", "delete", "rename", "build", "test", "lint", "package"}
 USER_AUTH_ACTIONS = {"push", "pull-request", "tag", "release", "publish"}
 BLOCKED_ACTIONS = {"broad-delete", "history-rewrite", "credential", "ssh"}
 GUARDED_ACTIONS = ORDINARY_ACTIONS | USER_AUTH_ACTIONS | BLOCKED_ACTIONS | {
@@ -54,14 +54,16 @@ MAX_ACCEPTED_PATH_BYTES = 16 * 1024
 MAX_GIT_OUTPUT_BYTES = 8 * 1024 * 1024
 MAX_INDEX_BYTES = 64 * 1024 * 1024
 MAX_REPOSITORY_TASKS = 1024
-DIRECT_MODES = ("codex-direct", "claude-direct")
+DIRECT_MODES = ("codex-direct", "claude-direct", "codex-paseo-claude")
 RUN_SCHEMAS = {
     "codex-direct": "harness.codex-direct-run/v1",
     "claude-direct": "harness.claude-direct-run/v1",
+    "codex-paseo-claude": "harness.codex-paseo-claude-run/v1",
 }
 CONTROL_SCHEMAS = {
     "codex-direct": "harness.codex-direct-control/v1",
     "claude-direct": "harness.claude-direct-control/v1",
+    "codex-paseo-claude": "harness.codex-paseo-claude-control/v1",
 }
 GIT_SAFE_CONFIG = (
     "-c",
@@ -452,7 +454,7 @@ def _validate_run_shape(run: dict[str, Any], context: WorktreeContext, task_id: 
         "repairs",
         "commit_sha",
     }
-    if not _state_keys(run, required, {"accepted_diff", "recovery_bundle"}):
+    if not _state_keys(run, required, {"accepted_diff", "recovery_bundle", "agent_id", "agent_state", "agent_provider", "provider_routing", "bridge_handoff_digest", "bridge_recorded_at"}):
         raise CodexDirectError("Codex Direct task state is unavailable or invalid")
     contract = run["contract"]
     mode = _direct_mode(contract)
@@ -1391,9 +1393,9 @@ def guard_codex_direct(
             "requires_user": False,
             "reason_code": None if allowed else "acceptance-required",
         }, 0 if allowed else 5
-    if action == "edit":
+    if action in {"edit", "write", "delete", "rename"}:
         if path is None:
-            raise CodexDirectError("edit guard requires a repository-relative path")
+            raise CodexDirectError(f"{action} guard requires a repository-relative path")
         if run["state"] not in {"executing", "repairing"}:
             return {
                 **base,
@@ -1598,14 +1600,14 @@ def record_risk(
     return _control(run, risk_id=risk_id, risk=run["risks"][risk_id])
 
 
-@_serialized
-def accept_codex_direct(
+def _accept_codex_direct_unlocked(
     context: WorktreeContext,
     *,
     task_id: str,
     message: str = "chore(harness): create accepted ticket commit",
     expected_mode: str | None = "codex-direct",
 ) -> dict[str, Any]:
+    """Shared acceptance core — caller holds ``run.lock``."""
     run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     _require_commit_message(message)
     if run["state"] == "accepted":
@@ -1760,6 +1762,20 @@ def accept_codex_direct(
     }
 
 
+@_serialized
+def accept_codex_direct(
+    context: WorktreeContext,
+    *,
+    task_id: str,
+    message: str = "chore(harness): create accepted ticket commit",
+    expected_mode: str | None = "codex-direct",
+) -> dict[str, Any]:
+    return _accept_codex_direct_unlocked(
+        context, task_id=task_id, message=message,
+        expected_mode=expected_mode,
+    )
+
+
 def _checks_digest(run: dict[str, Any]) -> str:
     records = sorted(
         {
@@ -1833,6 +1849,80 @@ def _make_recovery_bundle(
     }
 
 
+COLLABORATION_RECOVERY_SIDECARS = (
+    "dispatch-pending.json",
+    "launch.json",
+    "repair-pending-attempts",
+    "repair-dispatch-attempts",
+    "report.json",
+)
+
+
+def _attempts_digest(task_dir: Path, prefix: str) -> str:
+    """Digest of the canonical sorted name->digest map for ``prefix-*.json``.
+
+    Attempt-keyed repair evidence (``repair-pending-{n}.json`` /
+    ``repair-dispatch-{n}.json``) is folded into one logical sidecar per
+    kind; the singleton file name is not part of the evidence schema.
+    """
+    mapping: dict[str, str] = {}
+    for path in sorted(task_dir.glob(f"{prefix}-*.json")):
+        raw = read_bounded_bytes(path, MAX_STATE_BYTES)
+        mapping[path.name] = (
+            "missing-or-unreadable"
+            if raw is None
+            else hashlib.sha256(b"sidecar-v1\0" + raw).hexdigest()
+        )
+    if not mapping:
+        return "missing-or-unreadable"
+    encoded = json.dumps(mapping, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(b"attempts-v1\0" + encoded).hexdigest()
+
+
+def _collaboration_recovery_evidence(
+    run: dict[str, Any], task_dir: Path, bridge_path: Path
+) -> dict[str, Any]:
+    """Bounded secret-free collaboration evidence for recovery bundles.
+
+    Digest-only: file contents are never embedded; missing or unreadable
+    files record a fixed status string.  Agent identity/state is the last
+    persisted run-record state (not a live inspect claim), preserving
+    same-agent resume identity.  Added only to ``codex-paseo-claude``
+    bundles; Direct bundles keep the exact schema.
+    """
+    sidecars: dict[str, str] = {}
+    for name in COLLABORATION_RECOVERY_SIDECARS:
+        if name.endswith("-attempts"):
+            sidecars[name] = _attempts_digest(
+                task_dir, name[: -len("-attempts")]
+            )
+            continue
+        raw = read_bounded_bytes(task_dir / name, MAX_STATE_BYTES)
+        if raw is None:
+            sidecars[name] = "missing-or-unreadable"
+        else:
+            sidecars[name] = hashlib.sha256(b"sidecar-v1\0" + raw).hexdigest()
+    bridge_raw = read_bounded_bytes(bridge_path, MAX_STATE_BYTES)
+    bridge_digest = (
+        "missing-or-unreadable"
+        if bridge_raw is None
+        else hashlib.sha256(b"bridge-v1\0" + bridge_raw).hexdigest()
+    )
+    return {
+        "schema": "harness.collaboration-recovery-evidence/v1",
+        "agent_id": run.get("agent_id"),
+        "agent_state": run.get("agent_state"),
+        "agent_provider": run.get("agent_provider"),
+        "bridge_handoff_digest": run.get("bridge_handoff_digest"),
+        "bridge_trigger_digest": bridge_digest,
+        "sidecars": sidecars,
+        "lease_preserved": True,
+        "daemon_restarted": False,
+        "adapter_switched": False,
+        "provider_switched": False,
+    }
+
+
 def _recovery_reference(bundle: dict[str, Any]) -> dict[str, Any]:
     encoded = _bounded_json(bundle).encode("utf-8")
     return {
@@ -1899,6 +1989,16 @@ def _enter_recovery_unlocked(
         staged_paths=staged_paths,
         repository_inspection=repository_inspection,
     )
+    if contract["execution"]["mode"] == "codex-paseo-claude":
+        bundle["collaboration"] = _collaboration_recovery_evidence(
+            run,
+            run_path.parent,
+            context.root
+            / ".harness"
+            / "coordination"
+            / task_id
+            / "bridge-trigger.json",
+        )
     reference = _recovery_reference(bundle)
     _write_json(context, run_path.parent / reference["file"], bundle)
     run["state"] = "recovery-required"
@@ -1929,14 +2029,14 @@ def enter_recovery(
     )
 
 
-@_serialized
-def begin_repair(
+def _begin_repair_unlocked(
     context: WorktreeContext,
     *,
     task_id: str,
     fingerprint: str,
     expected_mode: str | None = "codex-direct",
 ) -> tuple[dict[str, Any], int]:
+    """Shared repair eligibility core — caller holds ``run.lock``."""
     run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     if run["state"] not in {"verifying", "reviewing"}:
         raise CodexDirectError("repair requires verifying or reviewing state")
@@ -1977,6 +2077,20 @@ def begin_repair(
     _add_history(run, "repair-started", "repairing")
     _save_run(context, run_path, run)
     return _control(run, repair_attempt=attempt_number), 0
+
+
+@_serialized
+def begin_repair(
+    context: WorktreeContext,
+    *,
+    task_id: str,
+    fingerprint: str,
+    expected_mode: str | None = "codex-direct",
+) -> tuple[dict[str, Any], int]:
+    return _begin_repair_unlocked(
+        context, task_id=task_id, fingerprint=fingerprint,
+        expected_mode=expected_mode,
+    )
 
 
 def _commit_paths(root: Path, commit_sha: str) -> list[str]:
@@ -2537,6 +2651,59 @@ def commit_codex_direct(
     )
 
 
+def _digest_or_marker(value: Any) -> bool:
+    return isinstance(value, str) and (
+        re.fullmatch(r"[0-9a-f]{64}", value)
+        or value == "missing-or-unreadable"
+    )
+
+
+def _validate_collaboration_evidence(evidence: Any, run: dict[str, Any]) -> None:
+    """Validate the bounded collaboration section of a recovery bundle.
+
+    Exact key set, digest-or-marker formats, identity bound to the last
+    persisted run record, and no-fallback policy flags.
+    """
+    invalid = "Recovery Bundle collaboration evidence is invalid"
+    if not isinstance(evidence, dict):
+        raise CodexDirectError(invalid)
+    if set(evidence) != {
+        "schema", "agent_id", "agent_state", "agent_provider",
+        "bridge_handoff_digest", "bridge_trigger_digest", "sidecars",
+        "lease_preserved", "daemon_restarted", "adapter_switched",
+        "provider_switched",
+    }:
+        raise CodexDirectError(invalid)
+    if evidence.get("schema") != "harness.collaboration-recovery-evidence/v1":
+        raise CodexDirectError(invalid)
+    for key in (
+        "agent_id", "agent_state", "agent_provider", "bridge_handoff_digest",
+    ):
+        if evidence.get(key) != run.get(key):
+            raise CodexDirectError(invalid)
+    handoff_digest = evidence.get("bridge_handoff_digest")
+    if not isinstance(handoff_digest, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", handoff_digest
+    ):
+        raise CodexDirectError(invalid)
+    if not _digest_or_marker(evidence.get("bridge_trigger_digest")):
+        raise CodexDirectError(invalid)
+    sidecars = evidence.get("sidecars")
+    if (
+        not isinstance(sidecars, dict)
+        or set(sidecars) != set(COLLABORATION_RECOVERY_SIDECARS)
+        or any(not _digest_or_marker(value) for value in sidecars.values())
+    ):
+        raise CodexDirectError(invalid)
+    if (
+        evidence.get("lease_preserved") is not True
+        or evidence.get("daemon_restarted") is not False
+        or evidence.get("adapter_switched") is not False
+        or evidence.get("provider_switched") is not False
+    ):
+        raise CodexDirectError(invalid)
+
+
 def _validate_recovery_bundle_shape(
     bundle: dict[str, Any], run: dict[str, Any], reference: dict[str, Any]
 ) -> None:
@@ -2550,9 +2717,15 @@ def _validate_recovery_bundle_shape(
         "validations", "incomplete_criteria", "risks", "repair_attempts",
         "writer_lease", "adapter_switch_policy", "failure", "commit_sha",
     }
-    if set(bundle) != keys or bundle.get("schema") != "harness.recovery-bundle/v1":
-        raise CodexDirectError("Recovery Bundle is unavailable or invalid")
     contract = run["contract"]
+    if contract["execution"]["mode"] == "codex-paseo-claude":
+        if set(bundle) != keys | {"collaboration"}:
+            raise CodexDirectError("Recovery Bundle is unavailable or invalid")
+        _validate_collaboration_evidence(bundle.get("collaboration"), run)
+    elif set(bundle) != keys:
+        raise CodexDirectError("Recovery Bundle is unavailable or invalid")
+    if bundle.get("schema") != "harness.recovery-bundle/v1":
+        raise CodexDirectError("Recovery Bundle is unavailable or invalid")
     if (
         bundle.get("task_id") != contract["task"]["id"]
         or bundle.get("mode") != contract["execution"]["mode"]

@@ -238,6 +238,98 @@ Use this checklist before accepting changes to harness surfaces.
   `action-required`; the runtime-created untracked `.codex/config.toml` in the
   implementation worktree is excluded from the ticket and commit.
 
+## 2026-08-12 Paseo Collaboration Validation
+
+- The collaboration adapter (`harness/paseo_collaboration.py`) reuses the
+  shared #30/#31 contract validation, repository mutex, sibling-worktree scan,
+  state persistence, edit guards, recovery bundle, acceptance, and commit
+  machinery. Collaboration-specific behavior (Paseo preflight, agent launch,
+  dispatch/report/bridge management) is a thin seam; it does not duplicate the
+  Direct controller.
+- Bootstrap freezes authority (mode, base, branch, worktree, Codex acceptance
+  owner, active Claude lease, owned paths, pending agent state) into a durable
+  run record BEFORE the external `paseo run` call. A retry rejects the existing
+  active run rather than launching a second writer.
+- Bridge-trigger evidence (non-empty 64-hex digests, actual handoff bytes) is
+  validated before any agent launch. Missing bridge emits one deduplicated
+  repository-wide reminder and writes no state. The native `/implement`
+  invocation is recorded only after the external send succeeds.
+- Provider resolution reads live preferences or an explicit runtime override;
+  provider/model are never persisted in tracked contracts, rules, or config.
+  Empty or failed model discovery is blocking.
+- Dispatch is serialized with the task lock and persists a prepared
+  `dispatch-pending.json` intent before external send; launch evidence is
+  persisted before the pending record is deleted. A prepared intent without
+  launch evidence blocks re-dispatch, giving at-most-once semantics.
+- The actor guard validates `actor` inside functions (not only argparse) and
+  covers `edit`, `write`, `delete`, `rename`, and `stage`. Codex cannot mutate
+  Claude-owned paths while the lease is active; Claude cannot mutate outside
+  owned paths, accept, commit, or stage.
+- Report validation requires exact top-level and nested key sets with bounded
+  counts/lengths, secret-free command metadata, unique criterion IDs covering
+  every criterion exactly once, owned-path enforcement, and exact current diff
+  digest. Raw commands, stdout, stderr, environment, paths, tokens, Cookies,
+  and prompts are rejected.
+- For `codex-paseo-claude` runs, recovery bundles add a bounded secret-free
+  collaboration section: last-persisted agent identity/state from the run
+  record (not a live inspect claim), the frozen bridge handoff digest
+  (strict 64-hex, identity-bound), bridge-trigger digest, and sidecar
+  digests (dispatch pending/launch, repair pending/dispatch, report) —
+  digests only, never contents — plus lease-preserved/no-daemon-restart/
+  no-adapter-switch constraints. Raw failure text is never persisted in the
+  run record (the shared run shape has no error key); only the hashed
+  category/fingerprint reach the bundle. The Direct bundle schema is
+  unchanged for Direct modes. Every bootstrap failure routes through the
+  same shared recovery path, so a durable bundle always accompanies
+  `recovery-required`.
+- Paseo subprocess stdout/stderr are drained concurrently under byte bounds
+  and the process is killed on overflow or timeout; raw stderr is never
+  surfaced (metadata-only errors).
+- Acceptance remains Codex-only. It revalidates the normalized report,
+  launch/dispatch state, current diff, no staged paths, live same-agent
+  idle/stopped state, baseline remote/ref evidence, every required check, every
+  criterion, and all risks. The automatic commit creates exactly one local
+  commit; a second commit attempt is idempotent and creates no new delta.
+- The collaboration module contains 73 tests after final review. Attempt 6
+  passed 71/71 before the last CLI-boundary proof; attempt 7 passed that new
+  process test independently, and the final full Harness suite covers that
+  72-test snapshot. Attempt 8's new accepted-state authority proof passed alone
+  and with all seven guard tests. The proofs show
+  fixes: the Paseo 0.2.5 `connectedDaemon: reachable` spelling is accepted
+  (unreachable still rejected); dispatch/repair prompt files are ephemeral
+  (removed in `finally` after send) and the report persists only normalized
+  projections of exact-key nested objects; repair delivery evidence is
+  attempt-keyed (`repair-pending-{n}` / `repair-dispatch-{n}`) so a completed
+  attempt never blocks the next while a prepared current-attempt intent
+  blocks replay, and acceptance blocks any pending-N lacking dispatch-N;
+  acceptance binds launch/report/task/agent IDs and the launch/bridge/handoff
+  digests to the frozen run record under the task lock (a tampered launch
+  sidecar is rejected); a post-launch malformed (list) inspect output routes
+  to the shared Recovery Bundle path with the candidate agent ID preserved
+  and no raw error persisted. Later trust-boundary proofs require frozen
+  handoff and writer identity, current-diff acceptance, delivery evidence for
+  every repair, strict command/status/digest metadata, and `finally` cleanup of
+  ephemeral prompts on send exceptions.
+- The collaboration guard rejects Claude `local-commit` before delegating to
+  the actor-agnostic shared guard. Codex still reaches the shared gate, which
+  blocks pre-acceptance and allows the accepted local commit. This prevents a
+  Claude host from inheriting Codex's commit authority through the advertised
+  public guard boundary.
+- The real public-path pilot ran in an ignored zero-remote Harness-only
+  repository. Paseo resolved `claude/deepseek-v4-flash`; the activity log shows
+  host-native `/implement`; live inspection matched the frozen agent/model/
+  mode/cwd. The writer changed only `harness-only.txt`; public report,
+  verification, review, judgment, acceptance, and idempotent commit all passed.
+  The pilot advanced by exactly one local commit (`291ad721…`), finished clean
+  with a released lease, and never gained a remote. No product credential,
+  SSH, push, PR, tag, release, publish, or history rewrite was used.
+- The pilot is an integration snapshot from before attempts 6–7; it remains
+  evidence for real Paseo/provider resolution, native `/implement`, bounded
+  writer/report flow, one accepted commit, and zero remotes. The later
+  lock-drift, metadata, prompt-failure, guard, and malformed-input changes are
+  negative-path hardening covered by current public-process tests rather than
+  falsely described as hash-identical pilot code.
+
 ## Incident Response
 
 If a harness change exposes a secret, executes unexpected external code, breaks hooks, corrupts memory, or causes an agent to follow untrusted external instructions:

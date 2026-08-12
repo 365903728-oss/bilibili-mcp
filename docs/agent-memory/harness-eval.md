@@ -432,6 +432,67 @@ Candidate metrics:
 - product-source files changed: 0
 - remote operations performed: 0
 
+### 2026-08-12 Harness Eval: Harness v2 Issue #32 Paseo Collaboration loop
+
+- The collaboration adapter reuses the shared #30/#31 controller for
+  contracts, locking, state, guards, recovery, acceptance, and commit. The
+  collaboration-specific seam (~2072 lines) is a thin CLI-accessible wrapper;
+  it does not copy the Direct controller.
+- Vertical-slice TDD with portable disposable-Git CLI tracer tests caught
+  real cross-boundary defects before they reached production: authority freeze
+  before agent launch, bridge-trigger sequencing, at-most-once dispatch,
+  fail-closed inspect, stage/unknown-actor guards, secret-free report keys,
+  and idempotent commit semantics.
+- Independent review (Round 3 findings) drove the complete rewrite from
+  patched private functions to public CLI-tracer tests. The 8 numbered repair
+  findings all resolved to green tests with no remaining P0-P3.
+- Keep: one shared Direct controller, thin adapter seam, public CLI tracer
+  tests, Codex-owned acceptance and pilot, dead-code removal before freeze.
+- Change: full final verification must run with a command-scoped Windows Git
+  PATH when Python inherits a Git Bash environment; an earlier combined-suite
+  hang is historical evidence, not the final result.
+- Remove: do not duplicate contract validation, locking, state, or commit
+  machinery per adapter.
+- Residual: the primary legacy Codex Hook overlap remains the deliberate
+  `doctor=action-required` migration gate.
+- Final review (2026-08-13) added six release-blocker fixes with one proof
+  each: Paseo 0.2.5 `connectedDaemon: reachable` preflight acceptance,
+  ephemeral dispatch/repair prompt files with exact-key report projections,
+  attempt-keyed repair delivery evidence (sequential repairs; acceptance
+  blocks pending-N without dispatch-N), acceptance identity/digest binding to
+  the frozen run record (tampered launch rejected), and malformed post-launch
+  inspect output routing to the shared Recovery Bundle path. The focused
+  module reached 72 tests at that snapshot. Repair attempt 8 later added one
+  accepted-state guard proof after staged review found the Claude
+  `local-commit` authority gap. The real zero-remote public-path pilot records
+  native `/implement`, one live `claude/deepseek-v4-flash` writer, one exact
+  accepted local commit, clean final status, and a released lease.
+
+Candidate metrics:
+
+- focused collaboration tests: 73 (function + CLI tracer)
+- shared Harness tests: final full-suite result recorded in verification log
+- legacy Hook compatibility tests: final result recorded in verification log
+- product tests: 41 files / 862 tests
+- package entries / forbidden Harness entries: 185 / 0
+- new collaboration module: ~2072 lines
+- new test module: ~4474 lines
+- tracked modified: 3 files, +289/-14 (Round 3); final review adds the
+  collaboration module/test/docs edits above that base
+- dead code removed: ~66 lines (_validate_collaboration_contract)
+- implementation-client handoffs / real Paseo pilot launches: 1 / 1
+- repair attempts authorized: 8 maximum. Attempts 1–6 stayed on the original
+  writer; attempt 7 used an explicit user-authorized sequential transfer to one
+  DeepSeek V4 Pro replacement at thinking `max`, with no overlapping lease.
+  Attempt 8 reused that same replacement to close the staged-review
+  `local-commit` actor gap; it returned idle and both original reviewers passed
+  the repair.
+- pilot accepted commits / changed paths / remotes: 1 / 1 / 0
+- final independent review axes: focused spec and risk reviews pass; final
+  acceptance review recorded separately
+- product-source files changed: 0
+- remote operations performed: 0
+
 ### 2026-08-11 Harness Eval: Harness v2 Issue #31 Claude Direct loop
 
 - Parameterizing the accepted #30 controller was lower risk than copying its

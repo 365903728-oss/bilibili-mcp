@@ -415,6 +415,83 @@
 - Evidence: the v1.11.2 403 response and the successful v1.11.3 publication and
   exact-match Official Registry API response.
 
+## 2026-08-12
+
+- Decision: Implement the `codex-paseo-claude` collaboration adapter as a thin
+  seam on the shared #30/#31 Direct controller rather than a parallel controller.
+- Reason: Contract validation, repository mutex, sibling-worktree scan, state
+  persistence, edit guards, recovery bundles, acceptance, and commit are shared
+  semantics. Duplicating them would create drift and increase audit surface.
+- Evidence: `harness/paseo_collaboration.py` reuses `validate_task_contract()`,
+  `start_direct`, `_commit_unlocked`, `accept_codex_direct`, and the shared
+  safe-I/O/locking/recovery machinery. The collaboration-specific seam is ~1479
+  lines vs. a hypothetical ~2500+ line copied controller.
+
+- Decision: Use vertical-slice CLI tracer tests with disposable Git repositories
+  and command-scoped fake Paseo executables instead of patching private functions.
+- Reason: Public-seam tests survive implementation rewrites and catch
+  cross-boundary defects (authority freeze before launch, at-most-once dispatch,
+  fail-closed inspect, stage guards) that private-function mocks miss.
+- Evidence: All 8 Round 3 repair findings resolved to green CLI tracer tests.
+  The original private-function patch approach required a complete rewrite.
+
+- Decision: Freeze authority (mode, base, branch, worktree, Codex acceptance
+  owner, active Claude lease, owned paths, pending agent state) into a durable
+  run record BEFORE the external `paseo run` call.
+- Reason: A Paseo launch failure after partial freeze would leave invisible
+  state; freezing first makes every failure recoverable from the durable run.
+- Evidence: `test_slice1_run_json_frozen_before_paseo_run` — run.json exists
+  with complete frozen authority before the fake Paseo CLI records its `run`.
+
+- Decision: Delete `_validate_collaboration_contract` and keep only
+  collaboration-specific assertions inline in `paseo_bootstrap`.
+- Reason: The function duplicated `validate_task_contract()` checks already
+  performed by the shared `contracts.py` validator. The active inline assertions
+  (branch, plan, state, lease, acceptance owner, manual Skill gate) are the
+  actual collaboration-specific additions.
+- Evidence: 36/36 tests pass after removal of the 66-line dead function.
+
+- Decision: Treat bridge metadata as pre-invocation intent and require the
+  real Paseo/Claude activity log to prove host-native `/implement` before final
+  acceptance.
+- Reason: A JSON bridge can freeze ordering and digests, but it cannot prove
+  that Claude Code actually routed the user message through its manual Skill.
+- Evidence: The disposable Issue #32 pilot log contains `/implement` as the
+  Claude host user message before the guarded write; its frozen agent, provider,
+  model, mode, and cwd match the controller run and launch evidence.
+
+- Decision: Keep transient prompt files only for the duration of `paseo send`
+  and remove them in `finally` on both success and failure.
+- Reason: A failed adapter call must preserve the metadata-only prepared intent
+  without retaining raw handoff or review text in ignored runtime state.
+- Evidence: `test_fix12_send_exception_removes_prompt_files` proves both
+  dispatch and repair retain pending intent, write no success sidecar, send
+  once, remove the prompt, and leave HEAD unchanged.
+
+- Decision: When the user explicitly changes the implementation model after a
+  frozen writer is idle, perform a sequential lease transfer: release the old
+  logical lease, launch exactly one replacement with an explicit runtime
+  override, live-inspect model/mode/cwd, and only then dispatch the next bounded
+  repair.
+- Reason: Paseo 0.2.5 cannot change the model of an existing agent in place.
+  Guessing an alias or leaving both agents writable would violate live routing
+  and single-writer authority.
+- Evidence: Attempt 7 transferred from idle agent `72f2b418…` to
+  `0bdef442…`, inspected `claude/deepseek-v4-pro[1m]`,
+  `bypassPermissions`, canonical cwd, and thinking `max`, then released the
+  replacement lease after its bounded repair. No daemon restart or overlap
+  occurred.
+
+- Decision: Enforce collaboration actor ownership before delegating an action
+  to an actor-agnostic shared guard.
+- Reason: Shared `local-commit` semantics correctly gate accepted state but do
+  not know whether Codex or Claude invoked them. Delegating first allowed an
+  accepted Claude caller to inherit Codex's commit authority.
+- Evidence: Repair attempt 8 added the early Claude `local-commit` denial and
+  an accepted-lifecycle regression proving Claude blocked and Codex allowed.
+  The same DeepSeek V4 Pro writer returned idle and both independent reviewers
+  passed the repair.
+
 ## 2026-08-11
 
 - Decision: Use one shared `RULES.md` constitutional/workflow core with thin

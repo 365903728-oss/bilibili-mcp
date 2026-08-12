@@ -210,13 +210,51 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
 - `harness/events.py`: Codex/Claude payload projection into `harness.hook-event/v1`.
 - `harness/safe_io.py`: bounded JSON/JSONL, rotation, atomic replacement, and
   descriptor-identity/link/hardlink-safe file-lock primitives.
+- `harness/paseo_collaboration.py`: Codex–Paseo–Claude collaboration seam for
+  `codex-paseo-claude` mode (Issue #32). Two-phase preflight/bootstrap gate
+  (Paseo daemon probe → bridge-trigger verification → frozen run state) with
+  accepted `start_direct` lock protocol (repository_lock identity →
+  bounded_file_lock → _repository_mutex → recheck). Live Git authority checks
+  (HEAD, branch, porcelain status) before agent creation. PascalCase Paseo
+  inspect field handling, blocking model-list failures, frozen bridge/handoff
+  digest validation. Single-agent serialized dispatch, writer-scoped
+  metadata-only report validation, attempt-keyed same-agent repair delivery,
+  unconditional ephemeral-prompt cleanup, and recovery delegation.
+  Acceptance binds launch/report/live identity to the frozen run and the
+  current diff. Collaboration guard reuses
+  `guard_codex_direct` with actor-aware passthrough for read-like actions and
+  rejects Claude `local-commit` before actor-agnostic shared delegation.
+  Thin lifecycle wrappers delegate to shared codex_direct machinery. CLI
+  routes `PaseoCollaborationError` through recovery.
+- `harness/tests/test_paseo_collaboration.py`: ~4474 lines, 73 tests (function
+  + CLI) for the collaboration seam. Git resolution via command-scoped PATH
+  (`shutil.which("git")`). Mock Paseo CLI with real PascalCase shapes. Covers
+  preflight (including Paseo 0.2.5 `connectedDaemon: reachable`), bootstrap
+  (including accepted lock protocol, repository-lock rejection, malformed
+  inspect output routing to recovery), dispatch (at-most-once sidecar,
+  persistence, rejection, oversized rejection, handoff digest validation,
+  ephemeral prompt files removed after send), collaboration guard (actor
+  validation, stage blocking, Claude local-commit denial in accepted state,
+  unknown-action fail-closed, non-zero response normalization), report (strict
+  command-key allowlist/blocklist,
+  duplicate-ID detection, agent state check, summary hashing, schema,
+  owned-path, agent-id, criterion-coverage, missing-key and extra-key
+  validation, normalized projection persistence), repair (same-agent,
+  begin_repair, attempt-keyed pending/dispatch evidence enabling sequential
+  repairs and blocking undelivered attempts), acceptance (identity/digest and
+  current-diff binding to the frozen run record, tampered/stale-sidecar
+  rejection), send-exception prompt cleanup, recovery, and the full lifecycle
+  (bootstrap → dispatch → report → accept → one-commit idempotent). The public
+  CLI boundary also rejects non-object `task` values as bounded JSON before
+  any run record or Paseo call.
 - `harness/capabilities.py`: provider/model-neutral adapter, Skill, and agent
   discovery plus source-bound, concurrency-safe, count-bounded native-manual-
   Skill reminder markers.
 - `harness/fixtures/`, `harness/tests/`: replay/conformance fixtures plus
-  stdlib-only disposable-Git tests for session events and both Direct adapters'
-  state/lease/guard/recovery/acceptance/commit boundary. The shared Direct
-  conformance fixture drives the same public lifecycle for Codex and Claude.
+  stdlib-only disposable-Git tests for session events, both Direct adapters'
+  state/lease/guard/recovery/acceptance/commit boundary, and the
+  `codex-paseo-claude` collaboration seam. The shared Direct conformance
+  fixture drives the same public lifecycle for Codex and Claude.
 - `docs/agent-memory/agent-communication.md`: three-mode execution/handoff/report protocol.
 - `docs/agent-memory/executions/`: unified execution and acceptance reports.
 - `docs/agent-memory/handoffs/`: durable Codex-to-Claude handoffs, Claude reports, and task-ticket-backed handoff artifacts.

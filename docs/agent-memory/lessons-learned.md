@@ -273,3 +273,84 @@
 - Future behavior: Centralize durable identity derivation and leave a red/green
   rollback test whenever lock or persistence code can fail after a one-shot
   effect.
+
+## 2026-08-12
+
+- Lesson: Public CLI tracer tests with disposable Git repositories survive
+  implementation rewrites; private-function patches do not.
+- Evidence: The original Issue #32 implementation patched private
+  `_run_paseo_cli` and other internal functions. Round 3 review found 13
+  defects that required a complete rewrite. The replacement vertical-slice
+  CLI tracer tests exercise the public `python -m harness codex-paseo-claude`
+  seam through process-boundary fixtures with fake Paseo executables.
+- Future behavior: For new Harness adapters, start with one public-seam CLI
+  tracer test that is red against the current implementation. Mock only the
+  external system boundary. Private-function mocks couple tests to
+  implementation details that reviews will change.
+
+- Lesson: Freeze authority before any external launch, not after.
+- Evidence: The original bootstrap called `paseo run` before persisting
+  authority. A Paseo failure after launch but before persistence would leave
+  invisible state. Slice 1's red test proved run.json did not exist before
+  the fake Paseo CLI recorded `run`.
+- Future behavior: Persist the complete frozen authority (mode, base, branch,
+  worktree, owners, lease, owned paths, pending state) as a durable run record
+  BEFORE any external side effect. Make every post-freeze failure recoverable
+  from that record.
+
+- Lesson: Dead code that duplicates a shared seam is a review finding, not a
+  style preference.
+- Evidence: `_validate_collaboration_contract` (~66 lines) duplicated
+  `validate_task_contract()` checks already performed by the shared
+  `contracts.py` validator. Removing it reduced audit surface and eliminated
+  the risk of the two validators drifting apart.
+- Future behavior: Before freezing a new adapter, grep for functions that
+  reimplement shared-controller semantics and replace them with thin wrappers
+  plus adapter-specific inline assertions.
+
+- Lesson: A manual-Skill bridge record is not native invocation evidence.
+- Evidence: The Issue #32 bridge froze `/implement`, contract, handoff, owner,
+  lease, worktree, base, and branch before dispatch, while the real Paseo log
+  separately showed `/implement` as the Claude host user message.
+- Future behavior: Keep bridge evidence for ordering and digest binding, then
+  require host activity evidence before claiming a native manual Skill ran.
+
+- Lesson: On Windows, a Git Bash command can find `git` while a child Windows
+  Python process cannot resolve it from the inherited POSIX-style `PATH`.
+- Evidence: The real pilot's first public guard returned
+  `unable to inspect Git worktree`; the same-agent retry with a process-local
+  Git `cmd` PATH prefix passed without changing config, tracked files, or the
+  frozen provider.
+- Future behavior: Use a command-scoped, verified Git PATH for Harness Python
+  processes on Windows; never hard-code it in repository contracts or rules.
+
+- Lesson: A live model switch is a lease transition, not a label edit.
+- Evidence: Paseo 0.2.5 exposed thinking updates on an existing agent but no
+  model-update command. Issue #32 therefore released the idle original writer,
+  created one replacement with the official runtime route, verified its
+  identity, and kept the old agent idle. Paseo also reported that a new thinking
+  level applies on the next turn, so a second bounded verification turn proved
+  `max` was active.
+- Future behavior: Resolve the official model ID live, never encode it in
+  governance contracts, and require inspect evidence plus a non-overlapping
+  lease transfer before the replacement can write.
+
+- Lesson: Actor-specific authority must be decided before an actor-agnostic
+  shared state guard.
+- Evidence: The shared `local-commit` guard correctly allowed accepted runs,
+  but the collaboration wrapper originally applied no Claude-specific denial.
+  Final staged review therefore found that Claude could inherit Codex's commit
+  permission. Attempt 8 moved the denial ahead of shared delegation and proved
+  both actors in one accepted-lifecycle regression.
+- Future behavior: When a shared controller intentionally lacks actor identity,
+  enforce host ownership at the adapter boundary before calling it, then retain
+  the shared state gate for the authorized actor.
+
+- Lesson: Ephemeral prompt cleanup belongs in `finally`, not only after a
+  successful adapter call.
+- Evidence: Independent review found failed `paseo send` paths could retain raw
+  handoff/review text. The final regression proves cleanup on send exceptions
+  while keeping prepared intent and withholding success evidence.
+- Future behavior: For any file-backed external send, persist only bounded
+  metadata, clean the content file unconditionally, and treat ambiguous sends
+  as recovery rather than automatic retry.

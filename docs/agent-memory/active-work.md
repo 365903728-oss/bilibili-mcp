@@ -25,13 +25,47 @@ and creating exactly one accepted commit. Its pilot contract required no
 manual Skill; `/implement` one-reminder/zero-write behavior is proven separately
 at the public process boundary and is not claimed as native pilot evidence.
 
-The dependency frontier is live Issue #32,
-`Codex–Paseo–Claude accepted-ticket loop`, once HEAD contains this record;
-otherwise it remains #31. A new ticket still requires one frozen mode decision
-and its own native manual Skill evidence. #31 does not authorize Paseo restart,
-collaboration launch, adapter fallback, or remote delivery for #32. The primary
-legacy Codex Hook overlap remains an explicit `doctor=action-required` rollout
-gate and was not rewritten.
+Issue #32 is a Codex-accepted candidate; the focused local commit containing
+this record is its acceptance commit. The collaboration adapter
+(`harness/paseo_collaboration.py`, ~2072 lines) reuses the shared #30/#31
+controller for contracts, locking, state, guards, recovery, acceptance, and
+commit. Collaboration-specific behavior (read-only Paseo/provider preflight,
+bridge-triggered native `/implement`, one frozen writer, bounded dispatch and
+report, same-agent repair, and recovery) remains a thin public CLI seam.
+
+The focused collaboration module contains 73 tests. Attempt 6 passed the full
+module 71/71 before the final CLI-boundary proof was added; attempt 7 then
+passed that new public-process proof independently, and the final full Harness
+suite covered the resulting 72-test snapshot. Attempt 8 added one focused
+accepted-state authority regression; the new proof passed independently and
+with all seven guard tests. The proofs include
+trust-boundary proofs for frozen handoff/agent/diff identity, every recorded
+repair delivery, metadata-only reports, and unconditional prompt cleanup after
+failed sends. A real public-path Paseo pilot resolved the live preference
+`claude/deepseek-v4-flash`, recorded native `/implement`, changed only
+`harness-only.txt`, and advanced from seed `eb0205b…` to exactly one accepted
+local commit `291ad721…`; it finished clean with a released lease and zero
+remotes. Full Harness, legacy Hook, TypeScript, Vitest, package, secret, scope,
+and dirty-primary gates are recorded in the Issue #32 execution report.
+The user explicitly authorized a sequential writer transfer for repair attempt
+7: the original idle writer released its lease, one replacement
+`claude/deepseek-v4-pro[1m]` writer was live-inspected at thinking `max`,
+closed the last malformed-contract CLI boundary, reverified it on a max-thinking
+turn, and returned idle. The route is execution evidence only, not tracked
+governance configuration.
+The user then authorized repair attempt 8 on the same replacement writer. It
+closed the final staged-review finding by rejecting Claude `local-commit`
+before the actor-agnostic shared guard while preserving Codex's accepted-state
+commit gate. The writer returned idle, Codex reran the focused proof, and both
+original reviewers returned PASS.
+No push, PR, Issue close, tag, release, or publish was authorized or performed.
+The implementation branch remains `codex/harness-v2-paseo-claude-32` from exact
+base `5e9de4bace35a2ca4b9c83b5a0d81ebb627df6fb`.
+
+The dependency frontier advances to Issue #33 once Codex accepts #32. A new
+ticket still requires one frozen mode decision and its own native manual Skill
+evidence. The primary legacy Codex Hook overlap remains an explicit
+`doctor=action-required` rollout gate and was not rewritten.
 
 The Harness target is one `RULES.md` core with `codex-direct`,
 `codex-paseo-claude`, and `claude-direct` adapters. Local commit is automatic
