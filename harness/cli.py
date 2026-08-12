@@ -28,7 +28,7 @@ from harness.codex_direct import (
     judge_criterion,
     record_check,
     record_risk,
-    start_codex_direct,
+    start_direct,
 )
 from harness.context import WorktreeError, discover_worktree
 from harness.contracts import ContractError, validate_task_contract
@@ -51,6 +51,74 @@ def _load_json_file(path: Path, max_bytes: int = 256 * 1024) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("JSON file must contain an object")
     return value
+
+
+def _add_direct_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+    name: str,
+    label: str,
+) -> None:
+    direct = subcommands.add_parser(
+        name, help=f"run the {label} accepted-ticket loop"
+    )
+    actions = direct.add_subparsers(dest="direct_command", required=True)
+    start = actions.add_parser("start")
+    start.add_argument("path", type=Path)
+    start.add_argument("--cwd", type=Path, default=Path.cwd())
+    guard = actions.add_parser("guard")
+    guard.add_argument("--cwd", type=Path, default=Path.cwd())
+    guard.add_argument("--task", required=True)
+    guard.add_argument("--action", choices=sorted(GUARDED_ACTIONS), required=True)
+    guard.add_argument("--path")
+    advance = actions.add_parser("advance")
+    advance.add_argument("--cwd", type=Path, default=Path.cwd())
+    advance.add_argument("--task", required=True)
+    advance.add_argument("--to", choices=("verifying", "reviewing"), required=True)
+    evidence = actions.add_parser("record-check")
+    evidence.add_argument("--cwd", type=Path, default=Path.cwd())
+    evidence.add_argument("--task", required=True)
+    evidence.add_argument("--check", required=True)
+    evidence.add_argument("--status", choices=("pass", "fail", "skipped"), required=True)
+    evidence.add_argument("--source", choices=("command", "inspection", "review"), required=True)
+    evidence.add_argument("--exit-code", type=int)
+    evidence.add_argument(
+        "--sensitivity", choices=("public", "metadata", "secret-free"), required=True
+    )
+    evidence.add_argument("--digest", required=True)
+    evidence.add_argument("--reason-code")
+    judge = actions.add_parser("judge")
+    judge.add_argument("--cwd", type=Path, default=Path.cwd())
+    judge.add_argument("--task", required=True)
+    judge.add_argument("--criterion", required=True)
+    judge.add_argument("--status", choices=("pass", "fail"), required=True)
+    judge.add_argument("--evidence-digest", required=True)
+    risk = actions.add_parser("risk")
+    risk.add_argument("--cwd", type=Path, default=Path.cwd())
+    risk.add_argument("--task", required=True)
+    risk.add_argument("--risk", required=True)
+    risk.add_argument("--severity", choices=("low", "medium", "high", "critical"), required=True)
+    risk.add_argument("--status", choices=("open", "accepted", "resolved"), required=True)
+    risk.add_argument("--digest", required=True)
+    accept = actions.add_parser("accept")
+    accept.add_argument("--cwd", type=Path, default=Path.cwd())
+    accept.add_argument("--task", required=True)
+    accept.add_argument("--message", default="chore(harness): create accepted ticket commit")
+    repair = actions.add_parser("repair")
+    repair.add_argument("--cwd", type=Path, default=Path.cwd())
+    repair.add_argument("--task", required=True)
+    repair.add_argument("--fingerprint", required=True)
+    recover = actions.add_parser("recover")
+    recover.add_argument("--cwd", type=Path, default=Path.cwd())
+    recover.add_argument("--task", required=True)
+    recover.add_argument("--category", choices=("adapter-failure",), required=True)
+    recover.add_argument("--fingerprint", required=True)
+    commit = actions.add_parser("commit")
+    commit.add_argument("--cwd", type=Path, default=Path.cwd())
+    commit.add_argument("--task", required=True)
+    commit.add_argument("--message", required=True)
+    status = actions.add_parser("status")
+    status.add_argument("--cwd", type=Path, default=Path.cwd())
+    status.add_argument("--task", required=True)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -87,69 +155,8 @@ def _build_parser() -> argparse.ArgumentParser:
     check.add_argument("--skill", required=True)
     check.add_argument("--invoked", action="store_true")
 
-    codex_direct = subcommands.add_parser(
-        "codex-direct", help="run the Codex Direct accepted-ticket loop"
-    )
-    codex_sub = codex_direct.add_subparsers(dest="codex_command", required=True)
-    start = codex_sub.add_parser("start")
-    start.add_argument("path", type=Path)
-    start.add_argument("--cwd", type=Path, default=Path.cwd())
-    guard = codex_sub.add_parser("guard")
-    guard.add_argument("--cwd", type=Path, default=Path.cwd())
-    guard.add_argument("--task", required=True)
-    guard.add_argument("--action", choices=sorted(GUARDED_ACTIONS), required=True)
-    guard.add_argument("--path")
-    advance = codex_sub.add_parser("advance")
-    advance.add_argument("--cwd", type=Path, default=Path.cwd())
-    advance.add_argument("--task", required=True)
-    advance.add_argument("--to", choices=("verifying", "reviewing"), required=True)
-    evidence = codex_sub.add_parser("record-check")
-    evidence.add_argument("--cwd", type=Path, default=Path.cwd())
-    evidence.add_argument("--task", required=True)
-    evidence.add_argument("--check", required=True)
-    evidence.add_argument("--status", choices=("pass", "fail", "skipped"), required=True)
-    evidence.add_argument("--source", choices=("command", "inspection", "review"), required=True)
-    evidence.add_argument("--exit-code", type=int)
-    evidence.add_argument(
-        "--sensitivity", choices=("public", "metadata", "secret-free"), required=True
-    )
-    evidence.add_argument("--digest", required=True)
-    evidence.add_argument("--reason-code")
-    judge = codex_sub.add_parser("judge")
-    judge.add_argument("--cwd", type=Path, default=Path.cwd())
-    judge.add_argument("--task", required=True)
-    judge.add_argument("--criterion", required=True)
-    judge.add_argument("--status", choices=("pass", "fail"), required=True)
-    judge.add_argument("--evidence-digest", required=True)
-    risk = codex_sub.add_parser("risk")
-    risk.add_argument("--cwd", type=Path, default=Path.cwd())
-    risk.add_argument("--task", required=True)
-    risk.add_argument("--risk", required=True)
-    risk.add_argument("--severity", choices=("low", "medium", "high", "critical"), required=True)
-    risk.add_argument("--status", choices=("open", "accepted", "resolved"), required=True)
-    risk.add_argument("--digest", required=True)
-    accept = codex_sub.add_parser("accept")
-    accept.add_argument("--cwd", type=Path, default=Path.cwd())
-    accept.add_argument("--task", required=True)
-    accept.add_argument(
-        "--message", default="chore(harness): create accepted ticket commit"
-    )
-    repair = codex_sub.add_parser("repair")
-    repair.add_argument("--cwd", type=Path, default=Path.cwd())
-    repair.add_argument("--task", required=True)
-    repair.add_argument("--fingerprint", required=True)
-    recover = codex_sub.add_parser("recover")
-    recover.add_argument("--cwd", type=Path, default=Path.cwd())
-    recover.add_argument("--task", required=True)
-    recover.add_argument("--category", choices=("adapter-failure",), required=True)
-    recover.add_argument("--fingerprint", required=True)
-    commit = codex_sub.add_parser("commit")
-    commit.add_argument("--cwd", type=Path, default=Path.cwd())
-    commit.add_argument("--task", required=True)
-    commit.add_argument("--message", required=True)
-    status = codex_sub.add_parser("status")
-    status.add_argument("--cwd", type=Path, default=Path.cwd())
-    status.add_argument("--task", required=True)
+    _add_direct_parser(subcommands, "codex-direct", "Codex Direct")
+    _add_direct_parser(subcommands, "claude-direct", "Claude Direct")
     return parser
 
 
@@ -226,30 +233,35 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_json(result)
             return 0 if result["status"] == "invoked" else 3
 
-        if args.command == "codex-direct":
+        if args.command in {"codex-direct", "claude-direct"}:
             context = discover_worktree(args.cwd)
-            if args.codex_command == "start":
+            if args.direct_command == "start":
                 contract_value = _load_json_file(args.path)
                 candidate_task_id = contract_value.get("task", {}).get("id")
                 if isinstance(candidate_task_id, str):
                     recovery_task_id = candidate_task_id
-                result, exit_code = start_codex_direct(
+                result, exit_code = start_direct(
                     context,
                     contract_value,
+                    mode=args.command,
                 )
-            elif args.codex_command == "guard":
+            elif args.direct_command == "guard":
                 result, exit_code = guard_codex_direct(
                     context,
                     task_id=args.task,
                     action=args.action,
                     path=args.path,
+                    expected_mode=args.command,
                 )
-            elif args.codex_command == "advance":
+            elif args.direct_command == "advance":
                 result = advance_codex_direct(
-                    context, task_id=args.task, target=args.to
+                    context,
+                    task_id=args.task,
+                    target=args.to,
+                    expected_mode=args.command,
                 )
                 exit_code = 0
-            elif args.codex_command == "record-check":
+            elif args.direct_command == "record-check":
                 result = record_check(
                     context,
                     task_id=args.task,
@@ -260,18 +272,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                     sensitivity=args.sensitivity,
                     digest=args.digest,
                     reason_code=args.reason_code,
+                    expected_mode=args.command,
                 )
                 exit_code = 0
-            elif args.codex_command == "judge":
+            elif args.direct_command == "judge":
                 result = judge_criterion(
                     context,
                     task_id=args.task,
                     criterion_id=args.criterion,
                     status=args.status,
                     evidence_digest=args.evidence_digest,
+                    expected_mode=args.command,
                 )
                 exit_code = 0
-            elif args.codex_command == "risk":
+            elif args.direct_command == "risk":
                 result = record_risk(
                     context,
                     task_id=args.task,
@@ -279,37 +293,52 @@ def main(argv: Sequence[str] | None = None) -> int:
                     severity=args.severity,
                     status=args.status,
                     digest=args.digest,
+                    expected_mode=args.command,
                 )
                 exit_code = 0
-            elif args.codex_command == "accept":
+            elif args.direct_command == "accept":
                 result = accept_codex_direct(
-                    context, task_id=args.task, message=args.message
+                    context,
+                    task_id=args.task,
+                    message=args.message,
+                    expected_mode=args.command,
                 )
                 exit_code = 0
-            elif args.codex_command == "repair":
+            elif args.direct_command == "repair":
                 result, exit_code = begin_repair(
-                    context, task_id=args.task, fingerprint=args.fingerprint
+                    context,
+                    task_id=args.task,
+                    fingerprint=args.fingerprint,
+                    expected_mode=args.command,
                 )
-            elif args.codex_command == "recover":
+            elif args.direct_command == "recover":
                 result, exit_code = enter_recovery(
                     context,
                     task_id=args.task,
                     category=args.category,
                     fingerprint=args.fingerprint,
+                    expected_mode=args.command,
                 )
-            elif args.codex_command == "commit":
+            elif args.direct_command == "commit":
                 result = commit_codex_direct(
-                    context, task_id=args.task, message=args.message
+                    context,
+                    task_id=args.task,
+                    message=args.message,
+                    expected_mode=args.command,
                 )
                 exit_code = 0
             else:
-                result = codex_direct_status(context, task_id=args.task)
+                result = codex_direct_status(
+                    context,
+                    task_id=args.task,
+                    expected_mode=args.command,
+                )
                 exit_code = 0
             _print_json(result)
             return exit_code
     except CodexDirectAdapterError as exc:
         task_id = getattr(args, "task", None) or recovery_task_id
-        if args.command == "codex-direct" and isinstance(task_id, str):
+        if args.command in {"codex-direct", "claude-direct"} and isinstance(task_id, str):
             fingerprint = hashlib.sha256(
                 f"adapter-failure-v1\0{exc}".encode("utf-8")
             ).hexdigest()
@@ -319,6 +348,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     task_id=task_id,
                     category="adapter-failure",
                     fingerprint=fingerprint,
+                    expected_mode=args.command,
                 )
                 _print_json(result)
                 return exit_code

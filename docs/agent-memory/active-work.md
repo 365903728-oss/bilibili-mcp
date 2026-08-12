@@ -3,26 +3,35 @@
 ## Harness v2
 
 GitHub Issue #28 is the approved Harness v2 specification. Issues #29-#36 are
-the dependency-ordered implementation tickets. Issue #29, `Portable session
-spine and constitutional adapters`, is accepted. The focused local commit
-containing this record is #30's acceptance commit; before that commit exists in
-HEAD, #30 remains a final acceptance candidate. Both remote Issues remain open
-because no close/push/PR authority was granted.
+the dependency-ordered implementation tickets. Issues #29 and #30 are accepted;
+#30's accepted and pushed commit `cbd31b952aa9f820005e60852bcd2d4db886a31c`
+is the exact base for Issue #31, `Claude Direct accepted-ticket loop`. The
+focused local commit containing this record is #31's acceptance commit; before
+that commit exists in HEAD, #31 remains a final acceptance candidate. The live
+Issues remain open because no Issue-close, push, or PR authority was granted
+for this ticket.
 
-#30 froze mode, baseline `0ed8968…`, Codex's sole writer/acceptance ownership,
-and the user's native `$implement` invocation before implementation. The
-executable loop now covers typed evidence, atomic cross-worktree writer
-exclusion by task/source with worktree-local lease records, guards, bounded
-repair, Recovery Bundle, current-diff review, and a hermetic temporary-index /
-`commit-tree` / CAS `update-ref` automatic ticket-owned local commit. The
-primary legacy Codex Hook overlap remains an explicit
-`doctor=action-required` rollout gate and was not rewritten.
+#31 froze `codex-direct` for the implementation worktree, the clean
+`cbd31b9…` base, branch `codex/harness-v2-claude-direct-31`, Codex's sole writer
+and acceptance ownership, and the user's native `$implement` invocation. The
+shared Direct controller now gives `claude-direct` the same typed contract,
+state, canonical writer exclusion, authority guards, diff-bound evidence,
+bounded repair, Recovery Bundle, acceptance, and exact automatic local-commit
+semantics as `codex-direct`, while rejecting cross-adapter control.
 
-The dependency frontier is #31, `Codex-to-Paseo-to-Claude execution loop`, once
-HEAD contains this record; otherwise it remains #30. A new ticket still
-requires one frozen mode decision and its own native manual Skill evidence.
-#30 does not authorize Paseo restart, Claude writer launch, adapter fallback,
-or remote delivery for #31.
+A real Claude Code 2.1.212 session completed the full Claude Direct loop in an
+ignored zero-remote Harness-only repository, changing only `harness-only.txt`
+and creating exactly one accepted commit. Its pilot contract required no
+manual Skill; `/implement` one-reminder/zero-write behavior is proven separately
+at the public process boundary and is not claimed as native pilot evidence.
+
+The dependency frontier is live Issue #32,
+`Codex–Paseo–Claude accepted-ticket loop`, once HEAD contains this record;
+otherwise it remains #31. A new ticket still requires one frozen mode decision
+and its own native manual Skill evidence. #31 does not authorize Paseo restart,
+collaboration launch, adapter fallback, or remote delivery for #32. The primary
+legacy Codex Hook overlap remains an explicit `doctor=action-required` rollout
+gate and was not rewritten.
 
 The Harness target is one `RULES.md` core with `codex-direct`,
 `codex-paseo-claude`, and `claude-direct` adapters. Local commit is automatic

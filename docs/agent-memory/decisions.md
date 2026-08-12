@@ -487,3 +487,29 @@
   injection red/green regressions, CRLF/symlink semantics, post-ref index crash
   recovery, altered-owned-diff rejection, and the one-commit/no-remote v6
   pilot.
+
+- Decision: Implement Claude Direct as a second, mode-fenced public entrypoint
+  to the #30 Direct controller instead of copying or switching controllers.
+- Reason: Locking, canonical worktree/source identity, evidence, repair,
+  recovery, acceptance, and commit are shared semantics. The invoked command
+  must still match the frozen run mode so a Codex command cannot inspect or
+  mutate a Claude lease, or vice versa. The `codex_direct.py` module and
+  Codex-named Python compatibility functions remain to avoid a churn-only
+  refactor; the public CLI, persisted schemas, and ownership that define
+  authority are mode-specific.
+- Evidence: live Issue #31, the shared process-lifecycle conformance fixture,
+  cross-mode status/mutation rejection, mixed Codex/Claude linked-worktree
+  writer collision, and the real Claude Direct pilot.
+
+- Decision: Run the required real Claude Direct pilot in an ignored,
+  zero-remote Harness-only repository with project settings only, strict empty
+  MCP configuration, bypass permissions, no session persistence, a bounded
+  spend cap, and no model/provider/fallback flag.
+- Reason: This proves the actual Claude Code host path while excluding global
+  Hook/MCP interference and all product, credential, SSH, and remote effects.
+  The pilot contract has no required manual Skill, so it does not falsely claim
+  a user-native `/implement`; that gate is verified independently at the public
+  CLI boundary.
+- Evidence: Claude Code 2.1.212 attempt 2, accepted pilot commit
+  `d4875bfe6b21e2e460d7fad2ebb59e3165a32c1e`, zero remotes, the redacted run
+  ledger, and one-reminder/zero-write Claude manual-Skill regressions.

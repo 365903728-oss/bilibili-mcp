@@ -1,4 +1,4 @@
-"""Persistent Codex Direct accepted-ticket control loop."""
+"""Persistent shared control loop for direct accepted-ticket adapters."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from typing import Any, Iterator
 
 from harness.capabilities import check_manual_skill, manual_skill_reminder_id
 from harness.context import WorktreeContext, git_environment
-from harness.contracts import validate_codex_direct_contract
+from harness.contracts import ACCEPTANCE_OWNERS, WRITERS, validate_direct_contract
 from harness.safe_io import (
     bounded_file_lock,
     ensure_no_link_components,
@@ -54,12 +54,29 @@ MAX_ACCEPTED_PATH_BYTES = 16 * 1024
 MAX_GIT_OUTPUT_BYTES = 8 * 1024 * 1024
 MAX_INDEX_BYTES = 64 * 1024 * 1024
 MAX_REPOSITORY_TASKS = 1024
+DIRECT_MODES = ("codex-direct", "claude-direct")
+RUN_SCHEMAS = {
+    "codex-direct": "harness.codex-direct-run/v1",
+    "claude-direct": "harness.claude-direct-run/v1",
+}
+CONTROL_SCHEMAS = {
+    "codex-direct": "harness.codex-direct-control/v1",
+    "claude-direct": "harness.claude-direct-control/v1",
+}
 GIT_SAFE_CONFIG = (
     "-c",
     f"core.hooksPath={os.devnull}",
     "-c",
     "core.fsmonitor=false",
 )
+
+
+def _direct_mode(contract: Any) -> str:
+    execution = contract.get("execution") if isinstance(contract, dict) else None
+    mode = execution.get("mode") if isinstance(execution, dict) else None
+    if mode not in DIRECT_MODES:
+        raise CodexDirectError("direct task mode is unavailable or invalid")
+    return mode
 
 
 def _git(
@@ -286,8 +303,11 @@ def _reject_ticket_in_other_worktree(
             )
             contract = existing.get("contract")
             task = contract.get("task") if isinstance(contract, dict) else None
+            execution = contract.get("execution") if isinstance(contract, dict) else None
+            mode = execution.get("mode") if isinstance(execution, dict) else None
             if (
-                existing.get("schema") != "harness.codex-direct-run/v1"
+                mode not in DIRECT_MODES
+                or existing.get("schema") != RUN_SCHEMAS[mode]
                 or not isinstance(task, dict)
                 or set(task) != {"id", "source_digest"}
                 or not isinstance(task.get("id"), str)
@@ -308,12 +328,13 @@ def _manual_skill_was_reminded_elsewhere(
     known_roots: list[Path],
     *,
     task_id: str,
+    adapter: str,
     host: str,
     skill: str,
 ) -> bool:
     reminder_id = manual_skill_reminder_id(
         task_id=task_id,
-        adapter="codex-direct",
+        adapter=adapter,
         host=host,
         skill=skill,
     )
@@ -334,8 +355,9 @@ def _manual_skill_was_reminded_elsewhere(
 
 def _control(run: dict[str, Any], **extra: Any) -> dict[str, Any]:
     contract = run["contract"]
+    mode = _direct_mode(contract)
     return {
-        "schema": "harness.codex-direct-control/v1",
+        "schema": CONTROL_SCHEMAS[mode],
         "task_id": contract["task"]["id"],
         "mode": contract["execution"]["mode"],
         "state": run["state"],
@@ -432,9 +454,11 @@ def _validate_run_shape(run: dict[str, Any], context: WorktreeContext, task_id: 
     }
     if not _state_keys(run, required, {"accepted_diff", "recovery_bundle"}):
         raise CodexDirectError("Codex Direct task state is unavailable or invalid")
-    if run.get("schema") != "harness.codex-direct-run/v1":
-        raise CodexDirectError("Codex Direct task state is unavailable or invalid")
     contract = run["contract"]
+    mode = _direct_mode(contract)
+    writer = WRITERS[mode]
+    if run.get("schema") != RUN_SCHEMAS[mode]:
+        raise CodexDirectError("Codex Direct task state is unavailable or invalid")
     contract_keys = {
         "schema",
         "source_contract_digest",
@@ -456,7 +480,7 @@ def _validate_run_shape(run: dict[str, Any], context: WorktreeContext, task_id: 
         or not _state_keys(task, {"id", "source_digest"})
         or task.get("id") != task_id
         or not re.fullmatch(r"[0-9a-f]{64}", str(task.get("source_digest", "")))
-        or contract.get("acceptance_owner") != "codex"
+        or contract.get("acceptance_owner") != ACCEPTANCE_OWNERS[mode]
         or contract.get("state") != run.get("state")
     ):
         raise CodexDirectError("Codex Direct runtime contract is invalid")
@@ -473,7 +497,7 @@ def _validate_run_shape(run: dict[str, Any], context: WorktreeContext, task_id: 
             "isolated_worktree",
         },
     ) or (
-        execution.get("mode") != "codex-direct"
+        execution.get("mode") != mode
         or execution.get("worktree_id") != context.worktree_id
         or execution.get("repository_id") != context.repository_id
         or not re.fullmatch(r"[0-9a-f]{40}", str(execution.get("base_sha", "")))
@@ -573,8 +597,8 @@ def _validate_run_shape(run: dict[str, Any], context: WorktreeContext, task_id: 
     if len(criterion_ids) != len(acceptance_plan) or len(check_ids) != len(verification_plan):
         raise CodexDirectError("Codex Direct runtime plan is invalid")
     if contract.get("writer_lease") not in (
-        {"holder": "codex", "state": "active"},
-        {"holder": "codex", "state": "released"},
+        {"holder": writer, "state": "active"},
+        {"holder": writer, "state": "released"},
     ) or contract.get("authority") != {
         "local_read_write_test": "allowed",
         "local_commit": "after-acceptance",
@@ -760,13 +784,13 @@ def _validate_run_shape(run: dict[str, Any], context: WorktreeContext, task_id: 
     lease = contract["writer_lease"]
     if run["state"] == "accepted":
         expected_lease = (
-            {"holder": "codex", "state": "released"}
+            {"holder": writer, "state": "released"}
             if commit_sha is not None
-            else {"holder": "codex", "state": "active"}
+            else {"holder": writer, "state": "active"}
         )
         if lease != expected_lease or "accepted_diff" not in run:
             raise CodexDirectError("Codex Direct accepted lifecycle state is invalid")
-    elif lease != {"holder": "codex", "state": "active"} or commit_sha is not None:
+    elif lease != {"holder": writer, "state": "active"} or commit_sha is not None:
         raise CodexDirectError("Codex Direct active lifecycle state is invalid")
     if run["state"] == "recovery-required":
         reference = run.get("recovery_bundle")
@@ -795,13 +819,23 @@ def _validate_run_shape(run: dict[str, Any], context: WorktreeContext, task_id: 
         raise CodexDirectError("Recovery Bundle is invalid for this lifecycle state")
 
 
-def _load_run(context: WorktreeContext, task_id: str) -> tuple[Path, dict[str, Any]]:
+def _load_run(
+    context: WorktreeContext,
+    task_id: str,
+    *,
+    expected_mode: str | None = "codex-direct",
+) -> tuple[Path, dict[str, Any]]:
     run_path = _task_dir(context, task_id) / "run.json"
     ensure_no_link_components(context.root, run_path.parent)
     run = read_bounded_json_object(
         run_path, MAX_STATE_BYTES, max_nodes=MAX_STATE_NODES
     )
     _validate_run_shape(run, context, task_id)
+    if (
+        expected_mode is not None
+        and run["contract"]["execution"]["mode"] != expected_mode
+    ):
+        raise CodexDirectError("direct command mode does not match the frozen task mode")
     contract = run.get("contract")
     if not isinstance(contract, dict) or contract.get("task", {}).get("id") != task_id:
         raise CodexDirectError("Codex Direct task identity does not match state")
@@ -961,10 +995,16 @@ def _repository_mutex(context: WorktreeContext, fallback_lock: Path) -> Any:
         kernel32.CloseHandle(handle)
 
 
+def _task_source_digest(contract: dict[str, Any]) -> str:
+    return hashlib.sha256(contract["task"]["source"].encode("utf-8")).hexdigest()
+
+
 def _runtime_contract(
     context: WorktreeContext, contract: dict[str, Any]
 ) -> dict[str, Any]:
     plan = contract["plan"]
+    mode = contract["execution"]["mode"]
+    writer = WRITERS[mode]
     contract_digest = hashlib.sha256(
         json.dumps(
             contract, ensure_ascii=True, sort_keys=True, separators=(",", ":")
@@ -975,12 +1015,10 @@ def _runtime_contract(
         "source_contract_digest": contract_digest,
         "task": {
             "id": contract["task"]["id"],
-            "source_digest": hashlib.sha256(
-                contract["task"]["source"].encode("utf-8")
-            ).hexdigest(),
+            "source_digest": _task_source_digest(contract),
         },
         "execution": {
-            "mode": "codex-direct",
+            "mode": mode,
             "worktree_id": context.worktree_id,
             "repository_id": context.repository_id,
             "base_sha": contract["execution"]["base_sha"],
@@ -1018,8 +1056,8 @@ def _runtime_contract(
                 for item in plan["stop_conditions"]
             ],
         },
-        "writer_lease": {"holder": "codex", "state": "active"},
-        "acceptance_owner": "codex",
+        "writer_lease": {"holder": writer, "state": "active"},
+        "acceptance_owner": ACCEPTANCE_OWNERS[mode],
         "authority": copy.deepcopy(contract["authority"]),
         "state": "executing",
     }
@@ -1324,10 +1362,11 @@ def guard_codex_direct(
     task_id: str,
     action: str,
     path: str | None = None,
+    expected_mode: str | None = "codex-direct",
 ) -> tuple[dict[str, Any], int]:
     if action not in GUARDED_ACTIONS:
         raise CodexDirectError("unsupported guarded action")
-    _, run = _load_run(context, task_id)
+    _, run = _load_run(context, task_id, expected_mode=expected_mode)
     base = _control(run, action=action)
 
     if action in USER_AUTH_ACTIONS:
@@ -1403,9 +1442,13 @@ def guard_codex_direct(
 
 @_serialized
 def advance_codex_direct(
-    context: WorktreeContext, *, task_id: str, target: str
+    context: WorktreeContext,
+    *,
+    task_id: str,
+    target: str,
+    expected_mode: str | None = "codex-direct",
 ) -> dict[str, Any]:
-    run_path, run = _load_run(context, task_id)
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     allowed = {
         ("executing", "verifying"),
         ("repairing", "verifying"),
@@ -1432,8 +1475,9 @@ def record_check(
     sensitivity: str,
     digest: str,
     reason_code: str | None,
+    expected_mode: str | None = "codex-direct",
 ) -> dict[str, Any]:
-    run_path, run = _load_run(context, task_id)
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     if run["state"] not in {"verifying", "reviewing", "repairing"}:
         raise CodexDirectError("verification evidence is not allowed in this state")
     planned = {
@@ -1496,8 +1540,9 @@ def judge_criterion(
     criterion_id: str,
     status: str,
     evidence_digest: str,
+    expected_mode: str | None = "codex-direct",
 ) -> dict[str, Any]:
-    run_path, run = _load_run(context, task_id)
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     if run["state"] != "reviewing":
         raise CodexDirectError("acceptance criteria can be judged only during review")
     criteria = {
@@ -1531,8 +1576,9 @@ def record_risk(
     severity: str,
     status: str,
     digest: str,
+    expected_mode: str | None = "codex-direct",
 ) -> dict[str, Any]:
-    run_path, run = _load_run(context, task_id)
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     if run["state"] != "reviewing":
         raise CodexDirectError("risks can be recorded only during review")
     _require_runtime_id(risk_id, "risk id")
@@ -1558,12 +1604,16 @@ def accept_codex_direct(
     *,
     task_id: str,
     message: str = "chore(harness): create accepted ticket commit",
+    expected_mode: str | None = "codex-direct",
 ) -> dict[str, Any]:
-    run_path, run = _load_run(context, task_id)
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     _require_commit_message(message)
     if run["state"] == "accepted":
         committed = _commit_unlocked(
-            context, task_id=task_id, message=message
+            context,
+            task_id=task_id,
+            message=message,
+            expected_mode=expected_mode,
         )
         run["commit_sha"] = committed["commit_sha"]
         run["contract"]["writer_lease"] = committed["writer_lease"]
@@ -1689,7 +1739,12 @@ def accept_codex_direct(
             "accepted state cannot preserve recovery-safe bundle capacity"
         ) from exc
     _save_run(context, run_path, run)
-    committed = _commit_unlocked(context, task_id=task_id, message=message)
+    committed = _commit_unlocked(
+        context,
+        task_id=task_id,
+        message=message,
+        expected_mode=expected_mode,
+    )
     run["commit_sha"] = committed["commit_sha"]
     run["contract"]["writer_lease"] = committed["writer_lease"]
     return {
@@ -1738,7 +1793,7 @@ def _make_recovery_bundle(
     return {
         "schema": "harness.recovery-bundle/v1",
         "task_id": contract["task"]["id"],
-        "mode": "codex-direct",
+        "mode": contract["execution"]["mode"],
         "repository_id": contract["execution"]["repository_id"],
         "worktree_id": contract["execution"]["worktree_id"],
         "base_sha": contract["execution"]["base_sha"],
@@ -1794,8 +1849,9 @@ def _enter_recovery_unlocked(
     task_id: str,
     category: str,
     fingerprint: str,
+    expected_mode: str | None = None,
 ) -> tuple[dict[str, Any], int]:
-    run_path, run = _load_run(context, task_id)
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     if run["state"] not in {
         "executing",
         "verifying",
@@ -1860,6 +1916,7 @@ def enter_recovery(
     task_id: str,
     category: str,
     fingerprint: str,
+    expected_mode: str | None = "codex-direct",
 ) -> tuple[dict[str, Any], int]:
     if category != "adapter-failure":
         raise CodexDirectError("public recovery can record only adapter failures")
@@ -1868,14 +1925,19 @@ def enter_recovery(
         task_id=task_id,
         category=category,
         fingerprint=fingerprint,
+        expected_mode=expected_mode,
     )
 
 
 @_serialized
 def begin_repair(
-    context: WorktreeContext, *, task_id: str, fingerprint: str
+    context: WorktreeContext,
+    *,
+    task_id: str,
+    fingerprint: str,
+    expected_mode: str | None = "codex-direct",
 ) -> tuple[dict[str, Any], int]:
-    run_path, run = _load_run(context, task_id)
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     if run["state"] not in {"verifying", "reviewing"}:
         raise CodexDirectError("repair requires verifying or reviewing state")
     fingerprint = _require_digest(fingerprint, "failure fingerprint")
@@ -1895,6 +1957,7 @@ def begin_repair(
             task_id=task_id,
             category="repeated-failure",
             fingerprint=fingerprint,
+            expected_mode=expected_mode,
         )
     if len(run["repairs"]) >= max_attempts:
         return _enter_recovery_unlocked(
@@ -1902,6 +1965,7 @@ def begin_repair(
             task_id=task_id,
             category="repair-limit",
             fingerprint=fingerprint,
+            expected_mode=expected_mode,
         )
 
     attempt_number = len(run["repairs"]) + 1
@@ -2273,9 +2337,13 @@ def _commit_identity_environment(root: Path) -> dict[str, str]:
 
 
 def _commit_unlocked(
-    context: WorktreeContext, *, task_id: str, message: str
+    context: WorktreeContext,
+    *,
+    task_id: str,
+    message: str,
+    expected_mode: str | None = None,
 ) -> dict[str, Any]:
-    run_path, run = _load_run(context, task_id)
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     if run["state"] != "accepted":
         raise CodexDirectError("local commit is unavailable before acceptance")
     _require_commit_message(message)
@@ -2351,7 +2419,10 @@ def _commit_unlocked(
                     "accepted ticket commit recovery failed its postcondition"
                 )
         run["commit_sha"] = current_head
-        contract["writer_lease"] = {"holder": "codex", "state": "released"}
+        contract["writer_lease"] = {
+            "holder": WRITERS[contract["execution"]["mode"]],
+            "state": "released",
+        }
         _add_history(run, "commit-recovered", "accepted")
         _save_run(context, run_path, run)
         return _control(
@@ -2441,7 +2512,10 @@ def _commit_unlocked(
             "created commit failed the ticket-scope postcondition"
         )
     run["commit_sha"] = commit_sha
-    contract["writer_lease"] = {"holder": "codex", "state": "released"}
+    contract["writer_lease"] = {
+        "holder": WRITERS[contract["execution"]["mode"]],
+        "state": "released",
+    }
     _add_history(run, "local-commit-created", "accepted")
     _save_run(context, run_path, run)
     return _control(run, commit_status="created", commit_sha=commit_sha)
@@ -2449,9 +2523,18 @@ def _commit_unlocked(
 
 @_serialized
 def commit_codex_direct(
-    context: WorktreeContext, *, task_id: str, message: str
+    context: WorktreeContext,
+    *,
+    task_id: str,
+    message: str,
+    expected_mode: str | None = "codex-direct",
 ) -> dict[str, Any]:
-    return _commit_unlocked(context, task_id=task_id, message=message)
+    return _commit_unlocked(
+        context,
+        task_id=task_id,
+        message=message,
+        expected_mode=expected_mode,
+    )
 
 
 def _validate_recovery_bundle_shape(
@@ -2472,7 +2555,7 @@ def _validate_recovery_bundle_shape(
     contract = run["contract"]
     if (
         bundle.get("task_id") != contract["task"]["id"]
-        or bundle.get("mode") != "codex-direct"
+        or bundle.get("mode") != contract["execution"]["mode"]
         or bundle.get("repository_id") != contract["execution"]["repository_id"]
         or bundle.get("worktree_id") != contract["execution"]["worktree_id"]
         or bundle.get("base_sha") != contract["execution"]["base_sha"]
@@ -2611,8 +2694,13 @@ def _read_recovery_bundle(
 
 
 @_serialized
-def codex_direct_status(context: WorktreeContext, *, task_id: str) -> dict[str, Any]:
-    run_path, run = _load_run(context, task_id)
+def codex_direct_status(
+    context: WorktreeContext,
+    *,
+    task_id: str,
+    expected_mode: str | None = "codex-direct",
+) -> dict[str, Any]:
+    run_path, run = _load_run(context, task_id, expected_mode=expected_mode)
     return _control(
         run,
         checks=run["checks"],
@@ -2633,9 +2721,9 @@ def _start_codex_direct_unlocked(
     known_roots: list[Path],
 ) -> tuple[dict[str, Any], int]:
     task_id = contract["task"]["id"]
-    source_digest = hashlib.sha256(
-        contract["task"]["source"].encode("utf-8")
-    ).hexdigest()
+    mode = contract["execution"]["mode"]
+    writer = WRITERS[mode]
+    source_digest = _task_source_digest(contract)
     reminder_identity = f"source:{source_digest}"
     task_dir = _task_dir(context, task_id)
     run_path = task_dir / "run.json"
@@ -2644,7 +2732,7 @@ def _start_codex_direct_unlocked(
         existing = read_bounded_json_object(
             run_path, MAX_STATE_BYTES, max_nodes=MAX_STATE_NODES
         )
-        if existing.get("schema") == "harness.codex-direct-run/v1":
+        if existing.get("schema") in RUN_SCHEMAS.values():
             raise CodexDirectError(
                 "execution mode is already frozen and a writer lease exists for this task"
             )
@@ -2674,16 +2762,21 @@ def _start_codex_direct_unlocked(
             context,
             known_roots,
             task_id=reminder_identity,
+            adapter=mode,
             host=skill["host"],
             skill=skill["name"],
         ):
             result = {
                 "schema": "harness.manual-skill-gate/v1",
                 "task_id": task_id,
-                "adapter": "codex-direct",
+                "adapter": mode,
                 "host": skill["host"],
                 "skill": skill["name"],
-                "native_invocation": f"${skill['name']}",
+                "native_invocation": (
+                    f"/{skill['name']}"
+                    if skill["host"] == "claude"
+                    else f"${skill['name']}"
+                ),
                 "status": "already-reminded",
                 "message": None,
             }
@@ -2691,7 +2784,7 @@ def _start_codex_direct_unlocked(
             result = check_manual_skill(
                 runtime_root=context.runtime_root,
                 task_id=reminder_identity,
-                adapter="codex-direct",
+                adapter=mode,
                 host=skill["host"],
                 skill=skill["name"],
                 invoked=False,
@@ -2700,11 +2793,11 @@ def _start_codex_direct_unlocked(
             result["task_id"] = task_id
         return (
             {
-                "schema": "harness.codex-direct-control/v1",
+                "schema": CONTROL_SCHEMAS[mode],
                 "task_id": task_id,
-                "mode": "codex-direct",
+                "mode": mode,
                 "state": "awaiting-user",
-                "writer_lease": {"holder": "codex", "state": "inactive"},
+                "writer_lease": {"holder": writer, "state": "inactive"},
                 "manual_skill": result,
             },
             3,
@@ -2713,7 +2806,7 @@ def _start_codex_direct_unlocked(
     frozen = _runtime_contract(context, contract)
     empty_digest = hashlib.sha256(b"").hexdigest()
     run = {
-        "schema": "harness.codex-direct-run/v1",
+        "schema": RUN_SCHEMAS[mode],
         "contract": frozen,
         "state": "executing",
         "sequence": 3,
@@ -2767,8 +2860,8 @@ def _rollback_unstable_start(
             item for item in contract["required_manual_skills"] if item["status"] != "invoked"
         )
         reminder_id = manual_skill_reminder_id(
-            task_id=contract["task"]["id"],
-            adapter="codex-direct",
+            task_id=f"source:{_task_source_digest(contract)}",
+            adapter=contract["execution"]["mode"],
             host=skill["host"],
             skill=skill["name"],
         )
@@ -2777,10 +2870,13 @@ def _rollback_unstable_start(
             marker.unlink()
 
 
-def start_codex_direct(
-    context: WorktreeContext, contract_value: dict[str, Any]
+def start_direct(
+    context: WorktreeContext,
+    contract_value: dict[str, Any],
+    *,
+    mode: str,
 ) -> tuple[dict[str, Any], int]:
-    contract = validate_codex_direct_contract(contract_value)
+    contract = validate_direct_contract(contract_value, mode)
     task_id = contract["task"]["id"]
     task_dir = _task_dir(context, task_id)
     ensure_no_link_components(context.root, task_dir)
@@ -2803,3 +2899,15 @@ def start_codex_direct(
                 _rollback_unstable_start(context, contract, result)
                 raise CodexDirectError("repository control lock changed during acquisition")
             return result
+
+
+def start_codex_direct(
+    context: WorktreeContext, contract_value: dict[str, Any]
+) -> tuple[dict[str, Any], int]:
+    return start_direct(context, contract_value, mode="codex-direct")
+
+
+def start_claude_direct(
+    context: WorktreeContext, contract_value: dict[str, Any]
+) -> tuple[dict[str, Any], int]:
+    return start_direct(context, contract_value, mode="claude-direct")

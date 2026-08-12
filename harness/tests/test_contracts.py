@@ -11,8 +11,10 @@ from harness.contracts import (
     WRITERS,
     ContractError,
     validate_codex_direct_contract,
+    validate_direct_contract,
     validate_task_contract,
 )
+from harness.codex_direct import CONTROL_SCHEMAS, RUN_SCHEMAS
 
 
 def valid_contract() -> dict[str, object]:
@@ -47,6 +49,49 @@ def valid_contract() -> dict[str, object]:
 
 
 class TaskContractTests(unittest.TestCase):
+    def test_direct_adapters_share_the_frozen_conformance_fixture(self) -> None:
+        fixture_path = Path(__file__).resolve().parents[1] / "fixtures" / "direct-adapter-conformance.json"
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+        self.assertEqual(fixture["schema"], "harness.direct-adapter-conformance/v1")
+
+        for adapter in fixture["adapters"]:
+            with self.subTest(mode=adapter["mode"]):
+                contract = valid_contract()
+                contract["execution"].update(  # type: ignore[union-attr]
+                    {"mode": adapter["mode"], "branch": "codex/conformance"}
+                )
+                contract["writer_lease"] = {
+                    "holder": adapter["writer"], "state": "inactive",
+                }
+                contract["acceptance_owner"] = adapter["acceptance_owner"]
+                contract["required_manual_skills"] = [
+                    {
+                        "name": "implement",
+                        "host": adapter["skill_host"],
+                        "status": "invoked",
+                        "invocation": adapter["skill_invocation"],
+                    }
+                ]
+                contract["state"] = "ready"
+                contract["plan"] = {
+                    "objective": "Exercise the shared direct contract.",
+                    "owned_paths": ["harness-only.txt"],
+                    "acceptance_criteria": [
+                        {"id": "criterion", "description": "The shared path passes."}
+                    ],
+                    "verification_plan": [
+                        {"id": "check", "command": "verify", "required": True}
+                    ],
+                    "repair_policy": {"max_attempts": 1},
+                    "stop_conditions": ["adapter-failure"],
+                }
+
+                normalized = validate_direct_contract(contract, adapter["mode"])
+                self.assertEqual(adapter["command"], adapter["mode"])
+                self.assertEqual(normalized["writer_lease"]["holder"], adapter["writer"])
+                self.assertEqual(RUN_SCHEMAS[adapter["mode"]], adapter["run_schema"])
+                self.assertEqual(CONTROL_SCHEMAS[adapter["mode"]], adapter["control_schema"])
+
     def test_contract_declares_exactly_three_modes_and_owners(self) -> None:
         self.assertEqual(
             EXECUTION_MODES,

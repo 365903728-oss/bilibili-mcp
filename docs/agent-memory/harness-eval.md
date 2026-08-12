@@ -432,6 +432,50 @@ Candidate metrics:
 - product-source files changed: 0
 - remote operations performed: 0
 
+### 2026-08-11 Harness Eval: Harness v2 Issue #31 Claude Direct loop
+
+- Parameterizing the accepted #30 controller was lower risk than copying its
+  state machine. The first failing process test nevertheless exposed a hidden
+  cross-adapter control seam: persisted mode alone is insufficient unless the
+  invoked command is checked on every state transaction. A second red test
+  found that unstable-start rollback used a different identity than the
+  source-scoped manual-Skill marker.
+- Keep: one Direct controller, adapter-specific run/control schemas and owners,
+  command-mode fencing, source-bound writer exclusion, native manual-Skill
+  gates, bounded repair/recovery, exact automatic commit, disposable Git tests,
+  dirty-primary fingerprints, package exclusion, and a real host pilot.
+- Change: a shared conformance fixture must drive both public adapter
+  lifecycles, not merely compare static mappings. Real pilot reports must
+  distinguish user-native Skill evidence from an empty pilot Skill requirement
+  and record preflight failures rather than hiding them.
+- Remove: do not add a copied Claude controller, do not let one adapter inspect
+  another adapter's state, do not pass or persist a model/provider/fallback,
+  and do not promote raw Claude stream output into formal memory.
+- Residual: the primary legacy Codex Hook overlap remains the deliberate
+  `doctor=action-required` migration gate. The real pilot used project settings
+  only; normal-config rollout remains out of scope.
+
+Candidate metrics:
+
+- focused pre-review Harness tests: 34
+- final shared Harness tests: 105 (1 platform-permission skip)
+- legacy Hook compatibility tests: 14
+- product tests: 862
+- package entries / forbidden Harness entries: 185 / 0
+- shared public lifecycle fixture adapters: 2
+- real Claude CLI attempts / accepted runs: 2 / 1
+- pre-start configuration failures / Recovery Bundles: 1 / 0
+- pilot repairs / evidence-command corrections: 0 / 1
+- routine approval prompts / user interventions: 0 / 0
+- accepted pilot commits / changed paths / remotes: 1 / 1 / 0
+- pilot elapsed / reported cost cap usage: 190.481s / USD 1.906883 of 2.00
+- implementation-client handoffs / Paseo launches: 0 / 0
+- final independent review axes: 3, all PASS with no remaining P0-P3
+- accepted review repairs: 4 (report/evidence, executable conformance,
+  subprocess environment, unified report contract)
+- product-source files changed: 0
+- remote operations performed: 0
+
 ### 2026-08-11 Harness Eval: Harness v2 Issue #30 Codex Direct loop
 
 - The public process-boundary seam kept adapter behavior testable without

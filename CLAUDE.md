@@ -14,6 +14,10 @@ entrypoint as selection of `claude-direct`: Claude plans, holds the only writer
 lease, implements, verifies, reviews, accepts, and creates the focused local
 commit. Do not ask for a redundant mode confirmation.
 
+Use `python -m harness claude-direct` for `start`, guards, lifecycle evidence,
+recovery, acceptance, and commit recovery. Never control a Claude Direct task
+through `codex-direct` or fall back to that adapter after failure.
+
 Use project agents under `.claude/agents/` only for bounded matching work. A
 subagent that edits must be the recorded active writer, not an additional
 writer. Read-only reviewers may run risk-weighted checks without a lease.

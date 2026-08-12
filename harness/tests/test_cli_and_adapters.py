@@ -300,6 +300,8 @@ class CliAndAdapterTests(unittest.TestCase):
 
         self.assertIn("RULES.md", agents)
         self.assertIn("@RULES.md", claude)
+        self.assertIn("python -m harness claude-direct", claude)
+        self.assertIn("Never control a Claude Direct task", claude)
         self.assertIn("Constitutional Kernel", rules)
         self.assertNotIn("C:/Users/", agents)
         self.assertNotIn("C:\\Users\\", agents)

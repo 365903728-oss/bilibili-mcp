@@ -1,0 +1,25 @@
+{
+  "schema": "harness.direct-adapter-conformance/v1",
+  "adapters": [
+    {
+      "command": "codex-direct",
+      "mode": "codex-direct",
+      "writer": "codex",
+      "acceptance_owner": "codex",
+      "skill_host": "codex",
+      "skill_invocation": "$implement",
+      "run_schema": "harness.codex-direct-run/v1",
+      "control_schema": "harness.codex-direct-control/v1"
+    },
+    {
+      "command": "claude-direct",
+      "mode": "claude-direct",
+      "writer": "claude",
+      "acceptance_owner": "claude",
+      "skill_host": "claude",
+      "skill_invocation": "/implement",
+      "run_schema": "harness.claude-direct-run/v1",
+      "control_schema": "harness.claude-direct-control/v1"
+    }
+  ]
+}

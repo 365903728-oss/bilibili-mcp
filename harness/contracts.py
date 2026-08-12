@@ -309,16 +309,24 @@ def validate_task_contract(value: Any) -> dict[str, Any]:
     return contract
 
 
-def validate_codex_direct_contract(value: Any) -> dict[str, Any]:
+def validate_direct_contract(value: Any, mode: str) -> dict[str, Any]:
+    if mode not in {"codex-direct", "claude-direct"}:
+        raise ContractError("direct control mode is invalid")
     contract = validate_task_contract(value)
-    if contract["execution"]["mode"] != "codex-direct":
-        raise ContractError("Codex Direct control requires codex-direct mode")
+    label = "Codex Direct" if mode == "codex-direct" else "Claude Direct"
+    writer = WRITERS[mode]
+    if contract["execution"]["mode"] != mode:
+        raise ContractError(f"{label} control requires {mode} mode")
     if "branch" not in contract["execution"]:
-        raise ContractError("Codex Direct control requires a frozen branch")
+        raise ContractError(f"{label} control requires a frozen branch")
     if "plan" not in contract:
-        raise ContractError("Codex Direct control requires a complete plan")
+        raise ContractError(f"{label} control requires a complete plan")
     if contract["state"] != "ready":
-        raise ContractError("Codex Direct control must start from ready")
-    if contract["writer_lease"] != {"holder": "codex", "state": "inactive"}:
-        raise ContractError("Codex Direct control requires an inactive Codex lease")
+        raise ContractError(f"{label} control must start from ready")
+    if contract["writer_lease"] != {"holder": writer, "state": "inactive"}:
+        raise ContractError(f"{label} control requires an inactive {writer.title()} lease")
     return contract
+
+
+def validate_codex_direct_contract(value: Any) -> dict[str, Any]:
+    return validate_direct_contract(value, "codex-direct")

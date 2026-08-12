@@ -191,18 +191,21 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
 - `AGENTS.md`: thin Codex adapter for `codex-direct` and Codex's controller/acceptance role in `codex-paseo-claude`.
 - `CLAUDE.md`: thin Claude adapter; imports `RULES.md` and defines `claude-direct` plus Paseo-managed writer behavior.
 - `harness/cli.py`: shared diagnostics, typed-contract validation, hook
-  ingestion/replay, manual-Skill gate, and Codex Direct control commands.
+  ingestion/replay, manual-Skill gate, and mode-fenced `codex-direct` /
+  `claude-direct` control commands.
 - `harness/contracts.py`: three-mode owners, writer lease, authority, state,
   terminal, no-switch, executable plan, owned-path, verification, and repair
   invariants.
-- `harness/codex_direct.py`: persistent `codex-direct` ticket controller. It
-  freezes a clean canonical worktree/branch/base and Codex-only writer, uses a
-  repository-scoped Windows mutex or POSIX existing-config advisory lock to
-  scan source-bound sibling worktree leases atomically, guards fixed action
-  classes, records an append-only bounded evidence log plus current checks/
-  criteria/risks, bounds repairs by fingerprint and progress, writes Recovery
-  Bundles, accepts the exact owned snapshot, and creates one hermetic,
-  idempotent `commit-tree`/`update-ref` post-acceptance local commit.
+- `harness/codex_direct.py`: shared persistent controller for both Direct
+  adapters, retaining the #30 compatibility module name. It freezes a clean
+  canonical worktree/branch/base and the mode-specific sole writer, rejects
+  cross-adapter control, uses a repository-scoped Windows mutex or POSIX
+  existing-config advisory lock to scan source-bound sibling worktree leases
+  atomically, guards fixed action classes, records an append-only bounded
+  evidence log plus current checks/criteria/risks, bounds repairs by fingerprint
+  and progress, writes Recovery Bundles, accepts the exact owned snapshot, and
+  creates one hermetic, idempotent `commit-tree`/`update-ref` post-acceptance
+  local commit.
 - `harness/context.py`: dynamic Git repository/worktree attribution and opaque IDs.
 - `harness/events.py`: Codex/Claude payload projection into `harness.hook-event/v1`.
 - `harness/safe_io.py`: bounded JSON/JSONL, rotation, atomic replacement, and
@@ -211,8 +214,9 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
   discovery plus source-bound, concurrency-safe, count-bounded native-manual-
   Skill reminder markers.
 - `harness/fixtures/`, `harness/tests/`: replay/conformance fixtures plus
-  stdlib-only disposable-Git tests for session events and the Codex Direct
-  state/lease/guard/recovery/acceptance/commit boundary.
+  stdlib-only disposable-Git tests for session events and both Direct adapters'
+  state/lease/guard/recovery/acceptance/commit boundary. The shared Direct
+  conformance fixture drives the same public lifecycle for Codex and Claude.
 - `docs/agent-memory/agent-communication.md`: three-mode execution/handoff/report protocol.
 - `docs/agent-memory/executions/`: unified execution and acceptance reports.
 - `docs/agent-memory/handoffs/`: durable Codex-to-Claude handoffs, Claude reports, and task-ticket-backed handoff artifacts.

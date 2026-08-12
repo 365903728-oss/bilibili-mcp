@@ -1674,3 +1674,53 @@
   candidate. No push, PR,
   Issue close, tag, release, publish, credential/SSH action, history rewrite,
   or broad deletion is authorized or performed.
+
+## 2026-08-12 Harness v2 Issue #31
+
+- Scope: isolated branch `codex/harness-v2-claude-direct-31` at exact parent
+  `cbd31b952aa9f820005e60852bcd2d4db886a31c`; shared Claude Direct entrypoint,
+  adapter-specific typed schemas/ownership, cross-adapter mode fencing,
+  source-bound writer collision checks, native manual-Skill gate, shared guards,
+  finite repair/Recovery Bundle, exact automatic local commit, executable
+  conformance fixture, and synchronized project memory. Product `src/`, package
+  metadata/dependencies/workflows, external configuration, and remote GitHub
+  state are excluded.
+- TDD/result: initial failures proved the missing public Claude command, a
+  cross-adapter control seam, malformed `/$implement` reminder, mismatched
+  reminder rollback identity, and static-only conformance. Review then added a
+  credential-free child-process environment regression. Final Harness discovery
+  ran 105 tests in 339.095 seconds with `OK (skipped=1)`; focused Claude module
+  passed 11/11 after the repair. Legacy Hook safety passes 6/6, Stop summary
+  passes 8/8, compileall and example contract validation pass.
+- Product/package: exact-lockfile install enabled the initially dependency-empty
+  worktree; build passes and full Vitest passes 41 files / 862 tests. Production
+  audit reports zero vulnerabilities. Package dry run reports 185 files,
+  1,088,657 packed bytes, 1,718,671 unpacked bytes, required dist entrypoints,
+  zero forbidden Harness/rules/adapter/project-memory paths, and no tarball.
+- Real Claude pilot: real Claude Code 2.1.212 attempt 2 completed the public
+  Claude Direct loop in ignored zero-remote repository
+  `github-31-claude-direct-real-v1`, advancing seed `c4844708…` to the single
+  accepted commit `d4875bfe…`. It changed only `harness-only.txt`, finished
+  clean with a released Claude lease, recorded two passing evidence records and
+  one passing criterion, used zero repairs, and emitted no Recovery Bundle.
+  Attempt 1 failed before Harness start on malformed strict MCP configuration
+  and created no run or diff.
+- Security/text: all 19 candidate files pass strict UTF-8/BOM and added-U+FFFD
+  checks, the scoped high-confidence added-content scan has zero findings, and
+  `git diff --check` passes. New subprocess tests allowlist only platform/process
+  location keys, disable global/system Git config and credential prompts, and
+  prove synthetic Bilibili/npm/GitHub credential keys cannot enter children.
+- Diagnostics/isolation: `harness doctor` remains the expected
+  `action-required`, with tracked/primary/user Codex Hook counts 4/5/0 and
+  tracked/local Claude counts 5/0. App-created untracked `.codex/config.toml`
+  remains unchanged and outside the commit. Dirty primary checkout
+  `C:\Users\ZX\bilibili-mcp` still matches #30 exactly: HEAD `ab4dd028…`,
+  status 68 / `34ef9dee…`, tracked diff `c9a4daa3…`, untracked 44 /
+  `2ec8b5fa…`, and staged 0.
+- Review/acceptance: fixed-base Standards and Spec follow-ups and the final
+  independent risk reconciliation return PASS with no remaining P0-P3. Frozen
+  controller/test SHA-256 values are `a40b65da…` / `595bd286…`. The single
+  focused commit containing this record exists only after exact staged-scope
+  reinspection; before then these results describe the accepted candidate. No
+  push, PR, Issue close, tag, release, publish, credential/SSH action, history
+  rewrite, or broad deletion is authorized or performed.

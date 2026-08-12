@@ -254,3 +254,22 @@
 - Future behavior: Give every scan a fresh empty artifact directory, place
   stdout/stderr logs in a sibling path, and never delete or overwrite an
   existing scan merely to retry startup.
+
+## 2026-08-11
+
+- Lesson: A shared state machine still needs the invoked adapter as an explicit
+  transaction invariant.
+- Evidence: The first Claude Direct red test showed `codex-direct status` could
+  read a valid Claude run when validation trusted only the persisted mode.
+- Future behavior: Pass and validate `expected_mode` at the shared load boundary
+  for every read and mutation, including recovery and commit, and test at least
+  one cross-mode mutation as well as status.
+
+- Lesson: One-shot state rollback must derive identity through the same helper
+  as creation.
+- Evidence: Source-scoped manual-Skill markers were created with
+  `source:<digest>` but unstable-start rollback originally recomputed the marker
+  from task ID, consuming a reminder the user never received.
+- Future behavior: Centralize durable identity derivation and leave a red/green
+  rollback test whenever lock or persistence code can fail after a one-shot
+  effect.

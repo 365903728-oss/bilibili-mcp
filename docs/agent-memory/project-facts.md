@@ -503,3 +503,27 @@
 - Impact: Recovery and acceptance remain auditable without copying private
   checkout paths, command text, prompts, output, or credential-bearing values
   into `.harness/runtime/`.
+
+- Fact: Harness v2 Issue #31 adds the executable `claude-direct` accepted-ticket
+  loop as a mode-fenced entrypoint to the same controller used by Codex Direct.
+- Evidence: the shared two-adapter lifecycle conformance fixture, Claude process
+  tests for mode/owner/manual-host tampering, cross-adapter status and mutation
+  rejection, mixed-writer collision, authority guards, repeated-failure and
+  adapter-failure recovery, and exact one-commit/no-remote acceptance.
+- Impact: Claude Code can now plan, hold the sole Claude writer lease, write,
+  verify, review, judge criteria, accept, and create the exact local ticket
+  commit without Paseo or Codex fallback. Public commands must match the frozen
+  mode; the constitutional remote/credential/delete/history gates are unchanged.
+
+- Fact: A real Claude Code 2.1.212 session completed the bounded Claude Direct
+  path in a disposable Harness-only repository.
+- Evidence: ignored pilot base `c4844708eebdaf4339feb26c0f91877a66321367`,
+  accepted commit `d4875bfe6b21e2e460d7fad2ebb59e3165a32c1e`,
+  only path `harness-only.txt`, exact released Claude lease, two passing evidence
+  records, one passing criterion, clean tree, and zero remotes. The first CLI
+  attempt failed before start because its empty MCP JSON lacked the required
+  `mcpServers` object; the corrected strict-empty configuration succeeded.
+- Impact: The actual host path is proven without modifying product source, the
+  implementation worktree, global settings, external Hooks, or remote state.
+  The pilot required no manual Skill and therefore is not evidence of native
+  `/implement`; that one-reminder/zero-write behavior is independently tested.

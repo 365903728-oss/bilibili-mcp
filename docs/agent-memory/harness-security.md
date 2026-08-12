@@ -207,6 +207,37 @@ Use this checklist before accepting changes to harness surfaces.
   is parsed or persisted, and no test or pilot performs push, PR, tag, release,
   publish, credential/SSH access, broad deletion, or history rewrite.
 
+## 2026-08-11 Claude Direct Validation
+
+- Claude Direct reuses the protected #30 controller. Persisted mode and run
+  schema must agree, and every public load/mutation receives the invoked
+  `expected_mode`; a `codex-direct` command cannot inspect, advance, recover,
+  accept, or commit a `claude-direct` run. Python compatibility entrypoints
+  default to Codex mode rather than silently accepting either adapter.
+- Repository-wide writer discovery recognizes both Direct run schemas under
+  the same bounded sibling-worktree scan and repository mutex. A Codex and a
+  Claude contract with different task IDs but the same source cannot acquire
+  simultaneous writers.
+- Claude native manual-Skill reminders use `/skill`, stay source-bound and
+  adapter-bound, emit once, and create no task run or repository diff. Start
+  rollback now deletes the marker with the same source identity used at
+  creation, so an unstable repository lock cannot consume an unseen reminder.
+- Ordinary scoped read/edit/build/test guards remain prompt-free; unowned edits,
+  pre-acceptance commit, broad deletion, history rewrite, credentials/SSH, and
+  remote/release actions retain the same deterministic stop or user-authority
+  outcome. Repair fingerprints and Recovery Bundles retain Claude mode and the
+  active Claude lease and never name a fallback.
+- The real pilot used an ignored disposable repository with zero remotes,
+  project-only settings, strict empty MCP configuration, bypass permissions,
+  no persisted session, no model/provider/fallback flag, and no required
+  manual Skill. Its only accepted path was `harness-only.txt`; one local commit
+  was created and the remote list remained empty. The raw stream transcript and
+  runtime ledger remain ignored validation evidence and are not formal memory.
+- The primary checkout and external/user Hook configuration were not modified.
+  `harness doctor` continues to expose the primary legacy Codex Hook overlap as
+  `action-required`; the runtime-created untracked `.codex/config.toml` in the
+  implementation worktree is excluded from the ticket and commit.
+
 ## Incident Response
 
 If a harness change exposes a secret, executes unexpected external code, breaks hooks, corrupts memory, or causes an agent to follow untrusted external instructions:

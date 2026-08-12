@@ -26,7 +26,7 @@ Claude's separate `PostToolUse` and `PostToolUseFailure` events project into the
 same canonical tool-completion event without treating ordinary response
 `message` fields as failures.
 
-## Codex Direct
+## Direct accepted-ticket loops
 
 An executable contract adds `execution.branch` plus a typed `plan` containing
 owned paths, acceptance criteria, verification commands, repair limits, and
@@ -42,6 +42,18 @@ python -m harness codex-direct judge --task github-30 ...
 python -m harness codex-direct accept --task github-30
 python -m harness codex-direct status --task github-30
 ```
+
+Claude Direct uses the same commands and state machine with a Claude-owned
+contract and the `claude-direct` prefix, for example:
+
+```text
+python -m harness claude-direct start .harness/tasks/github-31/contract.json
+python -m harness claude-direct guard --task github-31 --action edit --path harness/codex_direct.py
+python -m harness claude-direct status --task github-31
+```
+
+The command prefix must match the frozen mode; one direct adapter cannot inspect
+or mutate the other adapter's run.
 
 `repair` stops at the ticket limit or on a repeated failure fingerprint with
 no new diff/evidence. `recover` writes a metadata-only Recovery Bundle and
@@ -74,3 +86,5 @@ python .codex/scripts/test_stop_summary.py
 
 The replay fixtures deliberately contain synthetic secret-like values. Tests
 must prove those raw values never enter normalized events or ledgers.
+`direct-adapter-conformance.json` freezes the mode, writer, acceptance owner,
+manual Skill invocation, and run/control schemas shared by both direct adapters.
