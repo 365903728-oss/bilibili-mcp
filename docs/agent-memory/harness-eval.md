@@ -432,6 +432,40 @@ Candidate metrics:
 - product-source files changed: 0
 - remote operations performed: 0
 
+### 2026-08-13 Harness Eval: Harness v2 Issue #33 typed memory
+
+- Intended outcome: turn explicitly typed, accepted evidence into durable
+  idempotent memory and bounded current startup context without granting Hooks,
+  reports, or model inference authority.
+- Keep: one stdlib-only shared projector; exact accepted-source digest binding;
+  stable content IDs; bounded provenance; explicit promotion thresholds;
+  temporal current-fact supersession; fail-closed equal-time conflicts; atomic
+  store/projection writes; metadata-only audit; deterministic capability builds;
+  and a separate memory-only accepted task.
+- Change: future accepted tasks that need memory should produce the typed
+  envelope and record its digest during normal verification. Do not scrape
+  legacy Markdown or append-only runtime logs, and do not add adapter-specific
+  projector logic.
+- Remove: no automatic Hook promotion, free-form model-to-memory path, oldest-
+  line startup loading, duplicate Codex/Claude policy text, or memory-triggered
+  mutation of governance/evaluation surfaces was added.
+- Residual: existing legacy Markdown remains human-maintained history until
+  explicit accepted evidence projects a typed record; the primary legacy Codex
+  Hook overlap remains `doctor=action-required` and outside this ticket.
+
+Candidate metrics:
+
+- focused typed-memory tests: 33
+- exhaustive Harness discovery: 211 in 873.324s (1 platform-permission skip)
+- legacy Hook compatibility tests: 14
+- product tests: 862
+- package entries / forbidden Harness entries: 185 / 0
+- accepted pilot tasks / memory-only commits / remotes: 2 / 1 / 0
+- pilot replay no-change audit outcomes: 1
+- implementation-client handoffs / repairs / user interventions: 0 / 0 / 0
+- product-source files changed: 0
+- remote operations performed: 0
+
 ### 2026-08-12 Harness Eval: Harness v2 Issue #32 Paseo Collaboration loop
 
 - The collaboration adapter reuses the shared #30/#31 controller for

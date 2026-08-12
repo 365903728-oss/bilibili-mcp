@@ -1909,3 +1909,54 @@ Six release blockers fixed; one regression proof per root cause (new tests
   - npm gates, `npm pack --dry-run`, and the real Paseo pilot remain
     Codex-owned and were not run.
   - All changes remain uncommitted for Codex acceptance review.
+
+## 2026-08-13 Issue #33 Typed Memory Verification
+
+- Baseline: clean independent worktree at exact accepted #32 commit
+  `9cbb8de64ffedefd682517e203841dd137b75662`; its direct parent is accepted #31
+  commit `5e9de4bace35a2ca4b9c83b5a0d81ebb627df6fb`. Branch is
+  `codex/harness-v2-typed-memory-33`.
+- Live scope: GitHub #33 is open with title `[Harness v2] Automatic typed
+  memory from accepted evidence`; live dependency metadata still names open
+  #30, while the accepted implementation chain through #32 satisfies the
+  ticket's specified commit baseline. No live Issue or remote state changed.
+- Doctor: `action-required` only for the known primary legacy Codex Hook
+  overlap. No primary/user Hook, Skill, Agent, MCP, or configuration rewrite
+  was performed.
+- TDD: focused typed-memory tests progressed from missing-module/schema failures
+  to 33/33 pass in 69.134s. Coverage includes record shape, replay/no-change,
+  semantic digest binding, supersession and equal-time conflict, correction and
+  independent-task lesson thresholds, weak evidence, secret/raw payload
+  rejection, six record types, invalid dates/writers, tamper checks, bounded
+  startup, deterministic capability builds, and the real memory-only pilot.
+- Shared Harness modules: Codex Direct 61/61 in 427.367s (one platform-
+  permission skip), Claude Direct 12/12 in 84.850s, Paseo collaboration 73/73 in
+  263.526s, and CLI/contracts/events core 32/32. Final unified discovery passed
+  211 tests in 873.324s with one skip.
+- Legacy compatibility: Hook safety 6/6 and Stop-summary 8/8 passed. Python
+  compileall passed.
+- Product isolation: exact-lockfile `npm ci` was required because this fresh
+  worktree had no dependencies; it changed no package metadata. TypeScript
+  build passed and full Vitest passed 41 files / 862 tests in 11.61s.
+- Package/security: production audit reports zero vulnerabilities across 97
+  production dependencies. Dry-run pack is version 1.11.4 with 185 files,
+  1,088,657 packed bytes, and zero Harness, `.harness`, agent-memory, RULES,
+  AGENTS, or CLAUDE entries. `package.json` and `package-lock.json` are
+  unchanged.
+- Real process-boundary pilot: disposable zero-remote source task commit
+  `62caea4d73e0f88d81803ecd6abc70aae9faed54`, followed by exactly one
+  memory-only commit `a3e6fcabdd36849f46a738592a24d815b64d337b`. Its two paths were exactly the
+  typed store and current projection; replay was no-change, audit line count was
+  two, final status was clean, and no remote existed.
+- Independent risk review: PASS with no remaining P0-P2. Review-driven red/green
+  repairs cover A→B→A facts, different-time lesson support, secret/raw key and
+  command variants, exact Direct memory-only writer locking, source/target
+  identity, projection/store/HEAD binding, node bounds, future validity, and
+  isolated pilot environment.
+- Frozen candidate gates: 23 paths, all under `harness/` or
+  `docs/agent-memory/`; strict UTF-8 passed; the index and product/package diffs
+  are empty; `git diff --check` and tracked/untracked secret scans pass.
+- Final Doctor remains the known `action-required` Hook-overlap result with
+  tracked/primary/user Codex command counts 4/5/0. Primary HEAD, tracked diff,
+  empty staged diff, untracked manifest, status digest, and count 44 exactly
+  match the recorded baseline.

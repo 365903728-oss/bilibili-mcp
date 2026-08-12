@@ -1,0 +1,14 @@
+{
+  "files": {
+    "SKILL.md": "9b40c88902f61eda7a7f67bfcc61b12d5fab8fcbc161ab736a483af74936085c",
+    "evaluation.json": "da747d17221bb8c6a72bf9e3fea578c660b78dd15ae155a8c1bdb7747a614e1f",
+    "interface.json": "8091f2acd905e070dc4d71287837bff00af6b2c2d630e09dabc9409bb0e978e6"
+  },
+  "host": "claude",
+  "name": "bilibili-mcp-memory",
+  "owner": "bilibili-mcp maintainers",
+  "schema": "harness.capability-manifest/v1",
+  "source": "canonical.json",
+  "source_digest": "0dd39c40c8d0d13f798f81623da4efa16b14f6873850e14cf0348ec72f503a99",
+  "version": "1.0.0"
+}

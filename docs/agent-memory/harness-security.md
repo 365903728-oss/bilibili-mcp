@@ -330,6 +330,46 @@ Use this checklist before accepting changes to harness surfaces.
   negative-path hardening covered by current public-process tests rather than
   falsely described as hash-identical pilot code.
 
+## 2026-08-13 Typed Memory Boundary
+
+- The typed-memory projector accepts only a bounded exact-key envelope. It
+  requires a known Codex/Claude writer, accepted state, final commit SHA,
+  accepted diff, passing current checks, and exact semantic digest membership.
+  Validation happens again when an existing store or startup projection is
+  loaded; malformed, oversized, linked, tampered, or internally inconsistent
+  state fails closed.
+- Forbidden keys and content cover secrets, credentials, tokens, Cookies,
+  private keys, authentication headers, environment assignments/dumps, raw
+  commands, stdout/stderr, prompts, multiline/control payloads, and common
+  high-confidence token forms. Unsafe candidates are rejected before either
+  tracked output is written; proposed/deferred records never enter current
+  startup context.
+- Record/provenance counts, string bytes, store bytes, projection bytes, and
+  startup record count are bounded. Tracked writes use atomic replacement and
+  exact read-back; change and no-change outcomes write only digests/counts to an
+  ignored bounded audit ledger.
+- Runtime output is allowlisted to `typed-memory.json`, `current-memory.json`,
+  and ignored audit state. It cannot modify Skills, Agents, MCP/product code,
+  package metadata, shared CLI/controller/Hook/Loop/kernel files, capability
+  packages, or `harness-eval.md`. The canonical capability compiler is a
+  developer command covered by byte-for-byte tests, not a projector side
+  effect.
+- Projection holds the target task's run lock while checking an executing or
+  repairing `codex-direct`/`claude-direct` writer and the exact two memory-owned
+  paths. Collaboration and broad-path tasks cannot use the write seam. Startup
+  trusts only a clean, tracked Git HEAD pair whose projection digest matches the
+  fully revalidated typed store; dirty, untracked, ignored, deleted, linked, or
+  forged-in-place pairs fail closed. Git's committed repository state is the
+  durable cross-session trust root because ignored run state is intentionally
+  not portable.
+- Candidate validity cannot begin more than five minutes in the future, so a
+  distant timestamp cannot supersede the current fact early. Equal-time
+  conflicts still fail closed.
+- The real pilot used a disposable repository, local identity only, zero
+  remotes, no credential/SSH access, and exactly one memory-only commit after
+  the accepted source commit. The product TypeScript runtime and npm package
+  boundary remained unchanged.
+
 ## Incident Response
 
 If a harness change exposes a secret, executes unexpected external code, breaks hooks, corrupts memory, or causes an agent to follow untrusted external instructions:

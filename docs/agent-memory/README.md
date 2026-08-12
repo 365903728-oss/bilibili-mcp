@@ -22,6 +22,11 @@ entries into this directory.
 - `executions/`: unified execution and acceptance reports for all three adapters.
 - `handoffs/`: collaboration-only Codex/Paseo/Claude handoffs and reports.
 - `pending-learning-proposals.md`: legacy v1 generated proposal queue; not formal memory.
+- `typed-memory.json`: generated durable typed records. It is absent until the
+  first accepted evidence envelope changes memory and must never be hand-edited.
+- `current-memory.json`: generated bounded current startup projection. It is
+  absent until the first accepted projection and is the only typed startup
+  context source.
 
 ## Update When
 
@@ -59,14 +64,20 @@ Keep entries concise and evidence-backed.
 ## Memory Projection Status
 
 Runtime events remain non-authoritative. During Harness v2 ticket #29 they are
-not automatically promoted. Verified durable facts, decisions, lessons, and
-navigation changes may be written by the task's acceptance owner as scoped
-artifacts.
+not automatically promoted. Harness v2 ticket #33 adds a separate accepted-
+task projector: a source task first records the canonical digest of a bounded
+`harness.memory-evidence/v1` envelope, reaches accepted-and-committed state,
+and only then may a memory-only task project it.
 
-Ticket #33 will replace the legacy proposal-only path with typed,
-acceptance-owned projection, supersession, deduplication, and automatic
-rejection of unsafe or unverified candidates. That future automation does not
-give hooks or raw observations instruction authority.
+Use `python -m harness memory digest`, `memory project`, and `memory startup`
+through the shared CLI. The projector owns only `typed-memory.json`,
+`current-memory.json`, and ignored metadata-only audit state. Replay is
+idempotent, current facts supersede older values, general lessons require an
+explicit user correction or support from two independent accepted task IDs,
+and proposed/deferred records never enter startup context. Unsafe operational
+payloads and secrets are rejected rather than stored or projected. Hooks, raw
+observations, free-form reports, and the legacy proposal file remain outside
+this authority path.
 
 The active-work pointer is `docs/agent-memory/active-work.md`. GitHub Issues are
 the planning source.

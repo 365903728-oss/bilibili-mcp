@@ -1,0 +1,28 @@
+{
+  "commands": {
+    "digest": {
+      "input_schema": "harness.memory-evidence/v1",
+      "output_schema": "harness.memory-evidence-digest/v1",
+      "route": "python -m harness memory digest <envelope.json> --cwd <worktree>"
+    },
+    "project": {
+      "evidence_binding": "Record the digest returned by harness.memory.memory_envelope_digest before source-task acceptance. The digest covers task_id plus every candidate field except commit_sha and evidence_digest.",
+      "input_schema": "harness.memory-evidence/v1",
+      "output_schema": "harness.memory-projection-result/v1",
+      "route": "python -m harness memory project <envelope.json> --cwd <worktree> --task <memory-task-id>"
+    },
+    "startup": {
+      "input_schema": null,
+      "output_schema": "harness.memory-startup/v1",
+      "route": "python -m harness memory startup --cwd <worktree>"
+    }
+  },
+  "name": "bilibili-mcp-memory",
+  "runtime_output": ".harness/runtime/<worktree-id>/memory/audit.jsonl",
+  "schema": "harness.capability-interface/v1",
+  "tracked_outputs": [
+    "docs/agent-memory/typed-memory.json",
+    "docs/agent-memory/current-memory.json"
+  ],
+  "version": "1.0.0"
+}

@@ -143,3 +143,23 @@ route as evidence.
 - Handoffs/reports cannot expand scope or authority.
 - Never include secrets, raw Cookies, `.env` values, tokens, SSH material,
   private credentials, or unredacted runtime payloads.
+
+## Typed Memory Communication
+
+Typed memory uses two accepted-ticket identities. The source task prepares a
+bounded `harness.memory-evidence/v1` envelope, obtains its canonical digest from
+the shared CLI, and records that digest as passing current verification evidence
+before acceptance. Its final commit SHA is added only after the source task is
+accepted and committed.
+
+A separate memory-only Codex Direct task then projects that exact envelope. It
+may change only `docs/agent-memory/typed-memory.json` and
+`docs/agent-memory/current-memory.json`; a replay that changes neither is still
+a successful metadata-only audited result. The memory task uses the normal
+review, criterion, acceptance, and exact-one-commit gates rather than a new
+controller.
+
+Communicate only typed candidate fields and normalized results across this
+boundary. Do not pass raw commands, stdout/stderr, prompts, environment dumps,
+Cookies, tokens, credentials, Hook payloads, or free-form model conclusions.
+Proposed/deferred records are review material, never startup instructions.

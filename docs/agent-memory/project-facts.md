@@ -574,3 +574,47 @@
 - Impact: Tests are portable across machines with different Git installations.
   The command-scoped PATH pattern isolates Git resolution to the test command
   without mutating global process state.
+
+## 2026-08-13
+
+- Fact: Harness v2 Issue #33 adds a typed-memory projector at
+  `harness/memory.py` without changing the accepted #30/#31/#32 execution
+  controllers.
+- Evidence: The projector reads the shared strict Direct status seam, requires
+  an accepted-and-committed source task plus a passing current evidence entry
+  whose digest equals the canonical semantic envelope digest, and owns only
+  the typed store, bounded current projection, and ignored audit ledger.
+- Impact: Hooks, free-form reports, model inference, and old append-only lines
+  cannot silently become authoritative project memory.
+
+- Fact: Every durable typed record has a stable content identity, source and
+  provenance, validation state, sensitivity class, validity fields and/or a
+  supersession link, and an evidence digest.
+- Evidence: Replay, content-binding, tamper, semantic-date, supersession,
+  same-time-conflict, promotion-threshold, weak-evidence, secret/raw-payload,
+  and bounded-startup tests pass. Current startup loads only accepted current
+  records from `current-memory.json`.
+- Impact: Replaying accepted evidence creates neither duplicate records nor a
+  duplicate projection; conflicting current facts are deterministically
+  superseded or rejected when ordering is ambiguous.
+
+- Fact: The repository now has one canonical `bilibili-mcp-memory` capability
+  source and deterministic thin Codex/Claude packages at version `1.0.0`.
+- Evidence: The capability test recompiles both host packages byte-for-byte and
+  verifies their interface, evaluation metadata, and manifest hashes. No
+  externally installed capability copy is a projector output or was rewritten.
+- Impact: Both hosts route through the same shared CLI and memory contract
+  without duplicating projection policy in Skill prose.
+
+- Fact: The real Issue #33 pilot used two accepted Codex Direct tasks in a
+  disposable repository with no remote: a source commit
+  `62caea4d73e0f88d81803ecd6abc70aae9faed54`, followed by memory-only commit
+  `a3e6fcabdd36849f46a738592a24d815b64d337b`.
+- Evidence: The second commit changed exactly
+  `docs/agent-memory/current-memory.json` and
+  `docs/agent-memory/typed-memory.json`; replay returned no change, two audit
+  outcomes were retained, final Git status was clean, and remote output was
+  empty.
+- Impact: Automatic projection is proven through the accepted-ticket process
+  boundary without product credentials, SSH, remote writes, or controller
+  changes.

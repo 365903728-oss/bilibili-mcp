@@ -206,6 +206,13 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
   and progress, writes Recovery Bundles, accepts the exact owned snapshot, and
   creates one hermetic, idempotent `commit-tree`/`update-ref` post-acceptance
   local commit.
+- `harness/memory.py`: host-neutral Issue #33 typed-memory boundary. It validates
+  bounded evidence envelopes, binds their semantic digest to a passing current
+  check on an accepted-and-committed Direct run, applies promotion and current-
+  fact supersession rules, rejects unsafe payloads and tampered state, writes
+  the deterministic typed store/current projection atomically, and records
+  metadata-only no-change/change audit outcomes. Startup reads only the bounded
+  current projection.
 - `harness/context.py`: dynamic Git repository/worktree attribution and opaque IDs.
 - `harness/events.py`: Codex/Claude payload projection into `harness.hook-event/v1`.
 - `harness/safe_io.py`: bounded JSON/JSONL, rotation, atomic replacement, and
@@ -250,6 +257,13 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
 - `harness/capabilities.py`: provider/model-neutral adapter, Skill, and agent
   discovery plus source-bound, concurrency-safe, count-bounded native-manual-
   Skill reminder markers.
+- `harness/capability-packages/bilibili-mcp-memory/canonical.json`: canonical
+  versioned capability source. The adjacent `codex/` and `claude/` packages are
+  deterministic thin builds with matching interface/evaluation metadata and
+  host-specific manifest hashes; the runtime projector never rewrites them.
+- `harness/tests/test_memory.py`: typed contract, promotion, replay,
+  redaction/rejection, supersession, tamper, bounded startup, capability build,
+  and real disposable zero-remote Codex Direct memory-only pilot coverage.
 - `harness/fixtures/`, `harness/tests/`: replay/conformance fixtures plus
   stdlib-only disposable-Git tests for session events, both Direct adapters'
   state/lease/guard/recovery/acceptance/commit boundary, and the

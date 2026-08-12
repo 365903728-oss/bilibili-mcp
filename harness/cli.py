@@ -33,6 +33,12 @@ from harness.codex_direct import (
 from harness.context import WorktreeError, discover_worktree
 from harness.contracts import ContractError, validate_task_contract
 from harness.events import ADAPTERS, HOOK_EVENTS, normalize_hook_event, persist_hook_event
+from harness.memory import (
+    MAX_ENVELOPE_BYTES,
+    memory_envelope_digest,
+    project_memory,
+    startup_memory,
+)
 from harness.paseo_collaboration import (
     COLLAB_GUARD_ACTIONS,
     PaseoCollaborationError,
@@ -179,6 +185,20 @@ def _build_parser() -> argparse.ArgumentParser:
     check.add_argument("--host", choices=("codex", "claude"))
     check.add_argument("--skill", required=True)
     check.add_argument("--invoked", action="store_true")
+
+    memory = subcommands.add_parser(
+        "memory", help="project accepted typed evidence and load bounded current memory"
+    )
+    memory_sub = memory.add_subparsers(dest="memory_command", required=True)
+    project = memory_sub.add_parser("project")
+    project.add_argument("path", type=Path)
+    project.add_argument("--cwd", type=Path, default=Path.cwd())
+    project.add_argument("--task", required=True)
+    digest = memory_sub.add_parser("digest")
+    digest.add_argument("path", type=Path)
+    digest.add_argument("--cwd", type=Path, default=Path.cwd())
+    startup = memory_sub.add_parser("startup")
+    startup.add_argument("--cwd", type=Path, default=Path.cwd())
 
     _add_direct_parser(subcommands, "codex-direct", "Codex Direct")
     _add_direct_parser(subcommands, "claude-direct", "Claude Direct")
@@ -346,6 +366,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             _print_json(result)
             return 0 if result["status"] == "invoked" else 3
+
+        if args.command == "memory":
+            context = discover_worktree(args.cwd)
+            if args.memory_command == "project":
+                result = project_memory(
+                    context,
+                    _load_json_file(args.path, MAX_ENVELOPE_BYTES),
+                    target_task_id=args.task,
+                )
+            elif args.memory_command == "digest":
+                result = {
+                    "schema": "harness.memory-evidence-digest/v1",
+                    "evidence_digest": memory_envelope_digest(
+                        _load_json_file(args.path, MAX_ENVELOPE_BYTES)
+                    ),
+                }
+            else:
+                result = startup_memory(context)
+            _print_json(result)
+            return 0
 
         if args.command in {"codex-direct", "claude-direct"}:
             context = discover_worktree(args.cwd)

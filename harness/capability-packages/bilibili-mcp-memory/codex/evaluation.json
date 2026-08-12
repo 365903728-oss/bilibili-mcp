@@ -1,0 +1,18 @@
+{
+  "interface_version": "1.0.0",
+  "name": "bilibili-mcp-memory",
+  "required_cases": [
+    "accepted-source",
+    "replay-idempotence",
+    "supersession",
+    "independent-task-promotion",
+    "weak-evidence-deferral",
+    "secret-rejection",
+    "bounded-startup",
+    "memory-only-pilot"
+  ],
+  "review_cadence": "on interface or projector contract change",
+  "rollback_boundary": "remove or regenerate host packages from canonical.json; never rewrite durable records during rollback",
+  "schema": "harness.capability-evaluation/v1",
+  "suite": "python -m unittest harness.tests.test_memory"
+}

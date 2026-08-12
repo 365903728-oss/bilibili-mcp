@@ -1,0 +1,63 @@
+{
+  "schema": "harness.memory-capability-source/v1",
+  "name": "bilibili-mcp-memory",
+  "version": "1.0.0",
+  "owner": "bilibili-mcp maintainers",
+  "description": "Route accepted evidence through the repository typed-memory projector and load only bounded current memory.",
+  "skill_body": [
+    "Resolve the active bilibili-mcp worktree before every operation.",
+    "Project only a harness.memory-evidence/v1 envelope whose task is already accepted and committed.",
+    "Before source-task acceptance, use `python -m harness memory digest <envelope.json> --cwd <worktree>` and record that exact digest as passing verification evidence.",
+    "Start a Direct memory-only task whose active writer owns both memory JSON paths, then use `python -m harness memory project <envelope.json> --cwd <worktree> --task <memory-task-id>`; do not hand-edit the typed store or current projection.",
+    "At session startup use `python -m harness memory startup --cwd <worktree>` and consume only its bounded records.",
+    "Treat proposed and deferred records as non-authoritative, and never route commands, output, prompts, Cookies, tokens, credentials, environment dumps, or secrets into memory.",
+    "The projector may write only docs/agent-memory/typed-memory.json, docs/agent-memory/current-memory.json, and ignored metadata-only audit state.",
+    "Do not use memory processing to modify Skills, Agents, MCP, product or Harness CLI behavior, Hooks, execution Loops, repository rules, or harness-eval.md."
+  ],
+  "interface": {
+    "schema": "harness.capability-interface/v1",
+    "name": "bilibili-mcp-memory",
+    "version": "1.0.0",
+    "commands": {
+      "digest": {
+        "route": "python -m harness memory digest <envelope.json> --cwd <worktree>",
+        "input_schema": "harness.memory-evidence/v1",
+        "output_schema": "harness.memory-evidence-digest/v1"
+      },
+      "project": {
+        "route": "python -m harness memory project <envelope.json> --cwd <worktree> --task <memory-task-id>",
+        "input_schema": "harness.memory-evidence/v1",
+        "output_schema": "harness.memory-projection-result/v1",
+        "evidence_binding": "Record the digest returned by harness.memory.memory_envelope_digest before source-task acceptance. The digest covers task_id plus every candidate field except commit_sha and evidence_digest."
+      },
+      "startup": {
+        "route": "python -m harness memory startup --cwd <worktree>",
+        "input_schema": null,
+        "output_schema": "harness.memory-startup/v1"
+      }
+    },
+    "tracked_outputs": [
+      "docs/agent-memory/typed-memory.json",
+      "docs/agent-memory/current-memory.json"
+    ],
+    "runtime_output": ".harness/runtime/<worktree-id>/memory/audit.jsonl"
+  },
+  "evaluation": {
+    "schema": "harness.capability-evaluation/v1",
+    "name": "bilibili-mcp-memory",
+    "interface_version": "1.0.0",
+    "suite": "python -m unittest harness.tests.test_memory",
+    "required_cases": [
+      "accepted-source",
+      "replay-idempotence",
+      "supersession",
+      "independent-task-promotion",
+      "weak-evidence-deferral",
+      "secret-rejection",
+      "bounded-startup",
+      "memory-only-pilot"
+    ],
+    "review_cadence": "on interface or projector contract change",
+    "rollback_boundary": "remove or regenerate host packages from canonical.json; never rewrite durable records during rollback"
+  }
+}

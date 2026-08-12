@@ -354,3 +354,32 @@
 - Future behavior: For any file-backed external send, persist only bounded
   metadata, clean the content file unconditionally, and treat ambiguous sends
   as recovery rather than automatic retry.
+
+## 2026-08-13
+
+- Lesson: Acceptance metadata proves a task passed; it does not supply the
+  semantic memory candidate.
+- Evidence: The shared Direct run stores current digests, statuses, criteria,
+  risks, accepted paths, and commit identity, but deliberately stores no fact
+  text or raw command output. Issue #33 therefore added a bounded typed envelope
+  whose semantic digest must already be present in passing accepted evidence.
+- Future behavior: Never infer durable memory by scraping execution reports,
+  Hook ledgers, stdout/stderr, or adapter sidecars. Require an exact typed
+  candidate and an accepted digest binding.
+
+- Lesson: Repetition inside one task is deduplication evidence, not independent
+  support for a general process lesson.
+- Evidence: Replaying or duplicating a process observation under one task ID
+  leaves the lesson proposed; the same lesson becomes accepted only after a
+  second independently accepted task ID, unless the source is an explicit user
+  correction.
+- Future behavior: Count distinct accepted tasks at promotion boundaries and
+  preserve all bounded provenance without inflating support counts.
+
+- Lesson: Determinism must fail closed when evidence cannot order two current
+  truths.
+- Evidence: A newer `valid_from` supersedes the old current fact; two different
+  values at the same timestamp are rejected instead of being ordered by hash or
+  replay sequence.
+- Future behavior: Require meaningful temporal precedence for supersession;
+  never turn an implementation tie-breaker into factual authority.

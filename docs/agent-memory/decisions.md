@@ -590,3 +590,41 @@
 - Evidence: Claude Code 2.1.212 attempt 2, accepted pilot commit
   `d4875bfe6b21e2e460d7fad2ebb59e3165a32c1e`, zero remotes, the redacted run
   ledger, and one-reminder/zero-write Claude manual-Skill regressions.
+
+## 2026-08-13
+
+- Decision: Project typed memory after source-task acceptance through a separate
+  memory-only Codex Direct task, not from Hooks and not inside the acceptance or
+  commit controller.
+- Reason: Acceptance freezes the reviewed diff and immediately creates the
+  exact commit. Writing memory inside that transaction would invalidate its
+  evidence/snapshot semantics, while Hook observations and Markdown reports do
+  not contain a trustworthy typed candidate contract.
+- Evidence: The Issue #33 pilot accepted a source task first, then used the
+  unchanged shared #30 controller to accept exactly one memory-owned commit.
+
+- Decision: Bind an envelope's semantic candidate content to acceptance with a
+  canonical digest that excludes only the not-yet-known source commit SHA and
+  the self-referential evidence-digest fields.
+- Reason: A task must be able to record the digest before its acceptance commit
+  exists, while the later projector must still reject changed type, subject,
+  value, evidence kind, sensitivity, date, or task identity.
+- Evidence: Public `memory digest` and content-binding regressions prove that
+  post-acceptance semantic mutation is rejected even if a caller reuses the
+  previously accepted digest.
+
+- Decision: Treat equal-time conflicting current facts as invalid input rather
+  than selecting a winner by record ID or arrival order.
+- Reason: Neither content hashing nor replay order is evidence of temporal
+  precedence; choosing one would make authoritative context arbitrary.
+- Evidence: The same-validity conflict regression fails closed, while a newer
+  valid-from value supersedes the old record and removes it from startup.
+
+- Decision: Compile both host capability packages from one tracked canonical
+  source and keep the projector's runtime output allowlist separate from those
+  packages.
+- Reason: Host guidance must remain synchronized without granting memory data
+  the authority to change Skills, Agents, CLI, Hooks, Loops, or evaluation.
+- Evidence: Byte-for-byte compiler tests cover Codex and Claude interface,
+  evaluation, Skill, and manifest artifacts; the projection tests allow only
+  the two memory JSON outputs plus ignored audit metadata.

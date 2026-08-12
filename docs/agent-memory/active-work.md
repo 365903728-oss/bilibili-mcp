@@ -3,69 +3,43 @@
 ## Harness v2
 
 GitHub Issue #28 is the approved Harness v2 specification. Issues #29-#36 are
-the dependency-ordered implementation tickets. Issues #29 and #30 are accepted;
-#30's accepted and pushed commit `cbd31b952aa9f820005e60852bcd2d4db886a31c`
-is the exact base for Issue #31, `Claude Direct accepted-ticket loop`. The
-focused local commit containing this record is #31's acceptance commit; before
-that commit exists in HEAD, #31 remains a final acceptance candidate. The live
-Issues remain open because no Issue-close, push, or PR authority was granted
-for this ticket.
+the dependency-ordered implementation tickets. Accepted implementation lineage
+is #30 `cbd31b952aa9f820005e60852bcd2d4db886a31c` → #31
+`5e9de4bace35a2ca4b9c83b5a0d81ebb627df6fb` → #32
+`9cbb8de64ffedefd682517e203841dd137b75662`. The live Issues remain open
+because Issue-close and remote-write authority were not granted.
 
-#31 froze `codex-direct` for the implementation worktree, the clean
-`cbd31b9…` base, branch `codex/harness-v2-claude-direct-31`, Codex's sole writer
-and acceptance ownership, and the user's native `$implement` invocation. The
-shared Direct controller now gives `claude-direct` the same typed contract,
-state, canonical writer exclusion, authority guards, diff-bound evidence,
-bounded repair, Recovery Bundle, acceptance, and exact automatic local-commit
-semantics as `codex-direct`, while rejecting cross-adapter control.
+Issue #33, `Automatic typed memory from accepted evidence`, is the current
+acceptance candidate on branch `codex/harness-v2-typed-memory-33` from the exact
+#32 commit. It adds one shared, host-neutral typed-memory projector and thin
+shared-CLI routes without changing the three accepted-ticket controllers.
+Stable records carry source/provenance, validation, sensitivity, validity or
+supersession, and an evidence digest. Replay is deterministic; current facts
+supersede older values; weak claims stay proposed/deferred; and general lessons
+need explicit correction or two independent accepted task IDs.
 
-A real Claude Code 2.1.212 session completed the full Claude Direct loop in an
-ignored zero-remote Harness-only repository, changing only `harness-only.txt`
-and creating exactly one accepted commit. Its pilot contract required no
-manual Skill; `/implement` one-reminder/zero-write behavior is proven separately
-at the public process boundary and is not claimed as native pilot evidence.
+The source task must be accepted and committed, and its passing current evidence
+must contain the canonical semantic envelope digest. Projection writes only
+`docs/agent-memory/typed-memory.json`, the bounded
+`docs/agent-memory/current-memory.json`, and ignored metadata-only audit state.
+It rejects secrets, raw operational payloads, tampered stores, ambiguous
+same-time facts, and invalid provenance. No product source, MCP surface, Hooks,
+Loop/controller, constitutional rule, installed Skill/Agent package, or
+evaluator is a projector output.
 
-Issue #32 is a Codex-accepted candidate; the focused local commit containing
-this record is its acceptance commit. The collaboration adapter
-(`harness/paseo_collaboration.py`, ~2072 lines) reuses the shared #30/#31
-controller for contracts, locking, state, guards, recovery, acceptance, and
-commit. Collaboration-specific behavior (read-only Paseo/provider preflight,
-bridge-triggered native `/implement`, one frozen writer, bounded dispatch and
-report, same-agent repair, and recovery) remains a thin public CLI seam.
+`harness/capability-packages/bilibili-mcp-memory/canonical.json` is the single
+versioned capability source. Deterministic Codex and Claude packages expose the
+same interface, manifest hashes, and evaluation metadata; installed external
+copies were not rewritten. A real disposable zero-remote Codex Direct pilot
+accepted a source task and then exactly one memory-only commit containing only
+the typed store and current projection; replay was a successful auditable
+no-change outcome.
 
-The focused collaboration module contains 73 tests. Attempt 6 passed the full
-module 71/71 before the final CLI-boundary proof was added; attempt 7 then
-passed that new public-process proof independently, and the final full Harness
-suite covered the resulting 72-test snapshot. Attempt 8 added one focused
-accepted-state authority regression; the new proof passed independently and
-with all seven guard tests. The proofs include
-trust-boundary proofs for frozen handoff/agent/diff identity, every recorded
-repair delivery, metadata-only reports, and unconditional prompt cleanup after
-failed sends. A real public-path Paseo pilot resolved the live preference
-`claude/deepseek-v4-flash`, recorded native `/implement`, changed only
-`harness-only.txt`, and advanced from seed `eb0205b…` to exactly one accepted
-local commit `291ad721…`; it finished clean with a released lease and zero
-remotes. Full Harness, legacy Hook, TypeScript, Vitest, package, secret, scope,
-and dirty-primary gates are recorded in the Issue #32 execution report.
-The user explicitly authorized a sequential writer transfer for repair attempt
-7: the original idle writer released its lease, one replacement
-`claude/deepseek-v4-pro[1m]` writer was live-inspected at thinking `max`,
-closed the last malformed-contract CLI boundary, reverified it on a max-thinking
-turn, and returned idle. The route is execution evidence only, not tracked
-governance configuration.
-The user then authorized repair attempt 8 on the same replacement writer. It
-closed the final staged-review finding by rejecting Claude `local-commit`
-before the actor-agnostic shared guard while preserving Codex's accepted-state
-commit gate. The writer returned idle, Codex reran the focused proof, and both
-original reviewers returned PASS.
-No push, PR, Issue close, tag, release, or publish was authorized or performed.
-The implementation branch remains `codex/harness-v2-paseo-claude-32` from exact
-base `5e9de4bace35a2ca4b9c83b5a0d81ebb627df6fb`.
-
-The dependency frontier advances to Issue #33 once Codex accepts #32. A new
-ticket still requires one frozen mode decision and its own native manual Skill
-evidence. The primary legacy Codex Hook overlap remains an explicit
-`doctor=action-required` rollout gate and was not rewritten.
+The final dependency frontier becomes Issue #34 after #33 acceptance. The
+known primary legacy Codex Hook overlap remains an explicit
+`doctor=action-required` rollout gate and was not rewritten. No push, PR, Issue
+close, tag, release, publish, credential/SSH use, or history rewrite is part of
+#33.
 
 The Harness target is one `RULES.md` core with `codex-direct`,
 `codex-paseo-claude`, and `claude-direct` adapters. Local commit is automatic
