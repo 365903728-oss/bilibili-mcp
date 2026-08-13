@@ -618,3 +618,36 @@
 - Impact: Automatic projection is proven through the accepted-ticket process
   boundary without product credentials, SSH, remote writes, or controller
   changes.
+
+- Fact: Harness v2 Issue #34 adds governed Skill and Agent evolution at
+  `harness/evolution.py` without changing the accepted-ticket controllers or
+  product runtime.
+- Evidence: Evolution consumes only a current accepted `capability-gap`, binds
+  its accepted-and-committed origins, and requires an independent linked
+  worktree plus an active Direct writer whose exact derived owned paths exclude
+  the fixed evaluator, holdout, product, kernel, and engine.
+- Impact: Typed memory may authorize a bounded Evolution Run but still cannot
+  itself modify capabilities, evaluate a candidate, or approve promotion.
+
+- Fact: One canonical evolution capability compiles deterministic Codex and
+  Claude Skill/Agent projections with explicit invocation, triggers,
+  interface, governance, trust, packaging, and read-only zero-child authority.
+- Evidence: Host compiler, native discovery-path/schema parser, and exact projection tests
+  cover manual/model semantics, shared interface and canonical digests, bounded
+  manifests, and extra-file/byte drift rejection.
+- Impact: Host packages cannot silently diverge or grant subagents autonomous
+  delegation or a second writer.
+
+- Fact: Controlled #34 fixtures exercise Search, Build, Reject,
+  rollback, promotion-ready, and exact-one local commit in disposable linked
+  worktrees with no remotes.
+- Evidence: The real Search candidate is pinned `antfu/skills` commit
+  `a74f281a27dadc02397bc1a174b0f2c97531b6ae`; the installed `vitest` content
+  differs and has unknown immutable provenance, so the zero-install pilot is
+  deferred. Candidate-provided machine claims cannot authorize Adapt; the safe
+  repository-local Build fixture runs without executing or installing external
+  code.
+- Impact: Search evidence can reject or defer a candidate without turning
+  external Skill prose into execution authority; the Adapt seam remains
+  fail-closed pending trusted machine evidence, and Build remains a
+  repository-local fixture.

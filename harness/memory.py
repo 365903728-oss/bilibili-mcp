@@ -12,10 +12,22 @@ import stat
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
-from harness.codex_direct import _git_bytes, _load_run, _task_dir, codex_direct_status
+from harness.codex_direct import (
+    CodexDirectError,
+    _commit_parents,
+    _commit_paths,
+    _commit_tree_snapshot,
+    _git_bytes,
+    _git_paths,
+    _load_run,
+    _snapshot_digest,
+    _task_dir,
+    _valid_snapshot,
+    codex_direct_status,
+)
 from harness.context import WorktreeContext
 from harness.safe_io import (
     append_bounded_jsonl,
@@ -163,7 +175,7 @@ FORBIDDEN_KEYS = {
     "token",
     "tokens",
 }
-FORBIDDEN_TEXT = (
+SECRET_TEXT = (
     re.compile(r"-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----", re.IGNORECASE),
     re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b"),
     re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
@@ -172,12 +184,18 @@ FORBIDDEN_TEXT = (
     re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{16,}\b"),
     re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
-    re.compile(r"(?i)\b(?:SESSDATA|bili_jct|DedeUserID|DedeUserID__ckMd5)\s*="),
+    re.compile(
+        r"(?i)\b(?:BILIBILI_)?(?:SESSDATA|BILI_JCT|DEDEUSERID|DEDEUSERID__CKMD5)"
+        r"[\"']?\s*[:=]\s*[\"']?\S+"
+    ),
     re.compile(r"(?i)\bCookie\s*[:=]"),
     re.compile(r"(?i)\bBearer\s+\S+"),
     re.compile(r"(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}\b"),
     re.compile(r"(?i)\b(?:password|passwd|token|credential|secret)\s*[:=]\s*\S+"),
     re.compile(r"(?m)^[A-Z_][A-Z0-9_]{1,63}=\S+"),
+)
+FORBIDDEN_TEXT = (
+    *SECRET_TEXT,
     re.compile(
         r"(?i)^\s*(?:\$\s*)?(?:awk|bash|cargo|cat|cd|cmake|cmd|curl|docker|"
         r"dotnet|echo|env|export|find|git|gh|go|grep|helm|java|javac|kubectl|"
@@ -210,7 +228,9 @@ def _canonical_bytes(value: Any) -> bytes:
             allow_nan=False,
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise MemoryProjectionError("memory JSON is invalid or exceeds structural limits") from exc
+        raise MemoryProjectionError(
+            "memory JSON is invalid or exceeds structural limits"
+        ) from exc
 
 
 def _pretty_bytes(value: Any, limit: int) -> bytes:
@@ -255,17 +275,17 @@ def _forbidden_subject(subject: str) -> bool:
     ):
         return True
     return any(pattern.search(subject) for pattern in FORBIDDEN_TEXT) or any(
-        _forbidden_key(part)
-        for part in re.split(r"[^A-Za-z0-9]+", separated)
-        if part
+        _forbidden_key(part) for part in re.split(r"[^A-Za-z0-9]+", separated) if part
     )
 
 
 def _validate_safe_value(value: Any, *, depth: int = 0) -> None:
     if depth > 8:
         raise MemoryProjectionError("memory value exceeds its depth limit")
-    if value is None or isinstance(value, bool) or (
-        isinstance(value, int) and not isinstance(value, bool)
+    if (
+        value is None
+        or isinstance(value, bool)
+        or (isinstance(value, int) and not isinstance(value, bool))
     ):
         return
     if isinstance(value, float):
@@ -276,9 +296,13 @@ def _validate_safe_value(value: Any, *, depth: int = 0) -> None:
         if len(value.encode("utf-8")) > MAX_VALUE_BYTES:
             raise MemoryProjectionError("memory value exceeds its byte limit")
         if "\n" in value or "\r" in value or any(ord(char) < 32 for char in value):
-            raise MemoryProjectionError("raw output or multiline text is not valid memory")
+            raise MemoryProjectionError(
+                "raw output or multiline text is not valid memory"
+            )
         if any(pattern.search(value) for pattern in FORBIDDEN_TEXT):
-            raise MemoryProjectionError("secret-like or raw operational text is not valid memory")
+            raise MemoryProjectionError(
+                "secret-like or raw operational text is not valid memory"
+            )
         return
     if isinstance(value, list):
         if len(value) > 64:
@@ -318,9 +342,11 @@ def _validate_candidate(value: Any) -> dict[str, Any]:
     )
     if candidate["type"] not in MEMORY_TYPES:
         raise MemoryProjectionError("memory candidate type is invalid")
-    if not isinstance(candidate["subject"], str) or not SUBJECT_RE.fullmatch(
-        candidate["subject"]
-    ) or _forbidden_subject(candidate["subject"]):
+    if (
+        not isinstance(candidate["subject"], str)
+        or not SUBJECT_RE.fullmatch(candidate["subject"])
+        or _forbidden_subject(candidate["subject"])
+    ):
         raise MemoryProjectionError("memory candidate subject is invalid")
     _validate_safe_value(candidate["subject"])
     if candidate["evidence_kind"] not in EVIDENCE_KINDS:
@@ -353,9 +379,7 @@ def _validated_envelope(value: Any) -> tuple[dict[str, Any], list[dict[str, Any]
     envelope = _exact_keys(value, {"schema", "source", "candidates"}, "memory envelope")
     if envelope["schema"] != "harness.memory-evidence/v1":
         raise MemoryProjectionError("memory envelope schema is unsupported")
-    source = _exact_keys(
-        envelope["source"], {"task_id", "commit_sha"}, "memory source"
-    )
+    source = _exact_keys(envelope["source"], {"task_id", "commit_sha"}, "memory source")
     if (
         not isinstance(source["task_id"], str)
         or not TASK_RE.fullmatch(source["task_id"])
@@ -408,15 +432,15 @@ def _memory_envelope_digest(
 def memory_envelope_digest(envelope: dict[str, Any]) -> str:
     """Return the semantic digest that an accepted check must record."""
 
-    raw = _exact_keys(
-        envelope, {"schema", "source", "candidates"}, "memory envelope"
-    )
+    raw = _exact_keys(envelope, {"schema", "source", "candidates"}, "memory envelope")
     if raw["schema"] != "harness.memory-evidence/v1":
         raise MemoryProjectionError("memory envelope schema is unsupported")
     source = _exact_keys(raw["source"], {"task_id", "commit_sha"}, "memory source")
-    if not isinstance(source["task_id"], str) or not TASK_RE.fullmatch(
-        source["task_id"]
-    ) or _forbidden_subject(source["task_id"]):
+    if (
+        not isinstance(source["task_id"], str)
+        or not TASK_RE.fullmatch(source["task_id"])
+        or _forbidden_subject(source["task_id"])
+    ):
         raise MemoryProjectionError("memory source task identity is invalid")
     if not isinstance(source["commit_sha"], str) or not re.fullmatch(
         r"[0-9a-f]{40}", source["commit_sha"]
@@ -434,9 +458,7 @@ def memory_envelope_digest(envelope: dict[str, Any]) -> str:
 def _accepted_evidence(
     context: WorktreeContext, source: dict[str, Any]
 ) -> tuple[dict[str, Any], set[str]]:
-    status = codex_direct_status(
-        context, task_id=source["task_id"], expected_mode=None
-    )
+    status = codex_direct_status(context, task_id=source["task_id"], expected_mode=None)
     accepted_diff = status.get("accepted_diff")
     lease = status.get("writer_lease")
     if (
@@ -469,6 +491,50 @@ def _accepted_evidence(
     return status, passing
 
 
+def _acceptance_receipt(
+    context: WorktreeContext,
+    status: dict[str, Any],
+    source: dict[str, Any],
+    evidence_digest: str,
+) -> dict[str, Any]:
+    accepted = status["accepted_diff"]
+    try:
+        parents = _commit_parents(context.root, source["commit_sha"])
+        paths = _commit_paths(context.root, source["commit_sha"])
+        if not paths and not parents:
+            paths = _git_paths(
+                context.root,
+                "ls-tree",
+                "-r",
+                "--name-only",
+                "-z",
+                source["commit_sha"],
+            )
+        snapshot = _commit_tree_snapshot(context.root, source["commit_sha"], paths)
+    except CodexDirectError as exc:
+        raise MemoryProjectionError("accepted memory receipt is unavailable") from exc
+    if (
+        len(parents) > 1
+        or not paths
+        or paths != sorted(set(paths))
+        or not _valid_snapshot(snapshot, paths)
+    ):
+        raise MemoryProjectionError("accepted memory receipt is unavailable")
+    material = {
+        "schema": "harness.accepted-task-receipt/v1",
+        "task_id": source["task_id"],
+        "terminal_state": "accepted",
+        "commit_sha": source["commit_sha"],
+        "base_sha": parents[0] if parents else None,
+        "diff_digest": accepted["diff_digest"],
+        "paths": copy.deepcopy(paths),
+        "index_snapshot": copy.deepcopy(snapshot),
+        "index_digest": _snapshot_digest(snapshot),
+        "evidence_digest": evidence_digest,
+    }
+    return {**material, "receipt_digest": _digest(material)}
+
+
 def _empty_store() -> dict[str, Any]:
     return {"schema": "harness.typed-memory-store/v1", "records": []}
 
@@ -490,7 +556,9 @@ def _validate_store(store: Any) -> dict[str, Any]:
     ):
         raise MemoryProjectionError("typed memory store is invalid")
     records = store["records"]
-    if len(records) > MAX_RECORDS or any(not isinstance(item, dict) for item in records):
+    if len(records) > MAX_RECORDS or any(
+        not isinstance(item, dict) for item in records
+    ):
         raise MemoryProjectionError("typed memory store exceeds its record limit")
     if len({item.get("record_id") for item in records}) != len(records):
         raise MemoryProjectionError("typed memory store contains duplicate records")
@@ -501,7 +569,8 @@ def _validate_store(store: Any) -> dict[str, Any]:
         previous = record["supersedes"]
         following = record["superseded_by"]
         if previous is not None and (
-            previous not in by_id or by_id[previous]["superseded_by"] != record["record_id"]
+            previous not in by_id
+            or by_id[previous]["superseded_by"] != record["record_id"]
         ):
             raise MemoryProjectionError("typed memory supersession chain is invalid")
         if following is not None and (
@@ -595,17 +664,20 @@ def _validate_record(record: Any) -> None:
     if not isinstance(provenance, list) or not 1 <= len(provenance) <= MAX_PROVENANCE:
         raise MemoryProjectionError("typed memory provenance is invalid")
     for source in provenance:
+        provenance_keys = {
+            "source",
+            "task_id",
+            "commit_sha",
+            "evidence_digest",
+            "evidence_kind",
+            "sensitivity",
+            "valid_from",
+        }
+        if item["type"] == "capability-gap":
+            provenance_keys.add("acceptance_receipt")
         _exact_keys(
             source,
-            {
-                "source",
-                "task_id",
-                "commit_sha",
-                "evidence_digest",
-                "evidence_kind",
-                "sensitivity",
-                "valid_from",
-            },
+            provenance_keys,
             "typed memory provenance",
         )
         if (
@@ -627,6 +699,54 @@ def _validate_record(record: Any) -> None:
             datetime.strptime(source["valid_from"], "%Y-%m-%dT%H:%M:%SZ")
         except ValueError as exc:
             raise MemoryProjectionError("typed memory provenance is invalid") from exc
+        if item["type"] == "capability-gap":
+            receipt = _exact_keys(
+                source["acceptance_receipt"],
+                {
+                    "schema",
+                    "task_id",
+                    "terminal_state",
+                    "commit_sha",
+                    "base_sha",
+                    "diff_digest",
+                    "paths",
+                    "index_snapshot",
+                    "index_digest",
+                    "evidence_digest",
+                    "receipt_digest",
+                },
+                "accepted task receipt",
+            )
+            material = {key: value for key, value in receipt.items() if key != "receipt_digest"}
+            paths = receipt["paths"]
+            if (
+                receipt["schema"] != "harness.accepted-task-receipt/v1"
+                or receipt["task_id"] != source["task_id"]
+                or receipt["terminal_state"] != "accepted"
+                or receipt["commit_sha"] != source["commit_sha"]
+                or receipt["evidence_digest"] != source["evidence_digest"]
+                or any(
+                    not isinstance(receipt[key], str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", receipt[key])
+                    for key in ("diff_digest", "index_digest", "receipt_digest")
+                )
+                or (
+                    receipt["base_sha"] is not None
+                    and (
+                        not isinstance(receipt["base_sha"], str)
+                        or not re.fullmatch(r"[0-9a-f]{40}", receipt["base_sha"])
+                    )
+                )
+                or not isinstance(paths, list)
+                or not paths
+                or paths != sorted(set(paths))
+                or any(not isinstance(path, str) for path in paths)
+                or not _valid_snapshot(receipt["index_snapshot"], paths)
+                or receipt["index_digest"]
+                != _snapshot_digest(receipt["index_snapshot"])
+                or receipt["receipt_digest"] != _digest(material)
+            ):
+                raise MemoryProjectionError("accepted task receipt is invalid")
     if len({_canonical_bytes(source) for source in provenance}) != len(provenance):
         raise MemoryProjectionError("typed memory provenance is duplicated")
     validity = _exact_keys(item["validity"], {"from", "to"}, "memory validity")
@@ -655,9 +775,9 @@ def _validate_record(record: Any) -> None:
             or not re.fullmatch(r"mem-[0-9a-f]{64}", item[key])
         ):
             raise MemoryProjectionError("typed memory supersession link is invalid")
-    if item["validation"] != _validation(item) or item["evidence_digest"] != _evidence_digest(
-        provenance
-    ):
+    if item["validation"] != _validation(item) or item[
+        "evidence_digest"
+    ] != _evidence_digest(provenance):
         raise MemoryProjectionError("typed memory validation evidence is invalid")
     sensitivity_order = {"public": 0, "metadata": 1, "secret-free": 2}
     if item["sensitivity"] != max(
@@ -667,8 +787,13 @@ def _validate_record(record: Any) -> None:
         raise MemoryProjectionError("typed memory provenance summary is invalid")
 
 
-def _provenance(source: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any]:
-    return {
+def _provenance(
+    context: WorktreeContext,
+    source: dict[str, Any],
+    candidate: dict[str, Any],
+    status: dict[str, Any],
+) -> dict[str, Any]:
+    result = {
         "source": "accepted-task",
         "task_id": source["task_id"],
         "commit_sha": source["commit_sha"],
@@ -677,6 +802,11 @@ def _provenance(source: dict[str, Any], candidate: dict[str, Any]) -> dict[str, 
         "sensitivity": candidate["sensitivity"],
         "valid_from": candidate["valid_from"],
     }
+    if candidate["type"] == "capability-gap":
+        result["acceptance_receipt"] = _acceptance_receipt(
+            context, status, source, candidate["evidence_digest"]
+        )
+    return result
 
 
 def _validation(record: dict[str, Any]) -> str:
@@ -695,13 +825,16 @@ def _validation(record: dict[str, Any]) -> str:
     if record["type"] == "execution-result" and "accepted-execution-result" in kinds:
         return "accepted"
     if record["type"] == "lesson" and "process-observation" in kinds:
-        if len(
-            {
-                item["task_id"]
-                for item in provenance
-                if item["evidence_kind"] == "process-observation"
-            }
-        ) >= 2:
+        if (
+            len(
+                {
+                    item["task_id"]
+                    for item in provenance
+                    if item["evidence_kind"] == "process-observation"
+                }
+            )
+            >= 2
+        ):
             return "accepted"
     if kinds == {"external-claim"}:
         return "deferred"
@@ -714,11 +847,17 @@ def _evidence_digest(provenance: list[dict[str, Any]]) -> str:
 
 
 def _merge_candidate(
-    records: list[dict[str, Any]], source: dict[str, Any], candidate: dict[str, Any]
+    context: WorktreeContext,
+    records: list[dict[str, Any]],
+    source: dict[str, Any],
+    candidate: dict[str, Any],
+    status: dict[str, Any],
 ) -> None:
     record_id = _record_id(candidate)
-    record = next((item for item in records if item.get("record_id") == record_id), None)
-    provenance = _provenance(source, candidate)
+    record = next(
+        (item for item in records if item.get("record_id") == record_id), None
+    )
+    provenance = _provenance(context, source, candidate, status)
     if record is None:
         if len(records) >= MAX_RECORDS:
             raise MemoryProjectionError("typed memory store is full")
@@ -783,7 +922,9 @@ def _recompute_supersession(records: list[dict[str, Any]]) -> None:
             key=lambda item: (item["validity"]["from"], item["record_id"]),
         )
         if len({item["validity"]["from"] for item in facts}) != len(facts):
-            raise MemoryProjectionError("accepted evidence contains ambiguous current facts")
+            raise MemoryProjectionError(
+                "accepted evidence contains ambiguous current facts"
+            )
         for previous, current in zip(facts, facts[1:]):
             previous["superseded_by"] = current["record_id"]
             previous["validity"]["to"] = current["validity"]["from"]
@@ -847,10 +988,7 @@ def _validate_artifact_path(root: Path, relative: Path) -> Path:
         raise MemoryProjectionError("memory artifact path is unsafe")
     if path.exists():
         visible = path.stat(follow_symlinks=False)
-        if (
-            not stat.S_ISREG(visible.st_mode)
-            or visible.st_nlink != 1
-        ):
+        if not stat.S_ISREG(visible.st_mode) or visible.st_nlink != 1:
             raise MemoryProjectionError("memory artifact path is unsafe")
     return path
 
@@ -882,8 +1020,12 @@ def _audit(
     row = {
         "schema": "harness.memory-audit/v1",
         "operation_id": operation_id,
-        "source_task_digest": hashlib.sha256(source["task_id"].encode("utf-8")).hexdigest(),
-        "target_task_digest": hashlib.sha256(target_task_id.encode("utf-8")).hexdigest(),
+        "source_task_digest": hashlib.sha256(
+            source["task_id"].encode("utf-8")
+        ).hexdigest(),
+        "target_task_digest": hashlib.sha256(
+            target_task_id.encode("utf-8")
+        ).hexdigest(),
         "source_commit_sha": source["commit_sha"],
         "envelope_digest": envelope_digest,
         "before_store_digest": before_store,
@@ -946,9 +1088,11 @@ def project_memory(
     source, candidates = _validated_envelope(envelope)
     if source["task_id"] == target_task_id:
         raise MemoryProjectionError("memory source and target tasks must be distinct")
-    _, passing = _accepted_evidence(context, source)
+    status, passing = _accepted_evidence(context, source)
     if any(candidate["evidence_digest"] not in passing for candidate in candidates):
-        raise MemoryProjectionError("memory candidate does not cite passing accepted evidence")
+        raise MemoryProjectionError(
+            "memory candidate does not cite passing accepted evidence"
+        )
 
     store_path = _validate_artifact_path(context.root, STORE_PATH)
     projection_path = _validate_artifact_path(context.root, PROJECTION_PATH)
@@ -956,13 +1100,13 @@ def project_memory(
     with _target_memory_writer(context, target_task_id):
         with bounded_file_lock(lock_path):
             before_store_bytes = read_bounded_bytes(store_path, MAX_STORE_BYTES) or b""
-            before_projection_bytes = read_bounded_bytes(
-                projection_path, MAX_PROJECTION_BYTES
-            ) or b""
+            before_projection_bytes = (
+                read_bounded_bytes(projection_path, MAX_PROJECTION_BYTES) or b""
+            )
             store = _load_store(context.root)
             records = store["records"]
             for candidate in candidates:
-                _merge_candidate(records, source, candidate)
+                _merge_candidate(context, records, source, candidate, status)
             _recompute_supersession(records)
             records.sort(key=lambda item: item["record_id"])
             store_bytes = _pretty_bytes(store, MAX_STORE_BYTES)
@@ -1050,14 +1194,18 @@ def startup_memory(context: WorktreeContext) -> dict[str, Any]:
         }
     else:
         if tracked != expected_tracked:
-            raise MemoryProjectionError("current memory artifacts are not tracked in HEAD")
+            raise MemoryProjectionError(
+                "current memory artifacts are not tracked in HEAD"
+            )
         projection_bytes = read_bounded_bytes(path, MAX_PROJECTION_BYTES)
         if projection_bytes is None:
             raise MemoryProjectionError("current memory projection is invalid")
         store_bytes = read_bounded_bytes(store_path, MAX_STORE_BYTES)
         try:
             if path.stat().st_nlink != 1 or store_path.stat().st_nlink != 1:
-                raise MemoryProjectionError("current memory artifacts cannot be hard links")
+                raise MemoryProjectionError(
+                    "current memory artifacts cannot be hard links"
+                )
             projection = json.loads(projection_bytes.decode("utf-8", errors="strict"))
             validate_json_shape(
                 projection, max_nodes=MAX_PROJECTION_NODES, max_depth=12
@@ -1077,19 +1225,28 @@ def startup_memory(context: WorktreeContext) -> dict[str, Any]:
             store_bytes is None
             or hashlib.sha256(store_bytes).hexdigest() != projection["store_digest"]
         ):
-            raise MemoryProjectionError("current memory projection is not bound to its store")
+            raise MemoryProjectionError(
+                "current memory projection is not bound to its store"
+            )
         store = _load_store_bytes(store_bytes)
         expected = _projection(store["records"], projection["store_digest"])
         if _pretty_bytes(expected, MAX_PROJECTION_BYTES) != projection_bytes:
-            raise MemoryProjectionError("current memory projection is not deterministic")
+            raise MemoryProjectionError(
+                "current memory projection is not deterministic"
+            )
         for record in projection["records"]:
             _validate_record(record)
-            if record["validation"] != "accepted" or record["validity"]["to"] is not None:
+            if (
+                record["validation"] != "accepted"
+                or record["validity"]["to"] is not None
+            ):
                 raise MemoryProjectionError("current memory projection is invalid")
         current_facts: set[str] = set()
         for record in projection["records"]:
             if record["type"] == "fact" and record["subject"] in current_facts:
-                raise MemoryProjectionError("current memory projection has conflicting current facts")
+                raise MemoryProjectionError(
+                    "current memory projection has conflicting current facts"
+                )
             if record["type"] == "fact":
                 current_facts.add(record["subject"])
     return {
@@ -1102,9 +1259,92 @@ def startup_memory(context: WorktreeContext) -> dict[str, Any]:
 
 
 def _json_text(value: Any) -> str:
-    return json.dumps(
-        value, ensure_ascii=True, sort_keys=True, indent=2, allow_nan=False
-    ) + "\n"
+    return (
+        json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2, allow_nan=False)
+        + "\n"
+    )
+
+
+def compile_host_package(
+    *,
+    name: str,
+    version: str,
+    owner: str,
+    host: str,
+    source_label: str,
+    source_digest: str,
+    files: dict[str, str],
+    max_files: int,
+    max_bytes: int,
+    extended_manifest: bool = False,
+) -> dict[str, str]:
+    """Add one deterministic manifest to bounded canonical host files."""
+
+    if host not in {"codex", "claude"}:
+        raise MemoryProjectionError("capability host is invalid")
+    if (
+        not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", name)
+        or not re.fullmatch(r"\d+\.\d+\.\d+", version)
+        or not isinstance(owner, str)
+        or not owner
+        or len(owner) > 128
+        or not isinstance(source_label, str)
+        or not source_label
+        or len(source_label) > 128
+        or not re.fullmatch(r"[0-9a-f]{64}", source_digest)
+        or not isinstance(max_files, int)
+        or not 1 <= max_files <= 64
+        or not isinstance(max_bytes, int)
+        or not 1024 <= max_bytes <= 1024 * 1024
+        or not isinstance(files, dict)
+        or not files
+        or "manifest.json" in files
+        or not isinstance(extended_manifest, bool)
+    ):
+        raise MemoryProjectionError("capability package metadata is invalid")
+    package: dict[str, str] = {}
+    for raw_path, content in sorted(files.items()):
+        path = PurePosixPath(raw_path)
+        if (
+            not isinstance(raw_path, str)
+            or not raw_path
+            or path.is_absolute()
+            or any(part in {"", ".", ".."} for part in path.parts)
+            or not isinstance(content, str)
+        ):
+            raise MemoryProjectionError("capability package file is invalid")
+        package[path.as_posix()] = content
+    if len(package) + 1 > max_files:
+        raise MemoryProjectionError(
+            "capability package file count exceeds its manifest"
+        )
+    manifest: dict[str, Any] = {
+        "schema": "harness.capability-manifest/v1",
+        "name": name,
+        "version": version,
+        "owner": owner,
+        "host": host,
+        "source": source_label,
+        "source_digest": source_digest,
+        "files": {
+            path: hashlib.sha256(content.encode("utf-8")).hexdigest()
+            for path, content in package.items()
+        },
+    }
+    if extended_manifest:
+        manifest.update(
+            {
+                "canonical_digest": source_digest,
+                "total_bytes": sum(
+                    len(content.encode("utf-8")) for content in package.values()
+                ),
+            }
+        )
+    package["manifest.json"] = _json_text(manifest)
+    total_bytes = sum(len(content.encode("utf-8")) for content in package.values())
+    if total_bytes > max_bytes:
+        raise MemoryProjectionError("capability package bytes exceed its manifest")
+    return package
 
 
 def compile_memory_capability(host: str) -> dict[str, str]:
@@ -1168,23 +1408,18 @@ def compile_memory_capability(host: str) -> dict[str, str]:
             "",
         ]
     )
-    package = {
-        "SKILL.md": skill,
-        "interface.json": _json_text(interface),
-        "evaluation.json": _json_text(evaluation),
-    }
-    manifest = {
-        "schema": "harness.capability-manifest/v1",
-        "name": source["name"],
-        "version": source["version"],
-        "owner": source["owner"],
-        "host": host,
-        "source": "canonical.json",
-        "source_digest": _digest(source),
-        "files": {
-            path: hashlib.sha256(content.encode("utf-8")).hexdigest()
-            for path, content in sorted(package.items())
+    return compile_host_package(
+        name=source["name"],
+        version=source["version"],
+        owner=source["owner"],
+        host=host,
+        source_label="canonical.json",
+        source_digest=_digest(source),
+        files={
+            "SKILL.md": skill,
+            "interface.json": _json_text(interface),
+            "evaluation.json": _json_text(evaluation),
         },
-    }
-    package["manifest.json"] = _json_text(manifest)
-    return package
+        max_files=4,
+        max_bytes=64 * 1024,
+    )

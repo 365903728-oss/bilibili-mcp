@@ -31,8 +31,21 @@ from harness.codex_direct import (
     start_direct,
 )
 from harness.context import WorktreeError, discover_worktree
-from harness.contracts import ContractError, validate_task_contract
-from harness.events import ADAPTERS, HOOK_EVENTS, normalize_hook_event, persist_hook_event
+from harness.contracts import EXECUTION_MODES, ContractError, validate_task_contract
+from harness.events import (
+    ADAPTERS,
+    HOOK_EVENTS,
+    normalize_hook_event,
+    persist_hook_event,
+)
+from harness.evolution import (
+    EvolutionError,
+    apply_capability,
+    ensure_evolution_acceptance,
+    evaluate_capability,
+    record_search,
+    start_evolution,
+)
 from harness.memory import (
     MAX_ENVELOPE_BYTES,
     memory_envelope_digest,
@@ -89,9 +102,7 @@ def _add_direct_parser(
     name: str,
     label: str,
 ) -> None:
-    direct = subcommands.add_parser(
-        name, help=f"run the {label} accepted-ticket loop"
-    )
+    direct = subcommands.add_parser(name, help=f"run the {label} accepted-ticket loop")
     actions = direct.add_subparsers(dest="direct_command", required=True)
     start = actions.add_parser("start")
     start.add_argument("path", type=Path)
@@ -109,8 +120,12 @@ def _add_direct_parser(
     evidence.add_argument("--cwd", type=Path, default=Path.cwd())
     evidence.add_argument("--task", required=True)
     evidence.add_argument("--check", required=True)
-    evidence.add_argument("--status", choices=("pass", "fail", "skipped"), required=True)
-    evidence.add_argument("--source", choices=("command", "inspection", "review"), required=True)
+    evidence.add_argument(
+        "--status", choices=("pass", "fail", "skipped"), required=True
+    )
+    evidence.add_argument(
+        "--source", choices=("command", "inspection", "review"), required=True
+    )
     evidence.add_argument("--exit-code", type=int)
     evidence.add_argument(
         "--sensitivity", choices=("public", "metadata", "secret-free"), required=True
@@ -127,13 +142,19 @@ def _add_direct_parser(
     risk.add_argument("--cwd", type=Path, default=Path.cwd())
     risk.add_argument("--task", required=True)
     risk.add_argument("--risk", required=True)
-    risk.add_argument("--severity", choices=("low", "medium", "high", "critical"), required=True)
-    risk.add_argument("--status", choices=("open", "accepted", "resolved"), required=True)
+    risk.add_argument(
+        "--severity", choices=("low", "medium", "high", "critical"), required=True
+    )
+    risk.add_argument(
+        "--status", choices=("open", "accepted", "resolved"), required=True
+    )
     risk.add_argument("--digest", required=True)
     accept = actions.add_parser("accept")
     accept.add_argument("--cwd", type=Path, default=Path.cwd())
     accept.add_argument("--task", required=True)
-    accept.add_argument("--message", default="chore(harness): create accepted ticket commit")
+    accept.add_argument(
+        "--message", default="chore(harness): create accepted ticket commit"
+    )
     repair = actions.add_parser("repair")
     repair.add_argument("--cwd", type=Path, default=Path.cwd())
     repair.add_argument("--task", required=True)
@@ -153,12 +174,18 @@ def _add_direct_parser(
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="harness", description="bilibili-mcp Harness v2 CLI")
+    parser = argparse.ArgumentParser(
+        prog="harness", description="bilibili-mcp Harness v2 CLI"
+    )
     subcommands = parser.add_subparsers(dest="command", required=True)
 
-    doctor = subcommands.add_parser("doctor", help="report adapter and capability discovery")
+    doctor = subcommands.add_parser(
+        "doctor", help="report adapter and capability discovery"
+    )
     doctor.add_argument("--repo", type=Path, default=Path.cwd())
-    doctor.add_argument("--json", action="store_true", help="reserved; output is always JSON")
+    doctor.add_argument(
+        "--json", action="store_true", help="reserved; output is always JSON"
+    )
 
     contract = subcommands.add_parser("contract", help="validate a typed task contract")
     contract_sub = contract.add_subparsers(dest="contract_command", required=True)
@@ -176,7 +203,9 @@ def _build_parser() -> argparse.ArgumentParser:
         if name == "replay":
             action.add_argument("--payload", type=Path, required=True)
 
-    manual = subcommands.add_parser("manual-skill", help="enforce native manual-skill boundary")
+    manual = subcommands.add_parser(
+        "manual-skill", help="enforce native manual-skill boundary"
+    )
     manual_sub = manual.add_subparsers(dest="manual_command", required=True)
     check = manual_sub.add_parser("check")
     check.add_argument("--cwd", type=Path, default=Path.cwd())
@@ -199,6 +228,40 @@ def _build_parser() -> argparse.ArgumentParser:
     digest.add_argument("--cwd", type=Path, default=Path.cwd())
     startup = memory_sub.add_parser("startup")
     startup.add_argument("--cwd", type=Path, default=Path.cwd())
+
+    evolution = subcommands.add_parser(
+        "evolution", help="run governed Skill and Agent evolution"
+    )
+    evolution_sub = evolution.add_subparsers(dest="evolution_command", required=True)
+    evolution_start = evolution_sub.add_parser("start")
+    evolution_start.add_argument("path", type=Path)
+    evolution_start.add_argument("--cwd", type=Path, default=Path.cwd())
+    evolution_start.add_argument("--task", required=True)
+    evolution_start.add_argument("--mode", choices=EXECUTION_MODES, required=True)
+    evolution_start.add_argument("--actor", choices=("codex", "claude"), required=True)
+    evolution_search = evolution_sub.add_parser("search")
+    evolution_search.add_argument("path", type=Path)
+    evolution_search.add_argument("--cwd", type=Path, default=Path.cwd())
+    evolution_search.add_argument("--task", required=True)
+    evolution_search.add_argument("--mode", choices=EXECUTION_MODES, required=True)
+    evolution_search.add_argument("--actor", choices=("codex", "claude"), required=True)
+    for action in ("adapt", "build"):
+        evolution_apply = evolution_sub.add_parser(action)
+        evolution_apply.add_argument("path", type=Path)
+        evolution_apply.add_argument("--cwd", type=Path, default=Path.cwd())
+        evolution_apply.add_argument("--task", required=True)
+        evolution_apply.add_argument("--mode", choices=EXECUTION_MODES, required=True)
+        evolution_apply.add_argument(
+            "--actor", choices=("codex", "claude"), required=True
+        )
+    evolution_evaluate = evolution_sub.add_parser("evaluate")
+    evolution_evaluate.add_argument("path", type=Path)
+    evolution_evaluate.add_argument("--cwd", type=Path, default=Path.cwd())
+    evolution_evaluate.add_argument("--task", required=True)
+    evolution_evaluate.add_argument("--mode", choices=EXECUTION_MODES, required=True)
+    evolution_evaluate.add_argument(
+        "--actor", choices=("codex", "claude"), required=True
+    )
 
     _add_direct_parser(subcommands, "codex-direct", "Codex Direct")
     _add_direct_parser(subcommands, "claude-direct", "Claude Direct")
@@ -242,7 +305,9 @@ def _build_parser() -> argparse.ArgumentParser:
     guard_act = paseo_actions.add_parser("guard")
     guard_act.add_argument("--cwd", type=Path, default=Path.cwd())
     guard_act.add_argument("--task", required=True)
-    guard_act.add_argument("--action", choices=sorted(COLLAB_GUARD_ACTIONS), required=True)
+    guard_act.add_argument(
+        "--action", choices=sorted(COLLAB_GUARD_ACTIONS), required=True
+    )
     guard_act.add_argument("--actor", choices=("codex", "claude"), required=True)
     guard_act.add_argument("--path")
 
@@ -259,10 +324,16 @@ def _build_parser() -> argparse.ArgumentParser:
     check_act.add_argument("--cwd", type=Path, default=Path.cwd())
     check_act.add_argument("--task", required=True)
     check_act.add_argument("--check", required=True)
-    check_act.add_argument("--status", choices=("pass", "fail", "skipped"), required=True)
-    check_act.add_argument("--source", choices=("command", "inspection", "review"), required=True)
+    check_act.add_argument(
+        "--status", choices=("pass", "fail", "skipped"), required=True
+    )
+    check_act.add_argument(
+        "--source", choices=("command", "inspection", "review"), required=True
+    )
     check_act.add_argument("--exit-code", type=int)
-    check_act.add_argument("--sensitivity", choices=("public", "metadata", "secret-free"), required=True)
+    check_act.add_argument(
+        "--sensitivity", choices=("public", "metadata", "secret-free"), required=True
+    )
     check_act.add_argument("--digest", required=True)
     check_act.add_argument("--reason-code")
 
@@ -277,14 +348,20 @@ def _build_parser() -> argparse.ArgumentParser:
     risk_act.add_argument("--cwd", type=Path, default=Path.cwd())
     risk_act.add_argument("--task", required=True)
     risk_act.add_argument("--risk", required=True)
-    risk_act.add_argument("--severity", choices=("low", "medium", "high", "critical"), required=True)
-    risk_act.add_argument("--status", choices=("open", "accepted", "resolved"), required=True)
+    risk_act.add_argument(
+        "--severity", choices=("low", "medium", "high", "critical"), required=True
+    )
+    risk_act.add_argument(
+        "--status", choices=("open", "accepted", "resolved"), required=True
+    )
     risk_act.add_argument("--digest", required=True)
 
     accept_act = paseo_actions.add_parser("accept")
     accept_act.add_argument("--cwd", type=Path, default=Path.cwd())
     accept_act.add_argument("--task", required=True)
-    accept_act.add_argument("--message", default="chore(harness): create accepted ticket commit")
+    accept_act.add_argument(
+        "--message", default="chore(harness): create accepted ticket commit"
+    )
 
     commit_act = paseo_actions.add_parser("commit")
     commit_act.add_argument("--cwd", type=Path, default=Path.cwd())
@@ -327,7 +404,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if args.command == "contract":
             contract = validate_task_contract(_load_json_file(args.path))
-            _print_json({"schema": "harness.contract-validation/v1", "valid": True, "task_id": contract["task"]["id"]})
+            _print_json(
+                {
+                    "schema": "harness.contract-validation/v1",
+                    "valid": True,
+                    "task_id": contract["task"]["id"],
+                }
+            )
             return 0
 
         if args.command == "hook":
@@ -339,7 +422,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 payload = read_bounded_json_stream(sys.stdin.buffer)
             except ValueError:
-                _print_json(_hook_control(recorded=False, reason="invalid-or-oversized-payload"))
+                _print_json(
+                    _hook_control(recorded=False, reason="invalid-or-oversized-payload")
+                )
                 return 0
             try:
                 context = discover_worktree(args.cwd)
@@ -348,7 +433,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 event = normalize_hook_event(args.adapter, args.event, payload)
                 persist_hook_event(context, event)
             except (ValueError, WorktreeError, OSError):
-                _print_json(_hook_control(recorded=False, reason="context-or-persistence-rejected"))
+                _print_json(
+                    _hook_control(
+                        recorded=False, reason="context-or-persistence-rejected"
+                    )
+                )
                 return 0
             _print_json(_hook_control(recorded=True))
             return 0
@@ -387,6 +476,44 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_json(result)
             return 0
 
+        if args.command == "evolution":
+            context = discover_worktree(args.cwd)
+            if args.evolution_command == "start":
+                result = start_evolution(
+                    context,
+                    _load_json_file(args.path),
+                    task_id=args.task,
+                    expected_mode=args.mode,
+                    actor=args.actor,
+                )
+            elif args.evolution_command == "search":
+                result = record_search(
+                    context,
+                    _load_json_file(args.path),
+                    task_id=args.task,
+                    expected_mode=args.mode,
+                    actor=args.actor,
+                )
+            elif args.evolution_command in {"adapt", "build"}:
+                result = apply_capability(
+                    context,
+                    _load_json_file(args.path),
+                    task_id=args.task,
+                    strategy=args.evolution_command,
+                    expected_mode=args.mode,
+                    actor=args.actor,
+                )
+            else:
+                result = evaluate_capability(
+                    context,
+                    _load_json_file(args.path),
+                    task_id=args.task,
+                    expected_mode=args.mode,
+                    actor=args.actor,
+                )
+            _print_json(result)
+            return 0
+
         if args.command in {"codex-direct", "claude-direct"}:
             context = discover_worktree(args.cwd)
             if args.direct_command == "start":
@@ -408,6 +535,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     expected_mode=args.command,
                 )
             elif args.direct_command == "advance":
+                ensure_evolution_acceptance(
+                    context, task_id=args.task, expected_mode=args.command
+                )
                 result = advance_codex_direct(
                     context,
                     task_id=args.task,
@@ -451,6 +581,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 exit_code = 0
             elif args.direct_command == "accept":
+                ensure_evolution_acceptance(
+                    context, task_id=args.task, expected_mode=args.command
+                )
                 result = accept_codex_direct(
                     context,
                     task_id=args.task,
@@ -474,6 +607,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     expected_mode=args.command,
                 )
             elif args.direct_command == "commit":
+                ensure_evolution_acceptance(
+                    context, task_id=args.task, expected_mode=args.command
+                )
                 result = commit_codex_direct(
                     context,
                     task_id=args.task,
@@ -568,6 +704,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _print_json(result)
                 return 0
             elif args.direct_command == "advance":
+                ensure_evolution_acceptance(
+                    context,
+                    task_id=args.task,
+                    expected_mode="codex-paseo-claude",
+                )
                 result = collaboration_advance(
                     context, task_id=args.task, target=args.to
                 )
@@ -609,6 +750,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _print_json(result)
                 return 0
             elif args.direct_command == "accept":
+                ensure_evolution_acceptance(
+                    context,
+                    task_id=args.task,
+                    expected_mode="codex-paseo-claude",
+                )
                 result = collaboration_accept(
                     context,
                     task_id=args.task,
@@ -617,6 +763,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _print_json(result)
                 return 0
             elif args.direct_command == "commit":
+                ensure_evolution_acceptance(
+                    context,
+                    task_id=args.task,
+                    expected_mode="codex-paseo-claude",
+                )
                 result = collaboration_commit(
                     context,
                     task_id=args.task,
@@ -627,8 +778,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
     except (CodexDirectAdapterError, PaseoCollaborationError) as exc:
         task_id = getattr(args, "task", None) or recovery_task_id
-        expected_mode = MODE_BY_COMMAND.get(args.command, args.command)
-        if args.command in {"codex-direct", "claude-direct", "codex-paseo-claude"} and isinstance(task_id, str):
+        expected_mode = (
+            getattr(args, "mode", None)
+            if args.command == "evolution"
+            else MODE_BY_COMMAND.get(args.command, args.command)
+        )
+        if args.command in {
+            "codex-direct",
+            "claude-direct",
+            "codex-paseo-claude",
+            "evolution",
+        } and isinstance(task_id, str):
             fingerprint = hashlib.sha256(
                 f"adapter-failure-v1\0{exc}".encode("utf-8")
             ).hexdigest()
@@ -646,7 +806,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 pass
         _print_json({"schema": "harness.error/v1", "error": str(exc)})
         return 2
-    except (CodexDirectError, ContractError, ValueError, WorktreeError, OSError) as exc:
+    except (
+        CodexDirectError,
+        ContractError,
+        EvolutionError,
+        ValueError,
+        WorktreeError,
+        OSError,
+    ) as exc:
         _print_json({"schema": "harness.error/v1", "error": str(exc)})
         return 2
     return 2

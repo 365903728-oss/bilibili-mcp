@@ -18,6 +18,8 @@ Thumbs.db
 *.swp
 *.swo
 .claude/*
+!.claude/skills/
+!.claude/skills/**
 !.claude/agents/
 !.claude/agents/*.md
 !.claude/settings.json

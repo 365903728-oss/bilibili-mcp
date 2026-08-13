@@ -13,6 +13,7 @@ python -m harness contract validate harness/contracts/task-contract-v1.example.j
 python -m harness hook replay --adapter codex --event post-tool-use --payload harness/fixtures/codex-post-tool-use.json
 python -m harness hook replay --adapter claude --event post-tool-use-failure --payload harness/fixtures/claude-post-tool-use-failure.json
 python -m harness manual-skill check --task github-29 --adapter codex-direct --host codex --skill implement --invoked
+python -m harness evolution start evolution-request.json --cwd <worktree> --task <evolution-task> --mode codex-direct --actor codex
 ```
 
 Hook adapters call `harness/cli.py` directly so they remain usable without
@@ -75,6 +76,34 @@ attributes, `commit-tree`, a compare-and-swap `update-ref`, and Git's native
 not enter the protected effect. It verifies the exact accepted index, path set,
 snapshot, branch, parent, trailer, and clean postcondition. The retained
 `commit` command is only an idempotent crash-recovery seam.
+
+## Governed evolution
+
+`evolution start|search|adapt|build|evaluate` is a thin capability-evolution
+seam over the unchanged Direct accepted-ticket controller. `start` consumes
+only a current accepted `capability-gap`, rechecks its accepted-and-committed
+provenance, requires a clean linked worktree and active exact-path writer, and
+freezes the evaluator, holdout, derived repository-local package paths, report,
+rollback, and baseline.
+
+Search derives the active host's installed `find-skills` route, records bounded
+pinned official/live GitHub candidate metadata, and verifies the exact immutable
+artifact and license bytes before Adapt or Build. Compatibility, smoke, and
+installed-provenance fields supplied by a candidate are not trusted machine
+evidence; without an independent provider, Adapt stops once with an idempotent
+authorization request and no capability write or local resolution command. The
+Harness cannot grant itself authority. One canonical declarative source compiles exact
+Codex and Claude Skill/Agent packages and deploys them only to repository-local
+host discovery paths; agents are read-only, require a writer lease for writes,
+and have `max_children=0`.
+The engine rejects protected product/kernel/evaluator/holdout outputs,
+self-approval, drift, links, scripts, dependencies, executables, credentials,
+elevation, daemons, ports, global policy, and unbounded packages. Failed smoke,
+evaluation, holdout, or projection checks restore only the candidate namespace
+from the frozen Git snapshot; unknown drift enters Recovery instead of being
+deleted. The Harness runs the frozen evaluator and holdout cases itself.
+Promotion and the exact local commit remain owned by the existing Direct
+acceptance path.
 
 ## Conformance
 

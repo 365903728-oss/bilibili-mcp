@@ -383,3 +383,31 @@
   replay sequence.
 - Future behavior: Require meaningful temporal precedence for supersession;
   never turn an implementation tie-breaker into factual authority.
+
+- Lesson: An accepted capability gap is authority to start a separate governed
+  run, not authority to install the first plausible candidate.
+- Evidence: The #34 Search pilot found an installed and upstream `vitest`
+  capability but their bytes/provenance did not match; the run deferred and
+  produced only a bounded report.
+- Future behavior: Preserve Search evidence and choose Adapt only after pinned
+  source, immutable license/artifact evidence, compatibility, smoke, effects,
+  and rollback all pass. Never run an unpinned package-manager discovery route
+  merely to satisfy a search checkbox.
+
+- Lesson: Candidate-owned paths are not a sufficient evolution sandbox.
+- Evidence: The generic Direct contract correctly permits arbitrary declared
+  repository-relative paths, but #34 derives one strict capability/report path
+  set, rejects Windows aliases and ignored outputs, keeps evaluator/holdout
+  outside it, and revalidates ignored runtime state against the live Direct
+  contract on every transition.
+- Future behavior: At any privileged subsystem seam, validate both the general
+  writer lease and a narrow derived allowlist plus frozen independent evidence.
+
+- Lesson: Rollback evidence must restore the previous Git object bytes and
+  modes, not merely remove newly generated files.
+- Evidence: #34 freezes bounded `ls-tree` entries for the candidate namespace,
+  rejects links/submodules and oversized output, preserves sibling capabilities,
+  restores exact blobs/modes for known failure, and enters Recovery rather than
+  deleting unknown drift.
+- Future behavior: Bind rollback to an immutable baseline and route restoration
+  failure to the existing Recovery Bundle rather than declaring rejection.

@@ -1960,3 +1960,56 @@ Six release blockers fixed; one regression proof per root cause (new tests
   tracked/primary/user Codex command counts 4/5/0. Primary HEAD, tracked diff,
   empty staged diff, untracked manifest, status digest, and count 44 exactly
   match the recorded baseline.
+
+## 2026-08-13 — Harness v2 Issue #34 governed Skill and Agent evolution
+
+- Baseline: clean independent worktree, branch
+  `codex/harness-v2-skill-agent-evolution-34`, exact #33 HEAD
+  `1cd12c8a6edab272bd16ad5ecb8ba2ae4bd90cf8`, direct parent #32
+  `9cbb8de64ffedefd682517e203841dd137b75662`, and pushed #33 remote ref exact.
+- Live scope: GitHub #34 remains open, parent #28, blocked by #33, and titled
+  `[Harness v2] Governed Skill and Agent evolution`. No remote state changed.
+- Mode: the user explicitly selected `codex-direct`; the typed contract froze
+  the base/branch/owned paths and Codex acquired the only writer lease. No
+  Paseo/Claude adapter was launched or used as a writer.
+- Doctor: isolated-home exact command returned expected `action-required` with
+  tracked/primary/user Codex Hook counts 4/5/0. The isolated capability lists
+  were intentionally empty and were not used as catalog evidence; no external
+  configuration was rewritten.
+- TDD: focused evolution suite progressed from missing CLI/module behavior to
+  final 10/10 pass in 481.432s. Coverage includes accepted-gap provenance, independent
+  worktree/writer, exact ignored-state validation, protected paths, pinned
+  candidate contract, Search/Adapt/Build ordering, idempotent authorization,
+  canonical host packages, manual/model invocation, bounded read-only agents,
+  drift/self-approval denial, rollback, reports, zero remotes, and exact-one
+  local commits. Typed-memory regressions pass 33/33 in 62.953s.
+- Search evidence: installed `find-skills` route was inspected without running
+  its unpinned `npx` command; installed `vitest` SHA-256 is `3dcdc45f…6375`.
+  Live `antfu/skills` is MIT at verified commit
+  `a74f281a27dadc02397bc1a174b0f2c97531b6ae`; pinned Skill SHA-256 is
+  `2da9b15c…8968`, LICENSE SHA-256 `2a596f69…1cb2`. Mismatch/unknown installed
+  provenance caused deferred/no-install.
+- Current-diff focused evidence: Evolution 10/10 in 481.432s; typed memory
+  33/33 in 71.401s; legacy Hook 6/6; legacy Stop 8/8; Python compileall,
+  `py_compile`, Ruff, and `git diff --check` pass.
+- Product/package: TypeScript build passes in 2.619s; Vitest passes 41 files /
+  862 tests in 9.986s; `npm pack --dry-run --json --ignore-scripts` reports
+  185 files and zero forbidden Harness/internal paths. The production audit
+  attempt reached no advisory result because TLS failed before the npm registry
+  request; package/dependency inputs are unchanged from accepted #33.
+- Boundary checks: all 16 intended paths are strict UTF-8; added diff lines have
+  zero high-confidence secret-pattern hits. Product/package inputs, shared
+  controllers, constitutional files, and staged index have zero diff. Primary
+  HEAD/status/tracked/staged/untracked fingerprints match the #33 frozen values.
+- Independent risk review passes the accepted-gap receipt, forged Adapt state,
+  and terminal writer-lease audit under the existing repository-process trust
+  model. One monolithic Harness discovery process exceeded its 30-minute ceiling
+  without failure output; it was not rerun. Current-diff shards all pass:
+  Direct/Claude 73 (one skip), Paseo 73, CLI/contracts/events 32, typed memory
+  33, and Evolution 10, for 221 executed tests / one skip with no failure.
+- Final release review found one actionable terminal seam: promotion-ready
+  revalidation failure previously stopped without restoring known candidate
+  output. The shared acceptance gate now rolls that state back to a rejected
+  report while unknown/drifted files still enter Recovery. Its focused
+  public-CLI rollback/commit proof passes 1/1 in 146.898s; the reviewer closed
+  the finding after the rejected-reason invariant was added.

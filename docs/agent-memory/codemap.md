@@ -317,6 +317,25 @@ Claude reports must include a `Harness Artifacts` section covering task ticket, 
 Runtime observations are intentionally separate from formal memory and are now
 attributed to the invoking worktree rather than a machine-specific main checkout.
 
+Governed capability evolution:
+
+- `harness/evolution.py`: accepted-gap gate, independent Direct-writer binding,
+  Search/Adapt/Build state, bounded and byte-verified candidate schema,
+  canonical Skill/Agent compiler, derived repository-local host deployment,
+  fixed machine-run evaluator/holdout cases, candidate-scoped rollback/Recovery,
+  and rejected/deferred/promotable reports.
+- `harness/fixtures/evolution-build-capability.json`: safe, dependency-free,
+  repository-local Build fixture with read-only zero-child agent policy.
+- `harness/tests/test_evolution.py`: public CLI and compiler coverage including
+  accepted-gap provenance, linked worktree writer, protected paths, pinned
+  Search/Adapt, one authorization stop with no local resolution, Build
+  success/failure, exact host-schema/discovery-path conformance, drift,
+  self-approval denial, scoped
+  rollback, sibling preservation, and exact-one-commit zero-remote pilots.
+- `harness/memory.py::compile_host_package`: shared deterministic host-manifest
+  seam used by typed memory and governed evolution; it does not grant the memory
+  projector capability-write authority.
+
 ## Project Agents And Skills
 
 Claude Code subagents:

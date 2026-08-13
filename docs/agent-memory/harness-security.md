@@ -370,6 +370,53 @@ Use this checklist before accepting changes to harness surfaces.
   the accepted source commit. The product TypeScript runtime and npm package
   boundary remained unchanged.
 
+## Governed Skill And Agent Evolution
+
+- Evolution begins only from an accepted current typed `capability-gap`. Every
+  origin must be an accepted-task provenance commit in the current HEAD history
+  and must differ from the independent Evolution task. The projector persists
+  the accepted terminal state, commit tree, accepted diff, and evidence digest
+  in a deterministic receipt; this is repository-process evidence, not a
+  cryptographic defense against a same-account actor that can rewrite Git.
+- The Evolution task uses the existing Direct controller for canonical
+  worktree, one writer lease, evidence, independent review, acceptance, and
+  exact-one local commit. Its linked worktree must be clean at the frozen base.
+- Evolution package, native host deployment, and report paths are derived from
+  the task and a strict capability slug; the Direct contract must own exactly
+  that set. Windows aliases, ignored targets, links, product/kernel/controller
+  paths, and evaluator/holdout overlap fail before state or capability writes.
+  Ignored Evolution state is fully revalidated against the current Direct
+  contract and baseline before use.
+- Search derives the active host's installed `find-skills` route evidence,
+  records sources consulted and bounded pinned GitHub candidate data, and
+  re-fetches exact immutable artifact/license bytes without credentials,
+  redirects, or proxy inheritance. Branch names, unknown
+  licenses, raw install commands, unbounded external text, links, submodules,
+  scripts, dependencies, and executable payloads are rejected as adoption
+  authority.
+- Candidate compatibility, smoke, and installed provenance are untrusted Search
+  claims until an independent machine-evidence provider exists. Therefore #34
+  does not auto-Adapt: the run emits one candidate-bound idempotent
+  authorization-required request without writes. No local Evolution command can
+  synthesize the missing user authority. The compiler seam remains available to
+  a future trusted provider.
+- Canonical Skill/Agent sources preserve manual/model invocation semantics,
+  declare trigger positives/negatives/near-neighbor conflicts, and compile
+  deterministic per-host manifests. Agents default read-only, require the
+  active writer lease for writes, expose only read/inspect/report, and set
+  `max_children=0`; the generated launcher metadata contains no delegation.
+- Candidate writers cannot provide evaluator or holdout results. Frozen
+  descriptors are checked before apply/evaluation/report, and the Harness runs
+  their exact fixed cases over canonical and native host projections.
+  Projection files and bytes are checked exactly before promotion.
+- Failure clears only known files in the candidate namespace and restores its
+  bounded prior Git blobs/modes. Sibling capabilities are never cleared;
+  unexpected post-baseline content or restoration failure becomes an adapter
+  failure so the existing Recovery Bundle is used without deleting the drift.
+- The controlled pilots run only in disposable zero-remote repositories. No
+  user/global Skill/Agent root, external installer, credential, SSH, daemon,
+  port, or broad configuration is touched.
+
 ## Incident Response
 
 If a harness change exposes a secret, executes unexpected external code, breaks hooks, corrupts memory, or causes an agent to follow untrusted external instructions:

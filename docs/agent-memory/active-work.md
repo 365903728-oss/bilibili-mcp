@@ -6,19 +6,19 @@ GitHub Issue #28 is the approved Harness v2 specification. Issues #29-#36 are
 the dependency-ordered implementation tickets. Accepted implementation lineage
 is #30 `cbd31b952aa9f820005e60852bcd2d4db886a31c` → #31
 `5e9de4bace35a2ca4b9c83b5a0d81ebb627df6fb` → #32
-`9cbb8de64ffedefd682517e203841dd137b75662`. The live Issues remain open
+`9cbb8de64ffedefd682517e203841dd137b75662` → #33
+`1cd12c8a6edab272bd16ad5ecb8ba2ae4bd90cf8`. The live Issues remain open
 because Issue-close and remote-write authority were not granted.
 
-Issue #33, `Automatic typed memory from accepted evidence`, is the current
-acceptance candidate on branch `codex/harness-v2-typed-memory-33` from the exact
-#32 commit. It adds one shared, host-neutral typed-memory projector and thin
-shared-CLI routes without changing the three accepted-ticket controllers.
-Stable records carry source/provenance, validation, sensitivity, validity or
-supersession, and an evidence digest. Replay is deterministic; current facts
-supersede older values; weak claims stay proposed/deferred; and general lessons
-need explicit correction or two independent accepted task IDs.
+Issue #34, `Governed Skill and Agent evolution`, is the current acceptance
+candidate on branch `codex/harness-v2-skill-agent-evolution-34` from the exact
+#33 commit. It adds a thin `harness/evolution.py` seam and CLI routes while
+reusing the existing Direct task/worktree/writer/evidence/acceptance/commit
+controller. Evolution starts only from a current accepted typed capability gap
+whose originating task is accepted and committed.
 
-The source task must be accepted and committed, and its passing current evidence
+The accepted #33 typed-memory substrate requires the source task to be accepted
+and committed, and its passing current evidence
 must contain the canonical semantic envelope digest. Projection writes only
 `docs/agent-memory/typed-memory.json`, the bounded
 `docs/agent-memory/current-memory.json`, and ignored metadata-only audit state.
@@ -35,11 +35,24 @@ accepted a source task and then exactly one memory-only commit containing only
 the typed store and current projection; replay was a successful auditable
 no-change outcome.
 
-The final dependency frontier becomes Issue #34 after #33 acceptance. The
+Every run freezes its linked worktree, exact-path writer, evaluator, holdout,
+derived repository-local outputs, report, and candidate-scoped rollback
+snapshot. Search binds the active host's installed `find-skills` route and
+re-fetches pinned official/live GitHub artifact and license bytes before Adapt
+or Build. Candidate-supplied compatibility, smoke, and installed provenance are
+not trusted machine evidence, so Adapt stops once with zero capability writes
+and no self-authorizing resolution route. A canonical
+Skill/Agent source compiles drift-checked Codex/Claude packages into actual
+repository discovery paths; subagents remain read-only with no children.
+Failure restores only known candidate files and records rejected/deferred;
+unknown drift enters Recovery. Promotion and the one local commit still pass
+through the shared Direct acceptance path.
+
+The next dependency frontier becomes Issue #35 after #34 acceptance. The
 known primary legacy Codex Hook overlap remains an explicit
 `doctor=action-required` rollout gate and was not rewritten. No push, PR, Issue
 close, tag, release, publish, credential/SSH use, or history rewrite is part of
-#33.
+#34.
 
 The Harness target is one `RULES.md` core with `codex-direct`,
 `codex-paseo-claude`, and `claude-direct` adapters. Local commit is automatic

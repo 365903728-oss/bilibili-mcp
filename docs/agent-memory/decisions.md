@@ -628,3 +628,41 @@
 - Evidence: Byte-for-byte compiler tests cover Codex and Claude interface,
   evaluation, Skill, and manifest artifacts; the projection tests allow only
   the two memory JSON outputs plus ignored audit metadata.
+
+- Decision: Add one thin Evolution seam that consumes accepted typed gaps and
+  delegates task/worktree/writer/evidence/acceptance/commit semantics to the
+  existing Direct controller.
+- Reason: A second controller would duplicate the already-accepted authority
+  and exact-one-commit state machine; memory projection itself cannot safely
+  gain capability-write or evaluation authority.
+- Evidence: Public CLI pilots start a normal Direct task first, then require an
+  independent linked worktree and exact capability/report ownership before an
+  Evolution state record exists.
+
+- Decision: Treat installed catalog discovery and pinned official/live GitHub
+  metadata as evidence, not instructions; never execute an unpinned discovery
+  or installer route automatically.
+- Reason: The installed `find-skills` route names unversioned `npx`, which may
+  fetch and execute external code. Search does not need execution authority to
+  compare immutable source, license, artifact, compatibility, smoke, and local
+  provenance.
+- Evidence: The `vitest` pilot performs bounded no-credential reads of the
+  immutable GitHub artifact and license, records their verified byte/hash
+  evidence with local digests, detects mismatch/unknown installed provenance,
+  and defers with zero capability write.
+
+- Decision: Compile both Skill and Agent projections from one exact canonical
+  source and freeze evaluator/holdout plus a Git capability snapshot outside
+  candidate ownership.
+- Reason: Host prose synchronization alone cannot prove identical interfaces,
+  bounded authority, absence of autonomous agent trees, or reliable rollback.
+- Evidence: Derived-path and exact-file/byte checks, native host parser tests,
+  frozen evaluator/holdout descriptors with Harness-run cases, projection
+  drift, scoped restoration, and sibling-preservation tests all fail closed
+  before Direct acceptance.
+
+- Decision: Persist a deterministic accepted-task receipt with capability-gap
+  provenance instead of depending on disposable ignored runtime state.
+- Reason: Evolution needs durable terminal/commit/diff/tree evidence after the
+  source worktree is gone. This follows the repository-process/Git trust model;
+  it is not a cryptographic claim against a same-account Git rewriter.

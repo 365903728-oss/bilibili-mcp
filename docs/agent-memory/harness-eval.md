@@ -432,6 +432,45 @@ Candidate metrics:
 - product-source files changed: 0
 - remote operations performed: 0
 
+### 2026-08-13 Harness Eval: Harness v2 Issue #34 governed evolution
+
+- The useful seam is one `evolution` state machine layered on accepted typed
+  memory and the existing Direct controller. It does not need another ticket,
+  lease, evidence, acceptance, or commit implementation.
+- Search proved valuable without installation: immutable upstream artifact and
+  license hashes exposed installed provenance drift, so the honest outcome was
+  deferred instead of silently running unpinned `npx`.
+- The controlled Search pilot verifies immutable upstream bytes, then defers
+  Adapt because no independent trusted machine-evidence provider exists. The
+  safe Build fixture remains declarative: one canonical source produces both
+  native host packages, fixed Harness-run
+  evaluator/holdout cases do not trust caller results, and failure restores the
+  candidate namespace without executing candidate code or clearing siblings.
+- Keep: accepted-gap-only start, exact evolution-owned paths, subsystem
+  derived allowlisted paths, full ignored-state validation, fixed machine-run
+  evaluator/holdout, pinned byte-verified candidate schema, one authorization
+  stop without a self-authorizing resolution route, read-only zero-child agents,
+  exact host-schema and discovery-path conformance, exact drift checks,
+  scoped Git-object rollback, and
+  shared Direct acceptance.
+- Remove: do not add a package manager, daemon, background catalog crawler,
+  separate controller, recursive agent orchestrator, raw install/uninstall
+  command persistence, or product-runtime integration.
+- Residual: a normal-home Doctor still reads every Skill to detect manual
+  metadata, so #34 used an isolated empty-home Doctor and separate safe Search
+  evidence. The known primary Hook overlap remains `action-required`.
+
+Candidate metrics:
+
+- focused evolution tests: 10
+- typed-memory regression tests: 33
+- controlled Search boundary / safe Build paths: 2
+- unsafe external installs / user-global writes: 0 / 0
+- disposable remotes: 0
+- promotion commits per accepted Evolution task: exactly 1
+- product-source files changed: 0
+- remote operations performed: 0
+
 ### 2026-08-13 Harness Eval: Harness v2 Issue #33 typed memory
 
 - Intended outcome: turn explicitly typed, accepted evidence into durable
