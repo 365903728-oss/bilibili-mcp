@@ -847,7 +847,7 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
 
     # ---- Slice 7: positive lifecycle (accept → commit → idempotent) ---------
 
-    def test_slice7_accept_and_commit_positive_lifecycle(self) -> None:
+    def test_shared_fixture_drives_public_paseo_lifecycle(self) -> None:
         """Full lifecycle: bootstrap → dispatch → report → accept → commit
         → second commit idempotent.  Validates the happy path that the
         existing negative-only test does not cover."""
@@ -861,6 +861,16 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         )
         from harness.codex_direct import _diff_digest
 
+        matrix = json.loads(
+            (ROOT / "harness/fixtures/three-adapter-conformance.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        adapter = next(
+            item for item in matrix["adapters"]
+            if item["mode"] == "codex-paseo-claude"
+        )
+
         # Track owned file BEFORE bootstrap so baseline includes it
         (self.repo / "harness").mkdir(parents=True, exist_ok=True)
         owned = self.repo / "harness" / "paseo_collaboration.py"
@@ -870,6 +880,15 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
 
         # Contract with a non-required review check to satisfy accept
         contract = self._contract()
+        contract["execution"]["mode"] = adapter["mode"]
+        contract["writer_lease"]["holder"] = adapter["writer"]
+        contract["acceptance_owner"] = adapter["acceptance_owner"]
+        contract["required_manual_skills"] = [{
+            "name": "implement",
+            "host": adapter["skill_host"],
+            "status": "invoked",
+            "invocation": adapter["skill_invocation"],
+        }]
         contract["plan"]["verification_plan"].append(
             {"id": "review", "command": "code-review", "required": False}
         )
@@ -966,8 +985,9 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
             result = collaboration_accept(ctx, task_id="github-32")
         self.assertEqual(
             result.get("schema"),
-            "harness.codex-paseo-claude-control/v1",
+            adapter["control_schema"],
         )
+        self.assertEqual(result.get("mode"), adapter["mode"])
         accept_sha = result.get("commit_sha")
         self.assertIsNotNone(accept_sha)
         self.assertEqual(result.get("commit_status"), "created")

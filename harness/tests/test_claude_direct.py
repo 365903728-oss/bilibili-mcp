@@ -550,10 +550,12 @@ class ClaudeDirectProcessTests(unittest.TestCase):
         self.assertNotIn("fallback", json.dumps(payload).lower())
 
     def test_shared_fixture_drives_both_public_direct_lifecycles(self) -> None:
-        fixture_path = ROOT / "harness" / "fixtures" / "direct-adapter-conformance.json"
+        fixture_path = ROOT / "harness" / "fixtures" / "three-adapter-conformance.json"
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
-        for adapter in fixture["adapters"]:
+        for adapter in (
+            item for item in fixture["adapters"] if item["lifecycle"] == "direct"
+        ):
             with self.subTest(mode=adapter["mode"]):
                 repo = self.root / f"conformance-{adapter['writer']}"
                 repo.mkdir()

@@ -1,0 +1,70 @@
+{
+  "matrix_digest": "fe73405b5cf670b84e5cb3597c2d0d769ae8b6ceaa8d5930be602ec1ca11e013",
+  "migration": {
+    "checks": {
+      "clean-room": "pass",
+      "durable-memory": "pass",
+      "package-exclusion": "pass",
+      "product-verification": "pass"
+    },
+    "file": "migration.json",
+    "sha256": "13fe467e9be0c0c351e5cee288afffe864621157616bea765a9862c74114c62b"
+  },
+  "pilots": [
+    {
+      "checks": {
+        "adapter-failure-stop-and-report": "pass",
+        "canonical-worktree-dirty-primary-isolation": "pass",
+        "capability-discovery-drift": "pass",
+        "exact-one-local-commit-no-remote": "pass",
+        "manual-skill-reminder-no-write": "pass",
+        "mode-frozen-before-write": "pass",
+        "ordinary-full-access-no-noise": "pass",
+        "protected-effects": "pass",
+        "second-writer-rejected": "pass",
+        "typed-memory-evolution": "pass",
+        "typed-redacted-events": "pass"
+      },
+      "file": "codex-direct.json",
+      "mode": "codex-direct",
+      "sha256": "b3da9ccd9ac6505112291cbfd1723cd584692ae0ce27324905146753c884e63e"
+    },
+    {
+      "checks": {
+        "adapter-failure-stop-and-report": "pass",
+        "canonical-worktree-dirty-primary-isolation": "pass",
+        "capability-discovery-drift": "pass",
+        "exact-one-local-commit-no-remote": "pass",
+        "manual-skill-reminder-no-write": "pass",
+        "mode-frozen-before-write": "pass",
+        "ordinary-full-access-no-noise": "pass",
+        "protected-effects": "pass",
+        "second-writer-rejected": "pass",
+        "typed-memory-evolution": "pass",
+        "typed-redacted-events": "pass"
+      },
+      "file": "claude-direct.json",
+      "mode": "claude-direct",
+      "sha256": "1468005b7ea48dbd2747cec7bc1d2bfbd2dcc469af9156218a10a8cfa77ffc0f"
+    },
+    {
+      "checks": {
+        "adapter-failure-stop-and-report": "pass",
+        "canonical-worktree-dirty-primary-isolation": "pass",
+        "capability-discovery-drift": "pass",
+        "exact-one-local-commit-no-remote": "pass",
+        "manual-skill-reminder-no-write": "pass",
+        "mode-frozen-before-write": "pass",
+        "ordinary-full-access-no-noise": "pass",
+        "protected-effects": "pass",
+        "second-writer-rejected": "pass",
+        "typed-memory-evolution": "pass",
+        "typed-redacted-events": "pass"
+      },
+      "file": "codex-paseo-claude.json",
+      "mode": "codex-paseo-claude",
+      "sha256": "9a66c9a7a053e063302e718dca2257396d4039498a87619cd07a5f9a16496f42"
+    }
+  ],
+  "schema": "harness.adapter-pilot-evidence/v1"
+}

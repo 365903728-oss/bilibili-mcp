@@ -2075,3 +2075,77 @@ Six release blockers fixed; one regression proof per root cause (new tests
 - Static/boundary: Black, Ruff, `py_compile`, `git diff --check`, and strict
   UTF-8 over all 16 intended paths pass. Independent risk re-review closes all
   findings and reports no remaining live #35 blocker.
+
+## 2026-08-14 — Harness v2 Issue #36 checkpoint
+
+- Baseline/mode: clean independent worktree froze exact #35 HEAD
+  `8de058e772e97a6ab8d16d65386081db76953320` on branch
+  `codex/harness-v2-three-adapter-conformance-36`; `codex-direct` is frozen and
+  a repeated start is rejected while its writer lease is active.
+- TDD: missing three-adapter fixture, missing per-pilot/migration matrix,
+  missing explicit event provenance/sensitivity/digest/terminal state, and an
+  incorrect Paseo public-command label each failed before the shared fix.
+- Focused current-diff checks: contract/events/Direct fixture 21/21 in 22.343s;
+  writer/authority/recovery/exact-commit 7/7 in 33.230s; typed memory 3/3 in
+  21.834s; three-adapter Evolution surface 1/1 in 170.520s;
+  promotion/rejection/rollback 1/1 in 98.519s; evaluator/projection-drift
+  rollback 1/1 in 41.808s.
+- Real Direct pilots: Codex accepted commit `0cadc18c...`; Claude safe-mode
+  implementation and acceptance produced `a81fef21...`. Each pilot is one
+  commit above its seed, changes only `pilot.txt`, is clean after acceptance,
+  has no remote, rejects a second start, emits one deduplicated missing-manual-
+  Skill reminder with zero writes, and records attributed redacted active/stop
+  events. Intentional Claude adapter failure entered `recovery-required` with
+  `adapter_switch_policy=stop-and-report` and no changed paths.
+- Paseo pilot: after explicit user authority, one `paseo start` launched 0.3.1.
+  Provider initialization moved from `loading` to a green preflight for frozen
+  `claude/deepseek-v4-flash`, with no restart or fallback. Agent
+  `f4a4fec4-fb93-4a84-8c8c-556aeb08488c` received the digest-bound handoff,
+  changed only `pilot.txt`, stopped idle, and returned a validated report.
+  Codex review accepted commit `27fba0dce64fb591a30f0651979940089c667fb0`:
+  exactly one commit above base, clean, released lease, and no remote.
+- Inconclusive evidence: an initial parallel parent batch timed out at 304s and
+  returned no child results, so it is not counted as green. Its required short
+  shards were rerun independently; long Evolution cases were run separately.
+- Independent risk review: the shared fixture now drives the public Paseo
+  lifecycle, and pilot evidence is no longer a self-certified summary. Native
+  controller/Recovery state passes production validation, Git objects and
+  event digests are recomputed, package contents are compared with a live dry
+  run, durable files are rehashed, and clean-room bytes are compared directly
+  with exact #35 Git objects. The same reviewer closed both High findings;
+  the three pilot artifacts now carry that production/Git/ledger evidence.
+  Migration/index verification passes against the independent artifacts,
+  current durable-file hashes, live package dry run, and exact clean-room Git
+  objects.
+- Product/package checkpoint: after worktree-local `npm ci --ignore-scripts`,
+  build passed, Vitest passed 41 files / 862 tests in 6.82s, and `npm pack
+  --dry-run --json --ignore-scripts` returned 185 files with zero forbidden
+  Harness/runtime/Recovery/memory paths. A production-only audit was
+  inconclusive on a registry TLS disconnect and was not retried or reported as
+  green; the product and lockfile remain unchanged from accepted #35.
+- Final risk-weighted Harness shard passed 26/26 in 75.307s across the shared
+  contracts/events, Direct conformance/authority/exact-commit/Recovery, and
+  Paseo shared lifecycle/duplicate-dispatch/Recovery cases. Valid earlier typed
+  memory and governed-Evolution receipts were reused rather than rerunning the
+  long cases without an implementation change.
+- Final byte/scope gates: formatting-only churn in the two historical lifecycle
+  test files was removed, leaving only the shared-matrix deltas. The two
+  affected lifecycle tests and migration evidence test pass 3/3. Strict UTF-8
+  covers 22 paths; focused Black, Python compilation, git diff --check, and the
+  high-confidence secret-value scan pass. The dirty primary fingerprint remains
+  exact: 68 status rows, SHA-256
+  a4bbfb6dc821d203291ec664843d23f818db293aad8af1975f1190f33e5f8423,
+  zero staged paths, and 44 untracked paths.
+- Independent final risk review: PASS after correcting this durable-state
+  wording. Both earlier High findings remain closed; no reproducible
+  acceptance, security, or data-integrity defect remains.
+- Acceptance contract recovery: the first main run failed closed before
+  verifying because broad owned path `harness/` overlapped immutable
+  governed-Evolution roots. It produced a typed Recovery Bundle with
+  fingerprint
+  `ea11fa7123898b0e3e8d5a231daa408abc55529fa2814126dd810349f046b940`.
+  The same Codex writer used a reversible local stash to freeze a recovery
+  continuation on the exact #35 base with the same mode/worktree and 23 exact
+  Issue-owned paths, then restored all 23 changes. No kernel/evaluator/holdout
+  edit, adapter switch, second implementation actor, commit, or remote effect
+  occurred.

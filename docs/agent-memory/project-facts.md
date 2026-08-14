@@ -681,3 +681,26 @@
   limits, yields to new user input, and prohibits adapter switches.
 - Impact: Declaring a policy is insufficient; promotion evidence is generated
   by the shared CLI and remains subordinate to Direct acceptance.
+
+## 2026-08-14 — Harness v2 Issue #36 checkpoint
+
+- Fact: All three execution adapters now share one versioned conformance
+  matrix in addition to the existing typed task contract and constitutional
+  kernel.
+- Evidence: `three-adapter-conformance.json` enumerates the three public mode
+  commands, lifecycle kind, writer, acceptance owner, native invocation,
+  run/control schemas, eleven pilot checks, and four migration checks. Direct
+  contract/lifecycle tests consume the same fixture; no controller was copied.
+- Impact: Adapter comparison is an explicit project-owned acceptance surface,
+  while mode-specific transport remains in the accepted Direct/Paseo seams.
+
+- Fact: Real Codex Direct, Claude Direct, and Paseo-managed Claude #36 pilots
+  are accepted with one scoped local commit each and no remote.
+- Evidence: Disposable clean repositories accepted only `pilot.txt` as commits
+  `0cadc18c9cd85733875929e49130b847a204e1be` and
+  `a81fef21b17330613729b5a67f13386c4ad651ec`, and
+  `27fba0dce64fb591a30f0651979940089c667fb0`. Claude Direct ran in safe mode;
+  the Paseo agent used the frozen provider, handoff digest, worktree, writer
+  lease, and acceptance owner after one user-authorized daemon start.
+- Impact: Mocked adapter tests are not used as substitutes for any of the three
+  required real runtime pilots.

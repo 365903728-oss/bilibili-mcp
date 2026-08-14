@@ -46,6 +46,22 @@ class HookEventTests(unittest.TestCase):
         self.assertEqual(codex["schema"], "harness.hook-event/v1")
         self.assertEqual(claude["schema"], "harness.hook-event/v1")
 
+    def test_typed_events_bind_redacted_provenance_and_terminal_state(self) -> None:
+        payload = {"session_id": "fixture", "tool_name": "Read"}
+        codex = normalize_hook_event("codex", "post-tool-use", payload)
+        claude = normalize_hook_event("claude", "post-tool-use", payload)
+        stopped = normalize_hook_event("claude", "stop", payload)
+
+        self.assertEqual(
+            codex["provenance"],
+            {"adapter": "codex", "host_event": "post-tool-use"},
+        )
+        self.assertEqual(codex["sensitivity"], "metadata")
+        self.assertEqual(codex["terminal_state"], "active")
+        self.assertEqual(stopped["terminal_state"], "stopped")
+        self.assertRegex(codex["digest"], r"^[0-9a-f]{64}$")
+        self.assertNotEqual(codex["digest"], claude["digest"])
+
     def test_claude_success_message_is_not_misclassified_as_failure(self) -> None:
         event = normalize_hook_event(
             "claude", "post-tool-use", load_fixture("claude-post-tool-use.json")

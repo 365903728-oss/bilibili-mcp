@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,7 +19,8 @@ from harness.capabilities import (
     doctor_report,
 )
 from harness.cli import _hook_control, main
-from harness.context import discover_worktree
+from harness.codex_direct import _validate_recovery_bundle_shape, _validate_run_shape
+from harness.context import WorktreeContext, discover_worktree
 from harness.events import normalize_hook_event
 from harness.safe_io import read_bounded_jsonl
 
@@ -26,6 +29,502 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class CliAndAdapterTests(unittest.TestCase):
+    def test_three_adapter_conformance_uses_one_contract_and_kernel(self) -> None:
+        fixture = json.loads(
+            (
+                ROOT / "harness" / "fixtures" / "three-adapter-conformance.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(fixture["schema"], "harness.adapter-conformance/v1")
+        self.assertEqual(fixture["contract_schema"], "harness.task-contract/v1")
+        self.assertEqual(fixture["constitutional_kernel"], "RULES.md")
+        self.assertEqual(
+            {adapter["mode"] for adapter in fixture["adapters"]},
+            {"codex-direct", "claude-direct", "codex-paseo-claude"},
+        )
+        self.assertEqual(
+            fixture["pilot_checks"],
+            [
+                "mode-frozen-before-write",
+                "second-writer-rejected",
+                "manual-skill-reminder-no-write",
+                "adapter-failure-stop-and-report",
+                "ordinary-full-access-no-noise",
+                "protected-effects",
+                "exact-one-local-commit-no-remote",
+                "canonical-worktree-dirty-primary-isolation",
+                "typed-redacted-events",
+                "capability-discovery-drift",
+                "typed-memory-evolution",
+            ],
+        )
+        self.assertEqual(
+            fixture["migration_checks"],
+            [
+                "product-verification",
+                "package-exclusion",
+                "durable-memory",
+                "clean-room",
+            ],
+        )
+
+    def test_real_pilots_cover_the_shared_conformance_matrix(self) -> None:
+        fixture_root = ROOT / "harness" / "fixtures"
+        artifact_root = fixture_root / "pilot-artifacts"
+        matrix = json.loads(
+            (fixture_root / "three-adapter-conformance.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        evidence = json.loads(
+            (fixture_root / "three-adapter-pilot-evidence.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        def digest(value: object) -> str:
+            return hashlib.sha256(
+                json.dumps(
+                    value,
+                    ensure_ascii=True,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+
+        def exact_keys(value: dict[str, object], expected: set[str]) -> None:
+            self.assertEqual(set(value), expected)
+
+        def load_artifact(reference: dict[str, object]) -> dict[str, object]:
+            exact_keys(reference, {"file", "sha256", "checks"})
+            name = reference["file"]
+            self.assertIsInstance(name, str)
+            self.assertEqual(Path(name).name, name)
+            raw = (artifact_root / name).read_bytes()
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), reference["sha256"])
+            return json.loads(raw)
+
+        def git_object_id(kind: str, raw: bytes) -> str:
+            header = f"{kind} {len(raw)}\0".encode("ascii")
+            return hashlib.sha1(header + raw).hexdigest()
+
+        def tree_object_id(entries: list[dict[str, str]]) -> str:
+            raw = b"".join(
+                entry["mode"].encode("ascii")
+                + b" "
+                + entry["name"].encode("utf-8")
+                + b"\0"
+                + bytes.fromhex(entry["oid"])
+                for entry in sorted(entries, key=lambda item: item["name"].encode())
+            )
+            return git_object_id("tree", raw)
+
+        def validate_run(run: dict) -> None:
+            execution = run["contract"]["execution"]
+            context = WorktreeContext(
+                root=ROOT,
+                git_dir=ROOT / ".git",
+                common_git_dir=ROOT / ".git",
+                head_sha=run["baseline"]["head_sha"],
+                worktree_id=execution["worktree_id"],
+                repository_id=execution["repository_id"],
+            )
+            _validate_run_shape(run, context, run["contract"]["task"]["id"])
+
+        exact_keys(evidence, {"schema", "matrix_digest", "pilots", "migration"})
+        self.assertEqual(evidence["schema"], "harness.adapter-pilot-evidence/v1")
+        self.assertEqual(evidence["matrix_digest"], digest(matrix))
+        self.assertEqual(
+            {pilot["mode"] for pilot in evidence["pilots"]},
+            {adapter["mode"] for adapter in matrix["adapters"]},
+        )
+        pilot_artifacts = []
+        for reference in evidence["pilots"]:
+            with self.subTest(mode=reference["mode"]):
+                exact_keys(reference, {"mode", "file", "sha256", "checks"})
+                self.assertEqual(set(reference["checks"]), set(matrix["pilot_checks"]))
+                self.assertEqual(set(reference["checks"].values()), {"pass"})
+                artifact = load_artifact(
+                    {key: reference[key] for key in ("file", "sha256", "checks")}
+                )
+                pilot_artifacts.append(artifact)
+                exact_keys(
+                    artifact,
+                    {
+                        "schema",
+                        "mode",
+                        "controller_run",
+                        "git",
+                        "events",
+                        "manual_gate",
+                        "recovery",
+                        "authority",
+                        "capability",
+                        "memory_evolution",
+                    },
+                )
+                self.assertEqual(artifact["schema"], "harness.pilot-artifact/v1")
+                self.assertEqual(artifact["mode"], reference["mode"])
+                adapter = next(
+                    item
+                    for item in matrix["adapters"]
+                    if item["mode"] == artifact["mode"]
+                )
+
+                run = artifact["controller_run"]
+                validate_run(run)
+                self.assertEqual(run["schema"], adapter["run_schema"])
+                self.assertEqual(run["state"], "accepted")
+                self.assertEqual(run["contract"]["execution"]["mode"], artifact["mode"])
+                self.assertEqual(
+                    run["contract"]["writer_lease"],
+                    {"holder": adapter["writer"], "state": "released"},
+                )
+                self.assertEqual(run["accepted_diff"]["paths"], ["pilot.txt"])
+                self.assertEqual(run["commit_sha"], artifact["git"]["accepted"]["oid"])
+
+                git = artifact["git"]
+                exact_keys(
+                    git,
+                    {
+                        "base",
+                        "accepted",
+                        "trees",
+                        "files",
+                        "commit_count",
+                        "changed_paths",
+                        "remote_effects",
+                    },
+                )
+                self.assertEqual(git["commit_count"], 1)
+                self.assertEqual(git["changed_paths"], ["pilot.txt"])
+                self.assertEqual(git["remote_effects"], [])
+                for name in ("base", "accepted"):
+                    commit = git[name]
+                    exact_keys(commit, {"oid", "raw"})
+                    raw = commit["raw"].encode("utf-8")
+                    self.assertEqual(git_object_id("commit", raw), commit["oid"])
+                    tree_line = next(
+                        line
+                        for line in commit["raw"].splitlines()
+                        if line.startswith("tree ")
+                    )
+                    self.assertEqual(
+                        tree_line.removeprefix("tree "),
+                        tree_object_id(git["trees"][name]),
+                    )
+                self.assertIn(f"parent {git['base']['oid']}\n", git["accepted"]["raw"])
+                self.assertEqual(run["baseline"]["head_sha"], git["base"]["oid"])
+                for tree in git["trees"].values():
+                    for entry in tree:
+                        exact_keys(entry, {"mode", "name", "oid"})
+                        self.assertEqual(entry["mode"], "100644")
+                        content = git["files"][entry["name"]].encode("utf-8")
+                        self.assertEqual(entry["oid"], git_object_id("blob", content))
+                base_paths = {entry["name"] for entry in git["trees"]["base"]}
+                accepted_paths = {entry["name"] for entry in git["trees"]["accepted"]}
+                self.assertEqual(accepted_paths - base_paths, {"pilot.txt"})
+                pilot_digest = hashlib.sha256(
+                    git["files"]["pilot.txt"].encode("utf-8")
+                ).hexdigest()
+                self.assertEqual(
+                    run["accepted_diff"]["snapshot"][0]["digest"], pilot_digest
+                )
+
+                self.assertEqual(
+                    artifact["manual_gate"],
+                    {
+                        "first": "reminder-emitted",
+                        "second": "already-reminded",
+                        "implementation_write_count": 0,
+                    },
+                )
+                exact_keys(artifact["recovery"], {"run", "bundle"})
+                recovery_run = artifact["recovery"]["run"]
+                recovery_bundle = artifact["recovery"]["bundle"]
+                validate_run(recovery_run)
+                _validate_recovery_bundle_shape(
+                    recovery_bundle,
+                    recovery_run,
+                    recovery_run["recovery_bundle"],
+                )
+                self.assertEqual(
+                    recovery_bundle["adapter_switch_policy"], "stop-and-report"
+                )
+                self.assertEqual(recovery_bundle["changed_path_count"], 0)
+                self.assertEqual(
+                    artifact["authority"],
+                    {
+                        "ordinary": "allowed",
+                        "ssh": "blocked",
+                        "publish": "user-authorization-required",
+                        "second_writer": "rejected",
+                    },
+                )
+                self.assertEqual(artifact["capability"]["status"], "pass")
+                self.assertEqual(artifact["memory_evolution"]["status"], "pass")
+                exact_keys(artifact["capability"], {"status", "command_id"})
+                exact_keys(artifact["memory_evolution"], {"status", "command_id"})
+                self.assertEqual(
+                    {event["terminal_state"] for event in artifact["events"]},
+                    {"active", "stopped"},
+                )
+                for event in artifact["events"]:
+                    exact_keys(
+                        event,
+                        {
+                            "schema",
+                            "timestamp",
+                            "source_adapter",
+                            "provenance",
+                            "sensitivity",
+                            "digest",
+                            "terminal_state",
+                            "session_id",
+                            "event_id",
+                            "semantic",
+                            "repository_id",
+                            "worktree_id",
+                            "head_sha",
+                        },
+                    )
+                    event_source = {
+                        key: event[key]
+                        for key in (
+                            "session_id",
+                            "provenance",
+                            "sensitivity",
+                            "terminal_state",
+                            "semantic",
+                        )
+                    }
+                    self.assertEqual(event["digest"], digest(event_source))
+                    self.assertEqual(event["event_id"], event["digest"][:20])
+                    self.assertEqual(event["sensitivity"], "metadata")
+                    exact_keys(event["provenance"], {"adapter", "host_event"})
+                    exact_keys(
+                        event["semantic"],
+                        {
+                            "event",
+                            "tool_class",
+                            "category",
+                            "outcome",
+                            "exit_code",
+                            "has_error",
+                        },
+                    )
+
+        migration_reference = evidence["migration"]
+        migration = load_artifact(migration_reference)
+        self.assertEqual(
+            set(migration_reference["checks"]), set(matrix["migration_checks"])
+        )
+        self.assertEqual(set(migration_reference["checks"].values()), {"pass"})
+        exact_keys(
+            migration,
+            {
+                "schema",
+                "primary_checkout",
+                "commands",
+                "package",
+                "durable_memory",
+                "clean_room",
+            },
+        )
+        self.assertEqual(migration["schema"], "harness.migration-artifact/v1")
+        primary = migration["primary_checkout"]
+        exact_keys(
+            primary,
+            {
+                "head_sha",
+                "branch",
+                "status_digest_before",
+                "status_digest_after",
+                "receipt_digest",
+            },
+        )
+        self.assertEqual(
+            primary["status_digest_before"], primary["status_digest_after"]
+        )
+        self.assertEqual(
+            primary["receipt_digest"],
+            digest(
+                {
+                    key: value
+                    for key, value in primary.items()
+                    if key != "receipt_digest"
+                }
+            ),
+        )
+        expected_commands = {
+            "product-build": "npm run build",
+            "product-tests": "npm test",
+            "harness-tests": (
+                "python -m unittest harness.tests.test_contracts "
+                "harness.tests.test_events "
+                "harness.tests.test_claude_direct.ClaudeDirectProcessTests."
+                "test_shared_fixture_drives_both_public_direct_lifecycles "
+                "harness.tests.test_claude_direct.ClaudeDirectProcessTests."
+                "test_guard_matches_the_shared_direct_authority_matrix "
+                "harness.tests.test_claude_direct.ClaudeDirectProcessTests."
+                "test_full_path_creates_exactly_one_scoped_local_commit_without_remote_effects "
+                "harness.tests.test_claude_direct.ClaudeDirectProcessTests."
+                "test_repeated_failure_without_progress_emits_a_complete_recovery_bundle "
+                "harness.tests.test_paseo_collaboration.PaseoCollaborationFunctionTests."
+                "test_shared_fixture_drives_public_paseo_lifecycle "
+                "harness.tests.test_paseo_collaboration.PaseoCollaborationFunctionTests."
+                "test_dispatch_rejects_second_call "
+                "harness.tests.test_paseo_collaboration.PaseoCollaborationFunctionTests."
+                "test_recovery_preserves_lease_and_mode"
+            ),
+            "typed-memory-evolution-tests": (
+                "python -m unittest issue36-typed-memory-evolution-final"
+            ),
+        }
+        commands = {item["id"]: item for item in migration["commands"]}
+        self.assertEqual(set(commands), set(expected_commands))
+        for command_id, command in commands.items():
+            exact_keys(
+                command,
+                {
+                    "id",
+                    "argv_digest",
+                    "status",
+                    "exit_code",
+                    "stdout_digest",
+                    "stderr_digest",
+                    "sensitivity",
+                    "receipt_digest",
+                },
+            )
+            self.assertEqual(
+                command["argv_digest"], digest(expected_commands[command_id])
+            )
+            self.assertEqual(command["status"], "pass")
+            self.assertEqual(command["exit_code"], 0)
+            self.assertEqual(command["sensitivity"], "metadata")
+            self.assertRegex(command["stdout_digest"], r"^[0-9a-f]{64}$")
+            self.assertRegex(command["stderr_digest"], r"^[0-9a-f]{64}$")
+            self.assertEqual(
+                command["receipt_digest"],
+                digest(
+                    {
+                        key: value
+                        for key, value in command.items()
+                        if key != "receipt_digest"
+                    }
+                ),
+            )
+        for artifact in pilot_artifacts:
+            self.assertIn(artifact["capability"]["command_id"], commands)
+            self.assertIn(artifact["memory_evolution"]["command_id"], commands)
+        package = migration["package"]
+        exact_keys(package, {"pack_output", "output_digest"})
+        live_pack = subprocess.run(
+            [
+                shutil.which("npm") or "npm",
+                "pack",
+                "--dry-run",
+                "--json",
+                "--ignore-scripts",
+            ],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        live_pack_output = json.loads(live_pack.stdout)
+        self.assertEqual(package["pack_output"], live_pack_output)
+        self.assertEqual(package["output_digest"], digest(live_pack_output))
+        package_files = [item["path"] for item in live_pack_output[0]["files"]]
+        forbidden = (
+            "harness/",
+            ".harness/",
+            "docs/agent-memory/",
+            "recovery-bundle",
+            "events.jsonl",
+        )
+        self.assertFalse(
+            [
+                path
+                for path in package_files
+                if path.startswith(forbidden)
+                or any(marker in path for marker in forbidden[3:])
+            ]
+        )
+        required_memory = {
+            "docs/agent-memory/project-facts.md",
+            "docs/agent-memory/decisions.md",
+            "docs/agent-memory/lessons-learned.md",
+            "docs/agent-memory/codemap.md",
+            "docs/agent-memory/harness-security.md",
+            "docs/agent-memory/harness-eval.md",
+            "docs/agent-memory/verification-log.md",
+        }
+        durable_memory = migration["durable_memory"]
+        self.assertTrue(required_memory.issubset(durable_memory))
+        for relative, expected_digest in durable_memory.items():
+            self.assertEqual(
+                hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(),
+                expected_digest,
+            )
+        clean_room = migration["clean_room"]
+        exact_keys(clean_room, {"base_sha", "copied_external_code", "paths"})
+        self.assertFalse(clean_room["copied_external_code"])
+        self.assertEqual(
+            clean_room["base_sha"], "8de058e772e97a6ab8d16d65386081db76953320"
+        )
+        self.assertEqual(
+            set(clean_room["paths"]),
+            {
+                "RULES.md",
+                "harness/evolution.py",
+                "harness/fixtures/evolution-build-capability.json",
+                "harness/fixtures/evolution-build-surface.json",
+            },
+        )
+        for relative in clean_room["paths"]:
+            baseline = subprocess.check_output(
+                ["git", "show", f"{clean_room['base_sha']}:{relative}"],
+                cwd=ROOT,
+            )
+            current = subprocess.check_output(
+                ["git", "show", f"HEAD:{relative}"], cwd=ROOT
+            )
+            self.assertEqual(baseline, current)
+            subprocess.run(
+                ["git", "diff", "--quiet", "--", relative],
+                cwd=ROOT,
+                check=True,
+            )
+
+        forbidden_raw_keys = {
+            "command",
+            "stdout",
+            "stderr",
+            "environment",
+            "env",
+            "credential",
+            "credentials",
+            "secret",
+            "token",
+        }
+
+        def all_keys(value: object) -> set[str]:
+            if isinstance(value, dict):
+                return set(value) | {
+                    key for child in value.values() for key in all_keys(child)
+                }
+            if isinstance(value, list):
+                return {key for child in value for key in all_keys(child)}
+            return set()
+
+        self.assertTrue(forbidden_raw_keys.isdisjoint(all_keys(evidence)))
+        self.assertTrue(forbidden_raw_keys.isdisjoint(all_keys(pilot_artifacts)))
+        self.assertTrue(forbidden_raw_keys.isdisjoint(all_keys(migration)))
+
     def test_doctor_reports_three_adapters_without_provider_or_model(self) -> None:
         report = doctor_report(ROOT)
         self.assertEqual(report["schema"], "harness.doctor/v1")

@@ -461,3 +461,31 @@
   crossed a process boundary. Sorting fixed the shared root.
 - Future behavior: Canonicalize all set-like evidence before hashing,
   persisting, or presenting an idempotent authorization request.
+
+## 2026-08-14 — Harness v2 Issue #36 checkpoint
+
+- Lesson: Acquire the formal writer lease before preserving TDD edits, even
+  after the user has selected the mode and the branch exists.
+- Evidence: The first red/green draft preceded `codex-direct start`; it was
+  reverted to the exact clean #35 tree, the run froze the baseline and acquired
+  the lease, and the verified patch was then replayed unchanged.
+- Future behavior: Treat branch creation and controller writer acquisition as
+  one pre-write gate, then begin the first red test.
+
+- Lesson: Parallel long verification can erase useful evidence when the parent
+  batch times out even if shorter shards finished.
+- Evidence: One three-shard batch reached its 304-second parent limit without
+  returning child results. Subsequent short shards and each Evolution case were
+  run once independently and returned explicit green results.
+- Future behavior: Parallelize only similarly bounded checks; give long
+  Evolution cases their own process and timeout.
+
+- Lesson: A collaboration contract's canonical worktree is a byte-exact host
+  path, not merely a path that resolves to the same directory.
+- Evidence: The first real Paseo bootstrap rejected a forward-slash Windows
+  path before agent creation. Rewriting only that field to the canonical
+  backslash form and recomputing the bridge contract digest produced a valid
+  launch; no duplicate agent or implementation write existed.
+- Future behavior: Derive collaboration `canonical_worktree` from the same
+  resolved `Path` representation used by worktree discovery before freezing
+  the bridge trigger.

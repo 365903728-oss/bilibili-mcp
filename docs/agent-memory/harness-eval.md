@@ -432,6 +432,35 @@ Candidate metrics:
 - product-source files changed: 0
 - remote operations performed: 0
 
+### 2026-08-14 Harness Eval: Issue #36 checkpoint
+
+- Keep: one shared typed contract/kernel, one fixture-backed matrix, public
+  mode commands, source-bound leases, typed redacted evidence, exact local
+  commits, and disposable real pilots.
+- Change: event identity now includes adapter provenance, sensitivity, and
+  terminal state in its full digest; all three adapters are compared against
+  the same pilot and migration check IDs.
+- Remove: the two-Direct-only fixture and any implication that #35 repository-
+  local smoke alone proves an actual runtime pilot.
+- Result: all three real pilots are accepted. The user-authorized Paseo start
+  led to an available frozen Claude provider; bootstrap/dispatch/report/review/
+  accept created exactly one Paseo pilot commit with no restart, fallback, or
+  remote. Final migration/index evidence is verified separately before the
+  #36 controller accepts the repository diff.
+
+Checkpoint metrics:
+
+- focused shared contract/event tests: 21 pass
+- focused writer/authority/recovery/exact-commit tests: 7 pass
+- focused typed-memory tests: 3 pass
+- governed Evolution cases: 3 pass, including three-adapter surface,
+  promotion/rejection/rollback, and evaluator/projection-drift rollback
+- accepted real pilots / required pilots: 3 / 3
+- accepted pilot commits / remotes: 3 / 0
+- final risk-weighted Harness shard: 26 / 26 in 75.307s
+- product-source files changed: 0
+- remote operations performed: 0
+
 ### 2026-08-14 Harness Eval: Issue #35 review convergence
 
 - Independent read-only review found four acceptance-impacting gaps before

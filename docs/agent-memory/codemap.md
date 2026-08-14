@@ -345,6 +345,20 @@ Governed capability evolution:
 - `harness/fixtures/evolution-build-surface.json`: dependency/script/executable-
   free v2 CLI Build fixture; tests derive MCP, Hook, and Loop variants from the
   same canonical safe source.
+- `harness/fixtures/three-adapter-conformance.json`: #36 shared matrix for the
+  typed contract, constitutional kernel, per-pilot checks, migration checks,
+  public mode commands, writers, acceptance owners, native manual invocations,
+  and run/control schemas. Direct and collaboration lifecycles reuse their
+  existing controllers; this fixture adds no fourth controller.
+- `harness/fixtures/three-adapter-pilot-evidence.json` and
+  `harness/fixtures/pilot-artifacts/*.json`: thin migration index plus native
+  controller/Recovery snapshots, recomputable Git commit/tree/blob objects,
+  typed event rows, and bounded authority receipts for all three real pilots.
+  The migration artifact binds command receipts, live package output, durable
+  file hashes, dirty-primary isolation, and exact-#35 clean-room bytes.
+- `harness/events.py::normalize_hook_event`: shared #36 redaction seam that
+  binds adapter/host-event provenance, metadata sensitivity, terminal state,
+  and a full digest before persistence under the canonical worktree identity.
 - `harness/tests/test_evolution.py`, `test_events.py`, and
   `test_cli_and_adapters.py`: v2 Search/Adapt/Build, dangerous-effect authority,
   all-three-adapter discovery/smoke, Hook policy/evidence, Loop stop/yield/no-

@@ -702,3 +702,32 @@
 - Evidence: Candidate-bound official, MCP Registry, npm version, and immutable
   GitHub response parsers reject a forged result even when its HTTPS bytes and
   digest are otherwise valid.
+
+## 2026-08-14 — Harness v2 Issue #36 checkpoint
+
+- Decision: Express migration acceptance as one fixture-backed matrix plus
+  real adapter evidence, not a new orchestration controller.
+- Reason: Contract, authority, lease, evidence, Recovery, memory, Evolution,
+  and exact-commit behavior already live in the accepted shared core. The
+  integration ticket only needs a common comparison surface and current-
+  baseline evidence.
+- Evidence: The Direct lifecycle filters the shared fixture by lifecycle kind;
+  the generic contract test validates all modes and public mode commands.
+
+- Decision: Bind Hook-event provenance and terminal state inside the redacted
+  digest source.
+- Reason: A truncated digest over session plus semantic data could collide
+  across hosts and did not explicitly prove sensitivity or terminal state.
+- Evidence: Equivalent Codex/Claude semantics now retain distinct full digests,
+  metadata sensitivity, adapter/host-event provenance, and active/stopped state
+  without storing the raw payload.
+
+- Decision: Start the Paseo daemon only after explicit task-local user
+  authority, then freeze the resolved provider and forbid restart, switching,
+  or fallback throughout the pilot.
+- Reason: The real third pilot is required by #36, but that requirement does
+  not erase the adapter's external-process authority gate.
+- Evidence: `paseo start` was called once after authorization; preflight bound
+  Paseo 0.3.1 and `claude/deepseek-v4-flash` with
+  `restarted_daemon=false` and `fallback_chosen=false`; the accepted run kept
+  `codex-paseo-claude` through commit and lease release.

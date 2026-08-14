@@ -8,18 +8,33 @@ is #30 `cbd31b952aa9f820005e60852bcd2d4db886a31c` → #31
 `5e9de4bace35a2ca4b9c83b5a0d81ebb627df6fb` → #32
 `9cbb8de64ffedefd682517e203841dd137b75662` → #33
 `1cd12c8a6edab272bd16ad5ecb8ba2ae4bd90cf8` → #34
-`493393c9ef4941e5ff8dc7b66acaa6cd9d06d7ce`. The live Issues remain open
+`493393c9ef4941e5ff8dc7b66acaa6cd9d06d7ce` → #35
+`8de058e772e97a6ab8d16d65386081db76953320`. The live Issues remain open
 because Issue-close and remote-write authority were not granted.
 
-Issue #35, `Governed MCP, CLI, Hook, and Loop evolution`, is acceptance-ready
-after independent risk review and final current-diff verification on branch
-`codex/harness-v2-mcp-cli-hook-loop-evolution-35` from the exact accepted #34
-commit. The user froze `codex-direct`; Codex holds the only writer lease and no
-Paseo/Claude implementation writer was launched. It extends the existing
-Evolution governor with a versioned surface contract, repository-local
-discovery/smoke, bounded Loop decisions, and Hook-specific evidence while
-reusing the accepted gap, state, evaluator, rollback, report, Recovery Bundle,
-acceptance, and exact-one-commit seams.
+Issue #36, `Three-adapter conformance, real pilots, and migration acceptance`,
+is active on branch `codex/harness-v2-three-adapter-conformance-36` from the
+exact accepted #35 commit. The user selected `codex-direct` once; that mode is
+frozen and Codex holds the only active implementation writer lease. The shared
+conformance fixture now names all three public modes against one typed contract
+and `RULES.md` kernel, while the shared Hook-event projection carries explicit
+provenance, metadata sensitivity, a full digest, and active/stopped terminal
+state without raw host payloads. Real bounded Codex Direct and Claude Direct
+pilots are accepted in isolated zero-remote repositories with one scoped commit
+each. After explicit user authority for one `paseo start`, the third real pilot
+used Paseo 0.3.1 with `claude/deepseek-v4-flash`, created only `pilot.txt`, and
+was accepted as commit `27fba0dce64fb591a30f0651979940089c667fb0` with a
+released Claude lease and zero remote effects. No restart, adapter switch, or
+fallback occurred. Migration/index, package exclusion, secret/diff, and dirty
+primary isolation gates are green. Harness acceptance and the single #36-owned
+local commit are the remaining active steps.
+
+The first main acceptance run stopped in a Recovery Bundle because its frozen
+owned path `harness/` overlapped immutable governed-Evolution roots. No kernel,
+evaluator, holdout, or runtime record was edited to bypass that gate. The same
+Codex writer restored the unchanged diff under a recovery continuation with
+the same mode/base/worktree and 23 exact Issue-owned paths; no second
+implementation actor or adapter switch was introduced.
 
 The accepted #33 typed-memory substrate requires the source task to be accepted
 and committed, and its passing current evidence

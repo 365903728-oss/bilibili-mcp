@@ -467,3 +467,23 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
 4. Rotate exposed credentials when relevant.
 5. Record the lesson in `docs/agent-memory/lessons-learned.md`.
 6. Update this file, `AGENTS.md`, or `CLAUDE.md` if a durable rule should change.
+
+## Issue #36 three-adapter migration controls
+
+- The common matrix is data-only and cannot grant authority, acquire a lease,
+  accept a task, commit, switch adapters, or start an external daemon.
+- Hook-event digests bind only redacted semantic metadata, provenance,
+  sensitivity, and terminal state. Raw commands, stdout/stderr, environment
+  dumps, credentials, and host session identifiers remain excluded.
+- Real pilots use isolated zero-remote repositories and exact owned files.
+  Accepted state must show one commit above the frozen baseline and a released
+  writer lease.
+- Claude Direct runs use safe mode with Skills/plugins/hooks/MCP disabled for
+  this acceptance ticket. The explicitly prohibited Harness Skill was not
+  inspected, invoked, installed, or bridged.
+- Paseo availability is checked without daemon restart. The #36 daemon start
+  occurred only after explicit user authority; provider loading was observed
+  once before the successful preflight. The run froze
+  `claude/deepseek-v4-flash`, `fallback_chosen=false`, one Claude writer, a
+  digest-bound handoff, one owned file, Codex acceptance, and zero remote
+  authority. Restart, provider/adapter switching, and fallback remained unused.

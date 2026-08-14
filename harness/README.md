@@ -146,5 +146,6 @@ python .codex/scripts/test_stop_summary.py
 
 The replay fixtures deliberately contain synthetic secret-like values. Tests
 must prove those raw values never enter normalized events or ledgers.
-`direct-adapter-conformance.json` freezes the mode, writer, acceptance owner,
-manual Skill invocation, and run/control schemas shared by both direct adapters.
+`three-adapter-conformance.json` freezes the shared contract, constitutional
+kernel, checks, mode, writer, acceptance owner, manual Skill invocation, and
+run/control schemas for all three adapters.

@@ -73,10 +73,18 @@ def _timestamp(payload: dict[str, Any]) -> str:
         try:
             parsed = dt.datetime.fromisoformat(candidate)
             if parsed.tzinfo is not None:
-                return parsed.astimezone(dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+                return (
+                    parsed.astimezone(dt.timezone.utc)
+                    .isoformat(timespec="seconds")
+                    .replace("+00:00", "Z")
+                )
         except ValueError:
             pass
-    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return (
+        dt.datetime.now(dt.timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _tool_outcome(
@@ -121,7 +129,9 @@ def _tool_outcome(
     return event, exit_code, failed, failed
 
 
-def normalize_hook_event(adapter: str, event: str, payload: dict[str, Any]) -> dict[str, Any]:
+def normalize_hook_event(
+    adapter: str, event: str, payload: dict[str, Any]
+) -> dict[str, Any]:
     if adapter not in ADAPTERS:
         raise ValueError("unsupported hook adapter")
     if event not in HOOK_EVENTS:
@@ -136,24 +146,42 @@ def normalize_hook_event(adapter: str, event: str, payload: dict[str, Any]) -> d
     semantic = {
         "event": canonical_event,
         "tool_class": tool,
-        "category": _category(find_key(payload, {"command", "cmd"})) if tool == "shell" else "shell",
+        "category": (
+            _category(find_key(payload, {"command", "cmd"}))
+            if tool == "shell"
+            else "shell"
+        ),
         "outcome": "failed" if failed else "succeeded",
         "exit_code": exit_code,
         "has_error": has_error,
     }
     session_id = _opaque_session_id(find_key(payload, {"session_id", "sessionId"}))
+    provenance = {"adapter": adapter, "host_event": event}
+    sensitivity = "metadata"
+    terminal_state = "stopped" if canonical_event == "stop" else "active"
     digest_source = json.dumps(
-        {"session_id": session_id, "semantic": semantic},
+        {
+            "session_id": session_id,
+            "provenance": provenance,
+            "sensitivity": sensitivity,
+            "terminal_state": terminal_state,
+            "semantic": semantic,
+        },
         ensure_ascii=True,
         sort_keys=True,
         separators=(",", ":"),
     )
+    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()
     return {
         "schema": "harness.hook-event/v1",
         "timestamp": _timestamp(payload),
         "source_adapter": adapter,
+        "provenance": provenance,
+        "sensitivity": sensitivity,
+        "digest": digest,
+        "terminal_state": terminal_state,
         "session_id": session_id,
-        "event_id": hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:20],
+        "event_id": digest[:20],
         "semantic": semantic,
     }
 

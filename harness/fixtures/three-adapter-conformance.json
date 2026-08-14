@@ -1,0 +1,59 @@
+{
+  "schema": "harness.adapter-conformance/v1",
+  "contract_schema": "harness.task-contract/v1",
+  "constitutional_kernel": "RULES.md",
+  "pilot_checks": [
+    "mode-frozen-before-write",
+    "second-writer-rejected",
+    "manual-skill-reminder-no-write",
+    "adapter-failure-stop-and-report",
+    "ordinary-full-access-no-noise",
+    "protected-effects",
+    "exact-one-local-commit-no-remote",
+    "canonical-worktree-dirty-primary-isolation",
+    "typed-redacted-events",
+    "capability-discovery-drift",
+    "typed-memory-evolution"
+  ],
+  "migration_checks": [
+    "product-verification",
+    "package-exclusion",
+    "durable-memory",
+    "clean-room"
+  ],
+  "adapters": [
+    {
+      "command": "codex-direct",
+      "lifecycle": "direct",
+      "mode": "codex-direct",
+      "writer": "codex",
+      "acceptance_owner": "codex",
+      "skill_host": "codex",
+      "skill_invocation": "$implement",
+      "run_schema": "harness.codex-direct-run/v1",
+      "control_schema": "harness.codex-direct-control/v1"
+    },
+    {
+      "command": "claude-direct",
+      "lifecycle": "direct",
+      "mode": "claude-direct",
+      "writer": "claude",
+      "acceptance_owner": "claude",
+      "skill_host": "claude",
+      "skill_invocation": "/implement",
+      "run_schema": "harness.claude-direct-run/v1",
+      "control_schema": "harness.claude-direct-control/v1"
+    },
+    {
+      "command": "codex-paseo-claude",
+      "lifecycle": "paseo",
+      "mode": "codex-paseo-claude",
+      "writer": "claude",
+      "acceptance_owner": "codex",
+      "skill_host": "claude",
+      "skill_invocation": "/implement",
+      "run_schema": "harness.codex-paseo-claude-run/v1",
+      "control_schema": "harness.codex-paseo-claude-control/v1"
+    }
+  ]
+}

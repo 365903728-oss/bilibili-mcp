@@ -20,7 +20,10 @@ from harness.codex_direct import CONTROL_SCHEMAS, RUN_SCHEMAS
 def valid_contract() -> dict[str, object]:
     return {
         "schema": "harness.task-contract/v1",
-        "task": {"id": "github:#29", "source": "https://github.com/example/repo/issues/29"},
+        "task": {
+            "id": "github:#29",
+            "source": "https://github.com/example/repo/issues/29",
+        },
         "execution": {
             "mode": "codex-direct",
             "canonical_worktree": "C:/worktrees/ticket-29/repo",
@@ -49,10 +52,14 @@ def valid_contract() -> dict[str, object]:
 
 
 class TaskContractTests(unittest.TestCase):
-    def test_direct_adapters_share_the_frozen_conformance_fixture(self) -> None:
-        fixture_path = Path(__file__).resolve().parents[1] / "fixtures" / "direct-adapter-conformance.json"
+    def test_three_adapters_share_the_frozen_conformance_fixture(self) -> None:
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "fixtures"
+            / "three-adapter-conformance.json"
+        )
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
-        self.assertEqual(fixture["schema"], "harness.direct-adapter-conformance/v1")
+        self.assertEqual(fixture["schema"], "harness.adapter-conformance/v1")
 
         for adapter in fixture["adapters"]:
             with self.subTest(mode=adapter["mode"]):
@@ -61,7 +68,8 @@ class TaskContractTests(unittest.TestCase):
                     {"mode": adapter["mode"], "branch": "codex/conformance"}
                 )
                 contract["writer_lease"] = {
-                    "holder": adapter["writer"], "state": "inactive",
+                    "holder": adapter["writer"],
+                    "state": "inactive",
                 }
                 contract["acceptance_owner"] = adapter["acceptance_owner"]
                 contract["required_manual_skills"] = [
@@ -86,11 +94,17 @@ class TaskContractTests(unittest.TestCase):
                     "stop_conditions": ["adapter-failure"],
                 }
 
-                normalized = validate_direct_contract(contract, adapter["mode"])
+                normalized = validate_task_contract(contract)
                 self.assertEqual(adapter["command"], adapter["mode"])
-                self.assertEqual(normalized["writer_lease"]["holder"], adapter["writer"])
+                self.assertEqual(
+                    normalized["writer_lease"]["holder"], adapter["writer"]
+                )
                 self.assertEqual(RUN_SCHEMAS[adapter["mode"]], adapter["run_schema"])
-                self.assertEqual(CONTROL_SCHEMAS[adapter["mode"]], adapter["control_schema"])
+                self.assertEqual(
+                    CONTROL_SCHEMAS[adapter["mode"]], adapter["control_schema"]
+                )
+                if adapter["lifecycle"] == "direct":
+                    validate_direct_contract(contract, adapter["mode"])
 
     def test_contract_declares_exactly_three_modes_and_owners(self) -> None:
         self.assertEqual(
@@ -103,7 +117,11 @@ class TaskContractTests(unittest.TestCase):
         self.assertEqual(ACCEPTANCE_OWNERS["codex-paseo-claude"], "codex")
         self.assertEqual(ACCEPTANCE_OWNERS["claude-direct"], "claude")
 
-        schema_path = Path(__file__).resolve().parents[1] / "contracts" / "task-contract-v1.schema.json"
+        schema_path = (
+            Path(__file__).resolve().parents[1]
+            / "contracts"
+            / "task-contract-v1.schema.json"
+        )
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
         self.assertEqual(
             tuple(schema["properties"]["execution"]["properties"]["mode"]["enum"]),
