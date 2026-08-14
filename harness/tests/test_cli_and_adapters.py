@@ -11,7 +11,11 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from harness.capabilities import MAX_MANUAL_SKILL_REMINDERS, check_manual_skill, doctor_report
+from harness.capabilities import (
+    MAX_MANUAL_SKILL_REMINDERS,
+    check_manual_skill,
+    doctor_report,
+)
 from harness.cli import _hook_control, main
 from harness.context import discover_worktree
 from harness.events import normalize_hook_event
@@ -202,10 +206,22 @@ class CliAndAdapterTests(unittest.TestCase):
                 (skill_dir / "SKILL.md").write_text(f"# {skill}\n", encoding="utf-8")
 
             (repo / ".claude").mkdir(parents=True)
-            tracked = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "tracked"}]}]}}
-            local = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "local"}]}]}}
-            (repo / ".claude" / "settings.json").write_text(json.dumps(tracked), encoding="utf-8")
-            (repo / ".claude" / "settings.local.json").write_text(json.dumps(local), encoding="utf-8")
+            tracked = {
+                "hooks": {
+                    "Stop": [{"hooks": [{"type": "command", "command": "tracked"}]}]
+                }
+            }
+            local = {
+                "hooks": {
+                    "Stop": [{"hooks": [{"type": "command", "command": "local"}]}]
+                }
+            }
+            (repo / ".claude" / "settings.json").write_text(
+                json.dumps(tracked), encoding="utf-8"
+            )
+            (repo / ".claude" / "settings.local.json").write_text(
+                json.dumps(local), encoding="utf-8"
+            )
 
             report = doctor_report(repo, home=home)
             self.assertEqual(report["status"], "action-required")
@@ -272,7 +288,9 @@ class CliAndAdapterTests(unittest.TestCase):
     def test_hook_control_reports_persistence_failure_without_a_traceback(self) -> None:
         output = io.StringIO()
         with patch("harness.cli.read_bounded_json_stream", return_value={}):
-            with patch("harness.cli.persist_hook_event", side_effect=OSError("fixture")):
+            with patch(
+                "harness.cli.persist_hook_event", side_effect=OSError("fixture")
+            ):
                 with redirect_stdout(output):
                     status = main(
                         [
@@ -312,7 +330,9 @@ class CliAndAdapterTests(unittest.TestCase):
         self.assertIn("post-tool-use-failure", claude_hooks)
         self.assertLess(len(agents), len(rules))
         self.assertLess(len(claude), len(rules))
-        context_budget = (ROOT / ".codex" / "scripts" / "context_budget.py").read_text(encoding="utf-8")
+        context_budget = (ROOT / ".codex" / "scripts" / "context_budget.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn('ROOT / "RULES.md"', context_budget)
         self.assertIn('"settings.json"', context_budget)
         self.assertIn('"settings.local.json"', context_budget)
@@ -355,9 +375,79 @@ class CliAndAdapterTests(unittest.TestCase):
             semantics.append(json.loads(result.stdout)["semantic"])
         self.assertEqual(semantics[0], semantics[1])
 
+    def test_loop_step_cli_stops_without_progress_yields_and_never_switches(
+        self,
+    ) -> None:
+        policy = {
+            "origin": "accepted-gap",
+            "max_attempts": 2,
+            "no_progress_limit": 1,
+            "yield_to_user": True,
+            "adapter_switch_policy": "stop-and-report",
+        }
+        fingerprint = "1" * 64
+        evidence = "2" * 64
+
+        def run(
+            *,
+            attempts: list[dict[str, str]],
+            requested: str = "codex-direct",
+            user_input: bool = False,
+        ) -> dict[str, object]:
+            with tempfile.NamedTemporaryFile(
+                "w", suffix=".json", encoding="utf-8", delete=False
+            ) as handle:
+                json.dump(
+                    {
+                        "schema": "harness.loop-step/v1",
+                        "policy": policy,
+                        "frozen_adapter": "codex-direct",
+                        "requested_adapter": requested,
+                        "attempts": attempts,
+                        "current": {
+                            "fingerprint": fingerprint,
+                            "evidence_digest": evidence,
+                        },
+                        "user_input": user_input,
+                    },
+                    handle,
+                )
+                path = handle.name
+            try:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "harness",
+                        "capability",
+                        "loop-step",
+                        path,
+                        "--adapter",
+                        "codex-direct",
+                    ],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                )
+            finally:
+                Path(path).unlink(missing_ok=True)
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            return json.loads(result.stdout)
+
+        current = {"fingerprint": fingerprint, "evidence_digest": evidence}
+        self.assertEqual(run(attempts=[])["action"], "continue")
+        self.assertEqual(run(attempts=[current])["reason"], "no-progress")
+        self.assertEqual(run(attempts=[], user_input=True)["action"], "yield-to-user")
+        switched = run(attempts=[], requested="claude-direct")
+        self.assertEqual(switched["action"], "stop")
+        self.assertEqual(switched["reason"], "adapter-switch-prohibited")
+
     def test_codex_hook_commands_preserve_stdin_from_a_nested_directory(self) -> None:
         raw_session = "SYNTHETIC_PROCESS_BOUNDARY_SESSION_29"
-        config = json.loads((ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+        config = json.loads(
+            (ROOT / ".codex" / "hooks.json").read_text(encoding="utf-8")
+        )
         expected_events = {
             "SessionStart": "session-start",
             "PostToolUse": "post-tool-use",

@@ -432,6 +432,56 @@ Candidate metrics:
 - product-source files changed: 0
 - remote operations performed: 0
 
+### 2026-08-14 Harness Eval: Issue #35 review convergence
+
+- Independent read-only review found four acceptance-impacting gaps before
+  final verification: a v1/v2 Search bypass, label-only CLI/MCP artifacts,
+  claim-derived surface smoke, and evidence that authenticated bytes but not
+  their channel/Hook semantics.
+- Keep: one shared #34 controller and compiler, immutable canonical inputs,
+  exact repository-local projections, three adapter host mappings, stateless
+  Loop decisions, and acceptance-owned exact-one-commit.
+- Change: v2 surface candidates now require v2 Search at every load; external
+  channel results are parsed from candidate-bound responses; CLI/MCP use shared
+  real handlers; Hook smoke invokes the deployed handler, reads its attributed
+  ledger, and restores the same manifest/config/canary/ledger state.
+- Remove: no caller-owned result label, unconditional pass map, scratch-file
+  rollback proof, candidate executable, new controller, dependency, daemon, or
+  port remains.
+- Focused repair evidence: channel semantics/tamper 2/2 in 50.570s; four
+  surfaces across three adapters with disposable acceptance 1/1 in 189.195s.
+  External Claude/Paseo was not launched because the user froze `codex-direct`;
+  host-package projection and public adapter seams are the bounded evidence.
+- Final current-diff metrics: Harness 17 Evolution + 73 Direct + 73 Paseo + 67
+  core = 230 executed tests with one platform-permission skip; Hook/Stop 6/6 and
+  8/8; product 862; package entries/forbidden Harness entries 185/0; reviewer
+  blockers remaining 0; external writer launches, product-source changes, and
+  remote operations 0.
+
+### 2026-08-13 Harness Eval: Harness v2 Issue #35 surfaces
+
+- Public seam: `python -m harness evolution` remains the stateful governor;
+  `capability discover|smoke|loop-step` adds only repository-local conformance
+  and bounded decisions. No product command or second controller was added.
+- Keep: #34 accepted-gap receipts, linked worktree and writer lease, strict
+  source/license bytes, canonical compiler, fixed evaluator/holdout,
+  candidate-scoped rollback, unknown-drift Recovery, and Direct acceptance.
+- Add: exact v2 MCP/CLI/Hook/Loop surface policy, four Search channels,
+  data-only safe Adapt evidence, three-adapter discovery/smoke, real Hook
+  safety checks, and stateless bounded Loop decisions.
+- Remove: do not trust candidate-declared compatibility/smoke/install state; do
+  not execute registry/package-manager installers; do not let Hooks accept or
+  mutate their configuration; do not build an autonomous Loop runner.
+- Risk weighting: immutable canonical bytes and authority/rollback paths receive
+  process-boundary tests; product runtime is unchanged and is verified through
+  build/Vitest/package boundaries. Network/TLS results are recorded honestly
+  rather than retried until green.
+- Current focused evidence before final convergence: Evolution 13/13 in
+  853.936s; Hook events 9/9 in 2.422s; CLI/adapters 16/16 in 10.655s; the four
+  surface Build/three-adapter/commit pilot alone passes in 289.367s. Final
+  shared/product/package/review evidence is recorded in the execution and
+  verification reports.
+
 ### 2026-08-13 Harness Eval: Harness v2 Issue #34 governed evolution
 
 - The useful seam is one `evolution` state machine layered on accepted typed

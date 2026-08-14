@@ -39,11 +39,18 @@ from harness.events import (
     persist_hook_event,
 )
 from harness.evolution import (
+    SURFACE_ADAPTERS,
     EvolutionError,
     apply_capability,
+    call_surface_capability,
+    discover_surface_capabilities,
     ensure_evolution_acceptance,
     evaluate_capability,
+    hook_surface_event,
+    loop_surface_step,
+    mcp_surface_message,
     record_search,
+    smoke_surface_capability,
     start_evolution,
 )
 from harness.memory import (
@@ -70,7 +77,11 @@ from harness.paseo_collaboration import (
     repair,
     report,
 )
-from harness.safe_io import read_bounded_bytes, read_bounded_json_stream
+from harness.safe_io import (
+    read_bounded_bytes,
+    read_bounded_json_stream,
+    validate_json_shape,
+)
 
 
 def _print_json(value: Any) -> None:
@@ -228,6 +239,39 @@ def _build_parser() -> argparse.ArgumentParser:
     digest.add_argument("--cwd", type=Path, default=Path.cwd())
     startup = memory_sub.add_parser("startup")
     startup.add_argument("--cwd", type=Path, default=Path.cwd())
+
+    capability = subcommands.add_parser(
+        "capability", help="discover and smoke repository-local Harness capabilities"
+    )
+    capability_sub = capability.add_subparsers(dest="capability_command", required=True)
+    capability_discover = capability_sub.add_parser("discover")
+    capability_discover.add_argument(
+        "--adapter", choices=SURFACE_ADAPTERS, required=True
+    )
+    capability_discover.add_argument("--cwd", type=Path, default=Path.cwd())
+    capability_smoke = capability_sub.add_parser("smoke")
+    capability_smoke.add_argument("--adapter", choices=SURFACE_ADAPTERS, required=True)
+    capability_smoke.add_argument("--name", required=True)
+    capability_smoke.add_argument("--cwd", type=Path, default=Path.cwd())
+    capability_call = capability_sub.add_parser("call")
+    capability_call.add_argument("path", type=Path)
+    capability_call.add_argument("--adapter", choices=SURFACE_ADAPTERS, required=True)
+    capability_call.add_argument("--name", required=True)
+    capability_call.add_argument("--cwd", type=Path, default=Path.cwd())
+    capability_serve = capability_sub.add_parser("serve")
+    capability_serve.add_argument("--adapter", choices=SURFACE_ADAPTERS, required=True)
+    capability_serve.add_argument("--name", required=True)
+    capability_serve.add_argument("--cwd", type=Path, default=Path.cwd())
+    capability_hook = capability_sub.add_parser("hook-event")
+    capability_hook.add_argument("path", type=Path)
+    capability_hook.add_argument("--adapter", choices=SURFACE_ADAPTERS, required=True)
+    capability_hook.add_argument("--host", choices=("codex", "claude"), required=True)
+    capability_hook.add_argument("--event", choices=HOOK_EVENTS, required=True)
+    capability_hook.add_argument("--name", required=True)
+    capability_hook.add_argument("--cwd", type=Path, default=Path.cwd())
+    capability_loop = capability_sub.add_parser("loop-step")
+    capability_loop.add_argument("path", type=Path)
+    capability_loop.add_argument("--adapter", choices=SURFACE_ADAPTERS, required=True)
 
     evolution = subcommands.add_parser(
         "evolution", help="run governed Skill and Agent evolution"
@@ -473,6 +517,71 @@ def main(argv: Sequence[str] | None = None) -> int:
                 }
             else:
                 result = startup_memory(context)
+            _print_json(result)
+            return 0
+
+        if args.command == "capability":
+            if args.capability_command == "discover":
+                context = discover_worktree(args.cwd)
+                result = discover_surface_capabilities(context, args.adapter)
+            elif args.capability_command == "smoke":
+                context = discover_worktree(args.cwd)
+                result = smoke_surface_capability(
+                    context, name=args.name, adapter=args.adapter
+                )
+            elif args.capability_command == "call":
+                context = discover_worktree(args.cwd)
+                result = call_surface_capability(
+                    context,
+                    name=args.name,
+                    adapter=args.adapter,
+                    value=_load_json_file(args.path),
+                )
+            elif args.capability_command == "serve":
+                context = discover_worktree(args.cwd)
+                initialized = False
+                ready = False
+                for index in range(33):
+                    raw = sys.stdin.buffer.readline(64 * 1024 + 1)
+                    if not raw:
+                        return 0
+                    if index == 32 or len(raw) > 64 * 1024:
+                        raise ValueError("MCP stdio input exceeds its bound")
+                    try:
+                        value = json.loads(raw.decode("utf-8", errors="strict"))
+                    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                        raise ValueError("MCP stdio input is invalid") from exc
+                    validate_json_shape(value, max_nodes=512, max_depth=8)
+                    method = value.get("method") if isinstance(value, dict) else None
+                    if (
+                        (method == "initialize" and initialized)
+                        or (method == "notifications/initialized" and not initialized)
+                        or (method in {"tools/list", "tools/call"} and not ready)
+                    ):
+                        raise ValueError("MCP stdio lifecycle is invalid")
+                    response = mcp_surface_message(
+                        context, name=args.name, adapter=args.adapter, value=value
+                    )
+                    if method == "initialize":
+                        initialized = True
+                    elif method == "notifications/initialized":
+                        ready = True
+                    if response is not None:
+                        _print_json(response)
+                        sys.stdout.flush()
+                raise ValueError("MCP stdio input exceeds its bound")
+            elif args.capability_command == "hook-event":
+                context = discover_worktree(args.cwd)
+                result = hook_surface_event(
+                    context,
+                    name=args.name,
+                    adapter=args.adapter,
+                    host=args.host,
+                    event=args.event,
+                    payload=_load_json_file(args.path, MAX_ENVELOPE_BYTES),
+                )
+            else:
+                result = loop_surface_step(_load_json_file(args.path), args.adapter)
             _print_json(result)
             return 0
 

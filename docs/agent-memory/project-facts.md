@@ -651,3 +651,33 @@
   external Skill prose into execution authority; the Adapt seam remains
   fail-closed pending trusted machine evidence, and Build remains a
   repository-local fixture.
+
+## 2026-08-13 — Harness v2 Issue #35
+
+- Fact: Governed Evolution now supports exact MCP, CLI, Hook, and Loop surface
+  contracts without a second controller or any product-runtime change.
+- Evidence: v2 canonical sources compile through the existing deterministic
+  Codex/Claude package seam; public Harness discovery and smoke validate
+  `codex-direct`, `claude-direct`, and `codex-paseo-claude` projections.
+- Impact: Surface capabilities remain repository-local Harness artifacts and
+  stay outside `src/`, `src/cli.ts`, `package.json` files, and the npm package.
+
+- Fact: A safe v2 Adapt decision trusts only governor-created evidence from
+  immutable canonical JSON, not candidate-supplied compatibility, smoke, or
+  installed-provenance fields.
+- Evidence: Search re-fetches the exact pinned artifact/license bytes, parses a
+  byte-canonical v2 source, derives all four candidate-bound channel results
+  from the fetched response formats, and compiles all adapter projections
+  without executing candidate code. Dangerous effects produce one stable
+  authorization request and zero capability files.
+- Impact: Safe repository-local adoption is possible without weakening the #34
+  fail-closed boundary for executable or legacy candidates.
+
+- Fact: Hook and Loop surfaces have executable Harness-only safety seams.
+- Evidence: The public Hook handler validates the installed capability and host,
+  persists an attributed redacted event, replays it, and reads the ledger.
+  Smoke proves shadow/no-diff, secret removal, linked-worktree identity, and
+  exact deployment/config/canary/ledger restoration. `capability loop-step` stops at attempt/no-progress
+  limits, yields to new user input, and prohibits adapter switches.
+- Impact: Declaring a policy is insufficient; promotion evidence is generated
+  by the shared CLI and remains subordinate to Direct acceptance.

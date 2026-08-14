@@ -14,6 +14,9 @@ python -m harness hook replay --adapter codex --event post-tool-use --payload ha
 python -m harness hook replay --adapter claude --event post-tool-use-failure --payload harness/fixtures/claude-post-tool-use-failure.json
 python -m harness manual-skill check --task github-29 --adapter codex-direct --host codex --skill implement --invoked
 python -m harness evolution start evolution-request.json --cwd <worktree> --task <evolution-task> --mode codex-direct --actor codex
+python -m harness capability discover --cwd <worktree> --adapter codex-direct
+python -m harness capability smoke --cwd <worktree> --name <name> --adapter codex-direct
+python -m harness capability loop-step loop-step.json --adapter codex-direct
 ```
 
 Hook adapters call `harness/cli.py` directly so they remain usable without
@@ -104,6 +107,34 @@ from the frozen Git snapshot; unknown drift enters Recovery instead of being
 deleted. The Harness runs the frozen evaluator and holdout cases itself.
 Promotion and the exact local commit remain owned by the existing Direct
 acceptance path.
+
+Version 2 evolution candidates add one exact MCP/CLI/Hook/Loop surface and
+Search evidence for official, registry, package-manager, and live-GitHub
+channels. The governor fetches each candidate-bound HTTPS response and derives
+its normalized candidate/no-match/rejected result from the bounded response;
+caller-supplied result labels must match. Package-manager evidence binds a
+separate npm name/version coordinate (including
+scoped packages); only an exact 404 at that bound URL becomes `no-match`, while
+authentication, rate-limit, and server failures remain errors.
+Candidate compatibility/smoke/install claims still have no authority: only immutable canonical JSON fetched and
+byte-verified by the governor can be compiled without execution into trusted
+three-adapter projection evidence.
+Safe repository-local candidates may then enter Adapt automatically. Credentials,
+elevation, daemons, ports, global mutation, SSH, publishing, runtime writes, or
+unsafe network/data combinations remain an idempotent user-authorization stop.
+
+`capability discover|smoke|call|serve|hook-event` verifies or invokes the
+installed canonical source, exact host packages, native repository-local
+deployment, and all three execution adapters. `call` exposes the bounded CLI
+operations; `serve` exposes the stable MCP stdio lifecycle. Hook smoke invokes
+the deployed Hook handler twice, reads the capability-bound event ledger, proves
+no-secret/no-diff and linked-worktree attribution, then restores the same
+deployment/config/canary/ledger snapshots without editing Hook registrations.
+`capability loop-step` is a stateless bounded decision seam: it
+stops on repeated failure without new evidence or the attempt limit, yields to
+new user input, and rejects automatic adapter switching. Hook and Loop sources
+require accepted-gap provenance and remain candidates in their own Evolution
+Run; Hooks still observe and never accept work.
 
 ## Conformance
 

@@ -332,6 +332,23 @@ Governed capability evolution:
   success/failure, exact host-schema/discovery-path conformance, drift,
   self-approval denial, scoped
   rollback, sibling preservation, and exact-one-commit zero-remote pilots.
+- `harness/evolution.py` also owns v2 MCP/CLI/Hook/Loop surface validation,
+  four-channel Search records, immutable canonical-JSON verification, safe
+  auto-Adapt eligibility, three-adapter repository-local discovery/smoke,
+  Hook evidence checks, and bounded Loop step decisions. It extends the #34
+  state machine rather than adding a controller.
+- `harness/cli.py::capability discover|smoke|call|serve|hook-event|loop-step`:
+  public process seam for exact deployment discovery, behavior-derived smoke,
+  bounded CLI calls, stable MCP stdio, capability-bound Hook event persistence,
+  and stateless Loop decisions. These are Harness-only commands and do not
+  change `src/cli.ts` or the npm package.
+- `harness/fixtures/evolution-build-surface.json`: dependency/script/executable-
+  free v2 CLI Build fixture; tests derive MCP, Hook, and Loop variants from the
+  same canonical safe source.
+- `harness/tests/test_evolution.py`, `test_events.py`, and
+  `test_cli_and_adapters.py`: v2 Search/Adapt/Build, dangerous-effect authority,
+  all-three-adapter discovery/smoke, Hook policy/evidence, Loop stop/yield/no-
+  switch, rollback, package-boundary, zero-remote, and exact-one-commit coverage.
 - `harness/memory.py::compile_host_package`: shared deterministic host-manifest
   seam used by typed memory and governed evolution; it does not grant the memory
   projector capability-write authority.

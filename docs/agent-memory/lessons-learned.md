@@ -411,3 +411,53 @@
   deleting unknown drift.
 - Future behavior: Bind rollback to an immutable baseline and route restoration
   failure to the existing Recovery Bundle rather than declaring rejection.
+
+- Lesson: A candidate's `pass` fields are not independent machine evidence.
+- Evidence: The first #35 slice could have treated compatibility, smoke, and
+  installed provenance as trusted input. The final seam derives eligibility
+  from exact fetched canonical bytes plus governor-compiled projections and
+  leaves those candidate fields untrusted.
+- Future behavior: When automation may grant authority, bind the decision to
+  evidence produced inside the trusted boundary, not a claimed result adjacent
+  to the candidate.
+
+- Lesson: Naming Hook phases or Loop limits does not prove their behavior.
+- Evidence: #35 added public smoke/step checks after the initial declarative
+  surface schema. Hook evidence now observes replay, no-secret, no-diff,
+  worktree, canary, and rollback boundaries; Loop behavior is exercised through
+  the CLI for no-progress, user-input, and adapter-switch cases.
+- Future behavior: For each safety label in an acceptance criterion, leave one
+  runnable check whose failure changes promotion outcome.
+
+- Lesson: A fetched channel response is evidence only after the governor derives
+  its meaning; a caller-owned `result` label remains a claim.
+- Evidence: Independent #35 review showed that valid bytes from an allowed host
+  could still be labelled `no-match`. Search now parses candidate-bound official,
+  Registry, npm, and GitHub responses and rejects any label mismatch.
+- Future behavior: Bind both evidence identity and its security-relevant semantic
+  conclusion inside the trusted boundary.
+
+- Lesson: A package-manager `no-match` is a transport status, not a synthetic
+  200 error document, and capability identity is not an npm coordinate.
+- Evidence: Final #35 re-review found real npm 404s were rejected before parsing
+  and scoped MCP packages could not equal the capability ID. Surface candidates
+  now bind a separate scoped-capable name/version and only their exact 404 URL is
+  normalized to `no-match`.
+- Future behavior: Model package coordinates separately and test the real HTTP
+  status path; keep 401, 429, and 5xx fail-closed.
+
+- Lesson: A Hook rollback canary must exercise the deployed Hook and the state it
+  actually mutates.
+- Evidence: Independent #35 review rejected a temporary unrelated file as
+  rollback proof. The final smoke invokes the public deployed handler twice,
+  reads the capability-bound ledger, and restores the deployment, configuration,
+  canary, and ledger snapshots.
+- Future behavior: Test rollback against the same objects used by the real
+  operation, not a structurally similar scratch file.
+
+- Lesson: Authorization payload ordering is part of deterministic idempotence.
+- Evidence: The dangerous-surface red test saw two semantically identical
+  requests serialize effect blocks in different orders because an input object
+  crossed a process boundary. Sorting fixed the shared root.
+- Future behavior: Canonicalize all set-like evidence before hashing,
+  persisting, or presenting an idempotent authorization request.

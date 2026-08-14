@@ -666,3 +666,39 @@
 - Reason: Evolution needs durable terminal/commit/diff/tree evidence after the
   source worktree is gone. This follows the repository-process/Git trust model;
   it is not a cryptographic claim against a same-account Git rewriter.
+
+- Decision: Extend the #34 Evolution schema and compiler with one v2 surface
+  field instead of introducing MCP-, CLI-, Hook-, or Loop-specific controllers.
+- Reason: Accepted-gap provenance, writer authority, evaluator/holdout,
+  rollback, report, Recovery Bundle, and exact-one-commit semantics are already
+  shared. Only discovery, smoke, and surface-specific policy differ.
+- Evidence: All four surface Build variants and a pinned safe CLI Adapt pass
+  through the existing `evolution start|search|adapt|build|evaluate` and Direct
+  acceptance paths in disposable linked worktrees.
+
+- Decision: Auto-Adapt only immutable, byte-canonical, data-only v2 sources
+  whose exact projections are compiled by the governor itself.
+- Reason: Candidate claims cannot authorize their own installation, while a
+  verified declarative source can be inspected and compiled without executing
+  dependencies, scripts, installers, daemons, or network behavior.
+- Evidence: Unverified candidate compatibility/smoke/install claims are ignored;
+  credentials, elevation, daemons, ports, global mutation, SSH, publishing,
+  runtime writes, and unsafe network/data combinations still block adoption.
+
+- Decision: Keep Loop decisions stateless at the shared CLI seam and Hook
+  evolution observation-only through one deployed, capability-bound event seam.
+- Reason: A stateful autonomous runner or self-mutating Hook would duplicate
+  controller authority and make yield/no-switch guarantees harder to audit.
+- Evidence: The public Loop step consumes bounded fingerprints/evidence and
+  returns only continue/stop/yield. Hook smoke snapshots the deployed manifest,
+  tracked configurations, runtime canary, and ledger; it invokes and replays the
+  public handler, reads attributed redacted events, then restores the same
+  snapshots while leaving the Git diff unchanged.
+
+- Decision: Derive each v2 Search channel result from its fetched response and
+  require the caller record to match that normalized result.
+- Reason: URL, digest, and byte count prove response identity but cannot prove a
+  caller's `candidate`, `no-match`, or `rejected` interpretation.
+- Evidence: Candidate-bound official, MCP Registry, npm version, and immutable
+  GitHub response parsers reject a forged result even when its HTTPS bytes and
+  digest are otherwise valid.

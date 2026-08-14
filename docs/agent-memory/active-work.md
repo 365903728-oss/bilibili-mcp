@@ -7,15 +7,19 @@ the dependency-ordered implementation tickets. Accepted implementation lineage
 is #30 `cbd31b952aa9f820005e60852bcd2d4db886a31c` → #31
 `5e9de4bace35a2ca4b9c83b5a0d81ebb627df6fb` → #32
 `9cbb8de64ffedefd682517e203841dd137b75662` → #33
-`1cd12c8a6edab272bd16ad5ecb8ba2ae4bd90cf8`. The live Issues remain open
+`1cd12c8a6edab272bd16ad5ecb8ba2ae4bd90cf8` → #34
+`493393c9ef4941e5ff8dc7b66acaa6cd9d06d7ce`. The live Issues remain open
 because Issue-close and remote-write authority were not granted.
 
-Issue #34, `Governed Skill and Agent evolution`, is the current acceptance
-candidate on branch `codex/harness-v2-skill-agent-evolution-34` from the exact
-#33 commit. It adds a thin `harness/evolution.py` seam and CLI routes while
-reusing the existing Direct task/worktree/writer/evidence/acceptance/commit
-controller. Evolution starts only from a current accepted typed capability gap
-whose originating task is accepted and committed.
+Issue #35, `Governed MCP, CLI, Hook, and Loop evolution`, is acceptance-ready
+after independent risk review and final current-diff verification on branch
+`codex/harness-v2-mcp-cli-hook-loop-evolution-35` from the exact accepted #34
+commit. The user froze `codex-direct`; Codex holds the only writer lease and no
+Paseo/Claude implementation writer was launched. It extends the existing
+Evolution governor with a versioned surface contract, repository-local
+discovery/smoke, bounded Loop decisions, and Hook-specific evidence while
+reusing the accepted gap, state, evaluator, rollback, report, Recovery Bundle,
+acceptance, and exact-one-commit seams.
 
 The accepted #33 typed-memory substrate requires the source task to be accepted
 and committed, and its passing current evidence
@@ -48,11 +52,28 @@ Failure restores only known candidate files and records rejected/deferred;
 unknown drift enters Recovery. Promotion and the one local commit still pass
 through the shared Direct acceptance path.
 
-The next dependency frontier becomes Issue #35 after #34 acceptance. The
-known primary legacy Codex Hook overlap remains an explicit
+Safe declarative v2 candidates are fetched at immutable source revisions. Four
+candidate-bound Search responses are re-fetched and their results are derived
+by the governor rather than trusted from caller labels. Candidates are compiled
+without executing candidate code and become auto-Adapt eligible only after the
+governor itself creates three-adapter projection evidence. Unsafe
+credentials/elevation/daemon/port/global-mutation/SSH/publish effects remain an
+idempotent user-authorization stop. No-candidate runs can Build an MCP, CLI,
+Hook, or Loop capability entirely under repository-local Harness paths. Hook
+smoke invokes the deployed public handler, replays and reads its attributed
+ledger, verifies shadow/no-diff, secret removal and linked-worktree identity,
+then restores the deployment/config/canary/ledger snapshot; Loop decisions enforce
+attempt/no-progress bounds, yield to user input, and stop adapter switches.
+
+The known primary legacy Codex Hook overlap remains an explicit
 `doctor=action-required` rollout gate and was not rewritten. No push, PR, Issue
 close, tag, release, publish, credential/SSH use, or history rewrite is part of
-#34.
+#35.
+
+Final current-diff evidence is green: Harness shards execute 230 tests with one
+platform-permission skip, legacy Hook/Stop compatibility is 6/6 and 8/8,
+product Vitest is 41 files/862 tests, and npm pack contains 185 files with zero
+Harness paths. The independent reviewer reports no remaining live #35 blocker.
 
 The Harness target is one `RULES.md` core with `codex-direct`,
 `codex-paseo-claude`, and `claude-direct` adapters. Local commit is automatic

@@ -59,6 +59,27 @@ WINDOWS_RESERVED = {
 }
 EVALUATOR_CASES = ["canonical-source", "codex-discovery", "claude-discovery"]
 HOLDOUT_CASES = ["read-only-agent", "no-agent-tree"]
+EVOLUTION_SURFACES = {"mcp", "cli", "hook", "loop"}
+SURFACE_ADAPTERS = [
+    "codex-direct",
+    "claude-direct",
+    "codex-paseo-claude",
+]
+SEARCH_CHANNELS = ["official", "registry", "package-manager", "live-github"]
+SEARCH_CHANNEL_HOSTS = {
+    "official": {"raw.githubusercontent.com"},
+    "registry": {"registry.modelcontextprotocol.io"},
+    "package-manager": {"registry.npmjs.org"},
+    "live-github": {"raw.githubusercontent.com"},
+}
+HOOK_PHASES = [
+    "replay",
+    "shadow",
+    "no-secret",
+    "multi-worktree",
+    "canary",
+    "rollback",
+]
 LICENSES = {
     "Apache-2.0",
     "BSD-2-Clause",
@@ -221,8 +242,7 @@ def _assert_projection_tracked(
     context: WorktreeContext, projection: dict[str, Any], report_path: str
 ) -> None:
     if any(
-        _ignored_path(context, path)
-        for path in (*projection["files"], report_path)
+        _ignored_path(context, path) for path in (*projection["files"], report_path)
     ):
         raise EvolutionError("Evolution managed output is ignored by Git")
 
@@ -344,7 +364,189 @@ def _invocation(value: Any, label: str, *, metadata: bool) -> dict[str, Any]:
     return dict(invocation)
 
 
+def _surface(value: Any) -> dict[str, Any]:
+    surface = _exact(
+        value,
+        {
+            "kind",
+            "adapters",
+            "external_system",
+            "entrypoint",
+            "hook",
+            "loop",
+        },
+        "evolution surface",
+    )
+    if (
+        surface["kind"] not in EVOLUTION_SURFACES
+        or surface["adapters"] != SURFACE_ADAPTERS
+        or not isinstance(surface["external_system"], bool)
+        or surface["entrypoint"] != "harness-shared-cli"
+        or (surface["kind"] == "mcp") != surface["external_system"]
+        or (surface["kind"] != "hook" and surface["hook"] is not None)
+        or (surface["kind"] != "loop" and surface["loop"] is not None)
+    ):
+        raise EvolutionError("evolution surface is invalid")
+    if surface["kind"] == "hook":
+        hook = surface["hook"]
+        if (
+            not isinstance(hook, dict)
+            or set(hook) != {"origin", "phases", "observation_only", "canary_scope"}
+            or hook["origin"] != "accepted-gap"
+            or hook["phases"] != HOOK_PHASES
+            or hook["observation_only"] is not True
+            or hook["canary_scope"] != "active-worktree"
+        ):
+            raise EvolutionError("Hook surface policy is unsafe")
+    if surface["kind"] == "loop":
+        loop = surface["loop"]
+        if (
+            not isinstance(loop, dict)
+            or set(loop)
+            != {
+                "origin",
+                "max_attempts",
+                "no_progress_limit",
+                "yield_to_user",
+                "adapter_switch_policy",
+            }
+            or loop["origin"] != "accepted-gap"
+            or not isinstance(loop["max_attempts"], int)
+            or isinstance(loop["max_attempts"], bool)
+            or not 1 <= loop["max_attempts"] <= 3
+            or not isinstance(loop["no_progress_limit"], int)
+            or isinstance(loop["no_progress_limit"], bool)
+            or not 1 <= loop["no_progress_limit"] < loop["max_attempts"]
+            or loop["yield_to_user"] is not True
+            or loop["adapter_switch_policy"] != "stop-and-report"
+        ):
+            raise EvolutionError("Loop surface policy is unsafe")
+    return dict(surface)
+
+
+def _surface_check_names(surface: dict[str, Any]) -> list[str]:
+    kind = surface["kind"]
+    if kind == "hook":
+        return list(surface["hook"]["phases"])
+    if kind == "loop":
+        return [
+            "bounded",
+            "no-progress-stop",
+            "yield-to-user",
+            "no-adapter-switch",
+        ]
+    return ["discovery", "smoke"]
+
+
+def _surface_runtime(
+    surface: dict[str, Any], interface: dict[str, Any], name: str
+) -> dict[str, Any]:
+    action = {
+        "mcp": "serve",
+        "cli": "call",
+        "hook": "hook-event",
+        "loop": "loop-step",
+    }[surface["kind"]]
+    return {
+        "schema": "harness.surface-runtime/v1",
+        "kind": surface["kind"],
+        "name": name,
+        "interface": interface,
+        "entrypoint": {
+            "command": ["python", "-m", "harness", "capability", action],
+            "adapter": "required",
+            "cwd": "active-worktree",
+        },
+        "transport": "stdio-jsonrpc" if surface["kind"] == "mcp" else "typed-json",
+    }
+
+
+def loop_surface_step(value: Any, adapter: str) -> dict[str, Any]:
+    """Evaluate one bounded Loop step without executing or switching adapters."""
+
+    if adapter not in SURFACE_ADAPTERS:
+        raise EvolutionError("surface adapter is invalid")
+    request = _exact(
+        value,
+        {
+            "schema",
+            "policy",
+            "frozen_adapter",
+            "requested_adapter",
+            "attempts",
+            "current",
+            "user_input",
+        },
+        "Loop step request",
+    )
+    if request["schema"] != "harness.loop-step/v1":
+        raise EvolutionError("Loop step request is invalid")
+    surface = _surface(
+        {
+            "kind": "loop",
+            "adapters": list(SURFACE_ADAPTERS),
+            "external_system": False,
+            "entrypoint": "harness-shared-cli",
+            "hook": None,
+            "loop": request["policy"],
+        }
+    )
+    policy = surface["loop"]
+    if (
+        request["frozen_adapter"] != adapter
+        or request["requested_adapter"] not in SURFACE_ADAPTERS
+        or not isinstance(request["user_input"], bool)
+        or not isinstance(request["attempts"], list)
+        or len(request["attempts"]) > policy["max_attempts"]
+    ):
+        raise EvolutionError("Loop step request is invalid")
+
+    def attempt(value: Any) -> dict[str, str]:
+        item = _exact(value, {"fingerprint", "evidence_digest"}, "Loop attempt")
+        if not all(DIGEST_RE.fullmatch(str(item[key])) for key in item):
+            raise EvolutionError("Loop attempt is invalid")
+        return dict(item)
+
+    attempts = [attempt(item) for item in request["attempts"]]
+    current = attempt(request["current"])
+    if request["user_input"]:
+        action, reason = "yield-to-user", "new-user-input"
+    elif request["requested_adapter"] != request["frozen_adapter"]:
+        action, reason = "stop", "adapter-switch-prohibited"
+    elif len(attempts) >= policy["max_attempts"]:
+        action, reason = "stop", "attempt-limit"
+    else:
+        repeated = sum(item == current for item in attempts)
+        if repeated >= policy["no_progress_limit"]:
+            action, reason = "stop", "no-progress"
+        else:
+            action, reason = "continue", "new-evidence"
+    material = {
+        "adapter": adapter,
+        "policy": policy,
+        "attempts": attempts,
+        "current": current,
+        "user_input": request["user_input"],
+        "action": action,
+        "reason": reason,
+    }
+    return {
+        "schema": "harness.loop-control/v1",
+        "adapter": adapter,
+        "action": action,
+        "reason": reason,
+        "next_attempt": len(attempts) + 1 if action == "continue" else None,
+        "evidence_digest": _digest(material),
+    }
+
+
 def _validate_candidate(value: Any) -> dict[str, Any]:
+    surface_candidate = isinstance(value, dict) and "surface" in value
+    extra_keys = (
+        {"surface", "artifact_format", "install", "package"}
+        if surface_candidate
+        else set()
+    )
     candidate = _exact(
         value,
         {
@@ -366,7 +568,8 @@ def _validate_candidate(value: Any) -> dict[str, Any]:
             "manifest",
             "effects",
             "installed",
-        },
+        }
+        | extra_keys,
         "evolution candidate",
     )
     candidate_id = _nonempty(candidate["id"], "candidate identity", 96)
@@ -419,7 +622,8 @@ def _validate_candidate(value: Any) -> dict[str, Any]:
         "candidate compatibility",
     )
     if (
-        compatibility["hosts"] != ["codex", "claude"]
+        compatibility["hosts"]
+        != (SURFACE_ADAPTERS if surface_candidate else ["codex", "claude"])
         or compatibility["status"] not in {"pass", "fail", "unverified"}
         or not isinstance(compatibility["evidence_digest"], str)
         or not DIGEST_RE.fullmatch(compatibility["evidence_digest"])
@@ -500,9 +704,12 @@ def _validate_candidate(value: Any) -> dict[str, Any]:
         != candidate["license_digest"]
     ):
         raise EvolutionError("candidate source digests are not bound to its manifest")
+    effect_keys = {"credentials", "elevation", "daemon", "open_port", "global_policy"}
+    if surface_candidate:
+        effect_keys |= {"global_mutation", "ssh", "publish"}
     effects = _exact(
         candidate["effects"],
-        {"credentials", "elevation", "daemon", "open_port", "global_policy"},
+        effect_keys,
         "candidate effects",
     )
     if any(not isinstance(value, bool) for value in effects.values()):
@@ -526,45 +733,232 @@ def _validate_candidate(value: Any) -> dict[str, Any]:
         "license_path": license_path,
         "invocation": invocation,
     }
+    if surface_candidate:
+        if candidate["artifact_format"] != "canonical-json":
+            raise EvolutionError("surface candidate artifact format is invalid")
+        install = _exact(
+            candidate["install"],
+            {"scope", "method", "uninstall"},
+            "surface candidate install",
+        )
+        if install != {
+            "scope": "repository-local",
+            "method": "verified-copy",
+            "uninstall": "git-head-snapshot",
+        }:
+            raise EvolutionError("surface candidate install is unsafe")
+        package = _exact(
+            candidate["package"], {"name", "version"}, "surface package coordinate"
+        )
+        package_name = _nonempty(package["name"], "surface package name", 214)
+        package_version = _nonempty(package["version"], "surface package version", 64)
+        npm_part = r"[a-z0-9][a-z0-9._-]*"
+        if not re.fullmatch(
+            rf"(?:{npm_part}|@{npm_part}/{npm_part})", package_name
+        ) or not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z._+-]*", package_version):
+            raise EvolutionError("surface package coordinate is invalid")
+        normalized["package"] = {
+            "name": package_name,
+            "version": package_version,
+        }
+        normalized["surface"] = _surface(candidate["surface"])
     _safe_persisted_value(normalized)
     return normalized
 
 
-def _auto_safety_blocks(candidate: dict[str, Any]) -> list[str]:
+def _auto_safety_blocks(
+    candidate: dict[str, Any], verification: dict[str, Any] | None = None
+) -> list[str]:
     blocks: list[str] = []
-    if candidate["compatibility"]["status"] != "pass":
-        blocks.append("compatibility-not-passing")
-    if candidate["smoke"]["status"] != "pass":
-        blocks.append("smoke-not-passing")
-    if candidate["installed"]["provenance"] != "pinned":
-        blocks.append("installed-provenance-not-pinned")
-    if candidate["installed"]["artifact_digest"] != candidate["artifact_digest"]:
-        blocks.append("installed-artifact-mismatch")
+    trusted_surface = (
+        candidate.get("artifact_format") == "canonical-json"
+        and isinstance(verification, dict)
+        and isinstance(verification.get("surface"), dict)
+        and verification["surface"].get("kind")
+        == candidate.get("surface", {}).get("kind")
+        and verification["surface"].get("adapters") == SURFACE_ADAPTERS
+    )
+    if not trusted_surface:
+        if candidate["compatibility"]["status"] != "pass":
+            blocks.append("compatibility-not-passing")
+        if candidate["smoke"]["status"] != "pass":
+            blocks.append("smoke-not-passing")
+        if candidate["installed"]["provenance"] != "pinned":
+            blocks.append("installed-provenance-not-pinned")
+        if candidate["installed"]["artifact_digest"] != candidate["artifact_digest"]:
+            blocks.append("installed-artifact-mismatch")
     if not candidate["rollback"]["reversible"]:
         blocks.append("rollback-not-reversible")
     blocks.extend(
         f"effect-{effect}"
-        for effect, required in candidate["effects"].items()
-        if required
+        for effect in sorted(candidate["effects"])
+        if candidate["effects"][effect]
     )
     if candidate["network"] == "read-only-https" and candidate["data"] != "none":
         blocks.append("network-data-boundary")
     if set(candidate["permissions"]) - {"none", "read-repository"}:
         blocks.append("runtime-write-permission")
-    # Candidate compatibility, smoke, and installed provenance arrive as
-    # untrusted Search data until a separate trusted evidence provider exists.
-    blocks.append("trusted-machine-evidence-unavailable")
+    # Legacy executable candidates still have no trusted machine evidence.
+    # A v2 surface candidate is data-only canonical JSON: Search verifies its
+    # exact immutable bytes and compiles every adapter projection before this
+    # decision is made, so no untrusted executable is run.
+    if not trusted_surface:
+        blocks.append("trusted-machine-evidence-unavailable")
     return blocks
 
 
-def _auto_safe(candidate: dict[str, Any]) -> bool:
-    return not _auto_safety_blocks(candidate)
+def _auto_safe(
+    candidate: dict[str, Any], verification: dict[str, Any] | None = None
+) -> bool:
+    return not _auto_safety_blocks(candidate, verification)
 
 
-def _verify_pinned_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
-    repository = candidate["canonical_source"].removeprefix("https://github.com/")
+def _fetch_https_bytes(
+    url: str, label: str, *, allow_not_found: bool = False
+) -> tuple[bytes, int]:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "bilibili-mcp-harness-evolution/1"}
+    )
+    try:
+        with opener.open(request, timeout=20) as response:
+            raw = response.read(256 * 1024 + 1)
+            status = response.status
+            if (
+                status != 200
+                and not (allow_not_found and status == 404)
+                or response.geturl() != url
+            ):
+                raise EvolutionError(f"{label} redirected or failed")
+    except urllib.error.HTTPError as exc:
+        if not (allow_not_found and exc.code == 404 and exc.geturl() == url):
+            raise EvolutionError(f"{label} could not be verified") from exc
+        raw = exc.read(256 * 1024 + 1)
+        status = 404
+    except (OSError, urllib.error.URLError) as exc:
+        raise EvolutionError(f"{label} could not be verified") from exc
+    if len(raw) > 256 * 1024:
+        raise EvolutionError(f"{label} exceeds its bound")
+    return raw, status
+
+
+def _channel_result(
+    channel: str,
+    raw: bytes,
+    status: int,
+    candidate: dict[str, Any],
+) -> str:
+    """Derive Search meaning from bounded source bytes, never caller labels."""
+
+    if channel == "live-github":
+        return (
+            "candidate"
+            if hashlib.sha256(raw).hexdigest() == candidate["artifact_digest"]
+            else "rejected"
+        )
+    if channel == "official":
+        try:
+            text = raw.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise EvolutionError("official channel evidence is invalid") from exc
+        return (
+            "candidate"
+            if candidate["id"] in text or candidate["artifact_path"] in text
+            else "no-match"
+        )
+    if channel == "package-manager" and status == 404:
+        return "no-match"
+    try:
+        payload = json.loads(raw.decode("utf-8", errors="strict"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise EvolutionError(f"{channel} channel evidence is invalid") from exc
+    if not isinstance(payload, dict):
+        raise EvolutionError(f"{channel} channel evidence is invalid")
+    if channel == "registry":
+        servers = payload.get("servers")
+        if not isinstance(servers, list) or len(servers) > 256:
+            raise EvolutionError("registry channel evidence is invalid")
+        matches = []
+        for item in servers:
+            if not isinstance(item, dict):
+                raise EvolutionError("registry channel evidence is invalid")
+            server = item.get("server", item)
+            if not isinstance(server, dict):
+                raise EvolutionError("registry channel evidence is invalid")
+            if (
+                server.get("name") == candidate["id"]
+                or server.get("id") == candidate["id"]
+            ):
+                matches.append(server)
+        if not matches:
+            return "no-match"
+        for match in matches:
+            repository = match.get("repository")
+            repository_url = (
+                repository.get("url") if isinstance(repository, dict) else repository
+            )
+            if repository_url == candidate["canonical_source"]:
+                return "candidate"
+        return "rejected"
+    if "error" in payload:
+        return "rejected"
+    repository = payload.get("repository")
+    repository_url = (
+        repository.get("url") if isinstance(repository, dict) else repository
+    )
+    if isinstance(repository_url, str):
+        repository_url = repository_url.removeprefix("git+").removesuffix(".git")
+    dist = payload.get("dist")
+    expected_version = candidate["package"]["version"]
+    return (
+        "candidate"
+        if payload.get("name") == candidate["package"]["name"]
+        and payload.get("version") == expected_version
+        and payload.get("license") == candidate["license"]
+        and repository_url == candidate["canonical_source"]
+        and isinstance(dist, dict)
+        and isinstance(dist.get("integrity"), str)
+        and dist["integrity"].startswith("sha512-")
+        else "rejected"
+    )
+
+
+def _verify_search_channels(
+    search: dict[str, Any], candidate: dict[str, Any]
+) -> dict[str, Any]:
+    if search.get("schema") != "harness.evolution-search/v2":
+        raise EvolutionError("surface candidate requires v2 Search evidence")
     observations: dict[str, Any] = {}
+    for source in search["sources_consulted"]:
+        raw, status = _fetch_https_bytes(
+            source["evidence_url"],
+            "surface channel evidence",
+            allow_not_found=source["channel"] == "package-manager",
+        )
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != source["evidence_digest"] or len(raw) != source["evidence_bytes"]:
+            raise EvolutionError("surface channel evidence does not match its record")
+        result = _channel_result(source["channel"], raw, status, candidate)
+        if result != source["result"]:
+            raise EvolutionError("surface channel result does not match its response")
+        observations[source["channel"]] = {
+            "url": source["evidence_url"],
+            "digest": digest,
+            "bytes": len(raw),
+            "status": status,
+            "result": result,
+        }
+    if set(observations) != set(SEARCH_CHANNELS):
+        raise EvolutionError("surface channel evidence is incomplete")
+    return observations
+
+
+def _verify_pinned_candidate(
+    candidate: dict[str, Any], search: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    repository = candidate["canonical_source"].removeprefix("https://github.com/")
+    observations: dict[str, Any] = {}
+    artifact_raw: bytes | None = None
     manifest = {item["path"]: item for item in candidate["manifest"]["files"]}
     for label, path_key, digest_key in (
         ("artifact", "artifact_path", "artifact_digest"),
@@ -579,22 +973,12 @@ def _verify_pinned_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
             f"https://raw.githubusercontent.com/{repository}/"
             f"{candidate['immutable_revision']}/{quoted}"
         )
-        request = urllib.request.Request(
-            url, headers={"User-Agent": "bilibili-mcp-harness-evolution/1"}
-        )
-        try:
-            with opener.open(request, timeout=20) as response:
-                raw = response.read(256 * 1024 + 1)
-                if response.status != 200 or response.geturl() != url:
-                    raise EvolutionError("pinned candidate source redirected or failed")
-        except (OSError, urllib.error.URLError) as exc:
-            raise EvolutionError(
-                "pinned candidate source could not be verified"
-            ) from exc
+        raw, status = _fetch_https_bytes(url, "pinned candidate source")
+        if status != 200:
+            raise EvolutionError("pinned candidate source could not be verified")
         observed = hashlib.sha256(raw).hexdigest()
         if (
-            len(raw) > 256 * 1024
-            or observed != candidate[digest_key]
+            observed != candidate[digest_key]
             or manifest[relative]["digest"] != observed
             or manifest[relative]["bytes"] != len(raw)
         ):
@@ -604,6 +988,8 @@ def _verify_pinned_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
             "digest": observed,
             "bytes": len(raw),
         }
+        if label == "artifact":
+            artifact_raw = raw
         if label == "license":
             try:
                 license_text = raw.decode("utf-8", errors="strict")
@@ -616,11 +1002,50 @@ def _verify_pinned_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
                 raise EvolutionError(
                     "candidate license bytes do not match the declared license"
                 )
+    surface_evidence = None
+    if candidate.get("artifact_format") == "canonical-json":
+        try:
+            source = json.loads((artifact_raw or b"").decode("utf-8", errors="strict"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise EvolutionError(
+                "surface candidate artifact is not canonical JSON"
+            ) from exc
+        if (
+            not isinstance(source, dict)
+            or source.get("schema") != "harness.evolution-capability/v2"
+            or source.get("surface") != candidate.get("surface")
+            or source.get("license") != candidate["license"]
+            or source.get("skill", {}).get("invocation") != candidate["invocation"]
+            or (_canonical_text(source) + "\n").encode("utf-8") != artifact_raw
+        ):
+            raise EvolutionError("surface candidate artifact is not canonical")
+        packages = {
+            host: compile_evolution_capability(source, host)
+            for host in ("codex", "claude")
+        }
+        surface_evidence = {
+            "kind": candidate["surface"]["kind"],
+            "adapters": list(candidate["surface"]["adapters"]),
+            "source_digest": _digest(source),
+            "projection_digests": {
+                "codex-direct": _digest(packages["codex"]),
+                "claude-direct": _digest(packages["claude"]),
+                "codex-paseo-claude": _digest(
+                    {
+                        "codex": packages["codex"],
+                        "claude": packages["claude"],
+                    }
+                ),
+            },
+            "channels": _verify_search_channels(search or {}, candidate),
+        }
     material = {
         "source": candidate["canonical_source"],
         "revision": candidate["immutable_revision"],
         "observations": observations,
     }
+    if surface_evidence is not None:
+        material["surface"] = surface_evidence
     return {
         "schema": "harness.evolution-source-verification/v1",
         **material,
@@ -628,19 +1053,24 @@ def _verify_pinned_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _authorization(candidate: dict[str, Any]) -> dict[str, Any]:
+def _authorization(
+    candidate: dict[str, Any], verification: dict[str, Any] | None = None
+) -> dict[str, Any]:
     candidate_digest = _digest(candidate)
     return {
         "schema": "harness.evolution-authorization/v1",
         "request_id": f"evolution-auth-{candidate_digest[:24]}",
         "candidate_id": candidate["id"],
         "candidate_digest": candidate_digest,
-        "blocks": _auto_safety_blocks(candidate),
+        "blocks": _auto_safety_blocks(candidate, verification),
         "alternatives": ["defer", "build-repository-local"],
     }
 
 
 def _validate_search(value: Any) -> dict[str, Any]:
+    surface_search = (
+        isinstance(value, dict) and value.get("schema") == "harness.evolution-search/v2"
+    )
     search = _exact(
         value,
         {
@@ -652,11 +1082,17 @@ def _validate_search(value: Any) -> dict[str, Any]:
             "decision",
             "selected_candidate",
             "reason_code",
-        },
+        }
+        | ({"channels"} if surface_search else set()),
         "evolution search",
     )
-    if search["schema"] != "harness.evolution-search/v1":
+    if search["schema"] not in {
+        "harness.evolution-search/v1",
+        "harness.evolution-search/v2",
+    }:
         raise EvolutionError("evolution search schema is unsupported")
+    if surface_search and search["channels"] != SEARCH_CHANNELS:
+        raise EvolutionError("surface Evolution Search channels are incomplete")
     query = _nonempty(search["query"], "evolution search query", 256)
     installed = _exact(
         search["installed_catalog"],
@@ -678,6 +1114,8 @@ def _validate_search(value: Any) -> dict[str, Any]:
     candidates = [_validate_candidate(candidate) for candidate in raw_candidates]
     if len({candidate["id"] for candidate in candidates}) != len(candidates):
         raise EvolutionError("evolution candidate identities are duplicated")
+    if any("surface" in candidate for candidate in candidates) and not surface_search:
+        raise EvolutionError("surface candidate requires v2 Search evidence")
     raw_sources = search["sources_consulted"]
     if not isinstance(raw_sources, list) or not 1 <= len(raw_sources) <= 32:
         raise EvolutionError(
@@ -685,17 +1123,22 @@ def _validate_search(value: Any) -> dict[str, Any]:
         )
     sources: list[dict[str, Any]] = []
     for raw_source in raw_sources:
+        source_keys = {
+            "canonical_source",
+            "immutable_revision",
+            "artifact_path",
+            "artifact_digest",
+            "license_path",
+            "license_digest",
+            "result",
+        } | (
+            {"channel", "evidence_url", "evidence_digest", "evidence_bytes"}
+            if surface_search
+            else set()
+        )
         item = _exact(
             raw_source,
-            {
-                "canonical_source",
-                "immutable_revision",
-                "artifact_path",
-                "artifact_digest",
-                "license_path",
-                "license_digest",
-                "result",
-            },
+            source_keys,
             "evolution source evidence",
         )
         source = {
@@ -713,6 +1156,16 @@ def _validate_search(value: Any) -> dict[str, Any]:
             "license_digest": item["license_digest"],
             "result": item["result"],
         }
+        if surface_search:
+            source.update(
+                {
+                    "channel": item["channel"],
+                    "evidence_url": item["evidence_url"],
+                    "evidence_digest": item["evidence_digest"],
+                    "evidence_bytes": item["evidence_bytes"],
+                }
+            )
+            parsed_evidence = urllib.parse.urlsplit(str(source["evidence_url"]))
         if (
             not re.fullmatch(
                 r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
@@ -722,14 +1175,35 @@ def _validate_search(value: Any) -> dict[str, Any]:
             or not DIGEST_RE.fullmatch(str(source["artifact_digest"]))
             or not DIGEST_RE.fullmatch(str(source["license_digest"]))
             or source["result"] not in {"candidate", "no-match", "rejected"}
+            or (surface_search and source["channel"] not in SEARCH_CHANNELS)
+            or (
+                surface_search
+                and (
+                    parsed_evidence.scheme != "https"
+                    or parsed_evidence.username is not None
+                    or parsed_evidence.password is not None
+                    or parsed_evidence.port not in {None, 443}
+                    or parsed_evidence.hostname
+                    not in SEARCH_CHANNEL_HOSTS[source["channel"]]
+                    or bool(parsed_evidence.fragment)
+                    or not DIGEST_RE.fullmatch(str(source["evidence_digest"]))
+                    or not isinstance(source["evidence_bytes"], int)
+                    or not 1 <= source["evidence_bytes"] <= 256 * 1024
+                )
+            )
         ):
             raise EvolutionError("evolution source evidence is invalid")
         sources.append(source)
     if len({_digest(item) for item in sources}) != len(sources):
         raise EvolutionError("evolution source evidence is duplicated")
+    if surface_search and sorted(item["channel"] for item in sources) != sorted(
+        SEARCH_CHANNELS
+    ):
+        raise EvolutionError("surface Evolution Search channels are incomplete")
     for candidate in candidates:
         if not any(
             source["result"] == "candidate"
+            and (not surface_search or source["channel"] == "live-github")
             and all(
                 source[key] == candidate[key]
                 for key in (
@@ -751,6 +1225,39 @@ def _validate_search(value: Any) -> dict[str, Any]:
     candidate_ids = {candidate["id"] for candidate in candidates}
     if not candidates or selected not in candidate_ids:
         raise EvolutionError("evolution selected candidate is invalid")
+    if surface_search:
+        candidate = next(item for item in candidates if item["id"] == selected)
+        channel_sources = {item["channel"]: item for item in sources}
+        repository = candidate["canonical_source"].removeprefix("https://github.com/")
+        raw_prefix = (
+            f"https://raw.githubusercontent.com/{repository}/"
+            f"{candidate['immutable_revision']}/"
+        )
+        artifact_suffix = "/".join(
+            urllib.parse.quote(part, safe="._-")
+            for part in PurePosixPath(candidate["artifact_path"]).parts
+        )
+        registry_query = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(channel_sources["registry"]["evidence_url"]).query
+        )
+        package_path = urllib.parse.urlsplit(
+            channel_sources["package-manager"]["evidence_url"]
+        ).path
+        package_coordinate = candidate["package"]
+        expected_package_path = (
+            "/"
+            + urllib.parse.quote(package_coordinate["name"], safe="")
+            + "/"
+            + urllib.parse.quote(package_coordinate["version"], safe="")
+        )
+        if (
+            not channel_sources["official"]["evidence_url"].startswith(raw_prefix)
+            or channel_sources["live-github"]["evidence_url"]
+            != raw_prefix + artifact_suffix
+            or registry_query.get("search") != [candidate["id"]]
+            or package_path != expected_package_path
+        ):
+            raise EvolutionError("surface channel evidence is not candidate-bound")
     reason = _nonempty(search["reason_code"], "evolution search reason", 96)
     if not re.fullmatch(r"[a-z0-9-]+", reason):
         raise EvolutionError("evolution search reason is invalid")
@@ -764,11 +1271,16 @@ def _validate_search(value: Any) -> dict[str, Any]:
         "selected_candidate": selected,
         "reason_code": reason,
     }
+    if surface_search:
+        normalized["channels"] = list(SEARCH_CHANNELS)
     _safe_persisted_value(normalized)
     return normalized
 
 
 def _validate_stored_search(value: Any) -> dict[str, Any]:
+    surface_search = (
+        isinstance(value, dict) and value.get("schema") == "harness.evolution-search/v2"
+    )
     search = _exact(
         value,
         {
@@ -780,13 +1292,16 @@ def _validate_stored_search(value: Any) -> dict[str, Any]:
             "decision",
             "selected_candidate",
             "reason_code",
-        },
+        }
+        | ({"channels"} if surface_search else set()),
         "stored evolution search",
     )
     if (
-        search["schema"] != "harness.evolution-search/v1"
+        search["schema"]
+        not in {"harness.evolution-search/v1", "harness.evolution-search/v2"}
         or not isinstance(search["query_digest"], str)
         or not DIGEST_RE.fullmatch(search["query_digest"])
+        or (surface_search and search["channels"] != SEARCH_CHANNELS)
     ):
         raise EvolutionError("stored evolution search is invalid")
     installed = _exact(
@@ -812,7 +1327,11 @@ def _validate_stored_search(value: Any) -> dict[str, Any]:
     decision = search["decision"]
     selected = search["selected_candidate"]
     candidate_ids = {candidate["id"] for candidate in candidates}
-    if decision not in {"adapt", "build", "deferred"} or not candidates or selected not in candidate_ids:
+    if (
+        decision not in {"adapt", "build", "deferred"}
+        or not candidates
+        or selected not in candidate_ids
+    ):
         raise EvolutionError("stored evolution decision is invalid")
     if not isinstance(search["reason_code"], str) or not re.fullmatch(
         r"[a-z0-9-]{1,96}", search["reason_code"]
@@ -828,6 +1347,8 @@ def _validate_stored_search(value: Any) -> dict[str, Any]:
         "selected_candidate": selected,
         "reason_code": search["reason_code"],
     }
+    if surface_search:
+        query_probe["channels"] = list(SEARCH_CHANNELS)
     normalized_sources = _validate_search(query_probe)["sources_consulted"]
     normalized = {
         **search,
@@ -888,7 +1409,9 @@ def _safe_capability_text(values: list[str]) -> None:
         r"(?i)\binvoke-webrequest\b",
         r"(?i)(?:^|[\\/])\.env(?:\.|$)|\bignore\s+(?:the\s+)?(?:parent|scope|instructions?)\b",
     )
-    if any(pattern.search(value) for value in values for pattern in FORBIDDEN_TEXT) or any(
+    if any(
+        pattern.search(value) for value in values for pattern in FORBIDDEN_TEXT
+    ) or any(
         re.search(pattern, value) for value in values for pattern in command_patterns
     ):
         raise EvolutionError("canonical capability contains unsafe operational content")
@@ -918,6 +1441,10 @@ def _safe_persisted_value(value: Any) -> None:
 def compile_evolution_capability(source: dict[str, Any], host: str) -> dict[str, str]:
     """Compile one bounded Skill and Agent package from canonical source."""
 
+    surface_capability = (
+        isinstance(source, dict)
+        and source.get("schema") == "harness.evolution-capability/v2"
+    )
     canonical = _exact(
         source,
         {
@@ -935,11 +1462,16 @@ def compile_evolution_capability(source: dict[str, Any], host: str) -> dict[str,
             "trust",
             "packaging",
             "evaluation",
-        },
+        }
+        | ({"surface"} if surface_capability else set()),
         "canonical evolution capability",
     )
-    if canonical["schema"] != "harness.evolution-capability/v1":
+    if canonical["schema"] not in {
+        "harness.evolution-capability/v1",
+        "harness.evolution-capability/v2",
+    }:
         raise EvolutionError("canonical capability schema is unsupported")
+    surface = _surface(canonical["surface"]) if surface_capability else None
     name = _nonempty(canonical["name"], "capability name", 64)
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", name):
         raise EvolutionError("capability name is invalid")
@@ -951,26 +1483,40 @@ def compile_evolution_capability(source: dict[str, Any], host: str) -> dict[str,
     if canonical["license"] not in LICENSES:
         raise EvolutionError("canonical capability license is not clear")
     if canonical["adapted_from"] is not None:
-        adapted = _exact(
-            canonical["adapted_from"],
-            {
+        adapted_keys = (
+            {"source", "revision"}
+            if surface_capability
+            else {
                 "candidate_id",
                 "candidate_digest",
                 "source",
                 "revision",
                 "artifact_digest",
-            },
-            "adapted capability source",
+            }
+        )
+        adapted = _exact(
+            canonical["adapted_from"], adapted_keys, "adapted capability source"
         )
         if (
-            not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", str(adapted["candidate_id"]))
-            or not re.fullmatch(r"[0-9a-f]{64}", str(adapted["candidate_digest"]))
-            or not re.fullmatch(
+            not re.fullmatch(
                 r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
                 str(adapted["source"]),
             )
             or not re.fullmatch(r"[0-9a-f]{40}", str(adapted["revision"]))
-            or not re.fullmatch(r"[0-9a-f]{64}", str(adapted["artifact_digest"]))
+            or (
+                not surface_capability
+                and (
+                    not re.fullmatch(
+                        r"[A-Za-z0-9_.-]{1,96}", str(adapted["candidate_id"])
+                    )
+                    or not re.fullmatch(
+                        r"[0-9a-f]{64}", str(adapted["candidate_digest"])
+                    )
+                    or not re.fullmatch(
+                        r"[0-9a-f]{64}", str(adapted["artifact_digest"])
+                    )
+                )
+            )
         ):
             raise EvolutionError("adapted capability source is invalid")
 
@@ -1002,7 +1548,17 @@ def compile_evolution_capability(source: dict[str, Any], host: str) -> dict[str,
         or interface["version"] != version
     ):
         raise EvolutionError("capability interface is inconsistent")
-    _string_list(interface["operations"], "capability operations")
+    operations = _string_list(interface["operations"], "capability operations")
+    if (
+        surface is not None
+        and surface["kind"] in {"mcp", "cli"}
+        and operations
+        != [
+            "inspect",
+            "report",
+        ]
+    ):
+        raise EvolutionError("surface capability operations have no trusted handler")
 
     agent = _exact(
         canonical["agent"],
@@ -1173,6 +1729,17 @@ def compile_evolution_capability(source: dict[str, Any], host: str) -> dict[str,
         )
         + "\n",
     }
+    if surface is not None:
+        files[f"{skill_root}/surface.json"] = (
+            json.dumps(
+                _surface_runtime(surface, interface, name),
+                ensure_ascii=True,
+                sort_keys=True,
+                indent=2,
+                allow_nan=False,
+            )
+            + "\n"
+        )
     if invocation["mode"] == "manual" and host == "codex":
         manual_metadata = invocation["metadata"].get("openai_yaml")
         if not isinstance(manual_metadata, str):
@@ -1267,6 +1834,599 @@ def verify_evolution_projection(
         "status": "pass",
         "projection_digest": _digest(material),
         "file_count": len(actual),
+    }
+
+
+def _surface_canonical(context: WorktreeContext, name: str) -> dict[str, Any] | None:
+    raw = _read_single_link_file(
+        context, f"harness/capability-packages/{name}/canonical.json"
+    )
+    try:
+        canonical = json.loads(raw) if raw is not None else None
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        canonical = None
+    if not isinstance(canonical, dict):
+        raise EvolutionError("surface capability canonical source is unsafe")
+    if canonical.get("schema") != "harness.evolution-capability/v2":
+        return None
+    if canonical.get("name") != name or raw != (
+        _canonical_text(canonical) + "\n"
+    ).encode("utf-8"):
+        raise EvolutionError("surface capability canonical source is inconsistent")
+    return canonical
+
+
+def discover_surface_capabilities(
+    context: WorktreeContext, adapter: str
+) -> dict[str, Any]:
+    """Discover exact repository-local v2 packages for one execution adapter."""
+
+    if adapter not in SURFACE_ADAPTERS:
+        raise EvolutionError("surface adapter is invalid")
+    package_root = context.root / "harness/capability-packages"
+    ensure_no_link_components(context.root, package_root)
+    hosts = {
+        "codex-direct": ("codex",),
+        "claude-direct": ("claude",),
+        "codex-paseo-claude": ("codex", "claude"),
+    }[adapter]
+    capabilities: list[dict[str, Any]] = []
+    if package_root.exists():
+        roots = sorted(path for path in package_root.iterdir() if path.is_dir())
+        if len(roots) > 64:
+            raise EvolutionError("surface capability catalog exceeds its bound")
+        for root in roots:
+            if root.is_symlink() or not CAPABILITY_RE.fullmatch(root.name):
+                raise EvolutionError("surface capability catalog is unsafe")
+            canonical = _surface_canonical(context, root.name)
+            if canonical is None:
+                continue
+            surface = _surface(canonical.get("surface"))
+            if adapter not in surface["adapters"]:
+                continue
+            projection_digests: dict[str, str] = {}
+            for host in hosts:
+                verify_evolution_projection(canonical, host, root / host)
+                expected = compile_evolution_capability(canonical, host)
+                skill_prefix = f"skills/{root.name}/"
+                skill_root = context.root / (
+                    f".agents/skills/{root.name}"
+                    if host == "codex"
+                    else f".claude/skills/{root.name}"
+                )
+                deployed_skill = {
+                    path.relative_to(skill_root)
+                    .as_posix(): hashlib.sha256(
+                        (read_bounded_bytes(path, 256 * 1024) or b"")
+                    )
+                    .hexdigest()
+                    for path in _current_files(skill_root, context.root)
+                }
+                expected_skill = {
+                    relative.removeprefix(skill_prefix): hashlib.sha256(
+                        content.encode("utf-8")
+                    ).hexdigest()
+                    for relative, content in expected.items()
+                    if relative.startswith(skill_prefix)
+                }
+                agent_relative = (
+                    f".codex/agents/{root.name}.toml"
+                    if host == "codex"
+                    else f".claude/agents/{root.name}.md"
+                )
+                package_agent = (
+                    f"agents/{root.name}.toml"
+                    if host == "codex"
+                    else f"agents/{root.name}.md"
+                )
+                deployed_agent = _read_single_link_file(context, agent_relative)
+                if deployed_skill != expected_skill or deployed_agent != expected[
+                    package_agent
+                ].encode("utf-8"):
+                    raise EvolutionError("surface capability deployment drift detected")
+                projection_digests[host] = _digest(expected)
+            capabilities.append(
+                {
+                    "name": root.name,
+                    "kind": surface["kind"],
+                    "hosts": list(hosts),
+                    "source_digest": _digest(canonical),
+                    "projection_digest": _digest(projection_digests),
+                }
+            )
+    return {
+        "schema": "harness.surface-discovery/v1",
+        "adapter": adapter,
+        "hosts": list(hosts),
+        "status": "pass",
+        "capabilities": capabilities,
+        "evidence_digest": _digest(
+            {"adapter": adapter, "hosts": list(hosts), "capabilities": capabilities}
+        ),
+    }
+
+
+def _surface_operation_result(
+    context: WorktreeContext, canonical: dict[str, Any], operation: str
+) -> dict[str, Any]:
+    operations = canonical["skill"]["interface"]["operations"]
+    if operation not in operations:
+        raise EvolutionError("surface capability operation is unavailable")
+    if operation == "inspect":
+        return {
+            "capability": canonical["name"],
+            "kind": canonical["surface"]["kind"],
+            "head_sha": context.head_sha,
+            "worktree_id": context.worktree_id,
+        }
+    if operation == "report":
+        return {
+            "capability": canonical["name"],
+            "license": canonical["license"],
+            "operations": list(operations),
+            "source_digest": _digest(canonical),
+        }
+    raise EvolutionError("surface capability operation has no trusted handler")
+
+
+def call_surface_capability(
+    context: WorktreeContext,
+    *,
+    name: str,
+    adapter: str,
+    value: Any,
+) -> dict[str, Any]:
+    discovery = discover_surface_capabilities(context, adapter)
+    if not any(item["name"] == name for item in discovery["capabilities"]):
+        raise EvolutionError("surface capability is not discoverable")
+    canonical = _surface_canonical(context, name)
+    if canonical is None or canonical["surface"]["kind"] != "cli":
+        raise EvolutionError("surface capability is not a CLI")
+    request = _exact(
+        value, {"schema", "operation", "arguments"}, "surface call request"
+    )
+    if request["schema"] != "harness.surface-call/v1" or request["arguments"] != {}:
+        raise EvolutionError("surface call request is invalid")
+    operation = _nonempty(request["operation"], "surface operation", 64)
+    result = _surface_operation_result(context, canonical, operation)
+    material = {
+        "adapter": adapter,
+        "name": name,
+        "operation": operation,
+        "result": result,
+        "discovery_digest": discovery["evidence_digest"],
+    }
+    return {
+        "schema": "harness.surface-call-result/v1",
+        "adapter": adapter,
+        "name": name,
+        "operation": operation,
+        "status": "pass",
+        "result": result,
+        "evidence_digest": _digest(material),
+    }
+
+
+def mcp_surface_message(
+    context: WorktreeContext,
+    *,
+    name: str,
+    adapter: str,
+    value: Any,
+) -> dict[str, Any] | None:
+    discovery = discover_surface_capabilities(context, adapter)
+    if not any(item["name"] == name for item in discovery["capabilities"]):
+        raise EvolutionError("surface capability is not discoverable")
+    canonical = _surface_canonical(context, name)
+    if canonical is None or canonical["surface"]["kind"] != "mcp":
+        raise EvolutionError("surface capability is not an MCP server")
+    if not isinstance(value, dict) or value.get("jsonrpc") != "2.0":
+        raise EvolutionError("MCP message is invalid")
+    method = value.get("method")
+    if method == "notifications/initialized":
+        notification = _exact(
+            value, {"jsonrpc", "method", "params"}, "MCP initialized notification"
+        )
+        if notification["params"] != {}:
+            raise EvolutionError("MCP initialized notification is invalid")
+        return None
+    request = _exact(value, {"jsonrpc", "id", "method", "params"}, "MCP request")
+    request_id = request["id"]
+    if (
+        not isinstance(request_id, (str, int))
+        or isinstance(request_id, bool)
+        or len(str(request_id)) > 64
+    ):
+        raise EvolutionError("MCP request id is invalid")
+    params = request["params"]
+    if method == "initialize":
+        initialize = _exact(
+            params,
+            {"protocolVersion", "capabilities", "clientInfo"},
+            "MCP initialize params",
+        )
+        client = _exact(
+            initialize["clientInfo"], {"name", "version"}, "MCP client info"
+        )
+        _nonempty(client["name"], "MCP client name", 128)
+        _nonempty(client["version"], "MCP client version", 64)
+        if initialize["protocolVersion"] != "2025-11-25" or not isinstance(
+            initialize["capabilities"], dict
+        ):
+            raise EvolutionError("MCP initialize params are unsupported")
+        result = {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {"tools": {"listChanged": False}},
+            "serverInfo": {"name": canonical["name"], "version": canonical["version"]},
+        }
+    elif method == "tools/list":
+        if params != {}:
+            raise EvolutionError("MCP tools/list params are invalid")
+        result = {
+            "tools": [
+                {
+                    "name": operation,
+                    "description": f"{operation} bounded repository metadata",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                }
+                for operation in canonical["skill"]["interface"]["operations"]
+            ]
+        }
+    elif method == "tools/call":
+        call = _exact(params, {"name", "arguments"}, "MCP tools/call params")
+        if call["arguments"] != {}:
+            raise EvolutionError("MCP tool arguments are invalid")
+        operation = _nonempty(call["name"], "MCP tool name", 64)
+        operation_result = _surface_operation_result(context, canonical, operation)
+        result = {
+            "content": [{"type": "text", "text": _canonical_text(operation_result)}],
+            "structuredContent": operation_result,
+            "isError": False,
+        }
+    else:
+        raise EvolutionError("MCP method is unsupported")
+    return {"jsonrpc": "2.0", "id": request_id, "result": result}
+
+
+def hook_surface_event(
+    context: WorktreeContext,
+    *,
+    name: str,
+    adapter: str,
+    host: str,
+    event: str,
+    payload: Any,
+) -> dict[str, Any]:
+    """Invoke one deployed Hook capability through the shared event seam."""
+
+    from harness.events import HOOK_EVENTS, normalize_hook_event, persist_hook_event
+
+    discovery = discover_surface_capabilities(context, adapter)
+    if host not in discovery["hosts"] or event not in HOOK_EVENTS:
+        raise EvolutionError("Hook surface invocation is invalid")
+    canonical = _surface_canonical(context, name)
+    if (
+        canonical is None
+        or canonical["surface"]["kind"] != "hook"
+        or not any(item["name"] == name for item in discovery["capabilities"])
+        or not isinstance(payload, dict)
+    ):
+        raise EvolutionError("Hook surface capability is not deployed")
+    normalized = {**normalize_hook_event(host, event, payload), "capability": name}
+    ledger = persist_hook_event(context, normalized)
+    material = {
+        "adapter": adapter,
+        "host": host,
+        "capability": name,
+        "event": normalized,
+        "deployment_digest": _digest(canonical),
+    }
+    return {
+        "schema": "harness.hook-surface-result/v1",
+        "status": "recorded",
+        "adapter": adapter,
+        "host": host,
+        "capability": name,
+        "event": normalized,
+        "ledger": ledger.relative_to(context.root).as_posix(),
+        "evidence_digest": _digest(material),
+    }
+
+
+def smoke_surface_capability(
+    context: WorktreeContext, *, name: str, adapter: str
+) -> dict[str, Any]:
+    """Run deterministic discovery and policy smoke without candidate code."""
+
+    if not CAPABILITY_RE.fullmatch(name):
+        raise EvolutionError("capability name is invalid")
+    discovery = discover_surface_capabilities(context, adapter)
+    capability = next(
+        (item for item in discovery["capabilities"] if item["name"] == name), None
+    )
+    if capability is None:
+        raise EvolutionError("surface capability is not discoverable")
+    canonical = _surface_canonical(context, name)
+    if canonical is None:
+        raise EvolutionError("surface capability is not discoverable")
+    surface = _surface(canonical["surface"])
+    observations: dict[str, Any] = {}
+    results: dict[str, bool] = {}
+    if surface["kind"] == "cli":
+        calls = {
+            operation: call_surface_capability(
+                context,
+                name=name,
+                adapter=adapter,
+                value={
+                    "schema": "harness.surface-call/v1",
+                    "operation": operation,
+                    "arguments": {},
+                },
+            )
+            for operation in ("inspect", "report")
+        }
+        results = {
+            "discovery": capability["kind"] == "cli",
+            "smoke": all(item["status"] == "pass" for item in calls.values()),
+        }
+        observations = {
+            "calls": {
+                operation: item["evidence_digest"] for operation, item in calls.items()
+            }
+        }
+    elif surface["kind"] == "mcp":
+        messages = {
+            "initialize": {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "harness-smoke", "version": "1"},
+                },
+            },
+            "tools/list": {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/list",
+                "params": {},
+            },
+            "tools/call": {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {"name": "inspect", "arguments": {}},
+            },
+        }
+        responses = {
+            method: mcp_surface_message(
+                context, name=name, adapter=adapter, value=message
+            )
+            for method, message in messages.items()
+        }
+        listed = responses["tools/list"]
+        called = responses["tools/call"]
+        results = {
+            "discovery": capability["kind"] == "mcp",
+            "smoke": (
+                responses["initialize"] is not None
+                and listed is not None
+                and [tool["name"] for tool in listed["result"]["tools"]]
+                == canonical["skill"]["interface"]["operations"]
+                and called is not None
+                and called["result"]["isError"] is False
+            ),
+        }
+        observations = {
+            "protocol_version": "2025-11-25",
+            "methods": {
+                method: _digest(response)
+                for method, response in responses.items()
+                if response is not None
+            },
+        }
+    elif surface["kind"] == "hook":
+        from harness.events import normalize_hook_event
+
+        before = _changed_paths(context.root)
+        secret = "SYNTHETIC_HOOK_SECRET_VALUE"
+        host = discovery["hosts"][0]
+        event = "post-tool-use" if host == "codex" else "post-tool-use-failure"
+        payload = {
+            "session_id": f"{name}-{adapter}-hook-smoke",
+            "tool_name": "shell_command" if host == "codex" else "Bash",
+            "tool_input": {"command": "npm test", "token": secret},
+            **(
+                {"tool_response": {"exit_code": 1, "stderr": secret}}
+                if host == "codex"
+                else {"error": f"Exit code 1\n{secret}"}
+            ),
+        }
+        projected = normalize_hook_event(host, event, payload)
+        ledger = context.runtime_root / projected["session_id"] / "events.jsonl"
+        hook_configs = (".codex/hooks.json", ".claude/settings.json")
+        config_digests: dict[str, str] = {}
+        configs_current = True
+        protected: dict[Path, bytes | None] = {}
+        for relative in hook_configs:
+            raw = _read_single_link_file(context, relative)
+            head = _git_bytes(context.root, "show", f"HEAD:{relative}")
+            configs_current = configs_current and raw is not None and raw == head
+            if raw is not None:
+                config_digests[relative] = hashlib.sha256(raw).hexdigest()
+            protected[context.root / relative] = raw
+        surface_manifest = (
+            context.root
+            / "harness/capability-packages"
+            / name
+            / "codex"
+            / "skills"
+            / name
+            / "surface.json"
+        )
+        protected[surface_manifest] = read_bounded_bytes(surface_manifest, 256 * 1024)
+        protected[ledger] = read_bounded_bytes(ledger, 256 * 1024)
+        canary = context.runtime_root / "hook-canary" / f"{name}-{adapter}.json"
+        protected[canary] = read_bounded_bytes(canary, 64 * 1024)
+        canary_material = {
+            "schema": "harness.hook-canary/v1",
+            "capability": name,
+            "adapter": adapter,
+            "host": host,
+            "deployment_digest": _digest(canonical),
+            "config_digests": config_digests,
+        }
+        calls: list[dict[str, Any]] = []
+        stored: list[dict[str, Any]] = []
+        canary_invoked = False
+        try:
+            ensure_no_link_components(context.root, canary)
+            write_bounded_text(
+                canary, _canonical_text(canary_material) + "\n", 64 * 1024
+            )
+            calls = [
+                hook_surface_event(
+                    context,
+                    name=name,
+                    adapter=adapter,
+                    host=host,
+                    event=event,
+                    payload=payload,
+                )
+                for _ in range(2)
+            ]
+            ledger_raw = read_bounded_bytes(ledger, 256 * 1024) or b""
+            stored = [json.loads(line) for line in ledger_raw.splitlines()[-2:]]
+            canary_invoked = (
+                len(stored) == 2
+                and all(item.get("capability") == name for item in stored)
+                and all(call["status"] == "recorded" for call in calls)
+            )
+            rendered = ledger_raw.decode("utf-8", errors="strict") + _canonical_text(
+                calls
+            )
+        finally:
+            for path, snapshot in protected.items():
+                ensure_no_link_components(context.root, path)
+                if snapshot is None:
+                    if path.is_file() and not path.is_symlink():
+                        path.unlink()
+                else:
+                    write_bounded_text(
+                        path, snapshot.decode("utf-8", errors="strict"), 256 * 1024
+                    )
+            for directory in (ledger.parent, canary.parent):
+                try:
+                    directory.rmdir()
+                except OSError:
+                    pass
+        rollback_restored = all(
+            read_bounded_bytes(path, 256 * 1024) == snapshot
+            for path, snapshot in protected.items()
+        )
+        results = {
+            "replay": len(stored) == 2
+            and stored[0]["semantic"] == stored[1]["semantic"],
+            "shadow": _changed_paths(context.root) == before,
+            "no-secret": secret not in rendered,
+            "multi-worktree": (
+                context.git_dir.resolve() != context.common_git_dir.resolve()
+            ),
+            "canary": configs_current and canary_invoked,
+            "rollback": rollback_restored
+            and canonical["packaging"]
+            == {
+                "scope": "repository-local",
+                "reversible": True,
+                "hosts": ["codex", "claude"],
+            },
+        }
+        observations = {
+            "replay_digest": _digest([item["semantic"] for item in stored]),
+            "shadow_before": _digest(before),
+            "shadow_after": _digest(_changed_paths(context.root)),
+            "secret_survived": secret in rendered,
+            "worktree_id": context.worktree_id,
+            "canary_digests": config_digests,
+            "canary_evidence_digest": _digest(calls),
+            "rollback_digest": _digest(
+                {
+                    path.relative_to(context.root).as_posix(): (
+                        hashlib.sha256(snapshot).hexdigest()
+                        if snapshot is not None
+                        else None
+                    )
+                    for path, snapshot in protected.items()
+                }
+            ),
+        }
+    else:
+        policy = surface["loop"]
+        current = {"fingerprint": "1" * 64, "evidence_digest": "2" * 64}
+
+        def step(
+            *,
+            attempts: list[dict[str, str]],
+            requested_adapter: str = adapter,
+            user_input: bool = False,
+        ) -> dict[str, Any]:
+            return loop_surface_step(
+                {
+                    "schema": "harness.loop-step/v1",
+                    "policy": policy,
+                    "frozen_adapter": adapter,
+                    "requested_adapter": requested_adapter,
+                    "attempts": attempts,
+                    "current": current,
+                    "user_input": user_input,
+                },
+                adapter,
+            )
+
+        other_adapter = next(item for item in SURFACE_ADAPTERS if item != adapter)
+        bounded = step(attempts=[current] * policy["max_attempts"])
+        no_progress = step(attempts=[current] * policy["no_progress_limit"])
+        yielded = step(attempts=[], user_input=True)
+        switched = step(attempts=[], requested_adapter=other_adapter)
+        results = {
+            "bounded": bounded["reason"] == "attempt-limit",
+            "no-progress-stop": no_progress["reason"] == "no-progress",
+            "yield-to-user": yielded["action"] == "yield-to-user",
+            "no-adapter-switch": switched["reason"] == "adapter-switch-prohibited",
+        }
+        observations = {
+            "bounded": bounded,
+            "no-progress-stop": no_progress,
+            "yield-to-user": yielded,
+            "no-adapter-switch": switched,
+        }
+    if set(results) != set(_surface_check_names(surface)) or not all(results.values()):
+        raise EvolutionError(f"{surface['kind'].title()} surface smoke failed")
+    checks = {name: "pass" for name in _surface_check_names(surface)}
+    material = {
+        "adapter": adapter,
+        "hosts": discovery["hosts"],
+        "capability": capability,
+        "checks": checks,
+        "observations": observations,
+        "discovery_digest": discovery["evidence_digest"],
+    }
+    return {
+        "schema": "harness.surface-smoke/v1",
+        "name": name,
+        "kind": surface["kind"],
+        "adapter": adapter,
+        "hosts": discovery["hosts"],
+        "status": "pass",
+        "checks": checks,
+        "observations": observations,
+        "evidence_digest": _digest(material),
     }
 
 
@@ -1436,9 +2596,7 @@ def _verify_gap_gate(
             or _commit_paths(context.root, commit) != receipt.get("paths")
             or _commit_tree_snapshot(context.root, commit, receipt["paths"])
             != receipt.get("index_snapshot")
-            or message.splitlines().count(
-                f"Harness-Task: {_task_key(item['task_id'])}"
-            )
+            or message.splitlines().count(f"Harness-Task: {_task_key(item['task_id'])}")
             != 1
         ):
             raise EvolutionError(
@@ -1492,11 +2650,12 @@ def _load_evolution_run(
     writer = _expected_writer(mode)
     if actor is not None:
         _require_writer_actor(mode, actor)
-        if (
-            direct["state"] not in {"executing", "repairing"}
-            or contract["writer_lease"] != {"holder": writer, "state": "active"}
-        ):
-            raise EvolutionError("Evolution mutation actor does not hold the writer lease")
+        if direct["state"] not in {"executing", "repairing"} or contract[
+            "writer_lease"
+        ] != {"holder": writer, "state": "active"}:
+            raise EvolutionError(
+                "Evolution mutation actor does not hold the writer lease"
+            )
     if (
         run["schema"] != "harness.evolution-run/v1"
         or run["task_id"] != task_id
@@ -1683,6 +2842,7 @@ def _load_evolution_run(
         ):
             raise EvolutionError("Evolution Run state is invalid")
         canonical = run["canonical"]
+        surface_canonical = isinstance(canonical, dict) and "surface" in canonical
         if (
             not isinstance(canonical, dict)
             or set(canonical)
@@ -1692,6 +2852,7 @@ def _load_evolution_run(
                 "license",
                 "source_digest",
             }
+            | ({"surface"} if surface_canonical else set())
             or not isinstance(canonical["name"], str)
             or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", canonical["name"])
             or not isinstance(canonical["version"], str)
@@ -1700,6 +2861,12 @@ def _load_evolution_run(
             or canonical["source_digest"] != projection["source_digest"]
         ):
             raise EvolutionError("Evolution Run state is invalid")
+        if surface_canonical:
+            try:
+                if _surface(canonical["surface"]) != canonical["surface"]:
+                    raise EvolutionError("Evolution Run state is invalid")
+            except EvolutionError as exc:
+                raise EvolutionError("Evolution Run state is invalid") from exc
     elif run["projection_digest"] is not None:
         raise EvolutionError("Evolution Run state is invalid")
     elif run["canonical"] is not None:
@@ -1729,10 +2896,9 @@ def _load_evolution_run(
             normalized_search = _validate_stored_search(search)
         except EvolutionError as exc:
             raise EvolutionError("Evolution Run state is invalid") from exc
-        if (
-            normalized_search != search
-            or search["installed_catalog"] != _installed_catalog_evidence(run["mode"])
-        ):
+        if normalized_search != search or search[
+            "installed_catalog"
+        ] != _installed_catalog_evidence(run["mode"]):
             raise EvolutionError("Evolution Run state is invalid")
         selected = next(
             (
@@ -1746,6 +2912,7 @@ def _load_evolution_run(
             raise EvolutionError("Evolution Run state is invalid")
         verification = run["source_verification"]
         if verification is not None:
+            surface_verification = selected is not None and "surface" in selected
             if (
                 not isinstance(verification, dict)
                 or set(verification)
@@ -1756,6 +2923,7 @@ def _load_evolution_run(
                     "observations",
                     "evidence_digest",
                 }
+                | ({"surface"} if surface_verification else set())
                 or verification["schema"] != "harness.evolution-source-verification/v1"
                 or selected is None
                 or verification["source"] != selected["canonical_source"]
@@ -1769,6 +2937,11 @@ def _load_evolution_run(
                         "revision": verification["revision"],
                         "observations": verification["observations"],
                     }
+                    | (
+                        {"surface": verification["surface"]}
+                        if surface_verification
+                        else {}
+                    )
                 )
             ):
                 raise EvolutionError("Evolution Run state is invalid")
@@ -1797,6 +2970,49 @@ def _load_evolution_run(
             }
             if verification["observations"] != expected_observations:
                 raise EvolutionError("Evolution Run state is invalid")
+            if surface_verification:
+                surface_evidence = verification["surface"]
+                if (
+                    not isinstance(surface_evidence, dict)
+                    or set(surface_evidence)
+                    != {
+                        "kind",
+                        "adapters",
+                        "source_digest",
+                        "projection_digests",
+                        "channels",
+                    }
+                    or surface_evidence["kind"] != selected["surface"]["kind"]
+                    or surface_evidence["adapters"] != SURFACE_ADAPTERS
+                    or not DIGEST_RE.fullmatch(str(surface_evidence["source_digest"]))
+                    or not isinstance(surface_evidence["projection_digests"], dict)
+                    or set(surface_evidence["projection_digests"])
+                    != set(SURFACE_ADAPTERS)
+                    or any(
+                        not DIGEST_RE.fullmatch(str(digest))
+                        for digest in surface_evidence["projection_digests"].values()
+                    )
+                    or not isinstance(surface_evidence["channels"], dict)
+                    or set(surface_evidence["channels"]) != set(SEARCH_CHANNELS)
+                ):
+                    raise EvolutionError("Evolution Run state is invalid")
+                for channel, item in surface_evidence["channels"].items():
+                    source_record = next(
+                        source
+                        for source in search["sources_consulted"]
+                        if source["channel"] == channel
+                    )
+                    if (
+                        not isinstance(item, dict)
+                        or set(item) != {"url", "digest", "bytes", "status", "result"}
+                        or item["url"] != source_record["evidence_url"]
+                        or item["digest"] != source_record["evidence_digest"]
+                        or item["bytes"] != source_record["evidence_bytes"]
+                        or item["status"] not in {200, 404}
+                        or (item["status"] == 404 and channel != "package-manager")
+                        or item["result"] != source_record["result"]
+                    ):
+                        raise EvolutionError("Evolution Run state is invalid")
         decision = search["decision"]
         if (
             (run["state"] == "adapt-ready" and decision != "adapt")
@@ -1804,7 +3020,11 @@ def _load_evolution_run(
             or (run["state"] == "deferred" and decision != "deferred")
             or (
                 run["state"] == "authorization-required"
-                and (decision != "adapt" or selected is None or _auto_safe(selected))
+                and (
+                    decision != "adapt"
+                    or selected is None
+                    or _auto_safe(selected, verification)
+                )
             )
             or (
                 run["state"]
@@ -1821,7 +3041,7 @@ def _load_evolution_run(
             raise EvolutionError("Evolution Run state is invalid")
         if (
             run["state"] == "adapt-ready" or run["strategy"] == "adapt"
-        ) and not _auto_safe(selected):
+        ) and not _auto_safe(selected, verification):
             raise EvolutionError("Evolution Run state is invalid")
         if run["state"] in {"adapt-ready", "build-ready"} and any(
             run[key] is not None
@@ -1925,7 +3145,7 @@ def _write_exact_bounded(path: Path, content: str, max_bytes: int) -> None:
 def _candidate_audit(candidate: dict[str, Any] | None) -> dict[str, Any] | None:
     if candidate is None:
         return None
-    return {
+    audit = {
         key: candidate[key]
         for key in (
             "id",
@@ -1957,12 +3177,22 @@ def _candidate_audit(candidate: dict[str, Any] | None) -> dict[str, Any] | None:
             )
         }
     }
+    if "surface" in candidate:
+        audit.update(
+            {
+                "surface": candidate["surface"],
+                "artifact_format": candidate["artifact_format"],
+                "install": candidate["install"],
+                "package": candidate["package"],
+            }
+        )
+    return audit
 
 
 def _evolution_report(run: dict[str, Any]) -> dict[str, Any]:
     search = run["search"]
     paths = _capability_paths(run["task_id"], run["capability_name"])
-    return {
+    report = {
         "schema": "harness.evolution-report/v1",
         "task_id": run["task_id"],
         "gap_id": run["gap"]["record_id"],
@@ -2005,7 +3235,7 @@ def _evolution_report(run: dict[str, Any]) -> dict[str, Any]:
         "outcome": run["outcome"],
         "reason_code": run.get("outcome_reason") or search["reason_code"],
         "authorization": (
-            _authorization(run["candidate"])
+            _authorization(run["candidate"], run["source_verification"])
             if run["candidate"] is not None
             and (
                 run["state"] == "authorization-required"
@@ -2014,6 +3244,39 @@ def _evolution_report(run: dict[str, Any]) -> dict[str, Any]:
             else None
         ),
     }
+    surface = (
+        run["canonical"].get("surface")
+        if isinstance(run.get("canonical"), dict)
+        else None
+    )
+    if surface is None and run["candidate"] is not None:
+        surface = run["candidate"].get("surface")
+    if surface is not None:
+        surface_evaluation = (
+            run["evaluation"].get("surface")
+            if isinstance(run.get("evaluation"), dict)
+            else None
+        )
+        report["adapter_smoke"] = {
+            adapter: (
+                surface_evaluation["adapters"][adapter]["status"]
+                if surface_evaluation is not None
+                else "not-run"
+            )
+            for adapter in SURFACE_ADAPTERS
+        }
+        report["surface"] = surface
+        report["surface_checks"] = (
+            surface_evaluation["checks"] if surface_evaluation is not None else {}
+        )
+        report["surface_observations"] = (
+            surface_evaluation["observations"] if surface_evaluation is not None else {}
+        )
+        report["origin_acceptance"] = {
+            "status": "accepted",
+            "origins": list(run["gap"]["origins"]),
+        }
+    return report
 
 
 def _write_report(context: WorktreeContext, run: dict[str, Any]) -> dict[str, Any]:
@@ -2075,7 +3338,12 @@ def _read_single_link_file(context: WorktreeContext, relative: str) -> bytes | N
 
 def _fixed_artifacts_are_current(context: WorktreeContext, run: dict[str, Any]) -> None:
     for label, artifact, schema, cases in (
-        ("evaluator", run["evaluator"], "harness.evolution-evaluator/v1", EVALUATOR_CASES),
+        (
+            "evaluator",
+            run["evaluator"],
+            "harness.evolution-evaluator/v1",
+            EVALUATOR_CASES,
+        ),
         ("holdout", run["holdout"], "harness.evolution-holdout/v1", HOLDOUT_CASES),
     ):
         raw = _read_single_link_file(context, artifact["path"])
@@ -2443,10 +3711,14 @@ def apply_capability(
             raise EvolutionError("evolution canonical worktree baseline is stale")
         if strategy == "build":
             if (
+                source.get("schema") == "harness.evolution-capability/v2"
+                and run.get("search", {}).get("schema") != "harness.evolution-search/v2"
+            ):
+                raise EvolutionError("surface Build requires v2 Search evidence")
+            if (
                 source.get("adapted_from") is not None
                 or source.get("trust", {}).get("source") != "repository-local-build"
-                or source.get("skill", {}).get("invocation", {}).get("mode")
-                != "manual"
+                or source.get("skill", {}).get("invocation", {}).get("mode") != "manual"
             ):
                 raise EvolutionError(
                     "Build requires a manual repository-local canonical source"
@@ -2454,18 +3726,33 @@ def apply_capability(
         else:
             candidate = run.get("candidate")
             adapted = source.get("adapted_from")
-            if (
+            surface_adapt = candidate is not None and "surface" in candidate
+            invalid_adapt = (
                 candidate is None
                 or not isinstance(adapted, dict)
-                or adapted.get("candidate_id") != candidate["id"]
-                or adapted.get("candidate_digest") != _digest(candidate)
                 or adapted.get("source") != candidate["canonical_source"]
                 or adapted.get("revision") != candidate["immutable_revision"]
-                or adapted.get("artifact_digest") != candidate["artifact_digest"]
                 or source.get("license") != candidate["license"]
                 or source.get("skill", {}).get("invocation") != candidate["invocation"]
                 or source.get("trust", {}).get("source") != "pinned-adaptation"
-            ):
+            )
+            if surface_adapt:
+                invalid_adapt = invalid_adapt or (
+                    source.get("schema") != "harness.evolution-capability/v2"
+                    or source.get("surface") != candidate["surface"]
+                    or hashlib.sha256(
+                        (_canonical_text(source) + "\n").encode("utf-8")
+                    ).hexdigest()
+                    != candidate["artifact_digest"]
+                    or set(adapted) != {"source", "revision"}
+                )
+            else:
+                invalid_adapt = invalid_adapt or (
+                    adapted.get("candidate_id") != candidate["id"]
+                    or adapted.get("candidate_digest") != _digest(candidate)
+                    or adapted.get("artifact_digest") != candidate["artifact_digest"]
+                )
+            if invalid_adapt:
                 raise EvolutionError(
                     "Adapt source invocation or provenance is not bound to the selected candidate"
                 )
@@ -2484,6 +3771,8 @@ def apply_capability(
             "license": source["license"],
             "source_digest": projection["source_digest"],
         }
+        if "surface" in source:
+            run["canonical"]["surface"] = _surface(source["surface"])
         run["projection"] = projection
         run["projection_digest"] = projection["digest"]
         run["state"] = "applying"
@@ -2634,13 +3923,51 @@ def _run_evaluation(context: WorktreeContext, run: dict[str, Any]) -> dict[str, 
             ),
         },
     }
+    if "surface" in source:
+        surface = _surface(source["surface"])
+        adapter_results = {
+            adapter: smoke_surface_capability(
+                context, name=source["name"], adapter=adapter
+            )
+            for adapter in SURFACE_ADAPTERS
+        }
+        result["surface"] = {
+            "kind": surface["kind"],
+            "adapters": {
+                adapter: {
+                    "status": item["status"],
+                    "hosts": item["hosts"],
+                    "evidence_digest": item["evidence_digest"],
+                }
+                for adapter, item in adapter_results.items()
+            },
+            "checks": {
+                name: (
+                    "pass"
+                    if all(
+                        item["checks"].get(name) == "pass"
+                        for item in adapter_results.values()
+                    )
+                    else "fail"
+                )
+                for name in _surface_check_names(surface)
+            },
+            "observations": {
+                adapter: item["observations"]
+                for adapter, item in adapter_results.items()
+            },
+        }
     return result
 
 
 def _validate_stored_evaluation(run: dict[str, Any], value: Any) -> dict[str, Any]:
+    surface_run = (
+        isinstance(run.get("canonical"), dict) and "surface" in run["canonical"]
+    )
     evaluation = _exact(
         value,
-        {"schema", "candidate_digest", "evaluator", "holdout", "smoke"},
+        {"schema", "candidate_digest", "evaluator", "holdout", "smoke"}
+        | ({"surface"} if surface_run else set()),
         "stored evolution evaluation",
     )
     if (
@@ -2686,6 +4013,42 @@ def _validate_stored_evaluation(run: dict[str, Any], value: Any) -> dict[str, An
         )
     ):
         raise EvolutionError("stored evolution evaluation is invalid")
+    if surface_run:
+        surface = _surface(run["canonical"]["surface"])
+        surface_evidence = _exact(
+            evaluation["surface"],
+            {"kind", "adapters", "checks", "observations"},
+            "stored surface evaluation",
+        )
+        if (
+            surface_evidence["kind"] != surface["kind"]
+            or not isinstance(surface_evidence["checks"], dict)
+            or set(surface_evidence["checks"]) != set(_surface_check_names(surface))
+            or any(
+                status not in {"pass", "fail"}
+                for status in surface_evidence["checks"].values()
+            )
+            or not isinstance(surface_evidence["adapters"], dict)
+            or set(surface_evidence["adapters"]) != set(SURFACE_ADAPTERS)
+            or not isinstance(surface_evidence["observations"], dict)
+            or set(surface_evidence["observations"]) != set(SURFACE_ADAPTERS)
+        ):
+            raise EvolutionError("stored surface evaluation is invalid")
+        expected_hosts = {
+            "codex-direct": ["codex"],
+            "claude-direct": ["claude"],
+            "codex-paseo-claude": ["codex", "claude"],
+        }
+        for adapter, item in surface_evidence["adapters"].items():
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"status", "hosts", "evidence_digest"}
+                or item["status"] not in {"pass", "fail"}
+                or item["hosts"] != expected_hosts[adapter]
+                or not DIGEST_RE.fullmatch(str(item["evidence_digest"]))
+            ):
+                raise EvolutionError("stored surface evaluation is invalid")
+        _safe_persisted_value(surface_evidence["observations"])
     return evaluation
 
 
@@ -2770,7 +4133,49 @@ def evaluate_capability(
                     "holdout": normalized["holdout"]["cases"],
                 }
             )
-        passed = normalized["smoke"]["status"] == "pass"
+            if "surface" in run["canonical"]:
+                surface = _surface(run["canonical"]["surface"])
+                normalized["surface"] = {
+                    "kind": surface["kind"],
+                    "adapters": {
+                        adapter: {
+                            "status": "fail",
+                            "hosts": (
+                                ["codex", "claude"]
+                                if adapter == "codex-paseo-claude"
+                                else [
+                                    "codex" if adapter == "codex-direct" else "claude"
+                                ]
+                            ),
+                            "evidence_digest": _digest(
+                                {
+                                    "adapter": adapter,
+                                    "status": "fail",
+                                    "reason": "setup-failed",
+                                }
+                            ),
+                        }
+                        for adapter in SURFACE_ADAPTERS
+                    },
+                    "checks": {name: "fail" for name in _surface_check_names(surface)},
+                    "observations": {
+                        adapter: {"reason": "setup-failed"}
+                        for adapter in SURFACE_ADAPTERS
+                    },
+                }
+        passed = normalized["smoke"]["status"] == "pass" and (
+            "surface" not in normalized
+            or (
+                all(
+                    item["status"] == "pass"
+                    for item in normalized["surface"]["adapters"].values()
+                )
+                and all(
+                    status == "pass"
+                    for status in normalized["surface"]["checks"].values()
+                )
+            )
+        )
         if passed:
             run["evaluation"] = normalized
             run["state"] = "promotion-ready"
@@ -2837,7 +4242,7 @@ def record_search(
                 "candidate_id": search["selected_candidate"],
                 "requires_user": True,
                 "outcome": run["outcome"],
-                "authorization": _authorization(candidate),
+                "authorization": _authorization(candidate, run["source_verification"]),
             }
         if run.get("state") != "search-required":
             raise EvolutionError("Evolution Search is not allowed in this state")
@@ -2854,19 +4259,22 @@ def record_search(
         run["source_verification"] = None
         if candidate is None:
             raise EvolutionError("Evolution Search requires a selected candidate")
-        run["source_verification"] = _verify_pinned_candidate(candidate)
+        run["source_verification"] = _verify_pinned_candidate(candidate, search)
         if search["decision"] == "deferred":
             run["state"] = "deferred"
             run["outcome"] = "deferred"
             _write_report(context, run)
         elif search["decision"] == "build":
-            if any(_auto_safe(item) for item in search["candidates"]):
+            if _auto_safe(candidate, run["source_verification"]):
                 raise EvolutionError("a safe Adapt candidate is available")
             run["state"] = "build-ready"
         elif candidate is not None:
-            run["state"] = "authorization-required"
-            run["outcome"] = "deferred"
-            _write_report(context, run)
+            if _auto_safe(candidate, run["source_verification"]):
+                run["state"] = "adapt-ready"
+            else:
+                run["state"] = "authorization-required"
+                run["outcome"] = "deferred"
+                _write_report(context, run)
         _write_run(path, run)
     return {
         "schema": "harness.evolution-control/v1",
@@ -2877,7 +4285,7 @@ def record_search(
         "requires_user": run["state"] == "authorization-required",
         "outcome": run["outcome"],
         "authorization": (
-            _authorization(candidate)
+            _authorization(candidate, run["source_verification"])
             if run["state"] == "authorization-required" and candidate is not None
             else None
         ),
@@ -2943,7 +4351,7 @@ def ensure_evolution_acceptance(
             raise EvolutionError("Evolution Run is not ready for Direct acceptance")
         if (
             run["candidate"] is None
-            or _verify_pinned_candidate(run["candidate"])
+            or _verify_pinned_candidate(run["candidate"], run["search"])
             != run["source_verification"]
         ):
             raise EvolutionError("Evolution Search evidence is stale or unauthentic")
@@ -2957,9 +4365,7 @@ def ensure_evolution_acceptance(
                 _verify_canonical_source(context, run)
                 current_evaluation = _run_evaluation(context, run)
                 if current_evaluation != run["evaluation"]:
-                    raise EvolutionError(
-                        "Evolution evaluation is stale or unauthentic"
-                    )
+                    raise EvolutionError("Evolution evaluation is stale or unauthentic")
             except EvolutionAdapterError:
                 raise
             except (EvolutionError, OSError, ValueError):

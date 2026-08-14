@@ -1,0 +1,121 @@
+{
+  "schema": "harness.evolution-capability/v2",
+  "name": "safe-build-fixture",
+  "version": "1.0.0",
+  "owner": "bilibili-mcp maintainers",
+  "description": "Inspect bounded repository metadata through a deterministic repository-local Harness CLI capability.",
+  "license": "GPL-3.0-only",
+  "adapted_from": null,
+  "skill": {
+    "invocation": {
+      "mode": "manual",
+      "disable_model_invocation": true,
+      "allow_implicit_invocation": false,
+      "metadata": {
+        "openai_yaml": "policy:\n  allow_implicit_invocation: false\n"
+      },
+      "metadata_digest": "d7f4273cacc0c25fbb1849585e858e99c71557baa484c9cb706c3662eacc6327"
+    },
+    "triggers": {
+      "positive": [
+        "Inspect bounded repository metadata"
+      ],
+      "negative": [
+        "Do not modify files or configuration"
+      ],
+      "near_neighbor_conflicts": [
+        "Use a ticket writer for implementation changes"
+      ]
+    },
+    "body": [
+      "Resolve the active worktree before inspecting metadata.",
+      "Inspect only repository-relative paths explicitly supplied by the parent task.",
+      "Refuse ignored, environment, credential, configuration, and private paths.",
+      "Return bounded metadata findings without file contents, commands, or private paths."
+    ],
+    "interface": {
+      "schema": "harness.capability-interface/v1",
+      "name": "safe-build-fixture",
+      "version": "1.0.0",
+      "operations": [
+        "inspect",
+        "report"
+      ]
+    }
+  },
+  "agent": {
+    "description": "Read-only bounded fixture reviewer.",
+    "instructions": [
+      "Inspect only the repository-relative paths named by the parent task.",
+      "Refuse ignored, environment, credential, configuration, and private paths.",
+      "Do not edit files, acquire a writer lease, delegate, or spawn another agent.",
+      "Report bounded metadata findings without file contents, then stop."
+    ],
+    "access": "read-only",
+    "writer_lease_required": true,
+    "max_children": 0,
+    "capabilities": [
+      "read",
+      "inspect",
+      "report"
+    ]
+  },
+  "surface": {
+    "kind": "cli",
+    "adapters": [
+      "codex-direct",
+      "claude-direct",
+      "codex-paseo-claude"
+    ],
+    "external_system": false,
+    "entrypoint": "harness-shared-cli",
+    "hook": null,
+    "loop": null
+  },
+  "manifest": {
+    "max_files": 12,
+    "max_bytes": 65536,
+    "dependencies": [],
+    "scripts": [],
+    "resources": [],
+    "executables": false
+  },
+  "governance": {
+    "kernel": "immutable",
+    "evaluator": "immutable",
+    "holdout": "immutable",
+    "self_approval": false,
+    "writer_lease_required": true
+  },
+  "trust": {
+    "source": "repository-local-build",
+    "network": "none",
+    "data": "repository-local-metadata",
+    "credentials": "none",
+    "elevation": false,
+    "daemon": false,
+    "open_port": false,
+    "global_policy": false
+  },
+  "packaging": {
+    "scope": "repository-local",
+    "reversible": true,
+    "hosts": [
+      "codex",
+      "claude"
+    ]
+  },
+  "evaluation": {
+    "schema": "harness.capability-evaluation/v1",
+    "name": "safe-build-fixture",
+    "interface_version": "1.0.0",
+    "suite": "declarative-discovery",
+    "required_cases": [
+      "codex-discovery",
+      "claude-discovery",
+      "read-only-agent",
+      "no-agent-tree",
+      "projection-drift"
+    ]
+  }
+}

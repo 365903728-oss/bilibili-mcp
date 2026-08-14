@@ -2013,3 +2013,65 @@ Six release blockers fixed; one regression proof per root cause (new tests
   report while unknown/drifted files still enter Recovery. Its focused
   public-CLI rollback/commit proof passes 1/1 in 146.898s; the reviewer closed
   the finding after the rejected-reason invariant was added.
+
+## 2026-08-13 — Harness v2 Issue #35 MCP/CLI/Hook/Loop evolution
+
+- Baseline: independent clean worktree on branch
+  `codex/harness-v2-mcp-cli-hook-loop-evolution-35`, exact accepted #34 HEAD
+  `493393c9ef4941e5ff8dc7b66acaa6cd9d06d7ce`. The dirty primary checkout stays
+  isolated. The user selected `codex-direct`; one Codex writer lease is active
+  and no Paseo/Claude writer was launched.
+- Live source audit: Issue #35 remains open with parent #28 and blocker #34.
+  Official npm reports `@modelcontextprotocol/inspector@2.2.0` MIT metadata,
+  integrity `sha512-IUyZ…RxA==`, GitHub release/tag commit
+  `672f9f41c548487a468b9e7007d2f9de14da5a69`, Node `>=22.19.0`, and a
+  `postinstall` plus browser/listener surface, so it is not eligible for silent
+  auto-adoption. Official `@modelcontextprotocol/conformance@0.1.16` is MIT and
+  executable but has runtime dependencies/network behavior, so it is Search
+  evidence rather than a repository-local no-effect candidate.
+- TDD: safe byte-canonical CLI Adapt, dangerous MCP authorization, four surface
+  Build/promotion/three-adapter/commit, Hook/Loop policy, public Loop decisions,
+  and authorization canonical-order tests progressed red to green. The legacy
+  executable candidate remains authorization-required.
+- Focused current evidence: Evolution 13/13 pass in 853.936s; Hook events 9/9
+  pass in 2.422s; CLI/adapters 16/16 pass in 10.655s; the four-kind surface
+  zero-remote pilot passes in 289.367s. Python `py_compile`, Black, and
+  `git diff --check` pass at this checkpoint.
+- Final shared Harness shards, Hook/Stop regressions, product build/Vitest,
+  package-content checks, secret/diff checks, independent review, Direct
+  evidence binding, acceptance, and exact local commit are recorded below in
+  the final convergence update.
+
+### 2026-08-14 — Issue #35 independent-review repair checkpoint
+
+- Review closure: v1 surface Search fails closed; four candidate-bound channel
+  results are derived from bounded fetched responses; CLI/MCP use actual shared
+  Harness operations; Loop decisions call the public step seam; Hook runtime
+  points to the public event handler and smoke replays/reads/restores its actual
+  deployment/config/canary/ledger state.
+- Focused evidence: forged channel-result and response-digest regressions pass
+  2/2 in 50.570s; the complete MCP/CLI/Hook/Loop disposable lifecycle across
+  all three adapter mappings, including local acceptance commits, passes 1/1 in
+  189.195s. Black, Ruff, `py_compile`, and strict diff checks pass after repair.
+- Evidence boundary: no external Claude/Paseo process was launched under the
+  frozen `codex-direct` mode; no candidate code, installer, daemon, port,
+  credential, product source, tracked Hook registration, or remote state was
+  used or changed.
+- Final reviewer edge: package-manager evidence now separates capability ID from
+  scoped npm name/version and handles an exact bound urllib HTTPError 404 as
+  `no-match`; the scoped safe auto-Adapt regression passes in 36.959s. Other npm
+  status classes remain fail-closed.
+
+### 2026-08-14 — Issue #35 final current-diff verification
+
+- Harness shards: Evolution 17/17 in 677.525s; Direct/Claude Direct 73 in
+  448.405s (one platform-permission skip); Paseo 73/73 in 240.077s; typed
+  memory/contracts/events/CLI core 67/67 in 94.093s. Hook safety 6/6 and Stop
+  summary 8/8 pass.
+- Product/package: exact-lock isolated dependencies install 466 packages with
+  `@modelcontextprotocol/sdk@1.30.0`; build passes; Vitest passes 41 files/862
+  tests in 7.54s; dry-run npm pack contains 185 files and zero Harness paths.
+  Junction, temporary dependencies, and `dist` cleanup all verify absent.
+- Static/boundary: Black, Ruff, `py_compile`, `git diff --check`, and strict
+  UTF-8 over all 16 intended paths pass. Independent risk re-review closes all
+  findings and reports no remaining live #35 blocker.

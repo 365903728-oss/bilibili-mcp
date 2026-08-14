@@ -99,6 +99,8 @@ class EvolutionCliTests(unittest.TestCase):
             "MIT License\n\nPermission is hereby granted for this synthetic fixture.\n",
             encoding="utf-8",
         )
+        self.channel_evidence = self.root / "channel-evidence"
+        self.channel_evidence.mkdir()
         (self.repo / "README.md").write_text("seed\n", encoding="utf-8")
         evaluation = self.repo / "evaluation"
         evaluation.mkdir()
@@ -130,10 +132,24 @@ class EvolutionCliTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        git(self.repo, "add", ".gitignore", "README.md", "evaluation")
+        for relative in (".codex/hooks.json", ".claude/settings.json"):
+            target = self.repo / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("{}\n", encoding="utf-8")
+        git(
+            self.repo,
+            "add",
+            ".gitignore",
+            "README.md",
+            "evaluation",
+            ".codex/hooks.json",
+            ".claude/settings.json",
+        )
         git(self.repo, "commit", "-m", "seed")
 
-    def harness_at(self, repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def harness_at(
+        self, repo: Path, *args: str, input_text: str | None = None
+    ) -> subprocess.CompletedProcess[str]:
         command = list(args)
         if command and command[0] == "evolution" and "--mode" not in command:
             command.extend(("--mode", "codex-direct"))
@@ -143,21 +159,32 @@ class EvolutionCliTests(unittest.TestCase):
         environment["CODEX_HOME"] = str(self.codex_home)
         environment["HARNESS_TEST_CANDIDATE_ARTIFACT"] = str(self.candidate_artifact)
         environment["HARNESS_TEST_CANDIDATE_LICENSE"] = str(self.candidate_license)
+        environment["HARNESS_TEST_CHANNEL_EVIDENCE"] = str(self.channel_evidence)
         wrapper = """
+import json
+import io
 import os
 import sys
 import urllib.request
+import urllib.error
+from urllib.parse import urlsplit
 from pathlib import Path
 
 class Response:
     status = 200
     def __init__(self, request):
         self.url = request.full_url
-        source = os.environ[
-            "HARNESS_TEST_CANDIDATE_LICENSE"
-            if self.url.endswith("/LICENSE.md")
-            else "HARNESS_TEST_CANDIDATE_ARTIFACT"
-        ]
+        parsed = urlsplit(self.url)
+        if parsed.hostname == "registry.modelcontextprotocol.io":
+            source = str(Path(os.environ["HARNESS_TEST_CHANNEL_EVIDENCE"]) / "registry.json")
+        elif parsed.hostname == "registry.npmjs.org":
+            source = str(Path(os.environ["HARNESS_TEST_CHANNEL_EVIDENCE"]) / "package.json")
+        elif self.url.endswith("/LICENSE.md"):
+            source = os.environ["HARNESS_TEST_CANDIDATE_LICENSE"]
+        elif self.url.endswith("/README.md"):
+            source = str(Path(os.environ["HARNESS_TEST_CHANNEL_EVIDENCE"]) / "official.txt")
+        else:
+            source = os.environ["HARNESS_TEST_CANDIDATE_ARTIFACT"]
         self.data = Path(source).read_bytes()
     def __enter__(self): return self
     def __exit__(self, *_): return False
@@ -165,7 +192,13 @@ class Response:
     def read(self, _limit): return self.data
 
 class Opener:
-    def open(self, request, timeout): return Response(request)
+    def open(self, request, timeout):
+        response = Response(request)
+        if urlsplit(request.full_url).hostname == "registry.npmjs.org":
+            raise urllib.error.HTTPError(
+                request.full_url, 404, "Not Found", {}, io.BytesIO(response.data)
+            )
+        return response
 
 urllib.request.build_opener = lambda *_: Opener()
 from harness.cli import main
@@ -178,6 +211,7 @@ raise SystemExit(main())
             capture_output=True,
             text=True,
             encoding="utf-8",
+            input=input_text,
         )
 
     def harness(self, *args: str) -> subprocess.CompletedProcess[str]:
@@ -525,6 +559,190 @@ raise SystemExit(main())
             ),
         }
 
+    def surface_search_value(
+        self,
+        source: dict[str, object],
+        *,
+        decision: str = "adapt",
+        effects: dict[str, bool] | None = None,
+    ) -> dict[str, object]:
+        artifact = (
+            json.dumps(source, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode()
+        self.candidate_artifact.write_bytes(artifact)
+        artifact_digest = hashlib.sha256(artifact).hexdigest()
+        search = self.search_value(decision)
+        search["schema"] = "harness.evolution-search/v2"
+        search["channels"] = [
+            "official",
+            "registry",
+            "package-manager",
+            "live-github",
+        ]
+        candidate = search["candidates"][0]
+        old_path = candidate["artifact_path"]
+        candidate.update(
+            {
+                "artifact_format": "canonical-json",
+                "artifact_path": "capability.json",
+                "artifact_digest": artifact_digest,
+                "surface": source["surface"],
+                "invocation": source["skill"]["invocation"],
+                "install": {
+                    "scope": "repository-local",
+                    "method": "verified-copy",
+                    "uninstall": "git-head-snapshot",
+                },
+                "package": {
+                    "name": "@modelcontextprotocol/inspector",
+                    "version": "2.2.0",
+                },
+            }
+        )
+        candidate["compatibility"] = {
+            "hosts": [
+                "codex-direct",
+                "claude-direct",
+                "codex-paseo-claude",
+            ],
+            "status": "unverified",
+            "evidence_digest": "4" * 64,
+        }
+        candidate["smoke"] = {"status": "not-run", "evidence_digest": None}
+        candidate["installed"] = {
+            "artifact_digest": "0" * 64,
+            "provenance": "not-installed",
+        }
+        candidate["effects"].update(
+            {
+                "global_mutation": False,
+                "ssh": False,
+                "publish": False,
+                **(effects or {}),
+            }
+        )
+        manifest_item = next(
+            item for item in candidate["manifest"]["files"] if item["path"] == old_path
+        )
+        manifest_item.update(
+            {
+                "path": "capability.json",
+                "digest": artifact_digest,
+                "bytes": len(artifact),
+            }
+        )
+        candidate["manifest"]["total_bytes"] = sum(
+            item["bytes"] for item in candidate["manifest"]["files"]
+        )
+        source_record = search["sources_consulted"][0]
+        source_record.update(
+            {
+                "artifact_path": "capability.json",
+                "artifact_digest": artifact_digest,
+                "channel": "live-github",
+            }
+        )
+        search["sources_consulted"] = [
+            source_record,
+            *(
+                {**source_record, "channel": channel, "result": "no-match"}
+                for channel in ("official", "registry", "package-manager")
+            ),
+        ]
+        repository = candidate["canonical_source"].removeprefix("https://github.com/")
+        evidence_urls = {
+            "official": (
+                f"https://raw.githubusercontent.com/{repository}/"
+                f"{candidate['immutable_revision']}/README.md"
+            ),
+            "registry": (
+                "https://registry.modelcontextprotocol.io/v0/servers"
+                f"?search={candidate['id']}"
+            ),
+            "package-manager": (
+                "https://registry.npmjs.org/"
+                "%40modelcontextprotocol%2Finspector/2.2.0"
+            ),
+            "live-github": (
+                f"https://raw.githubusercontent.com/{repository}/"
+                f"{candidate['immutable_revision']}/capability.json"
+            ),
+        }
+        evidence = {
+            "official": b"# Synthetic upstream catalog\nNo matching capability.\n",
+            "registry": b'{"servers":[]}\n',
+            "package-manager": b'{"error":"Not found"}\n',
+            "live-github": artifact,
+        }
+        (self.channel_evidence / "official.txt").write_bytes(evidence["official"])
+        (self.channel_evidence / "registry.json").write_bytes(evidence["registry"])
+        (self.channel_evidence / "package.json").write_bytes(
+            evidence["package-manager"]
+        )
+        for item in search["sources_consulted"]:
+            raw = evidence[item["channel"]]
+            item.update(
+                {
+                    "evidence_url": evidence_urls[item["channel"]],
+                    "evidence_digest": hashlib.sha256(raw).hexdigest(),
+                    "evidence_bytes": len(raw),
+                }
+            )
+        return search
+
+    def surface_source(self, kind: str) -> dict[str, object]:
+        source = json.loads(
+            (ROOT / "harness/fixtures/evolution-build-capability.json").read_text()
+        )
+        source["schema"] = "harness.evolution-capability/v2"
+        source["license"] = "MIT"
+        source["adapted_from"] = {
+            "source": "https://github.com/antfu/skills",
+            "revision": "a74f281a27dadc02397bc1a174b0f2c97531b6ae",
+        }
+        source["trust"]["source"] = "pinned-adaptation"
+        source["surface"] = {
+            "kind": kind,
+            "adapters": [
+                "codex-direct",
+                "claude-direct",
+                "codex-paseo-claude",
+            ],
+            "external_system": kind == "mcp",
+            "entrypoint": "harness-shared-cli",
+            "hook": None,
+            "loop": None,
+        }
+        return source
+
+    def start_evolution_run(self, repo: Path, task_id: str, gap_id: str) -> None:
+        contract = self.write_contract(repo, task_id, self.evolution_owned(task_id))
+        self.start_direct(repo, contract)
+        evaluator = repo / "evaluation/evaluator.json"
+        holdout = repo / "evaluation/holdout.json"
+        request = self.request(
+            gap_id=gap_id,
+            evaluator={
+                "path": "evaluation/evaluator.json",
+                "digest": hashlib.sha256(evaluator.read_bytes()).hexdigest(),
+            },
+            holdout={
+                "path": "evaluation/holdout.json",
+                "digest": hashlib.sha256(holdout.read_bytes()).hexdigest(),
+            },
+        )
+        started = self.harness_at(
+            repo,
+            "evolution",
+            "start",
+            str(request),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertEqual(started.returncode, 0, started.stdout)
+
     def evolution_paths(
         self, task_id: str, name: str = "safe-build-fixture"
     ) -> dict[str, str]:
@@ -631,7 +849,9 @@ raise SystemExit(main())
             "forged-receipt-task",
         )
         self.assertEqual(result.returncode, 2, result.stdout)
-        self.assertIn("accepted current capability gap", json.loads(result.stdout)["error"])
+        self.assertIn(
+            "accepted current capability gap", json.loads(result.stdout)["error"]
+        )
 
     def test_request_derives_safe_paths_and_rejects_windows_aliases(self) -> None:
         for capability_name in (
@@ -1325,6 +1545,638 @@ raise SystemExit(main())
             candidate["artifact_digest"],
         )
 
+    def test_safe_declarative_cli_candidate_auto_adopts_after_live_verification(
+        self,
+    ) -> None:
+        linked, gap_id = self.accepted_gap_worktree()
+        contract = self.write_contract(
+            linked,
+            "surface-adapt-task",
+            self.evolution_owned("surface-adapt-task"),
+        )
+        self.start_direct(linked, contract)
+        evaluator = linked / "evaluation/evaluator.json"
+        holdout = linked / "evaluation/holdout.json"
+        request = self.request(
+            gap_id=gap_id,
+            evaluator={
+                "path": "evaluation/evaluator.json",
+                "digest": hashlib.sha256(evaluator.read_bytes()).hexdigest(),
+            },
+            holdout={
+                "path": "evaluation/holdout.json",
+                "digest": hashlib.sha256(holdout.read_bytes()).hexdigest(),
+            },
+        )
+        started = self.harness_at(
+            linked,
+            "evolution",
+            "start",
+            str(request),
+            "--cwd",
+            str(linked),
+            "--task",
+            "surface-adapt-task",
+        )
+        self.assertEqual(started.returncode, 0, started.stdout)
+
+        source = self.surface_source("cli")
+        artifact = (
+            json.dumps(source, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode()
+        search_value = self.surface_search_value(source)
+        search = self.root / "surface-adapt-search.json"
+        search.write_text(json.dumps(search_value), encoding="utf-8")
+
+        searched = self.harness_at(
+            linked,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(linked),
+            "--task",
+            "surface-adapt-task",
+        )
+
+        self.assertEqual(searched.returncode, 0, searched.stdout)
+        payload = json.loads(searched.stdout)
+        self.assertEqual(payload["state"], "adapt-ready")
+        self.assertFalse(payload["requires_user"])
+        self.assertIsNone(payload["authorization"])
+
+        canonical = self.root / "surface-adapt-capability.json"
+        canonical.write_bytes(artifact)
+        adapted = self.harness_at(
+            linked,
+            "evolution",
+            "adapt",
+            str(canonical),
+            "--cwd",
+            str(linked),
+            "--task",
+            "surface-adapt-task",
+        )
+        self.assertEqual(adapted.returncode, 0, adapted.stdout)
+        adapted_payload = json.loads(adapted.stdout)
+        self.assertEqual(adapted_payload["state"], "evaluating")
+        evaluation = self.root / "surface-adapt-evaluation.json"
+        evaluation.write_text(
+            json.dumps(
+                {
+                    "schema": "harness.evolution-evaluation-request/v1",
+                    "candidate_digest": adapted_payload["candidate_digest"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        evaluated = self.harness_at(
+            linked,
+            "evolution",
+            "evaluate",
+            str(evaluation),
+            "--cwd",
+            str(linked),
+            "--task",
+            "surface-adapt-task",
+        )
+        self.assertEqual(evaluated.returncode, 0, evaluated.stdout)
+        self.assertEqual(json.loads(evaluated.stdout)["state"], "promotion-ready")
+        report = json.loads(
+            (linked / self.evolution_paths("surface-adapt-task")["report"]).read_text()
+        )
+        self.assertEqual(report["candidate"]["surface"]["kind"], "cli")
+        self.assertEqual(
+            report["adapter_smoke"],
+            {
+                "codex-direct": "pass",
+                "claude-direct": "pass",
+                "codex-paseo-claude": "pass",
+            },
+        )
+        for adapter in (
+            "codex-direct",
+            "claude-direct",
+            "codex-paseo-claude",
+        ):
+            smoke = self.harness_at(
+                linked,
+                "capability",
+                "smoke",
+                "--cwd",
+                str(linked),
+                "--name",
+                "safe-build-fixture",
+                "--adapter",
+                adapter,
+            )
+            self.assertEqual(smoke.returncode, 0, smoke.stderr or smoke.stdout)
+            smoke_payload = json.loads(smoke.stdout)
+            self.assertEqual(smoke_payload["status"], "pass")
+            self.assertEqual(smoke_payload["kind"], "cli")
+
+    def test_surface_candidate_cannot_use_legacy_search_schema(self) -> None:
+        repo, gap_id = self.accepted_gap_worktree()
+        task_id = "surface-legacy-search"
+        self.start_evolution_run(repo, task_id, gap_id)
+        value = self.surface_search_value(self.surface_source("cli"))
+        value["schema"] = "harness.evolution-search/v1"
+        value.pop("channels")
+        source = value["sources_consulted"][0]
+        source.pop("channel")
+        value["sources_consulted"] = [source]
+        search = self.root / f"{task_id}-search.json"
+        search.write_text(json.dumps(value), encoding="utf-8")
+        result = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("v2 Search", result.stdout + result.stderr)
+
+    def test_surface_search_verifies_each_channel_response(self) -> None:
+        repo, gap_id = self.accepted_gap_worktree()
+        task_id = "surface-channel-evidence"
+        self.start_evolution_run(repo, task_id, gap_id)
+        value = self.surface_search_value(self.surface_source("cli"))
+        registry = next(
+            item for item in value["sources_consulted"] if item["channel"] == "registry"
+        )
+        registry["evidence_digest"] = "0" * 64
+        search = self.root / f"{task_id}-search.json"
+        search.write_text(json.dumps(value), encoding="utf-8")
+        result = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("channel evidence", result.stdout + result.stderr)
+
+    def test_surface_search_derives_channel_result_from_response(self) -> None:
+        repo, gap_id = self.accepted_gap_worktree()
+        task_id = "surface-channel-result"
+        self.start_evolution_run(repo, task_id, gap_id)
+        value = self.surface_search_value(self.surface_source("cli"))
+        registry = next(
+            item for item in value["sources_consulted"] if item["channel"] == "registry"
+        )
+        registry["result"] = "candidate"
+        search = self.root / f"{task_id}-search.json"
+        search.write_text(json.dumps(value), encoding="utf-8")
+        result = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("channel result", result.stdout + result.stderr)
+
+    def test_dangerous_surface_candidate_stops_at_one_user_authorization(self) -> None:
+        linked, gap_id = self.accepted_gap_worktree()
+        self.start_evolution_run(linked, "dangerous-surface-task", gap_id)
+        invalid_hook = self.root / "invalid-hook-surface-search.json"
+        invalid_hook.write_text(
+            json.dumps(self.surface_search_value(self.surface_source("hook"))),
+            encoding="utf-8",
+        )
+        rejected_hook = self.harness_at(
+            linked,
+            "evolution",
+            "search",
+            str(invalid_hook),
+            "--cwd",
+            str(linked),
+            "--task",
+            "dangerous-surface-task",
+        )
+        self.assertEqual(rejected_hook.returncode, 2, rejected_hook.stdout)
+        self.assertIn("Hook surface policy", json.loads(rejected_hook.stdout)["error"])
+
+        source = self.surface_source("mcp")
+        search_value = self.surface_search_value(
+            source,
+            effects={
+                "credentials": True,
+                "elevation": True,
+                "daemon": True,
+                "open_port": True,
+                "global_policy": True,
+                "global_mutation": True,
+                "ssh": True,
+                "publish": True,
+            },
+        )
+        search = self.root / "dangerous-surface-search.json"
+        search.write_text(json.dumps(search_value), encoding="utf-8")
+
+        first = self.harness_at(
+            linked,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(linked),
+            "--task",
+            "dangerous-surface-task",
+        )
+        repeated = self.harness_at(
+            linked,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(linked),
+            "--task",
+            "dangerous-surface-task",
+        )
+
+        self.assertEqual(first.returncode, 0, first.stdout)
+        self.assertEqual(first.stdout, repeated.stdout)
+        payload = json.loads(first.stdout)
+        self.assertEqual(payload["state"], "authorization-required")
+        self.assertTrue(payload["requires_user"])
+        self.assertEqual(
+            set(payload["authorization"]["blocks"]),
+            {
+                "effect-credentials",
+                "effect-elevation",
+                "effect-daemon",
+                "effect-open_port",
+                "effect-global_policy",
+                "effect-global_mutation",
+                "effect-ssh",
+                "effect-publish",
+            },
+        )
+        self.assertFalse(
+            (
+                linked / self.evolution_paths("dangerous-surface-task")["package"]
+            ).exists()
+        )
+
+    def test_repository_local_surface_builds_promote_in_all_three_adapters(
+        self,
+    ) -> None:
+        first, gap_id = self.accepted_gap_worktree()
+        kinds = {
+            "cli": {"hook": None, "loop": None},
+            "mcp": {"hook": None, "loop": None},
+            "hook": {
+                "hook": {
+                    "origin": "accepted-gap",
+                    "phases": [
+                        "replay",
+                        "shadow",
+                        "no-secret",
+                        "multi-worktree",
+                        "canary",
+                        "rollback",
+                    ],
+                    "observation_only": True,
+                    "canary_scope": "active-worktree",
+                },
+                "loop": None,
+            },
+            "loop": {
+                "hook": None,
+                "loop": {
+                    "origin": "accepted-gap",
+                    "max_attempts": 2,
+                    "no_progress_limit": 1,
+                    "yield_to_user": True,
+                    "adapter_switch_policy": "stop-and-report",
+                },
+            },
+        }
+        for index, (kind, policy) in enumerate(kinds.items()):
+            with self.subTest(kind=kind):
+                repo = first
+                if index:
+                    repo = self.root / f"surface-{kind}-worktree"
+                    git(
+                        self.repo,
+                        "worktree",
+                        "add",
+                        "-b",
+                        f"surface-{kind}",
+                        str(repo),
+                        "HEAD",
+                    )
+                task_id = f"surface-build-{kind}"
+                self.start_evolution_run(repo, task_id, gap_id)
+                source = json.loads(
+                    (ROOT / "harness/fixtures/evolution-build-surface.json").read_text()
+                )
+                source["surface"].update(
+                    {
+                        "kind": kind,
+                        "external_system": kind == "mcp",
+                        **policy,
+                    }
+                )
+                search = self.root / f"{task_id}-search.json"
+                search.write_text(
+                    json.dumps(
+                        self.surface_search_value(
+                            {**source, "license": "MIT"},
+                            decision="build",
+                            effects={"daemon": True},
+                        )
+                    ),
+                    encoding="utf-8",
+                )
+                searched = self.harness_at(
+                    repo,
+                    "evolution",
+                    "search",
+                    str(search),
+                    "--cwd",
+                    str(repo),
+                    "--task",
+                    task_id,
+                )
+                self.assertEqual(searched.returncode, 0, searched.stdout)
+                source_path = self.root / f"{task_id}-source.json"
+                source_path.write_text(json.dumps(source), encoding="utf-8")
+                built = self.harness_at(
+                    repo,
+                    "evolution",
+                    "build",
+                    str(source_path),
+                    "--cwd",
+                    str(repo),
+                    "--task",
+                    task_id,
+                )
+                self.assertEqual(built.returncode, 0, built.stdout)
+                candidate_digest = json.loads(built.stdout)["candidate_digest"]
+                evaluation = self.root / f"{task_id}-evaluation.json"
+                evaluation.write_text(
+                    json.dumps(
+                        {
+                            "schema": "harness.evolution-evaluation-request/v1",
+                            "candidate_digest": candidate_digest,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                evaluated = self.harness_at(
+                    repo,
+                    "evolution",
+                    "evaluate",
+                    str(evaluation),
+                    "--cwd",
+                    str(repo),
+                    "--task",
+                    task_id,
+                )
+                self.assertEqual(evaluated.returncode, 0, evaluated.stdout)
+                self.assertEqual(
+                    json.loads(evaluated.stdout)["state"],
+                    "promotion-ready",
+                    evaluated.stdout,
+                )
+                paths = self.evolution_paths(task_id)
+                for host in ("codex", "claude"):
+                    runtime = json.loads(
+                        (
+                            repo
+                            / paths[host]
+                            / "skills/safe-build-fixture/surface.json"
+                        ).read_text()
+                    )
+                    self.assertEqual(runtime["schema"], "harness.surface-runtime/v1")
+                    if kind == "hook":
+                        self.assertEqual(
+                            runtime["entrypoint"]["command"][-1], "hook-event"
+                        )
+                for adapter in (
+                    "codex-direct",
+                    "claude-direct",
+                    "codex-paseo-claude",
+                ):
+                    smoke = self.harness_at(
+                        repo,
+                        "capability",
+                        "smoke",
+                        "--cwd",
+                        str(repo),
+                        "--name",
+                        "safe-build-fixture",
+                        "--adapter",
+                        adapter,
+                    )
+                    self.assertEqual(smoke.returncode, 0, smoke.stdout)
+                    smoke_payload = json.loads(smoke.stdout)
+                    self.assertEqual(smoke_payload["status"], "pass")
+                    self.assertTrue(smoke_payload["observations"])
+                    self.assertEqual(
+                        smoke_payload["hosts"],
+                        (
+                            ["codex", "claude"]
+                            if adapter == "codex-paseo-claude"
+                            else ["codex" if adapter == "codex-direct" else "claude"]
+                        ),
+                    )
+                if kind == "cli":
+                    request = self.root / f"{task_id}-call.json"
+                    request.write_text(
+                        json.dumps(
+                            {
+                                "schema": "harness.surface-call/v1",
+                                "operation": "inspect",
+                                "arguments": {},
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    called = self.harness_at(
+                        repo,
+                        "capability",
+                        "call",
+                        str(request),
+                        "--cwd",
+                        str(repo),
+                        "--name",
+                        "safe-build-fixture",
+                        "--adapter",
+                        "codex-direct",
+                    )
+                    self.assertEqual(called.returncode, 0, called.stdout)
+                    self.assertEqual(json.loads(called.stdout)["operation"], "inspect")
+                if kind == "mcp":
+                    requests = [
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "initialize",
+                            "params": {
+                                "protocolVersion": "2025-11-25",
+                                "capabilities": {},
+                                "clientInfo": {"name": "harness-test", "version": "1"},
+                            },
+                        },
+                        {
+                            "jsonrpc": "2.0",
+                            "method": "notifications/initialized",
+                            "params": {},
+                        },
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 2,
+                            "method": "tools/list",
+                            "params": {},
+                        },
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 3,
+                            "method": "tools/call",
+                            "params": {"name": "inspect", "arguments": {}},
+                        },
+                    ]
+                    served = self.harness_at(
+                        repo,
+                        "capability",
+                        "serve",
+                        "--cwd",
+                        str(repo),
+                        "--name",
+                        "safe-build-fixture",
+                        "--adapter",
+                        "codex-direct",
+                        input_text="".join(
+                            json.dumps(item) + "\n" for item in requests
+                        ),
+                    )
+                    self.assertEqual(served.returncode, 0, served.stdout)
+                    responses = [
+                        json.loads(line) for line in served.stdout.splitlines()
+                    ]
+                    self.assertEqual([item["id"] for item in responses], [1, 2, 3])
+                    self.assertEqual(
+                        [tool["name"] for tool in responses[1]["result"]["tools"]],
+                        ["inspect", "report"],
+                    )
+                    self.assertFalse(responses[2]["result"]["isError"])
+                if kind == "hook":
+                    payload = self.root / f"{task_id}-hook.json"
+                    payload.write_text(
+                        json.dumps(
+                            {
+                                "session_id": "hook-public-cli",
+                                "tool_name": "shell_command",
+                                "tool_input": {"command": "npm test"},
+                                "tool_response": {"exit_code": 0},
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    invoked = self.harness_at(
+                        repo,
+                        "capability",
+                        "hook-event",
+                        str(payload),
+                        "--cwd",
+                        str(repo),
+                        "--name",
+                        "safe-build-fixture",
+                        "--adapter",
+                        "codex-direct",
+                        "--host",
+                        "codex",
+                        "--event",
+                        "post-tool-use",
+                    )
+                    self.assertEqual(invoked.returncode, 0, invoked.stdout)
+                    self.assertEqual(json.loads(invoked.stdout)["status"], "recorded")
+                report = json.loads((repo / paths["report"]).read_text())
+                self.assertEqual(report["surface"]["kind"], kind)
+                self.assertEqual(
+                    report["adapter_smoke"],
+                    {
+                        "codex-direct": "pass",
+                        "claude-direct": "pass",
+                        "codex-paseo-claude": "pass",
+                    },
+                )
+                if kind == "hook":
+                    self.assertEqual(
+                        report["surface_checks"],
+                        {phase: "pass" for phase in policy["hook"]["phases"]},
+                    )
+                if kind == "loop":
+                    self.assertEqual(
+                        report["surface_checks"],
+                        {
+                            "bounded": "pass",
+                            "no-progress-stop": "pass",
+                            "yield-to-user": "pass",
+                            "no-adapter-switch": "pass",
+                        },
+                    )
+                base = git(repo, "rev-parse", "HEAD")
+                commit = self.accept_direct(
+                    repo, task_id, hashlib.sha256(task_id.encode()).hexdigest()
+                )
+                self.assertEqual(git(repo, "rev-list", "--count", f"{base}..HEAD"), "1")
+                self.assertEqual(git(repo, "rev-parse", "HEAD"), commit)
+                self.assertEqual(git(repo, "remote"), "")
+                self.assertTrue(
+                    all(
+                        not path.startswith("src/")
+                        for path in git(
+                            repo, "show", "--pretty=", "--name-only", "HEAD"
+                        ).splitlines()
+                    )
+                )
+
+    def test_surface_build_requires_v2_search_evidence(self) -> None:
+        repo, gap_id = self.accepted_gap_worktree()
+        task_id = "surface-build-search-version"
+        self.start_evolution_run(repo, task_id, gap_id)
+        search = self.root / f"{task_id}-search.json"
+        search.write_text(json.dumps(self.search_value("build")), encoding="utf-8")
+        searched = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertEqual(searched.returncode, 0, searched.stdout)
+        built = self.harness_at(
+            repo,
+            "evolution",
+            "build",
+            str(ROOT / "harness/fixtures/evolution-build-surface.json"),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertNotEqual(built.returncode, 0, built.stdout)
+        self.assertIn("v2 Search evidence", built.stdout + built.stderr)
+
     def test_build_fixture_rolls_back_failure_and_promotes_once_after_independent_pass(
         self,
     ) -> None:
@@ -1513,7 +2365,9 @@ raise SystemExit(main())
             "--task",
             "build-promoted",
         )
-        self.assertEqual(terminal_revalidation.returncode, 0, terminal_revalidation.stdout)
+        self.assertEqual(
+            terminal_revalidation.returncode, 0, terminal_revalidation.stdout
+        )
         self.assertFalse((second / promoted_paths["package"]).exists())
         terminal_report = json.loads((second / promoted_paths["report"]).read_text())
         self.assertEqual(terminal_report["outcome"], "rejected")
@@ -1547,7 +2401,9 @@ raise SystemExit(main())
             "test(harness): accept existing-promoted",
         )
         self.assertEqual(repeated.returncode, 0, repeated.stdout)
-        self.assertEqual(json.loads(repeated.stdout)["commit_status"], "already-committed")
+        self.assertEqual(
+            json.loads(repeated.stdout)["commit_status"], "already-committed"
+        )
         self.assertEqual(git(existing, "rev-parse", "HEAD"), commit)
         self.assertEqual(git(existing, "remote"), "")
         self.assertEqual(git(existing, "status", "--short"), "")
@@ -1745,7 +2601,9 @@ raise SystemExit(main())
             "--task",
             "evaluator-drift-task",
         )
-        self.assertEqual(searched_after_restore.returncode, 0, searched_after_restore.stdout)
+        self.assertEqual(
+            searched_after_restore.returncode, 0, searched_after_restore.stdout
+        )
         built_after_restore = self.harness_at(
             other,
             "evolution",

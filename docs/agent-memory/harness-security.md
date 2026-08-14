@@ -417,6 +417,46 @@ Use this checklist before accepting changes to harness surfaces.
   user/global Skill/Agent root, external installer, credential, SSH, daemon,
   port, or broad configuration is touched.
 
+## Governed MCP, CLI, Hook, And Loop Evolution
+
+- V2 surface candidates remain exact-key, bounded, secret-scanned metadata.
+  Search must record official, registry, package-manager, and live-GitHub
+  channels; the selected source is an immutable GitHub revision whose artifact
+  and license bytes are fetched without proxy inheritance, redirects,
+  credentials, or execution. Every channel URL is candidate-bound; the governor
+  parses the bounded response and derives its result, so a valid digest cannot
+  authenticate a caller-invented `no-match` or `candidate` label. npm evidence
+  binds an independent package name/version with scoped-name encoding; only an
+  exact 404 at that URL becomes `no-match`, while 401/429/5xx fail verification.
+- Auto-Adapt is limited to byte-canonical declarative JSON. The governor parses
+  the exact fetched bytes and compiles deterministic Codex and Claude packages;
+  candidate-provided compatibility, smoke, and installed-provenance assertions
+  do not become trusted evidence. Legacy/executable candidates still stop for
+  missing machine evidence.
+- Credentials, elevation, daemons, open ports, global policy/mutation, SSH,
+  publishing, capability-runtime writes, irreversible rollback, and unsafe
+  network/data combinations produce a stable user-authorization request. No
+  local resolution command can fabricate that authority.
+- Installed capability discovery reads only single-link, bounded,
+  byte-canonical repository files and verifies exact package plus native host
+  deployments. Surface smoke executes no candidate scripts or dependencies.
+  All outputs remain under derived Harness capability/Skill/Agent/report paths.
+- Hook sources require accepted-gap provenance and an observation-only policy.
+  Their runtime manifest points to the bounded public Hook event command, which
+  verifies the deployed capability and adapter host before persisting a redacted,
+  worktree-attributed ledger row. Smoke invokes that handler twice, re-reads the
+  ledger, scans for synthetic secret survival, proves no Git-diff side effect,
+  and restores the same deployment/config/canary/ledger snapshots. It never
+  rewrites `.codex/hooks.json` or `.claude/settings.json`.
+- Loop input is bounded exact JSON with fixed adapter identity, attempt count,
+  failure fingerprint, and evidence digest. The CLI yields immediately to new
+  user input, stops repeated no-evidence failures and the attempt limit, and
+  returns `adapter-switch-prohibited` instead of switching hosts.
+- The #34 candidate namespace snapshot, fixed evaluator/holdout, scoped restore,
+  unknown-drift adapter failure, shared Recovery Bundle, Direct review gate,
+  and exact local commit remain unchanged. Product source/public CLI/package
+  paths are neither output nor authority.
+
 ## Incident Response
 
 If a harness change exposes a secret, executes unexpected external code, breaks hooks, corrupts memory, or causes an agent to follow untrusted external instructions:

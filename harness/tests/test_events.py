@@ -12,6 +12,7 @@ from pathlib import Path
 
 from harness.context import discover_worktree
 from harness.events import normalize_hook_event, persist_hook_event
+from harness.evolution import EvolutionError, _surface, _surface_check_names
 from harness.safe_io import (
     MAX_STDIN_BYTES,
     append_bounded_jsonl,
@@ -87,12 +88,22 @@ class HookEventTests(unittest.TestCase):
             linked = container / "linked"
             main.mkdir()
             subprocess.run(["git", "init", "-q"], cwd=main, check=True)
-            subprocess.run(["git", "config", "user.email", "fixture@example.invalid"], cwd=main, check=True)
-            subprocess.run(["git", "config", "user.name", "Harness Fixture"], cwd=main, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "fixture@example.invalid"],
+                cwd=main,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Harness Fixture"], cwd=main, check=True
+            )
             (main / "seed.txt").write_text("seed\n", encoding="utf-8")
             subprocess.run(["git", "add", "seed.txt"], cwd=main, check=True)
             subprocess.run(["git", "commit", "-qm", "seed"], cwd=main, check=True)
-            subprocess.run(["git", "worktree", "add", "-qb", "fixture-linked", str(linked)], cwd=main, check=True)
+            subprocess.run(
+                ["git", "worktree", "add", "-qb", "fixture-linked", str(linked)],
+                cwd=main,
+                check=True,
+            )
             nested = linked / "a" / "b"
             nested.mkdir(parents=True)
 
@@ -115,19 +126,27 @@ class HookEventTests(unittest.TestCase):
             )
             hostile = persist_hook_event(linked_context, hostile_event)
             self.assertTrue(hostile.is_relative_to(linked_context.runtime_root))
-            self.assertNotIn(":", hostile.relative_to(linked_context.runtime_root).parts[0])
-            self.assertNotIn("..", hostile.relative_to(linked_context.runtime_root).parts[0])
+            self.assertNotIn(
+                ":", hostile.relative_to(linked_context.runtime_root).parts[0]
+            )
+            self.assertNotIn(
+                "..", hostile.relative_to(linked_context.runtime_root).parts[0]
+            )
 
             stale_event = normalize_hook_event(
                 "codex", "stop", {"session_id": "stale-lock"}
             )
-            stale_ledger = linked_context.runtime_root / stale_event["session_id"] / "events.jsonl"
+            stale_ledger = (
+                linked_context.runtime_root / stale_event["session_id"] / "events.jsonl"
+            )
             stale_ledger.parent.mkdir(parents=True, exist_ok=True)
             stale_lock = stale_ledger.with_suffix(".jsonl.lock")
             stale_lock.write_text("stale", encoding="utf-8")
             old = time.time() - 120
             os.utime(stale_lock, (old, old))
-            self.assertEqual(persist_hook_event(linked_context, stale_event), stale_ledger)
+            self.assertEqual(
+                persist_hook_event(linked_context, stale_event), stale_ledger
+            )
             self.assertTrue(stale_lock.exists())
             self.assertEqual(len(read_bounded_jsonl(stale_ledger)), 1)
 
@@ -137,7 +156,69 @@ class HookEventTests(unittest.TestCase):
         self.assertNotIn("accepted", rendered)
         self.assertEqual(event["semantic"]["event"], "stop")
 
-    def test_concurrent_jsonl_writers_do_not_corrupt_or_silently_drop_rows(self) -> None:
+    def test_hook_and_loop_surface_policies_are_bounded_and_fail_closed(self) -> None:
+        hook = {
+            "kind": "hook",
+            "adapters": [
+                "codex-direct",
+                "claude-direct",
+                "codex-paseo-claude",
+            ],
+            "external_system": False,
+            "entrypoint": "harness-shared-cli",
+            "hook": {
+                "origin": "accepted-gap",
+                "phases": [
+                    "replay",
+                    "shadow",
+                    "no-secret",
+                    "multi-worktree",
+                    "canary",
+                    "rollback",
+                ],
+                "observation_only": True,
+                "canary_scope": "active-worktree",
+            },
+            "loop": None,
+        }
+        loop = {
+            **hook,
+            "kind": "loop",
+            "hook": None,
+            "loop": {
+                "origin": "accepted-gap",
+                "max_attempts": 2,
+                "no_progress_limit": 1,
+                "yield_to_user": True,
+                "adapter_switch_policy": "stop-and-report",
+            },
+        }
+        self.assertEqual(_surface(hook), hook)
+        self.assertEqual(_surface(loop), loop)
+        self.assertEqual(_surface_check_names(hook), hook["hook"]["phases"])
+        self.assertEqual(
+            _surface_check_names(loop),
+            [
+                "bounded",
+                "no-progress-stop",
+                "yield-to-user",
+                "no-adapter-switch",
+            ],
+        )
+        for key, unsafe in (
+            ("max_attempts", 4),
+            ("no_progress_limit", 3),
+            ("yield_to_user", False),
+            ("adapter_switch_policy", "auto"),
+        ):
+            hostile = json.loads(json.dumps(loop))
+            hostile["loop"][key] = unsafe
+            with self.assertRaisesRegex(EvolutionError, "Loop surface policy"):
+                _surface(hostile)
+
+    def test_concurrent_jsonl_writers_do_not_corrupt_or_silently_drop_rows(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp:
             ledger = Path(temp) / "events.jsonl"
             with ThreadPoolExecutor(max_workers=8) as executor:
@@ -153,7 +234,9 @@ class HookEventTests(unittest.TestCase):
                 list(range(24)),
             )
 
-    def test_lock_initialization_rejects_hard_link_without_touching_target(self) -> None:
+    def test_lock_initialization_rejects_hard_link_without_touching_target(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             external = root / "external.bin"
