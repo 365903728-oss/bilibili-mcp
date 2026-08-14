@@ -102,7 +102,8 @@ class CliAndAdapterTests(unittest.TestCase):
             self.assertIsInstance(name, str)
             self.assertEqual(Path(name).name, name)
             raw = (artifact_root / name).read_bytes()
-            self.assertEqual(hashlib.sha256(raw).hexdigest(), reference["sha256"])
+            canonical = raw.replace(b"\r\n", b"\n")
+            self.assertEqual(hashlib.sha256(canonical).hexdigest(), reference["sha256"])
             return json.loads(raw)
 
         def git_object_id(kind: str, raw: bytes) -> str:
@@ -466,12 +467,16 @@ class CliAndAdapterTests(unittest.TestCase):
         durable_memory = migration["durable_memory"]
         self.assertTrue(required_memory.issubset(durable_memory))
         for relative, expected_digest in durable_memory.items():
+            raw = (ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
             self.assertEqual(
-                hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(),
+                hashlib.sha256(raw).hexdigest(),
                 expected_digest,
             )
         clean_room = migration["clean_room"]
-        exact_keys(clean_room, {"base_sha", "copied_external_code", "paths"})
+        exact_keys(
+            clean_room,
+            {"base_sha", "copied_external_code", "paths", "review_repairs"},
+        )
         self.assertFalse(clean_room["copied_external_code"])
         self.assertEqual(
             clean_room["base_sha"], "8de058e772e97a6ab8d16d65386081db76953320"
@@ -480,7 +485,6 @@ class CliAndAdapterTests(unittest.TestCase):
             set(clean_room["paths"]),
             {
                 "RULES.md",
-                "harness/evolution.py",
                 "harness/fixtures/evolution-build-capability.json",
                 "harness/fixtures/evolution-build-surface.json",
             },
@@ -499,6 +503,18 @@ class CliAndAdapterTests(unittest.TestCase):
                 cwd=ROOT,
                 check=True,
             )
+        review_repairs = clean_room["review_repairs"]
+        exact_keys(review_repairs, {"harness/evolution.py"})
+        repair = review_repairs["harness/evolution.py"]
+        exact_keys(repair, {"finding", "sha256"})
+        self.assertEqual(repair["finding"], "pr-39-zero-candidate-local-build")
+        repaired = (ROOT / "harness/evolution.py").read_bytes().replace(b"\r\n", b"\n")
+        self.assertEqual(hashlib.sha256(repaired).hexdigest(), repair["sha256"])
+        baseline = subprocess.check_output(
+            ["git", "show", f"{clean_room['base_sha']}:harness/evolution.py"],
+            cwd=ROOT,
+        )
+        self.assertNotEqual(baseline, repaired)
 
         forbidden_raw_keys = {
             "command",

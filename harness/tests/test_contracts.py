@@ -26,7 +26,7 @@ def valid_contract() -> dict[str, object]:
         },
         "execution": {
             "mode": "codex-direct",
-            "canonical_worktree": "C:/worktrees/ticket-29/repo",
+            "canonical_worktree": str(Path("/worktrees/ticket-29/repo").resolve()),
             "base_sha": "a" * 40,
             "adapter_switch_policy": "stop-and-report",
         },

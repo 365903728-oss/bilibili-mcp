@@ -487,3 +487,19 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   `claude/deepseek-v4-flash`, `fallback_chosen=false`, one Claude writer, a
   digest-bound handoff, one owned file, Codex acceptance, and zero remote
   authority. Restart, provider/adapter switching, and fallback remained unused.
+
+## PR #39 review-repair controls
+
+- A zero-candidate Evolution Search may enter only repository-local Build. It
+  requires `decision=build`, an empty candidate list, no selected candidate,
+  and every consulted source recorded as `no-match`. Adapt and Deferred still
+  require a selected candidate, while every non-empty candidate path retains
+  immutable artifact/license and channel verification.
+- Skipping candidate-specific verification in the empty path grants no install
+  authority. Build still accepts only the dependency-free, script-free,
+  executable-free manual repository-local canonical source and remains subject
+  to the frozen evaluator, holdout, projection, rollback, and Direct acceptance
+  gates.
+- Migration and pilot hashes use LF-normalized repository bytes. The reviewed
+  `harness/evolution.py` repair has its own exact digest instead of being
+  misreported as unchanged #35 clean-room bytes.

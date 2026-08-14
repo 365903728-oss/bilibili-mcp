@@ -2149,3 +2149,28 @@ Six release blockers fixed; one regression proof per root cause (new tests
   Issue-owned paths, then restored all 23 changes. No kernel/evaluator/holdout
   edit, adapter switch, second implementation actor, commit, or remote effect
   occurred.
+
+## 2026-08-14 — PR #39 automated-review repair pre-acceptance
+
+- Baseline: branch `codex/harness-v2-three-adapter-conformance-36` was clean at
+  pushed PR HEAD `2fd2b9b0141d536534c7e565aad9172bac72d9b5`; the task-local mode was newly
+  frozen as `codex-direct` before implementation writes.
+- TDD red evidence: canonical LF hashing produced four expected digest failures
+  for the three pilot artifacts and migration artifact; WSL contract discovery
+  produced three assertion failures and six errors because the Windows literal
+  was not POSIX-absolute; zero-candidate Build was rejected as an invalid
+  selection; and an empty candidate list paired with a `candidate` source result
+  was initially accepted before the all-`no-match` guard was added.
+- Focused green evidence: pilot migration digest test 1/1; Windows contract tests
+  9/9; WSL contract tests 9/9; zero-candidate Search→Build→Evaluate→Accept 1/1
+  in 58.951s; five candidate Search/Adapt/authorization/version-gate tests 5/5
+  in 118.430s; and legacy Build reject/rollback/promote/accept 1/1 in 130.859s.
+- A 27-test contract/CLI batch intentionally stopped at the old migration
+  clean-room assertion after `harness/evolution.py` changed. It is not counted
+  green; the migration model now separates exact #35 paths from the reviewed
+  PR repair and normalizes durable-memory bytes before hashing.
+- Governance recovery: the first exact-path contract omitted
+  `harness/fixtures/pilot-artifacts/migration.json`. It entered a typed Recovery
+  Bundle with five changed paths and no staged files; a reversible stash carried
+  the identical diff into the same-mode, same-base recovery continuation with
+  the migration artifact explicitly owned.

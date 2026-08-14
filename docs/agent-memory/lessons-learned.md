@@ -489,3 +489,17 @@
 - Future behavior: Derive collaboration `canonical_worktree` from the same
   resolved `Path` representation used by worktree discovery before freezing
   the bridge trigger.
+
+## 2026-08-14 — PR #39 automated-review corrections
+
+- Lesson: Evidence digests must bind repository bytes, not a platform-specific
+  checkout transformation. Normalize CRLF to LF at the verification seam and
+  record the canonical Git-byte digest, including durable migration memory.
+- Lesson: A test fixture's canonical worktree must be native to the executing
+  OS. Building it from a resolved absolute `Path` preserves the intended
+  contract assertion on both Windows and POSIX.
+- Lesson: Search and Build are different trust boundaries. An all-`no-match`
+  Search has no candidate to pin, so Build must represent that absence
+  explicitly while still rejecting candidate/rejected source results and
+  preserving repository-local compiler, evaluator, holdout, rollback, and
+  acceptance gates.

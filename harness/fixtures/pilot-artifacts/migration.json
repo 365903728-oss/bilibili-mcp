@@ -4,10 +4,15 @@
     "copied_external_code": false,
     "paths": [
       "RULES.md",
-      "harness/evolution.py",
       "harness/fixtures/evolution-build-capability.json",
       "harness/fixtures/evolution-build-surface.json"
-    ]
+    ],
+    "review_repairs": {
+      "harness/evolution.py": {
+        "finding": "pr-39-zero-candidate-local-build",
+        "sha256": "6f293a00118caba3b881a889a48ddd2acd3484c9a40bc959b852100b8a1847c9"
+      }
+    }
   },
   "commands": [
     {
@@ -52,15 +57,15 @@
     }
   ],
   "durable_memory": {
-    "docs/agent-memory/active-work.md": "13e59233a6f0210666d673ebfe826219e77d710045cec4882e50e976814bb4be",
-    "docs/agent-memory/codemap.md": "db61e4b471da3636085616180f2adee6b8ee17a41a8110b67b7c3d5a98187795",
-    "docs/agent-memory/decisions.md": "9448b0c7df84892ccd63630c2f6090d6a6a9eeb83b7b0ee9cad6689718b85a2a",
-    "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "af50aea5cd1de8ff54a8c1950b5c1b3bedad5d57d526093e0739efbef28840ba",
-    "docs/agent-memory/harness-eval.md": "b02164b3be452f6520f47b6a61da15760690aa4833cb0cff144ae22f1eefa2e6",
-    "docs/agent-memory/harness-security.md": "a208213d823717e7bd70be57553fe10dee740d84a6c23f6aa03e9f8c6237ac8e",
-    "docs/agent-memory/lessons-learned.md": "28c197fa88a7097c062a417b81247ab93e5bd4bdd4bf6406f9777f9022b11e09",
-    "docs/agent-memory/project-facts.md": "3ea78a317948222e5d861bbd8e0d62b1c066e6b4d9cd17763bb0e825a2527804",
-    "docs/agent-memory/verification-log.md": "63bf5c2d1634434dc6d39c22275b94d64ff52a8d912032e308b057c5bf572a80"
+    "docs/agent-memory/active-work.md": "b793d3c245197559b03758ad41f97c4e815eaae7c224ec5283a5af709436c09f",
+    "docs/agent-memory/codemap.md": "cebbacd63f92baf7dee6cd8d0dfecc02357f26ed82b28a403cc359188606c0cb",
+    "docs/agent-memory/decisions.md": "70d5faeda9f4a5644e6c901b355a7d07ce8d89d688052fac4693801f50e39a62",
+    "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
+    "docs/agent-memory/harness-eval.md": "5dd81a625132ebcbbd2552221b53aaffa40d5e13f87a0852b2949142513d43fb",
+    "docs/agent-memory/harness-security.md": "ccb83ede4e9beb60c655333aa1bd5dd8e2d96dcdac503814fadcb4691a138ec9",
+    "docs/agent-memory/lessons-learned.md": "266b68f31d40b3f0222874fb11b521dfea205f08cf37a22a6a3ff78b3b853eab",
+    "docs/agent-memory/project-facts.md": "8b7c6f8d5ade7a763263839040c80ee2ad7123ec9651a92a20af6bcafbd7aee9",
+    "docs/agent-memory/verification-log.md": "6c3717fbc967f7c4c2736af358e2f7d20cd1775d17fac1e2870db2237f22b59b"
   },
   "package": {
     "output_digest": "d1bcf0dbfe699ba997d4b75e2e687e7a2b05c6c44423c28ab9a96b99eae4bcf6",

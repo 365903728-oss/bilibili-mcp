@@ -1320,6 +1320,90 @@ raise SystemExit(main())
         with self.assertRaisesRegex(EvolutionError, "projection drift|discovery"):
             verify_evolution_projection(source, "codex", codex_projection)
 
+    def test_zero_candidate_search_can_build_repository_local_capability(self) -> None:
+        repo, gap_id = self.accepted_gap_worktree()
+        task_id = "zero-candidate-build"
+        self.start_evolution_run(repo, task_id, gap_id)
+        value = self.search_value("build")
+        value["candidates"] = []
+        value["selected_candidate"] = None
+        search = self.root / f"{task_id}-search.json"
+        search.write_text(json.dumps(value), encoding="utf-8")
+
+        inconsistent = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+
+        self.assertNotEqual(inconsistent.returncode, 0, inconsistent.stdout)
+
+        value["sources_consulted"][0]["result"] = "no-match"
+        search.write_text(json.dumps(value), encoding="utf-8")
+
+        searched = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+
+        self.assertEqual(searched.returncode, 0, searched.stdout)
+        self.assertEqual(json.loads(searched.stdout)["state"], "build-ready")
+        self.assertIsNone(json.loads(searched.stdout)["candidate_id"])
+
+        built = self.harness_at(
+            repo,
+            "evolution",
+            "build",
+            str(ROOT / "harness/fixtures/evolution-build-capability.json"),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+
+        self.assertEqual(built.returncode, 0, built.stdout)
+        self.assertEqual(json.loads(built.stdout)["state"], "evaluating")
+
+        evaluation = self.root / f"{task_id}-evaluation.json"
+        evaluation.write_text(
+            json.dumps(
+                {
+                    "schema": "harness.evolution-evaluation-request/v1",
+                    "candidate_digest": json.loads(built.stdout)["candidate_digest"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        evaluated = self.harness_at(
+            repo,
+            "evolution",
+            "evaluate",
+            str(evaluation),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+
+        self.assertEqual(evaluated.returncode, 0, evaluated.stdout)
+        self.assertEqual(json.loads(evaluated.stdout)["state"], "promotion-ready")
+        base = git(repo, "rev-parse", "HEAD")
+        commit = self.accept_direct(
+            repo, task_id, hashlib.sha256(task_id.encode()).hexdigest()
+        )
+        self.assertEqual(git(repo, "rev-list", "--count", f"{base}..{commit}"), "1")
+
     def test_projection_drift_and_manual_invocation_metadata_fail_closed(self) -> None:
         source = json.loads(
             (ROOT / "harness/fixtures/evolution-build-capability.json").read_text()

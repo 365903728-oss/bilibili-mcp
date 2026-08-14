@@ -1223,9 +1223,15 @@ def _validate_search(value: Any) -> dict[str, Any]:
         raise EvolutionError("evolution search decision is invalid")
     selected = search["selected_candidate"]
     candidate_ids = {candidate["id"] for candidate in candidates}
-    if not candidates or selected not in candidate_ids:
+    zero_candidate_build = (
+        decision == "build"
+        and not candidates
+        and selected is None
+        and all(source["result"] == "no-match" for source in sources)
+    )
+    if not zero_candidate_build and selected not in candidate_ids:
         raise EvolutionError("evolution selected candidate is invalid")
-    if surface_search:
+    if surface_search and not zero_candidate_build:
         candidate = next(item for item in candidates if item["id"] == selected)
         channel_sources = {item["channel"]: item for item in sources}
         repository = candidate["canonical_source"].removeprefix("https://github.com/")
@@ -1327,10 +1333,9 @@ def _validate_stored_search(value: Any) -> dict[str, Any]:
     decision = search["decision"]
     selected = search["selected_candidate"]
     candidate_ids = {candidate["id"] for candidate in candidates}
-    if (
-        decision not in {"adapt", "build", "deferred"}
-        or not candidates
-        or selected not in candidate_ids
+    zero_candidate_build = decision == "build" and not candidates and selected is None
+    if decision not in {"adapt", "build", "deferred"} or (
+        not zero_candidate_build and selected not in candidate_ids
     ):
         raise EvolutionError("stored evolution decision is invalid")
     if not isinstance(search["reason_code"], str) or not re.fullmatch(
@@ -3014,6 +3019,11 @@ def _load_evolution_run(
                     ):
                         raise EvolutionError("Evolution Run state is invalid")
         decision = search["decision"]
+        zero_candidate_build = (
+            decision == "build"
+            and not search["candidates"]
+            and search["selected_candidate"] is None
+        )
         if (
             (run["state"] == "adapt-ready" and decision != "adapt")
             or (run["state"] == "build-ready" and decision != "build")
@@ -3056,7 +3066,7 @@ def _load_evolution_run(
             )
         ):
             raise EvolutionError("Evolution Run state is invalid")
-        if verification is None:
+        if verification is None and not zero_candidate_build:
             raise EvolutionError("Evolution Run state is invalid")
         if run["state"] in {"applying", "evaluating"} and any(
             run[key] is not None for key in ("evaluation", "outcome", "outcome_reason")
@@ -4257,15 +4267,18 @@ def record_search(
         run["search"] = search
         run["candidate"] = candidate
         run["source_verification"] = None
-        if candidate is None:
+        if candidate is None and search["decision"] != "build":
             raise EvolutionError("Evolution Search requires a selected candidate")
-        run["source_verification"] = _verify_pinned_candidate(candidate, search)
+        if candidate is not None:
+            run["source_verification"] = _verify_pinned_candidate(candidate, search)
         if search["decision"] == "deferred":
             run["state"] = "deferred"
             run["outcome"] = "deferred"
             _write_report(context, run)
         elif search["decision"] == "build":
-            if _auto_safe(candidate, run["source_verification"]):
+            if candidate is not None and _auto_safe(
+                candidate, run["source_verification"]
+            ):
                 raise EvolutionError("a safe Adapt candidate is available")
             run["state"] = "build-ready"
         elif candidate is not None:
@@ -4349,7 +4362,14 @@ def ensure_evolution_acceptance(
             raise EvolutionError("Evolution state does not match its task contract")
         if run["state"] not in {"promotion-ready", "deferred", "rejected"}:
             raise EvolutionError("Evolution Run is not ready for Direct acceptance")
-        if (
+        zero_candidate_build = (
+            run["search"]["decision"] == "build"
+            and not run["search"]["candidates"]
+            and run["search"]["selected_candidate"] is None
+            and run["candidate"] is None
+            and run["source_verification"] is None
+        )
+        if not zero_candidate_build and (
             run["candidate"] is None
             or _verify_pinned_candidate(run["candidate"], run["search"])
             != run["source_verification"]
