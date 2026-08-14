@@ -541,11 +541,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 context = discover_worktree(args.cwd)
                 initialized = False
                 ready = False
-                for index in range(33):
+                while True:
                     raw = sys.stdin.buffer.readline(64 * 1024 + 1)
                     if not raw:
                         return 0
-                    if index == 32 or len(raw) > 64 * 1024:
+                    if len(raw) > 64 * 1024:
                         raise ValueError("MCP stdio input exceeds its bound")
                     try:
                         value = json.loads(raw.decode("utf-8", errors="strict"))
@@ -569,7 +569,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                     if response is not None:
                         _print_json(response)
                         sys.stdout.flush()
-                raise ValueError("MCP stdio input exceeds its bound")
             elif args.capability_command == "hook-event":
                 context = discover_worktree(args.cwd)
                 result = hook_surface_event(

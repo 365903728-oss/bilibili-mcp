@@ -2174,3 +2174,26 @@ Six release blockers fixed; one regression proof per root cause (new tests
   Bundle with five changed paths and no staged files; a reversible stash carried
   the identical diff into the same-mode, same-base recovery continuation with
   the migration artifact explicitly owned.
+
+## 2026-08-14 — PR #39 automated-review round-2 pre-acceptance
+
+- Baseline/mode: the isolated worktree was clean at pushed PR HEAD
+  `58c23136d808e4be81a3c63ebffdcf36af8ee715`; `codex-direct` was frozen and
+  acquired the only writer lease before the first test edit.
+- Red evidence: empty-HOME Paseo preflight failed 1/1; clean-checkout migration
+  package comparison failed 1/1; WSL CRLF preservation failed 1/1; canonical
+  source identity and a 35-message MCP session failed 2/2.
+- Focused green evidence: source/MCP plus five empty-HOME Paseo cases passed
+  7/7 in 10.188s; WSL CRLF passed 1/1 in 1.743s; package migration acceptance
+  with `dist/` moved aside passed 1/1 in 2.457s; MCP lifetime plus per-message
+  bound passed 2/2 in 0.477s.
+- Final risk-weighted verification: contracts, CLI/adapters, writer aliases,
+  malformed sibling state, and Windows CRLF passed 34/34 in 34.121s. The
+  Paseo function class passed 51/51 with empty HOME in 129.414s.
+- Static boundary: `py_compile`, `git diff --check`, and focused Black for
+  `harness/cli.py` pass. Installed Black 24.10.0 would reformat historical test
+  style, so that churn was removed and no full-file Black result is claimed.
+- Independent risk review: PASS with no reproducible P0-P3. Reviewer reruns
+  passed source/MCP/CRLF 4/4, clean-checkout migration/package 1/1, empty-HOME
+  Paseo 51/51 in 130.825s, `git diff --check`, and migration/repair/durable-
+  memory digest recomputation.

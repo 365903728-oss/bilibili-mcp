@@ -503,3 +503,18 @@
   explicitly while still rejecting candidate/rejected source results and
   preserving repository-local compiler, evaluator, holdout, rollback, and
   acceptance gates.
+
+## 2026-08-14 — PR #39 automated-review round 2
+
+- Lesson: Canonical identity must use the normalized value returned by the
+  trust-boundary validator. Validating a trimmed view while hashing the original
+  string can split one ticket into multiple writer identities.
+- Lesson: Conformance tests must inject host preferences and compare the
+  invariant they own. A developer HOME or pre-generated `dist/` directory is
+  not portable test evidence; deterministic provider input and package
+  exclusion properties are.
+- Lesson: A per-message input bound is not a session lifetime bound. MCP stdio
+  should retain byte/shape/lifecycle limits while serving until EOF.
+- Lesson: Inspect formatter diff size before accepting it. A formatter version
+  can expose historical style debt; restore unrelated churn and verify only the
+  scoped change rather than laundering a broad rewrite into a repair.

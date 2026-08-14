@@ -218,6 +218,12 @@ class _PaseoTestBase(unittest.TestCase):
     def setUp(self) -> None:
         self._temp = tempfile.TemporaryDirectory()
         self.addCleanup(self._temp.cleanup)
+        prefs = patch(
+            "harness.paseo_collaboration._read_orchestration_prefs",
+            return_value={"providers": {"impl": "claude/deepseek-v4-flash"}},
+        )
+        prefs.start()
+        self.addCleanup(prefs.stop)
         self.root = Path(self._temp.name)
         self.repo = self.root / "repo"
         self.repo.mkdir()

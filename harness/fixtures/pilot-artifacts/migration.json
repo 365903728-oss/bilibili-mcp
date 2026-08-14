@@ -8,6 +8,14 @@
       "harness/fixtures/evolution-build-surface.json"
     ],
     "review_repairs": {
+      "harness/cli.py": {
+        "finding": "pr-39-mcp-session-lifetime",
+        "sha256": "0f0bde21aa509794294ff29c1e5980f6a4246f2d7e99522eeff2539c49dc997f"
+      },
+      "harness/contracts.py": {
+        "finding": "pr-39-canonical-task-source",
+        "sha256": "0f31d1e6748df6e4f92af861621b5330f35030aab9577333ec91009723d3931a"
+      },
       "harness/evolution.py": {
         "finding": "pr-39-zero-candidate-local-build",
         "sha256": "6f293a00118caba3b881a889a48ddd2acd3484c9a40bc959b852100b8a1847c9"
@@ -62,10 +70,10 @@
     "docs/agent-memory/decisions.md": "70d5faeda9f4a5644e6c901b355a7d07ce8d89d688052fac4693801f50e39a62",
     "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
     "docs/agent-memory/harness-eval.md": "5dd81a625132ebcbbd2552221b53aaffa40d5e13f87a0852b2949142513d43fb",
-    "docs/agent-memory/harness-security.md": "ccb83ede4e9beb60c655333aa1bd5dd8e2d96dcdac503814fadcb4691a138ec9",
-    "docs/agent-memory/lessons-learned.md": "266b68f31d40b3f0222874fb11b521dfea205f08cf37a22a6a3ff78b3b853eab",
+    "docs/agent-memory/harness-security.md": "4d7725409b274c6387cde584b392ab3df15c4614f45b85b1f1cce092ac710b0c",
+    "docs/agent-memory/lessons-learned.md": "099cf65bdc788849f2ea9352b94d94df05bf2e90ebb29590b336a36b7b7ec4fa",
     "docs/agent-memory/project-facts.md": "8b7c6f8d5ade7a763263839040c80ee2ad7123ec9651a92a20af6bcafbd7aee9",
-    "docs/agent-memory/verification-log.md": "6c3717fbc967f7c4c2736af358e2f7d20cd1775d17fac1e2870db2237f22b59b"
+    "docs/agent-memory/verification-log.md": "d8056baaa564eab3e31b820fac125d5b63ac51a7387a7bda99f43df9763d4803"
   },
   "package": {
     "output_digest": "d1bcf0dbfe699ba997d4b75e2e687e7a2b05c6c44423c28ab9a96b99eae4bcf6",

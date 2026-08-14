@@ -670,6 +670,44 @@ class CodexDirectProcessTests(unittest.TestCase):
         self.assertEqual(second.returncode, 2, second.stderr or second.stdout)
         self.assertIn("writer lease", json.loads(second.stdout)["error"].lower())
 
+    def test_same_issue_source_with_whitespace_allows_only_one_writer(self) -> None:
+        linked = self.root / "linked-source-whitespace"
+        git(
+            self.repo,
+            "worktree",
+            "add",
+            "-b",
+            "linked-source-whitespace",
+            str(linked),
+        )
+        linked_contract = self.root / "linked-source-whitespace-contract.json"
+        contract = json.loads(self.contract_path.read_text(encoding="utf-8"))
+        contract["task"].update(
+            {
+                "id": "pilot-30-source-whitespace",
+                "source": contract["task"]["source"] + " ",
+            }
+        )
+        contract["execution"].update(
+            {
+                "canonical_worktree": str(linked.resolve()),
+                "base_sha": git(linked, "rev-parse", "HEAD"),
+                "branch": "linked-source-whitespace",
+            }
+        )
+        linked_contract.write_text(json.dumps(contract), encoding="utf-8")
+
+        first = self.harness(
+            "codex-direct", "start", "--cwd", str(self.repo), str(self.contract_path)
+        )
+        second = self.harness(
+            "codex-direct", "start", "--cwd", str(linked), str(linked_contract)
+        )
+
+        self.assertEqual(first.returncode, 0, first.stderr or first.stdout)
+        self.assertEqual(second.returncode, 2, second.stderr or second.stdout)
+        self.assertIn("writer lease", json.loads(second.stdout)["error"].lower())
+
     def test_malformed_sibling_task_state_fails_closed_before_second_writer(self) -> None:
         linked = self.root / "linked-malformed"
         git(self.repo, "worktree", "add", "-b", "linked-malformed", str(linked))
@@ -2108,7 +2146,7 @@ class CodexDirectProcessTests(unittest.TestCase):
 
     def test_automatic_commit_preserves_builtin_crlf_normalization(self) -> None:
         git(self.repo, "config", "core.autocrlf", "true")
-        self.prepare_reviewed_diff()
+        self.prepare_reviewed_diff(content=b"accepted\r\n")
         accepted = self.harness(
             "codex-direct", "accept", "--cwd", str(self.repo), "--task", "pilot-30",
             "--message", "test: preserve repository eol semantics",

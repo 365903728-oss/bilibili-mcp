@@ -29,6 +29,74 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class CliAndAdapterTests(unittest.TestCase):
+    def test_capability_serve_retains_per_message_bound(self) -> None:
+        stdin = io.TextIOWrapper(io.BytesIO(b"{" + b" " * (64 * 1024)))
+        stdout = io.StringIO()
+
+        with patch("sys.stdin", stdin), redirect_stdout(stdout):
+            status = main(
+                [
+                    "capability",
+                    "serve",
+                    "--cwd",
+                    str(ROOT),
+                    "--name",
+                    "safe-build-fixture",
+                    "--adapter",
+                    "codex-direct",
+                ]
+            )
+
+        self.assertEqual(status, 2)
+        self.assertIn("input exceeds its bound", stdout.getvalue())
+
+    def test_capability_serve_processes_messages_until_eof(self) -> None:
+        requests = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {},
+            },
+            *[
+                {"jsonrpc": "2.0", "id": index, "method": "tools/list", "params": {}}
+                for index in range(2, 35)
+            ],
+        ]
+        stdin = io.TextIOWrapper(
+            io.BytesIO("".join(json.dumps(item) + "\n" for item in requests).encode())
+        )
+        stdout = io.StringIO()
+
+        def respond(
+            _context: WorktreeContext, *, name: str, adapter: str, value: object
+        ) -> dict[str, object] | None:
+            del name, adapter
+            message = value if isinstance(value, dict) else {}
+            if message.get("method") == "notifications/initialized":
+                return None
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {}}
+
+        with patch("sys.stdin", stdin), patch(
+            "harness.cli.mcp_surface_message", side_effect=respond
+        ), redirect_stdout(stdout):
+            status = main(
+                [
+                    "capability",
+                    "serve",
+                    "--cwd",
+                    str(ROOT),
+                    "--name",
+                    "safe-build-fixture",
+                    "--adapter",
+                    "codex-direct",
+                ]
+            )
+
+        self.assertEqual(status, 0, stdout.getvalue())
+        responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        self.assertEqual([item["id"] for item in responses], [1, *range(2, 35)])
+
     def test_three_adapter_conformance_uses_one_contract_and_kernel(self) -> None:
         fixture = json.loads(
             (
@@ -437,8 +505,13 @@ class CliAndAdapterTests(unittest.TestCase):
             encoding="utf-8",
         )
         live_pack_output = json.loads(live_pack.stdout)
-        self.assertEqual(package["pack_output"], live_pack_output)
-        self.assertEqual(package["output_digest"], digest(live_pack_output))
+        self.assertEqual(package["output_digest"], digest(package["pack_output"]))
+        self.assertEqual(
+            package["pack_output"][0]["name"], live_pack_output[0]["name"]
+        )
+        self.assertEqual(
+            package["pack_output"][0]["version"], live_pack_output[0]["version"]
+        )
         package_files = [item["path"] for item in live_pack_output[0]["files"]]
         forbidden = (
             "harness/",
@@ -504,17 +577,23 @@ class CliAndAdapterTests(unittest.TestCase):
                 check=True,
             )
         review_repairs = clean_room["review_repairs"]
-        exact_keys(review_repairs, {"harness/evolution.py"})
-        repair = review_repairs["harness/evolution.py"]
-        exact_keys(repair, {"finding", "sha256"})
-        self.assertEqual(repair["finding"], "pr-39-zero-candidate-local-build")
-        repaired = (ROOT / "harness/evolution.py").read_bytes().replace(b"\r\n", b"\n")
-        self.assertEqual(hashlib.sha256(repaired).hexdigest(), repair["sha256"])
-        baseline = subprocess.check_output(
-            ["git", "show", f"{clean_room['base_sha']}:harness/evolution.py"],
-            cwd=ROOT,
-        )
-        self.assertNotEqual(baseline, repaired)
+        expected_repairs = {
+            "harness/cli.py": "pr-39-mcp-session-lifetime",
+            "harness/contracts.py": "pr-39-canonical-task-source",
+            "harness/evolution.py": "pr-39-zero-candidate-local-build",
+        }
+        exact_keys(review_repairs, set(expected_repairs))
+        for relative, finding in expected_repairs.items():
+            repair = review_repairs[relative]
+            exact_keys(repair, {"finding", "sha256"})
+            self.assertEqual(repair["finding"], finding)
+            repaired = (ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
+            self.assertEqual(hashlib.sha256(repaired).hexdigest(), repair["sha256"])
+            baseline = subprocess.check_output(
+                ["git", "show", f"{clean_room['base_sha']}:{relative}"],
+                cwd=ROOT,
+            )
+            self.assertNotEqual(baseline, repaired)
 
         forbidden_raw_keys = {
             "command",

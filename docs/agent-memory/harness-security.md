@@ -503,3 +503,16 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
 - Migration and pilot hashes use LF-normalized repository bytes. The reviewed
   `harness/evolution.py` repair has its own exact digest instead of being
   misreported as unchanged #35 clean-room bytes.
+
+## PR #39 review round-2 controls
+
+- Validated task sources are stored in canonical trimmed form before the
+  repository-wide writer identity and manual-Skill reminder identity are
+  hashed. Whitespace aliases cannot acquire a second linked-worktree writer.
+- Harness MCP stdio has no small total-message cap. It reads until EOF while
+  retaining the 64-KiB per-message limit, bounded JSON shape, initialization
+  ordering, exact deployed-capability checks, and adapter identity.
+- Paseo tests inject a non-secret provider/model fixture and never depend on a
+  user's orchestration preferences. Package migration checks validate the
+  signed-in artifact receipt and live forbidden-path exclusion without treating
+  ignored generated output as a clean-host prerequisite.

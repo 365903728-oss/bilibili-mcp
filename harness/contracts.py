@@ -221,7 +221,7 @@ def validate_task_contract(value: Any) -> dict[str, Any]:
     _required_keys(task, {"id", "source"}, "task")
     _exact_keys(task, {"id", "source"}, "task")
     _identifier(task.get("id"), "task.id", 128)
-    _nonempty(task.get("source"), "task.source", 1024)
+    task["source"] = _nonempty(task.get("source"), "task.source", 1024)
 
     execution = _mapping(contract.get("execution"), "execution")
     _required_keys(
