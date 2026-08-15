@@ -2283,17 +2283,20 @@ raise SystemExit(main())
                         {
                             "jsonrpc": "2.0",
                             "method": "notifications/initialized",
-                            "params": {},
                         },
                         {
                             "jsonrpc": "2.0",
                             "id": 2,
-                            "method": "tools/list",
-                            "params": {},
+                            "method": "ping",
                         },
                         {
                             "jsonrpc": "2.0",
                             "id": 3,
+                            "method": "tools/list",
+                        },
+                        {
+                            "jsonrpc": "2.0",
+                            "id": 4,
                             "method": "tools/call",
                             "params": {"name": "inspect", "arguments": {}},
                         },
@@ -2316,12 +2319,15 @@ raise SystemExit(main())
                     responses = [
                         json.loads(line) for line in served.stdout.splitlines()
                     ]
-                    self.assertEqual([item["id"] for item in responses], [1, 2, 3])
                     self.assertEqual(
-                        [tool["name"] for tool in responses[1]["result"]["tools"]],
+                        [item["id"] for item in responses], [1, 2, 3, 4]
+                    )
+                    self.assertEqual(responses[1]["result"], {})
+                    self.assertEqual(
+                        [tool["name"] for tool in responses[2]["result"]["tools"]],
                         ["inspect", "report"],
                     )
-                    self.assertFalse(responses[2]["result"]["isError"])
+                    self.assertFalse(responses[3]["result"]["isError"])
                 if kind == "hook":
                     payload = self.root / f"{task_id}-hook.json"
                     payload.write_text(

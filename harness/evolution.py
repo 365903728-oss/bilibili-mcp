@@ -2090,6 +2090,8 @@ def mcp_surface_message(
     if not isinstance(value, dict) or value.get("jsonrpc") != "2.0":
         raise EvolutionError("MCP message is invalid")
     method = value.get("method")
+    if method in ("notifications/initialized", "tools/list", "ping"):
+        value = {"params": {}, **value}
     if method == "notifications/initialized":
         notification = _exact(
             value, {"jsonrpc", "method", "params"}, "MCP initialized notification"
@@ -2106,7 +2108,11 @@ def mcp_surface_message(
     ):
         raise EvolutionError("MCP request id is invalid")
     params = request["params"]
-    if method == "initialize":
+    if method == "ping":
+        if params != {}:
+            raise EvolutionError("MCP ping params are invalid")
+        result = {}
+    elif method == "initialize":
         initialize = _exact(
             params,
             {"protocolVersion", "capabilities", "clientInfo"},
