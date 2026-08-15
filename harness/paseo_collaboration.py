@@ -104,6 +104,24 @@ def _is_safe_identifier(value: Any) -> bool:
     )
 
 
+def _prompt_identity_matches(
+    prompt_path: Path,
+    descriptor: int,
+    expected_size: int | None = None,
+) -> bool:
+    try:
+        opened = os.fstat(descriptor)
+        current = os.stat(prompt_path, follow_symlinks=False)
+    except OSError:
+        return False
+    return (
+        stat.S_ISREG(opened.st_mode)
+        and opened.st_nlink == 1
+        and (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)
+        and (expected_size is None or opened.st_size == expected_size)
+    )
+
+
 def _unlink_ephemeral_prompt(
     context: WorktreeContext,
     prompt_path: Path,
@@ -160,13 +178,7 @@ def _write_ephemeral_prompt(
         ) from exc
 
     try:
-        opened = os.fstat(descriptor)
-        current = os.stat(prompt_path, follow_symlinks=False)
-        if (
-            not stat.S_ISREG(opened.st_mode)
-            or opened.st_nlink != 1
-            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
-        ):
+        if not _prompt_identity_matches(prompt_path, descriptor, 0):
             raise PaseoCollaborationError(
                 f"ephemeral_prompt_unavailable: {prompt_path.name}"
             )
@@ -177,13 +189,7 @@ def _write_ephemeral_prompt(
                 raise OSError("short prompt write")
             view = view[written:]
         os.fsync(descriptor)
-        opened = os.fstat(descriptor)
-        current = os.stat(prompt_path, follow_symlinks=False)
-        if (
-            opened.st_size != len(raw)
-            or opened.st_nlink != 1
-            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
-        ):
+        if not _prompt_identity_matches(prompt_path, descriptor, len(raw)):
             raise PaseoCollaborationError(
                 f"ephemeral_prompt_unavailable: {prompt_path.name}"
             )
@@ -206,6 +212,24 @@ def _write_ephemeral_prompt(
             f"ephemeral_prompt_write_failed: {prompt_path.name}"
         ) from exc
     return descriptor
+
+
+def _send_verified_prompt(
+    agent_id: str,
+    prompt_path: Path,
+    descriptor: int,
+) -> dict[str, Any]:
+    if not _prompt_identity_matches(prompt_path, descriptor):
+        raise PaseoCollaborationError("prompt_identity_changed")
+    result = _run_paseo_cli(
+        "send", agent_id,
+        "--prompt-file", str(prompt_path),
+        "--no-wait",
+        timeout=PASEO_RUN_TIMEOUT,
+    )
+    if not _prompt_identity_matches(prompt_path, descriptor):
+        raise PaseoCollaborationError("prompt_identity_changed")
+    return result
 
 
 def _validate_repair_deliveries(
@@ -1266,11 +1290,8 @@ def paseo_dispatch(
         try:
             descriptor = _write_ephemeral_prompt(context, prompt_path, prompt_content)
             try:
-                send_result = _run_paseo_cli(
-                    "send", agent_id,
-                    "--prompt-file", str(prompt_path),
-                    "--no-wait",
-                    timeout=PASEO_RUN_TIMEOUT,
+                send_result = _send_verified_prompt(
+                    agent_id, prompt_path, descriptor,
                 )
             except PaseoCollaborationError as exc:
                 # Keep pending sidecar — recovery inspects it
@@ -1864,11 +1885,8 @@ def paseo_repair(
         try:
             descriptor = _write_ephemeral_prompt(context, prompt_path, review_text)
             try:
-                send_result = _run_paseo_cli(
-                    "send", agent_id,
-                    "--prompt-file", str(prompt_path),
-                    "--no-wait",
-                    timeout=PASEO_RUN_TIMEOUT,
+                send_result = _send_verified_prompt(
+                    agent_id, prompt_path, descriptor,
                 )
             except PaseoCollaborationError as exc:
                 # Keep pending — recovery inspects it

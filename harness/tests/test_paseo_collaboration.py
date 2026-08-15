@@ -597,6 +597,24 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         prompt_path.unlink()
         outside.unlink()
 
+    def test_verified_prompt_send_rechecks_identity_before_accepting(self) -> None:
+        import harness.paseo_collaboration as collaboration
+
+        with patch(
+            "harness.paseo_collaboration._prompt_identity_matches",
+            side_effect=(True, False),
+        ) as identity, patch(
+            "harness.paseo_collaboration._run_paseo_cli",
+            return_value=_make_send_result(),
+        ):
+            with self.assertRaises(collaboration.PaseoCollaborationError) as cm:
+                collaboration._send_verified_prompt(
+                    "agent-test-uuid", Path("dispatch-prompt.txt"), 123
+                )
+
+        self.assertIn("prompt_identity_changed", str(cm.exception))
+        self.assertEqual(identity.call_count, 2)
+
     def test_dispatch_rejects_oversized_handoff(self) -> None:
         from harness.paseo_collaboration import (
             PaseoCollaborationError,

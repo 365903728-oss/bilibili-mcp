@@ -26,7 +26,7 @@
       },
       "harness/paseo_collaboration.py": {
         "finding": "pr-39-private-ephemeral-prompt-files",
-        "sha256": "33606bb7f861857b3019dfa566e29d9e0291fc2e8eea38628392c5fff29509ff"
+        "sha256": "e6a5d13df81856f3a21045d8debe87320f1354368f6a8754565db95c283c5f45"
       },
       "harness/safe_io.py": {
         "finding": "pr-39-verified-jsonl-descriptor",
