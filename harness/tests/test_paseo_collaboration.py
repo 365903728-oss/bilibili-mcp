@@ -539,6 +539,64 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
             paseo_dispatch(ctx, "github-32", handoff)
         self.assertIn("already_completed", str(cm.exception))
 
+    def test_ephemeral_prompt_refuses_preexisting_hard_links(self) -> None:
+        from harness.paseo_collaboration import (
+            PaseoCollaborationError,
+            _write_ephemeral_prompt,
+        )
+
+        outside = self.root / "outside-prompt.txt"
+        outside.write_text("outside sentinel", encoding="utf-8")
+        task_dir = self.repo / ".harness" / "runtime" / "prompt-test"
+        task_dir.mkdir(parents=True)
+
+        for name in ("dispatch-prompt.txt", "repair-prompt.txt"):
+            prompt_path = task_dir / name
+            os.link(outside, prompt_path)
+            with self.assertRaises(PaseoCollaborationError):
+                _write_ephemeral_prompt(self._ctx(), prompt_path, "secret prompt")
+            self.assertEqual(outside.read_text(encoding="utf-8"), "outside sentinel")
+            self.assertTrue(prompt_path.exists(), "untrusted link must not be removed")
+            prompt_path.unlink()
+
+    def test_ephemeral_prompt_scrubs_links_added_after_create(self) -> None:
+        import harness.paseo_collaboration as collaboration
+
+        prompt_path = self.repo / ".harness" / "runtime" / "dispatch-prompt.txt"
+        outside = self.root / "linked-after-create.txt"
+        real_write = os.write
+
+        def _link_then_write(descriptor, raw):
+            if not outside.exists():
+                os.link(prompt_path, outside)
+            return real_write(descriptor, raw)
+
+        with patch("harness.paseo_collaboration.os.write", new=_link_then_write):
+            with self.assertRaises(collaboration.PaseoCollaborationError):
+                collaboration._write_ephemeral_prompt(
+                    self._ctx(), prompt_path, "sensitive raw handoff"
+                )
+
+        self.assertEqual(outside.read_bytes(), b"")
+        self.assertEqual(prompt_path.read_bytes(), b"")
+        prompt_path.unlink()
+        outside.unlink()
+
+        prompt_path = self.repo / ".harness" / "runtime" / "repair-prompt.txt"
+        outside = self.root / "linked-before-cleanup.txt"
+        descriptor = collaboration._write_ephemeral_prompt(
+            self._ctx(), prompt_path, "sensitive raw review"
+        )
+        os.link(prompt_path, outside)
+        with self.assertRaises(collaboration.PaseoCollaborationError):
+            collaboration._unlink_ephemeral_prompt(
+                self._ctx(), prompt_path, descriptor
+            )
+        self.assertEqual(outside.read_bytes(), b"")
+        self.assertEqual(prompt_path.read_bytes(), b"")
+        prompt_path.unlink()
+        outside.unlink()
+
     def test_dispatch_rejects_oversized_handoff(self) -> None:
         from harness.paseo_collaboration import (
             PaseoCollaborationError,
@@ -1921,6 +1979,7 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         task_dir = _task_dir(ctx, "github-32")
         launch_path = task_dir / "launch.json"
         pending_path = task_dir / "dispatch-pending.json"
+        prompt_path = task_dir / "dispatch-prompt.txt"
 
         handoff = self.repo / "handoff.md"
         handoff.write_text("Fix11.", encoding="utf-8")
@@ -1949,6 +2008,7 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         # Controlled test-only reset: clear the prepared intent so a normal
         # retry can obtain launch evidence.
         pending_path.unlink()
+        prompt_path.unlink()
         with patch(
             "harness.paseo_collaboration._run_paseo_cli",
             side_effect=_paseo_cli_side_effect(str(self.repo)),
@@ -1970,6 +2030,7 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
 
         repair_pending_path = task_dir / "repair-pending-1.json"
         repair_dispatch_path = task_dir / "repair-dispatch-1.json"
+        repair_prompt_path = task_dir / "repair-prompt.txt"
         review_file = self.repo / "review.md"
         review_file.write_text("Fix review.", encoding="utf-8")
         with patch(
@@ -1984,6 +2045,12 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
                         "prepared repair intent must stay")
         self.assertFalse(repair_dispatch_path.exists(),
                          "no repair success sidecar after cleanup failure")
+
+        with self.assertRaises(PaseoCollaborationError) as cm:
+            paseo_repair(ctx, "github-32", review_file)
+        self.assertIn("repair_blocked_undelivered", str(cm.exception))
+        self.assertFalse(repair_prompt_path.exists(),
+                         "verified stale repair prompt must be scrubbed")
 
         # No repair success sidecar; HEAD unchanged throughout.
         self.assertFalse(repair_dispatch_path.exists())
@@ -2253,9 +2320,8 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         """Raw prompt bytes never survive any write/persist exit: a pending
         write failure creates no prompt, a partial prompt write is removed,
         and the prepared intent stays for recovery."""
-        import pathlib
-
         import harness.codex_direct as controller
+        import harness.paseo_collaboration as collaboration
         from harness.codex_direct import _task_dir
         from harness.paseo_collaboration import (
             paseo_bootstrap,
@@ -2281,7 +2347,7 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         head_before = _git(self.repo, "rev-parse", "HEAD")
 
         real_write_json = controller._write_json
-        real_write_text = pathlib.Path.write_text
+        real_write_prompt = collaboration._write_ephemeral_prompt
 
         def _fail_pending_write(context, path, value):
             if path.name == "dispatch-pending.json":
@@ -2300,18 +2366,19 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         self.assertFalse(pending_path.exists())
         self.assertFalse(launch_path.exists())
 
-        def _partial_prompt_write(self, *args, **kwargs):
-            if self.name == "dispatch-prompt.txt":
-                self.write_bytes(b"partial prompt bytes")
+        def _partial_prompt_write(context, path, content):
+            if path.name == "dispatch-prompt.txt":
+                path.write_bytes(b"partial prompt bytes")
                 raise OSError("injected partial prompt write failure")
-            return real_write_text(self, *args, **kwargs)
+            return real_write_prompt(context, path, content)
 
         # (b) dispatch: a partial prompt write is removed; the prepared
         #     intent (persisted first) stays for recovery.
         with patch(
             "harness.paseo_collaboration._run_paseo_cli",
             side_effect=_paseo_cli_side_effect(str(self.repo)),
-        ), patch("pathlib.Path.write_text", new=_partial_prompt_write):
+        ), patch("harness.paseo_collaboration._write_ephemeral_prompt",
+                 new=_partial_prompt_write):
             with self.assertRaises(OSError):
                 paseo_dispatch(ctx, "github-32", handoff)
         self.assertFalse(prompt_path.exists(),
@@ -2375,18 +2442,19 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
             expected_mode="codex-paseo-claude",
         )
 
-        def _partial_repair_prompt_write(self, *args, **kwargs):
-            if self.name == "repair-prompt.txt":
-                self.write_bytes(b"partial review bytes")
+        def _partial_repair_prompt_write(context, path, content):
+            if path.name == "repair-prompt.txt":
+                path.write_bytes(b"partial review bytes")
                 raise OSError("injected partial repair prompt write failure")
-            return real_write_text(self, *args, **kwargs)
+            return real_write_prompt(context, path, content)
 
         # (d) repair: a partial prompt write is removed; the prepared
         #     intent stays.
         with patch(
             "harness.paseo_collaboration._run_paseo_cli",
             side_effect=_paseo_cli_side_effect(str(self.repo)),
-        ), patch("pathlib.Path.write_text", new=_partial_repair_prompt_write):
+        ), patch("harness.paseo_collaboration._write_ephemeral_prompt",
+                 new=_partial_repair_prompt_write):
             with self.assertRaises(OSError):
                 paseo_repair(ctx, "github-32", review_file)
         self.assertFalse(repair_prompt_path.exists(),
@@ -3322,6 +3390,8 @@ else:
         pending_path = task_dir / "dispatch-pending.json"
         pending_path.write_text(json.dumps({"schema": "harness.dispatch-pending/v1",
                                              "status": "pending"}), encoding="utf-8")
+        prompt_path = task_dir / "dispatch-prompt.txt"
+        prompt_path.write_text("raw handoff residue", encoding="utf-8")
 
         # Dispatch must REJECT because the pending sidecar already exists.
         disp = subprocess.run(
@@ -3333,6 +3403,8 @@ else:
         )
         self.assertNotEqual(disp.returncode, 0,
                             "dispatch must reject when dispatch-pending.json exists")
+        self.assertFalse(prompt_path.exists(),
+                         "verified stale prompt must be scrubbed before rejection")
 
     def test_slice3_crash_recovery_both_files_reject_dispatch(self) -> None:
         """CLI tracer: if BOTH dispatch-pending.json AND launch.json exist

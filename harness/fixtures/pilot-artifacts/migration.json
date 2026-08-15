@@ -25,8 +25,8 @@
         "sha256": "c92d7a0329cd4d8be12367ccfaa20406a4310a1a8ab8aeb045433314c16dee53"
       },
       "harness/paseo_collaboration.py": {
-        "finding": "pr-39-posix-native-paseo-resolution",
-        "sha256": "ac7a50b1a72cc8788e113a2221e58401739000e46d5588a8d1c8a81515ce5b4c"
+        "finding": "pr-39-private-ephemeral-prompt-files",
+        "sha256": "33606bb7f861857b3019dfa566e29d9e0291fc2e8eea38628392c5fff29509ff"
       },
       "harness/safe_io.py": {
         "finding": "pr-39-verified-jsonl-descriptor",

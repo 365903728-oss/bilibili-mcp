@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import threading
 import time
@@ -103,18 +104,108 @@ def _is_safe_identifier(value: Any) -> bool:
     )
 
 
-def _unlink_ephemeral_prompt(prompt_path: Path) -> None:
+def _unlink_ephemeral_prompt(
+    context: WorktreeContext,
+    prompt_path: Path,
+    descriptor: int | None = None,
+) -> None:
     """Fail-closed ephemeral prompt cleanup.
 
     No launch/repair-dispatch success evidence may be emitted after a
     cleanup failure, so an unlink error stops the operation (the prepared
     pending intent stays for recovery inspection)."""
+    if descriptor is not None:
+        try:
+            os.ftruncate(descriptor, 0)
+            os.fsync(descriptor)
+        except OSError as exc:
+            raise PaseoCollaborationError(
+                f"prompt_cleanup_failed: {prompt_path.name}"
+            ) from exc
+        finally:
+            os.close(descriptor)
     try:
-        prompt_path.unlink(missing_ok=True)
-    except OSError as exc:
+        ensure_no_link_components(context.root, prompt_path)
+        current = prompt_path.stat(follow_symlinks=False)
+        if not stat.S_ISREG(current.st_mode) or current.st_nlink != 1:
+            raise OSError("prompt path is not a private regular file")
+        prompt_path.unlink()
+    except FileNotFoundError:
+        return
+    except (OSError, ValueError) as exc:
         raise PaseoCollaborationError(
             f"prompt_cleanup_failed: {prompt_path.name}"
         ) from exc
+
+
+def _write_ephemeral_prompt(
+    context: WorktreeContext,
+    prompt_path: Path,
+    content: str,
+) -> int:
+    """Create a private prompt without following or truncating existing files."""
+    raw = content.encode("utf-8")
+    if len(raw) > PROMPT_FILE_MAX_BYTES:
+        raise PaseoCollaborationError("ephemeral_prompt_oversized")
+
+    prompt_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        ensure_no_link_components(context.root, prompt_path)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(prompt_path, flags, 0o600)
+    except (OSError, ValueError) as exc:
+        raise PaseoCollaborationError(
+            f"ephemeral_prompt_unavailable: {prompt_path.name}"
+        ) from exc
+
+    try:
+        opened = os.fstat(descriptor)
+        current = os.stat(prompt_path, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+        ):
+            raise PaseoCollaborationError(
+                f"ephemeral_prompt_unavailable: {prompt_path.name}"
+            )
+        view = memoryview(raw)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise OSError("short prompt write")
+            view = view[written:]
+        os.fsync(descriptor)
+        opened = os.fstat(descriptor)
+        current = os.stat(prompt_path, follow_symlinks=False)
+        if (
+            opened.st_size != len(raw)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+        ):
+            raise PaseoCollaborationError(
+                f"ephemeral_prompt_unavailable: {prompt_path.name}"
+            )
+    except (OSError, PaseoCollaborationError) as exc:
+        # The descriptor always identifies the inode created above with
+        # O_EXCL.  If another process links or relocates it, erase those bytes
+        # through the trusted descriptor before reporting the failed write.
+        try:
+            os.ftruncate(descriptor, 0)
+            os.fsync(descriptor)
+        except OSError as scrub_exc:
+            os.close(descriptor)
+            raise PaseoCollaborationError(
+                f"ephemeral_prompt_scrub_failed: {prompt_path.name}"
+            ) from scrub_exc
+        os.close(descriptor)
+        if isinstance(exc, PaseoCollaborationError):
+            raise
+        raise PaseoCollaborationError(
+            f"ephemeral_prompt_write_failed: {prompt_path.name}"
+        ) from exc
+    return descriptor
 
 
 def _validate_repair_deliveries(
@@ -1073,9 +1164,11 @@ def paseo_dispatch(
     task_dir = _task_dir(context, task_id)
     launch_path = task_dir / "launch.json"
     pending_path = task_dir / "dispatch-pending.json"
+    prompt_path = task_dir / "dispatch-prompt.txt"
 
     with bounded_file_lock(task_dir / "run.lock"):
         _run_path, run = _load_run(context, task_id, expected_mode="codex-paseo-claude")
+        _unlink_ephemeral_prompt(context, prompt_path)
 
         if pending_path.exists() or launch_path.exists():
             raise PaseoCollaborationError("dispatch_already_completed")
@@ -1169,11 +1262,9 @@ def paseo_dispatch(
         _write_json(context, pending_path, pending_payload)
 
         # --- create prompt file and send (ephemeral across every exit) ---
-        prompt_path = task_dir / "dispatch-prompt.txt"
+        descriptor: int | None = None
         try:
-            prompt_path.parent.mkdir(parents=True, exist_ok=True)
-            ensure_no_link_components(context.root, prompt_path)
-            prompt_path.write_text(prompt_content, encoding="utf-8")
+            descriptor = _write_ephemeral_prompt(context, prompt_path, prompt_content)
             try:
                 send_result = _run_paseo_cli(
                     "send", agent_id,
@@ -1189,7 +1280,7 @@ def paseo_dispatch(
             # cleanup failure must not leave raw handoff text on disk, and
             # no launch evidence may follow a cleanup failure, so this
             # raises instead of swallowing OSError.
-            _unlink_ephemeral_prompt(prompt_path)
+            _unlink_ephemeral_prompt(context, prompt_path, descriptor)
 
         # --- persist launch evidence ---
         launch: dict[str, Any] = {
@@ -1678,9 +1769,11 @@ def paseo_repair(
     from harness.codex_direct import _write_json
 
     task_dir = _task_dir(context, task_id)
+    prompt_path = task_dir / "repair-prompt.txt"
 
     with bounded_file_lock(task_dir / "run.lock"):
         _run_path, run = _load_run(context, task_id, expected_mode="codex-paseo-claude")
+        _unlink_ephemeral_prompt(context, prompt_path)
 
         # --- attempt-keyed evidence: a completed prior attempt never blocks
         #     the next authorized one; only a prepared intent for the
@@ -1767,11 +1860,9 @@ def paseo_repair(
         _write_json(context, repair_pending_path, pending_payload)
 
         # --- create prompt file and send (ephemeral across every exit) ---
-        prompt_path = task_dir / "repair-prompt.txt"
+        descriptor: int | None = None
         try:
-            prompt_path.parent.mkdir(parents=True, exist_ok=True)
-            ensure_no_link_components(context.root, prompt_path)
-            prompt_path.write_text(review_text, encoding="utf-8")
+            descriptor = _write_ephemeral_prompt(context, prompt_path, review_text)
             try:
                 send_result = _run_paseo_cli(
                     "send", agent_id,
@@ -1786,7 +1877,7 @@ def paseo_repair(
             # Fail-closed cleanup on EVERY exit: a prompt write, send, or
             # cleanup failure must not leave raw review text on disk, and
             # no repair-dispatch evidence may follow a cleanup failure.
-            _unlink_ephemeral_prompt(prompt_path)
+            _unlink_ephemeral_prompt(context, prompt_path, descriptor)
 
         # --- persist repair dispatch evidence, then clear pending ---
         dispatch_evidence: dict[str, Any] = {

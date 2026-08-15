@@ -582,7 +582,7 @@ class CliAndAdapterTests(unittest.TestCase):
             "harness/contracts.py": "pr-39-canonical-task-source",
             "harness/evolution.py": "pr-39-verified-zero-candidate-channels",
             "harness/memory.py": "pr-39-recoverable-memory-transaction",
-            "harness/paseo_collaboration.py": "pr-39-posix-native-paseo-resolution",
+            "harness/paseo_collaboration.py": "pr-39-private-ephemeral-prompt-files",
             "harness/safe_io.py": "pr-39-verified-jsonl-descriptor",
         }
         exact_keys(review_repairs, set(expected_repairs))
