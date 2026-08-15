@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
+from harness import memory as memory_module
 from harness.context import discover_worktree
 from harness.memory import (
     MAX_PROJECTION_BYTES,
@@ -33,12 +34,19 @@ def target_writer_gate(allowed: bool):
     yield
 
 
-def clean_memory_git(_root: Path, *args: str) -> bytes:
+def clean_memory_git(root: Path, *args: str) -> bytes:
     if args and args[0] == "ls-files":
         return (
             b"docs/agent-memory/current-memory.json\0"
             b"docs/agent-memory/typed-memory.json\0"
         )
+    if args and args[0] in {"ls-tree", "show"}:
+        return subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=True,
+            capture_output=True,
+            env=isolated_environment(),
+        ).stdout
     return b""
 
 
@@ -213,6 +221,181 @@ class MemoryProjectionTests(unittest.TestCase):
         self.assertEqual([item["changed"] for item in audits], [True, False])
         self.assertTrue(all(item["status"] == "success" for item in audits))
         self.assertTrue(all("target_task_digest" in item for item in audits))
+
+    def test_projection_failure_restores_both_memory_artifacts(self) -> None:
+        self.project()
+        store_path = self.repo / "docs/agent-memory/typed-memory.json"
+        projection_path = self.repo / "docs/agent-memory/current-memory.json"
+        before_store = store_path.read_bytes()
+        before_projection = projection_path.read_bytes()
+        real_write_exact = memory_module._write_exact
+        failed = False
+
+        def fail_projection_once(
+            root: Path, relative: Path, content: bytes, limit: int
+        ) -> None:
+            nonlocal failed
+            if relative == memory_module.PROJECTION_PATH and not failed:
+                failed = True
+                raise MemoryProjectionError("synthetic projection failure")
+            real_write_exact(root, relative, content, limit)
+
+        with patch("harness.memory._write_exact", side_effect=fail_projection_once):
+            with self.assertRaisesRegex(
+                MemoryProjectionError, "synthetic projection failure"
+            ):
+                self.project(
+                    self.envelope(
+                        value=11,
+                        valid_from="2026-08-12T13:00:00Z",
+                    )
+                )
+
+        self.assertEqual(store_path.read_bytes(), before_store)
+        self.assertEqual(projection_path.read_bytes(), before_projection)
+        self.assertFalse(
+            (self.context.runtime_root / "memory/project-transaction.json").exists()
+        )
+
+    def test_interrupted_memory_transaction_recovers_from_its_marker(self) -> None:
+        self.project()
+        git(
+            self.repo,
+            "add",
+            "docs/agent-memory/typed-memory.json",
+            "docs/agent-memory/current-memory.json",
+        )
+        git(self.repo, "commit", "-m", "trusted memory baseline")
+        envelope = self.envelope(
+            value=11,
+            valid_from="2026-08-12T13:00:00Z",
+        )
+        real_write_exact = memory_module._write_exact
+        stopped = False
+
+        def stop_after_store(
+            root: Path, relative: Path, content: bytes, limit: int
+        ) -> None:
+            nonlocal stopped
+            real_write_exact(root, relative, content, limit)
+            if relative == memory_module.STORE_PATH and not stopped:
+                stopped = True
+                raise SystemExit("synthetic process stop")
+
+        with patch("harness.memory._write_exact", side_effect=stop_after_store):
+            with self.assertRaisesRegex(SystemExit, "synthetic process stop"):
+                self.project(envelope)
+
+        marker = self.context.runtime_root / "memory/project-transaction.json"
+        self.assertTrue(marker.is_file())
+        store_path = self.repo / "docs/agent-memory/typed-memory.json"
+        valid_store_bytes = store_path.read_bytes()
+        valid_marker_bytes = marker.read_bytes()
+        trusted_store = json.loads(
+            git(
+                self.repo,
+                "show",
+                "HEAD:docs/agent-memory/typed-memory.json",
+            )
+        )
+        forged_record = json.loads(json.dumps(trusted_store["records"][0]))
+        forged_record["subject"] = "forged.promotion"
+        forged_record["value"] = 99
+        forged_record["record_id"] = memory_module._record_id(forged_record)
+        forged_record["validity"]["to"] = None
+        forged_record["supersedes"] = None
+        forged_record["superseded_by"] = None
+        forged_prior = json.loads(json.dumps(trusted_store))
+        forged_prior["records"].append(forged_record)
+        forged_prior["records"].sort(key=lambda record: record["record_id"])
+        forged_prior_bytes = memory_module._pretty_bytes(
+            forged_prior, memory_module.MAX_STORE_BYTES
+        )
+        forged_prior_digest = hashlib.sha256(forged_prior_bytes).hexdigest()
+        forged_prior_projection = memory_module._pretty_bytes(
+            memory_module._projection(
+                forged_prior["records"], forged_prior_digest
+            ),
+            memory_module.MAX_PROJECTION_BYTES,
+        )
+        forged_store = json.loads(valid_store_bytes)
+        forged_store["records"].append(forged_record)
+        forged_store["records"].sort(key=lambda record: record["record_id"])
+        forged_store_bytes = memory_module._pretty_bytes(
+            forged_store, memory_module.MAX_STORE_BYTES
+        )
+        forged_marker = json.loads(valid_marker_bytes)
+        forged_marker["before_store_digest"] = forged_prior_digest
+        forged_marker["before_projection_digest"] = hashlib.sha256(
+            forged_prior_projection
+        ).hexdigest()
+        store_path.write_bytes(forged_store_bytes)
+        marker.write_bytes(
+            memory_module._pretty_bytes(
+                forged_marker, memory_module.MAX_TRANSACTION_BYTES
+            )
+        )
+        with self.assertRaisesRegex(MemoryProjectionError, "manual recovery"):
+            self.project(envelope)
+        store_path.write_bytes(valid_store_bytes)
+        marker.write_bytes(valid_marker_bytes)
+        with self.assertRaisesRegex(MemoryProjectionError, "does not match"):
+            self.project(
+                self.envelope(
+                    value=12,
+                    valid_from="2026-08-12T14:00:00Z",
+                )
+            )
+        recovered = self.project(envelope)
+        self.assertFalse(marker.exists())
+        self.assertTrue(recovered["changed"])
+        self.assertEqual(
+            [record["value"] for record in startup_memory(self.context)["records"]],
+            [11],
+        )
+
+    def test_interrupted_transaction_recovers_duplicate_candidate_envelope(
+        self,
+    ) -> None:
+        self.project()
+        git(
+            self.repo,
+            "add",
+            "docs/agent-memory/typed-memory.json",
+            "docs/agent-memory/current-memory.json",
+        )
+        git(self.repo, "commit", "-m", "trusted memory baseline")
+        envelope = self.envelope(
+            value=11,
+            valid_from="2026-08-12T13:00:00Z",
+        )
+        envelope["candidates"].append(
+            json.loads(json.dumps(envelope["candidates"][0]))
+        )
+        evidence_digest = memory_envelope_digest(envelope)
+        for candidate in envelope["candidates"]:
+            candidate["evidence_digest"] = evidence_digest
+        real_write_exact = memory_module._write_exact
+        stopped = False
+
+        def stop_after_store(
+            root: Path, relative: Path, content: bytes, limit: int
+        ) -> None:
+            nonlocal stopped
+            real_write_exact(root, relative, content, limit)
+            if relative == memory_module.STORE_PATH and not stopped:
+                stopped = True
+                raise SystemExit("synthetic process stop")
+
+        with patch("harness.memory._write_exact", side_effect=stop_after_store):
+            with self.assertRaisesRegex(SystemExit, "synthetic process stop"):
+                self.project(envelope)
+
+        recovered = self.project(envelope)
+        self.assertTrue(recovered["changed"])
+        self.assertFalse(
+            (self.context.runtime_root / "memory/project-transaction.json").exists()
+        )
 
     def test_new_current_fact_supersedes_the_old_projection(self) -> None:
         self.project()

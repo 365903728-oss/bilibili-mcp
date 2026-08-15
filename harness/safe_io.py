@@ -173,14 +173,46 @@ def read_bounded_jsonl(
     max_rows: int = MAX_JSONL_ROWS,
     max_bytes: int = MAX_JSONL_BYTES,
 ) -> list[dict[str, Any]]:
-    if not path.exists() or path.is_symlink() or not path.is_file():
+    if max_rows <= 0 or max_bytes <= 0:
         return []
-    size = path.stat().st_size
-    with path.open("rb") as handle:
-        if size > max_bytes:
-            handle.seek(size - max_bytes)
-            handle.readline()
-        raw_lines = deque(handle, maxlen=max_rows)
+    descriptor: int | None = None
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        opened = os.fstat(descriptor)
+        visible = os.stat(path, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or _is_link_like(path)
+            or (opened.st_dev, opened.st_ino) != (visible.st_dev, visible.st_ino)
+        ):
+            return []
+        with os.fdopen(descriptor, "rb") as handle:
+            descriptor = None
+            if opened.st_size > max_bytes:
+                handle.seek(opened.st_size - max_bytes)
+            raw = handle.read(max_bytes)
+            closed = os.fstat(handle.fileno())
+            visible_after = os.stat(path, follow_symlinks=False)
+        if (
+            len(raw) != min(opened.st_size, max_bytes)
+            or (closed.st_dev, closed.st_ino, closed.st_size)
+            != (opened.st_dev, opened.st_ino, opened.st_size)
+            or (visible_after.st_dev, visible_after.st_ino, visible_after.st_size)
+            != (opened.st_dev, opened.st_ino, opened.st_size)
+            or _is_link_like(path)
+        ):
+            return []
+        if opened.st_size > max_bytes:
+            _, separator, raw = raw.partition(b"\n")
+            if not separator:
+                return []
+        raw_lines = deque(raw.splitlines(), maxlen=max_rows)
+    except OSError:
+        return []
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
     rows: list[dict[str, Any]] = []
     for raw_line in raw_lines:
         if len(raw_line) > MAX_RECORD_BYTES:

@@ -516,3 +516,20 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   user's orchestration preferences. Package migration checks validate the
   signed-in artifact receipt and live forbidden-path exclusion without treating
   ignored generated output as a clean-host prerequisite.
+
+## PR #39 review round-3 controls
+
+- JSONL ledgers are opened once with the platform no-follow flag where
+  available. The opened regular-file descriptor must match the current lstat
+  identity before and after one configured-budget read; descriptor and visible
+  size must remain unchanged. A symlink replacement or concurrent growth fails
+  closed without granting a second byte budget to a partial tail.
+- Typed-memory projection writes a bounded metadata-only prepared marker before
+  changing either tracked artifact. The marker binds the target task and the
+  accepted envelope digest. Ordinary write failure restores the exact prior
+  pair and clears the marker. After an abrupt stop, automatic recovery requires
+  the marker's prior pair to match the internally consistent bytes committed at
+  Git `HEAD`; it restores that trusted pair, clears the marker, and lets the
+  same accepted envelope run normally. A marker cannot authorize partial or
+  extra records. An uncommitted prior pair fails closed for explicit recovery;
+  startup does not gain write authority.

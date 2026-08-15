@@ -518,3 +518,18 @@
 - Lesson: Inspect formatter diff size before accepting it. A formatter version
   can expose historical style debt; restore unrelated churn and verify only the
   scoped change rather than laundering a broad rewrite into a repair.
+
+## 2026-08-15 — PR #39 automated-review round 3
+
+- Lesson: A pathname check is not a bounded read. Open untrusted JSONL once,
+  verify the descriptor against the no-follow path identity before and after
+  one byte-budgeted read, and never grant a fresh budget after discarding a
+  partial tail. Otherwise a short concurrent append can evade the limit.
+- Lesson: Two individually atomic files do not form one transaction. A
+  metadata-only prepared marker plus same-process rollback keeps a typed store
+  and its digest-bound projection recoverable across ordinary write failure.
+- Lesson: A recovery marker is intent, not authority. Its fields and digests are
+  attacker-computable, so interrupted recovery must anchor the prior pair to an
+  independent trusted source. Restore the internally consistent pair committed
+  at Git `HEAD`, then run the same accepted envelope normally; if no exact
+  trusted baseline exists, fail closed for explicit recovery.

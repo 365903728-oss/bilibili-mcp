@@ -2197,3 +2197,43 @@ Six release blockers fixed; one regression proof per root cause (new tests
   passed source/MCP/CRLF 4/4, clean-checkout migration/package 1/1, empty-HOME
   Paseo 51/51 in 130.825s, `git diff --check`, and migration/repair/durable-
   memory digest recomputation.
+
+## 2026-08-15 — PR #39 automated-review round-3 pre-acceptance
+
+- Baseline/mode: the isolated worktree was clean at pushed PR HEAD
+  `80e893b1d0e0a8078cb3c7a0dd8f91f2e11e9fb6`; the existing `codex-direct`
+  mode was retained and the round-3 contract acquired the only writer lease.
+  The dirty primary checkout remained isolated with 58 status rows.
+- Red evidence: concurrent growth bypassed the stale JSONL size check; a
+  synthetic second-file failure left the new store beside the old projection;
+  and a synthetic process stop left no recoverable transaction marker. The
+  focused loop failed 3/4 with the symlink case skipped only because Windows
+  denied symlink creation.
+- Focused green evidence: the same four tests pass on Windows with one symlink
+  permission skip; the two JSONL race tests pass 2/2 under WSL/POSIX; and the
+  complete events plus typed-memory modules pass 47 tests with the same single
+  Windows symlink skip in 42.156s.
+- Independent review reproduced two successive recovery defects: self-reported
+  after digests admitted an unrelated shape-valid record, and a fully forged
+  before/after marker remained self-consistent while duplicate candidates could
+  break reverse replay. Automatic recovery no longer trusts marker-derived
+  state: it requires the exact internally consistent prior pair committed at
+  Git `HEAD`, restores it, and runs the same accepted envelope normally. The
+  three focused transaction regressions pass 3/3; unanchored state fails closed
+  for explicit recovery.
+- Final risk-weighted matrix passed 49 tests in 47.689s with one Windows-only
+  symlink-permission skip. Independent re-review then reproduced a short-append
+  P2 because partial-tail discard and payload read each received a byte budget.
+  The shared reader now performs one bounded descriptor read and revalidates
+  descriptor/path identity and size afterward. The exact red regression now
+  passes; the complete event module passes 12 tests in 1.155s with the same
+  Windows skip, and both descriptor races pass 2/2 under WSL in 0.003s.
+- Static boundary: Python compile, JSON parsing, strict UTF-8 decode,
+  `git diff --check`, high-confidence secret scan, and debug-marker scan pass;
+  the latter two report zero matches. Ruff is unavailable and was not installed.
+- Independent final review: PASS with no reproducible P0-P3. Short and long
+  append probes each read exactly 64 configured bytes and failed closed;
+  post-read replacement/growth, forged-marker, duplicate-candidate, rollback,
+  migration, durable-memory, repair-hash, and diff checks all passed. Full
+  Harness and npm suites were intentionally not repeated because this bounded
+  repair did not touch product or package code.

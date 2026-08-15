@@ -9,6 +9,7 @@ import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 
 from harness.context import discover_worktree
 from harness.events import normalize_hook_event, persist_hook_event
@@ -96,6 +97,89 @@ class HookEventTests(unittest.TestCase):
             read_bounded_json_stream(io.BytesIO(b"x" * (MAX_STDIN_BYTES + 1)))
         with self.assertRaises(ValueError):
             read_bounded_json_stream(io.BytesIO(b"not-json"))
+
+    def test_jsonl_reader_rejects_a_symlink_replacement_during_open(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ledger = root / "events.jsonl"
+            external = root / "external.jsonl"
+            probe = root / "symlink-probe"
+            ledger.write_text('{"source":"ledger"}\n', encoding="utf-8")
+            external.write_text('{"source":"external"}\n', encoding="utf-8")
+            try:
+                probe.symlink_to(external)
+            except OSError as exc:
+                self.skipTest(f"symlinks unavailable: {exc}")
+            probe.unlink()
+
+            real_path_open = Path.open
+            real_os_open = os.open
+            swapped = False
+
+            def swap() -> None:
+                nonlocal swapped
+                if swapped:
+                    return
+                swapped = True
+                ledger.unlink()
+                ledger.symlink_to(external)
+
+            def raced_path_open(candidate: Path, *args: object, **kwargs: object):
+                if candidate == ledger:
+                    swap()
+                return real_path_open(candidate, *args, **kwargs)
+
+            def raced_os_open(
+                candidate: os.PathLike[str] | str | bytes,
+                flags: int,
+                mode: int = 0o777,
+                *,
+                dir_fd: int | None = None,
+            ) -> int:
+                if Path(candidate) == ledger:
+                    swap()
+                if dir_fd is None:
+                    return real_os_open(candidate, flags, mode)
+                return real_os_open(candidate, flags, mode, dir_fd=dir_fd)
+
+            with (
+                patch.object(Path, "open", new=raced_path_open),
+                patch("harness.safe_io.os.open", new=raced_os_open),
+            ):
+                self.assertEqual(read_bounded_jsonl(ledger), [])
+
+    def test_jsonl_reader_rejects_growth_beyond_its_opened_byte_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            ledger = Path(temp) / "events.jsonl"
+            ledger.write_bytes(b"prefix\n" + b"x" * 63 + b"\n")
+            late_rows = b'{"late":1}\n'
+            real_path_open = Path.open
+            real_fstat = os.fstat
+            grown = False
+
+            def grow() -> None:
+                nonlocal grown
+                if grown:
+                    return
+                grown = True
+                with real_path_open(ledger, "ab") as handle:
+                    handle.write(late_rows)
+
+            def raced_path_open(candidate: Path, *args: object, **kwargs: object):
+                if candidate == ledger:
+                    grow()
+                return real_path_open(candidate, *args, **kwargs)
+
+            def raced_fstat(descriptor: int):
+                opened = real_fstat(descriptor)
+                grow()
+                return opened
+
+            with (
+                patch.object(Path, "open", new=raced_path_open),
+                patch("harness.safe_io.os.fstat", new=raced_fstat),
+            ):
+                self.assertEqual(read_bounded_jsonl(ledger, max_bytes=64), [])
 
     def test_nested_directory_and_linked_worktree_have_distinct_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

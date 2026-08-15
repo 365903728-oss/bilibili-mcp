@@ -50,6 +50,7 @@ CAPABILITY_SOURCE_PATH = (
 MAX_ENVELOPE_BYTES = 256 * 1024
 MAX_STORE_BYTES = 1024 * 1024
 MAX_PROJECTION_BYTES = 128 * 1024
+MAX_TRANSACTION_BYTES = 4 * 1024
 MAX_PROJECTION_NODES = 12_000
 MAX_RECORDS = 512
 MAX_CURRENT_RECORDS = 64
@@ -539,16 +540,6 @@ def _empty_store() -> dict[str, Any]:
     return {"schema": "harness.typed-memory-store/v1", "records": []}
 
 
-def _load_store(root: Path) -> dict[str, Any]:
-    path = root / STORE_PATH
-    if not path.exists():
-        return _empty_store()
-    store = read_bounded_json_object(
-        path, MAX_STORE_BYTES, max_nodes=12_000, max_depth=12
-    )
-    return _validate_store(store)
-
-
 def _validate_store(store: Any) -> dict[str, Any]:
     _exact_keys(store, {"schema", "records"}, "typed memory store")
     if store.get("schema") != "harness.typed-memory-store/v1" or not isinstance(
@@ -980,6 +971,171 @@ def _write_exact(root: Path, relative: Path, content: bytes, limit: int) -> None
         raise MemoryProjectionError("memory artifact persistence was not durable")
 
 
+def _write_transaction_marker(path: Path, marker: dict[str, Any]) -> None:
+    content = _pretty_bytes(marker, MAX_TRANSACTION_BYTES)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise MemoryProjectionError("memory transaction marker is unsafe")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, path)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+    if read_bounded_json_object(path, MAX_TRANSACTION_BYTES) != marker:
+        raise MemoryProjectionError("memory transaction marker was not durable")
+
+
+def _clear_transaction_marker(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        raise MemoryProjectionError(
+            "memory transaction marker could not be cleared"
+        ) from exc
+
+
+def _artifact_bytes(path: Path, limit: int) -> bytes | None:
+    content = read_bounded_bytes(path, limit)
+    if content is None and (path.exists() or path.is_symlink()):
+        raise MemoryProjectionError("memory artifact is unavailable or unsafe")
+    return content
+
+
+def _restore_artifact(
+    root: Path, relative: Path, content: bytes | None, limit: int
+) -> None:
+    path = root / relative
+    if content is None:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as exc:
+            raise MemoryProjectionError("memory artifact rollback failed") from exc
+    elif read_bounded_bytes(path, limit) != content:
+        _write_exact(root, relative, content, limit)
+
+
+def _head_artifact_bytes(root: Path, relative: Path, limit: int) -> bytes | None:
+    repository_path = relative.as_posix()
+    try:
+        paths = _git_paths(
+            root,
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "-z",
+            "HEAD",
+            "--",
+            repository_path,
+        )
+        if repository_path not in paths:
+            return None
+        content = _git_bytes(root, "show", f"HEAD:{repository_path}")
+    except CodexDirectError as exc:
+        raise MemoryProjectionError(
+            "trusted memory baseline is unavailable"
+        ) from exc
+    if len(content) > limit:
+        raise MemoryProjectionError("trusted memory baseline exceeds its byte limit")
+    return content
+
+
+def _recover_memory_transaction(
+    context: WorktreeContext,
+    marker_path: Path,
+    *,
+    target_task_id: str,
+    envelope_digest: str,
+) -> None:
+    if not marker_path.exists() and not marker_path.is_symlink():
+        return
+    marker = read_bounded_json_object(marker_path, MAX_TRANSACTION_BYTES)
+    expected_keys = {
+        "schema",
+        "before_store_digest",
+        "before_projection_digest",
+        "target_task_digest",
+        "envelope_digest",
+        "before_store_exists",
+        "before_projection_exists",
+    }
+    digest_keys = expected_keys - {
+        "schema",
+        "before_store_exists",
+        "before_projection_exists",
+    }
+    if (
+        set(marker) != expected_keys
+        or marker.get("schema") != "harness.memory-transaction/v1"
+        or any(
+            not isinstance(marker.get(key), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", marker[key])
+            for key in digest_keys
+        )
+        or not isinstance(marker.get("before_store_exists"), bool)
+        or not isinstance(marker.get("before_projection_exists"), bool)
+        or marker["before_store_exists"] != marker["before_projection_exists"]
+    ):
+        raise MemoryProjectionError("memory transaction marker is invalid")
+    if (
+        marker["target_task_digest"]
+        != hashlib.sha256(target_task_id.encode("utf-8")).hexdigest()
+        or marker["envelope_digest"] != envelope_digest
+    ):
+        raise MemoryProjectionError("memory transaction does not match this projection")
+
+    store_path = context.root / STORE_PATH
+    projection_path = context.root / PROJECTION_PATH
+    store_bytes = _artifact_bytes(store_path, MAX_STORE_BYTES)
+    projection_bytes = _artifact_bytes(projection_path, MAX_PROJECTION_BYTES)
+    store_digest = hashlib.sha256(store_bytes or b"").hexdigest()
+    projection_digest = hashlib.sha256(projection_bytes or b"").hexdigest()
+
+    trusted_store = _head_artifact_bytes(
+        context.root, STORE_PATH, MAX_STORE_BYTES
+    )
+    trusted_projection = _head_artifact_bytes(
+        context.root, PROJECTION_PATH, MAX_PROJECTION_BYTES
+    )
+    if (
+        (trusted_store is not None) != marker["before_store_exists"]
+        or (trusted_projection is not None) != marker["before_projection_exists"]
+        or hashlib.sha256(trusted_store or b"").hexdigest()
+        != marker["before_store_digest"]
+        or hashlib.sha256(trusted_projection or b"").hexdigest()
+        != marker["before_projection_digest"]
+    ):
+        raise MemoryProjectionError("memory transaction requires manual recovery")
+    if trusted_store is not None:
+        trusted = _load_store_bytes(trusted_store)
+        trusted_store_digest = hashlib.sha256(trusted_store).hexdigest()
+        expected_projection = _pretty_bytes(
+            _projection(trusted["records"], trusted_store_digest),
+            MAX_PROJECTION_BYTES,
+        )
+        if trusted_projection != expected_projection:
+            raise MemoryProjectionError("trusted memory baseline is inconsistent")
+    if (
+        store_digest == marker["before_store_digest"]
+        and projection_digest == marker["before_projection_digest"]
+        and (store_bytes is not None) == marker["before_store_exists"]
+        and (projection_bytes is not None) == marker["before_projection_exists"]
+    ):
+        _clear_transaction_marker(marker_path)
+        return
+    _restore_artifact(context.root, STORE_PATH, trusted_store, MAX_STORE_BYTES)
+    _restore_artifact(
+        context.root, PROJECTION_PATH, trusted_projection, MAX_PROJECTION_BYTES
+    )
+    _clear_transaction_marker(marker_path)
+
+
 def _validate_artifact_path(root: Path, relative: Path) -> Path:
     path = root / relative
     ensure_no_link_components(root, path.parent)
@@ -1097,13 +1253,35 @@ def project_memory(
     store_path = _validate_artifact_path(context.root, STORE_PATH)
     projection_path = _validate_artifact_path(context.root, PROJECTION_PATH)
     lock_path = context.runtime_root / "memory" / "project.lock"
+    marker_path = context.runtime_root / "memory" / "project-transaction.json"
+    envelope_digest = _digest(envelope)
     with _target_memory_writer(context, target_task_id):
         with bounded_file_lock(lock_path):
-            before_store_bytes = read_bounded_bytes(store_path, MAX_STORE_BYTES) or b""
-            before_projection_bytes = (
-                read_bounded_bytes(projection_path, MAX_PROJECTION_BYTES) or b""
+            _recover_memory_transaction(
+                context,
+                marker_path,
+                target_task_id=target_task_id,
+                envelope_digest=envelope_digest,
             )
-            store = _load_store(context.root)
+            before_store_bytes = _artifact_bytes(store_path, MAX_STORE_BYTES)
+            before_projection_bytes = _artifact_bytes(
+                projection_path, MAX_PROJECTION_BYTES
+            )
+            if (before_store_bytes is None) != (before_projection_bytes is None):
+                raise MemoryProjectionError("memory artifact pair is incomplete")
+            store = (
+                _empty_store()
+                if before_store_bytes is None
+                else _load_store_bytes(before_store_bytes)
+            )
+            if before_store_bytes is not None:
+                before_store_digest = hashlib.sha256(before_store_bytes).hexdigest()
+                expected_before_projection = _pretty_bytes(
+                    _projection(store["records"], before_store_digest),
+                    MAX_PROJECTION_BYTES,
+                )
+                if before_projection_bytes != expected_before_projection:
+                    raise MemoryProjectionError("memory artifact pair is inconsistent")
             records = store["records"]
             for candidate in candidates:
                 _merge_candidate(context, records, source, candidate, status)
@@ -1117,23 +1295,64 @@ def project_memory(
                 before_store_bytes != store_bytes
                 or before_projection_bytes != projection_bytes
             )
-            if before_store_bytes != store_bytes:
-                _write_exact(context.root, STORE_PATH, store_bytes, MAX_STORE_BYTES)
-            if before_projection_bytes != projection_bytes:
-                _write_exact(
-                    context.root,
-                    PROJECTION_PATH,
-                    projection_bytes,
-                    MAX_PROJECTION_BYTES,
-                )
+            before_store_digest = hashlib.sha256(before_store_bytes or b"").hexdigest()
+            before_projection_digest = hashlib.sha256(
+                before_projection_bytes or b""
+            ).hexdigest()
+            if changed:
+                marker = {
+                    "schema": "harness.memory-transaction/v1",
+                    "before_store_digest": before_store_digest,
+                    "before_projection_digest": before_projection_digest,
+                    "target_task_digest": hashlib.sha256(
+                        target_task_id.encode("utf-8")
+                    ).hexdigest(),
+                    "envelope_digest": envelope_digest,
+                    "before_store_exists": before_store_bytes is not None,
+                    "before_projection_exists": before_projection_bytes is not None,
+                }
+                _write_transaction_marker(marker_path, marker)
+                try:
+                    if before_store_bytes != store_bytes:
+                        _write_exact(
+                            context.root, STORE_PATH, store_bytes, MAX_STORE_BYTES
+                        )
+                    if before_projection_bytes != projection_bytes:
+                        _write_exact(
+                            context.root,
+                            PROJECTION_PATH,
+                            projection_bytes,
+                            MAX_PROJECTION_BYTES,
+                        )
+                except Exception:
+                    try:
+                        _restore_artifact(
+                            context.root,
+                            STORE_PATH,
+                            before_store_bytes,
+                            MAX_STORE_BYTES,
+                        )
+                        _restore_artifact(
+                            context.root,
+                            PROJECTION_PATH,
+                            before_projection_bytes,
+                            MAX_PROJECTION_BYTES,
+                        )
+                        _clear_transaction_marker(marker_path)
+                    except Exception as rollback_error:
+                        raise MemoryProjectionError(
+                            "memory transaction rollback failed"
+                        ) from rollback_error
+                    raise
+                _clear_transaction_marker(marker_path)
             projection_digest = hashlib.sha256(projection_bytes).hexdigest()
             operation_id = _audit(
                 context,
                 source=source,
                 target_task_id=target_task_id,
-                envelope_digest=_digest(envelope),
-                before_store=hashlib.sha256(before_store_bytes).hexdigest(),
-                before_projection=hashlib.sha256(before_projection_bytes).hexdigest(),
+                envelope_digest=envelope_digest,
+                before_store=before_store_digest,
+                before_projection=before_projection_digest,
                 after_store=store_digest,
                 after_projection=projection_digest,
                 changed=changed,
