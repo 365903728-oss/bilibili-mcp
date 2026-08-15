@@ -169,7 +169,7 @@ def _write_ephemeral_prompt(
     prompt_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         ensure_no_link_components(context.root, prompt_path)
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+        flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
         descriptor = os.open(prompt_path, flags, 0o600)
     except (OSError, ValueError) as exc:
@@ -221,11 +221,20 @@ def _send_verified_prompt(
 ) -> dict[str, Any]:
     if not _prompt_identity_matches(prompt_path, descriptor):
         raise PaseoCollaborationError("prompt_identity_changed")
+    prompt_source = str(prompt_path)
+    pass_fds: tuple[int, ...] = ()
+    if os.name != "nt":
+        # POSIX Paseo reads the inherited verified inode, not a swappable path.
+        # Windows keeps the source handle open, which denies path replacement.
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        prompt_source = f"/dev/fd/{descriptor}"
+        pass_fds = (descriptor,)
     result = _run_paseo_cli(
         "send", agent_id,
-        "--prompt-file", str(prompt_path),
+        "--prompt-file", prompt_source,
         "--no-wait",
         timeout=PASEO_RUN_TIMEOUT,
+        pass_fds=pass_fds,
     )
     if not _prompt_identity_matches(prompt_path, descriptor):
         raise PaseoCollaborationError("prompt_identity_changed")
@@ -328,6 +337,7 @@ def _run_paseo_cli(
     *args: str,
     timeout: int = PASEO_TIMEOUT,
     input_bytes: bytes | None = None,
+    pass_fds: tuple[int, ...] = (),
 ) -> dict[str, Any]:
     """Single bounded Paseo CLI subprocess call.
 
@@ -339,11 +349,17 @@ def _run_paseo_cli(
     exe = str(_resolve_paseo_cli())
     full_args = [exe, "--json", *args]
     try:
+        popen_options: dict[str, Any] = {}
+        if pass_fds:
+            if os.name == "nt":
+                raise PaseoCollaborationError("paseo_prompt_fd_unsupported")
+            popen_options["pass_fds"] = pass_fds
         process = subprocess.Popen(
             full_args,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            **popen_options,
         )
     except (OSError, subprocess.SubprocessError):
         raise PaseoCollaborationError("paseo_cli_unavailable")
@@ -458,15 +474,12 @@ def _resolve_provider(prefs: dict[str, Any], override: str | None) -> tuple[str,
     Returns ``(provider, model)`` tuple.  The preferences key is
     ``providers.impl`` in ``<provider>/<model>`` form.
     """
-    if override:
-        if "/" in override:
-            parts = override.split("/", 1)
-            return parts[0], parts[1]
-        return override, ""
-    providers = prefs.get("providers")
-    impl = providers.get("impl") if isinstance(providers, dict) else None
-    parts = impl.split("/", 1) if isinstance(impl, str) else []
-    if len(parts) != 2 or not all(parts):
+    coordinate: Any = override
+    if coordinate is None:
+        providers = prefs.get("providers")
+        coordinate = providers.get("impl") if isinstance(providers, dict) else None
+    parts = coordinate.split("/") if isinstance(coordinate, str) else []
+    if len(parts) != 2 or not all(_is_safe_identifier(part) for part in parts):
         raise PaseoCollaborationError(
             "provider_not_resolved: set providers.impl in "
             "~/.paseo/orchestration-preferences.json or pass --provider"

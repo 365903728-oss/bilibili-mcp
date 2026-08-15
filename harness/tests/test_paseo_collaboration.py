@@ -295,7 +295,15 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
     def test_preflight_malformed_provider_preferences_fail_closed(self) -> None:
         from harness.paseo_collaboration import paseo_preflight
 
-        malformed = (None, [], "claude/deepseek-v4-flash", {"impl": None})
+        malformed = (
+            None,
+            [],
+            "claude/deepseek-v4-flash",
+            {"impl": None},
+            {"impl": "claude/model\nLEAK"},
+            {"impl": f"claude/{'m' * 65}"},
+            {"impl": "claude/model/extra"},
+        )
         for providers in malformed:
             with self.subTest(providers=providers), patch(
                 "harness.paseo_collaboration._read_orchestration_prefs",
@@ -307,6 +315,8 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
                 result = paseo_preflight(self._ctx())
                 self.assertFalse(result["available"])
                 self.assertIn("provider_not_resolved", result["error"])
+                self.assertNotIn("LEAK", result["error"])
+                self.assertLess(len(result["error"]), 256)
 
     def test_preflight_daemon_not_running(self) -> None:
         from harness.paseo_collaboration import paseo_preflight
@@ -600,20 +610,45 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
     def test_verified_prompt_send_rechecks_identity_before_accepting(self) -> None:
         import harness.paseo_collaboration as collaboration
 
-        with patch(
-            "harness.paseo_collaboration._prompt_identity_matches",
-            side_effect=(True, False),
-        ) as identity, patch(
-            "harness.paseo_collaboration._run_paseo_cli",
-            return_value=_make_send_result(),
-        ):
-            with self.assertRaises(collaboration.PaseoCollaborationError) as cm:
-                collaboration._send_verified_prompt(
-                    "agent-test-uuid", Path("dispatch-prompt.txt"), 123
-                )
+        prompt_path = self.repo / ".harness" / "runtime" / "identity-prompt.txt"
+        descriptor = collaboration._write_ephemeral_prompt(
+            self._ctx(), prompt_path, "verified prompt"
+        )
+        try:
+            with patch(
+                "harness.paseo_collaboration._prompt_identity_matches",
+                side_effect=(True, False),
+            ) as identity, patch(
+                "harness.paseo_collaboration._run_paseo_cli",
+                return_value=_make_send_result(),
+            ):
+                with self.assertRaises(collaboration.PaseoCollaborationError) as cm:
+                    collaboration._send_verified_prompt(
+                        "agent-test-uuid", prompt_path, descriptor
+                    )
+        finally:
+            collaboration._unlink_ephemeral_prompt(
+                self._ctx(), prompt_path, descriptor
+            )
 
         self.assertIn("prompt_identity_changed", str(cm.exception))
         self.assertEqual(identity.call_count, 2)
+
+        with patch.object(collaboration.os, "name", "posix"), patch(
+            "harness.paseo_collaboration.os.lseek",
+        ), patch(
+            "harness.paseo_collaboration._prompt_identity_matches",
+            return_value=True,
+        ), patch(
+            "harness.paseo_collaboration._run_paseo_cli",
+            return_value=_make_send_result(),
+        ) as run:
+            collaboration._send_verified_prompt(
+                "agent-test-uuid", Path("dispatch-prompt.txt"), 123
+            )
+
+        self.assertEqual(run.call_args.args[3], "/dev/fd/123")
+        self.assertEqual(run.call_args.kwargs["pass_fds"], (123,))
 
     def test_dispatch_rejects_oversized_handoff(self) -> None:
         from harness.paseo_collaboration import (
