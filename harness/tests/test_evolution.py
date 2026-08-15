@@ -2277,7 +2277,21 @@ raise SystemExit(main())
                             "params": {
                                 "protocolVersion": "2025-11-25",
                                 "capabilities": {},
-                                "clientInfo": {"name": "harness-test", "version": "1"},
+                                "clientInfo": {
+                                    "name": "harness-test",
+                                    "version": "1",
+                                    "title": "Harness Test",
+                                    "websiteUrl": "https://example.invalid/harness",
+                                    "description": "Bounded test client",
+                                    "icons": [
+                                        {
+                                            "src": "data:image/png;base64,AA==",
+                                            "mimeType": "image/png",
+                                            "sizes": ["16x16", "any"],
+                                            "theme": "dark",
+                                        }
+                                    ],
+                                },
                             },
                         },
                         {

@@ -148,6 +148,16 @@ def _nonempty(value: Any, label: str, limit: int = 256) -> str:
     return value
 
 
+def _bounded_string(value: Any, label: str, limit: int) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) > limit
+        or any(ord(char) < 32 or ord(char) == 127 for char in value)
+    ):
+        raise EvolutionError(f"{label} is invalid")
+    return value
+
+
 def _relative_path(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value or len(value) > 256:
         raise EvolutionError(f"{label} is invalid")
@@ -2118,11 +2128,48 @@ def mcp_surface_message(
             {"protocolVersion", "capabilities", "clientInfo"},
             "MCP initialize params",
         )
-        client = _exact(
-            initialize["clientInfo"], {"name", "version"}, "MCP client info"
-        )
+        client = initialize["clientInfo"]
+        client_keys = {"name", "version", "title", "icons", "websiteUrl", "description"}
+        if (
+            not isinstance(client, dict)
+            or not {"name", "version"}.issubset(client)
+            or not set(client).issubset(client_keys)
+        ):
+            raise EvolutionError("MCP client info is invalid")
         _nonempty(client["name"], "MCP client name", 128)
         _nonempty(client["version"], "MCP client version", 64)
+        for key, label, limit in (
+            ("title", "MCP client title", 256),
+            ("websiteUrl", "MCP client website URL", 2048),
+            ("description", "MCP client description", 2048),
+        ):
+            if key in client:
+                _bounded_string(client[key], label, limit)
+        if "icons" in client:
+            icons = client["icons"]
+            if not isinstance(icons, list) or len(icons) > 16:
+                raise EvolutionError("MCP client icons are invalid")
+            for icon in icons:
+                icon_keys = {"src", "mimeType", "sizes", "theme"}
+                if (
+                    not isinstance(icon, dict)
+                    or "src" not in icon
+                    or not set(icon).issubset(icon_keys)
+                ):
+                    raise EvolutionError("MCP client icon is invalid")
+                _bounded_string(icon["src"], "MCP client icon source", 2048)
+                if "mimeType" in icon:
+                    _bounded_string(
+                        icon["mimeType"], "MCP client icon MIME type", 128
+                    )
+                if "sizes" in icon:
+                    sizes = icon["sizes"]
+                    if not isinstance(sizes, list) or len(sizes) > 16:
+                        raise EvolutionError("MCP client icon sizes are invalid")
+                    for size in sizes:
+                        _bounded_string(size, "MCP client icon size", 32)
+                if "theme" in icon and icon["theme"] not in {"light", "dark"}:
+                    raise EvolutionError("MCP client icon theme is invalid")
         if initialize["protocolVersion"] != "2025-11-25" or not isinstance(
             initialize["capabilities"], dict
         ):
