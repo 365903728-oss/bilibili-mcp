@@ -183,6 +183,8 @@ class Response:
             source = os.environ["HARNESS_TEST_CANDIDATE_LICENSE"]
         elif self.url.endswith("/README.md"):
             source = str(Path(os.environ["HARNESS_TEST_CHANNEL_EVIDENCE"]) / "official.txt")
+        elif (Path(os.environ["HARNESS_TEST_CHANNEL_EVIDENCE"]) / "live-not-found.json").exists():
+            source = str(Path(os.environ["HARNESS_TEST_CHANNEL_EVIDENCE"]) / "live-not-found.json")
         else:
             source = os.environ["HARNESS_TEST_CANDIDATE_ARTIFACT"]
         self.data = Path(source).read_bytes()
@@ -195,6 +197,12 @@ class Opener:
     def open(self, request, timeout):
         response = Response(request)
         if urlsplit(request.full_url).hostname == "registry.npmjs.org":
+            raise urllib.error.HTTPError(
+                request.full_url, 404, "Not Found", {}, io.BytesIO(response.data)
+            )
+        if (urlsplit(request.full_url).hostname == "raw.githubusercontent.com"
+                and request.full_url.endswith("/capability.json")
+                and (Path(os.environ["HARNESS_TEST_CHANNEL_EVIDENCE"]) / "live-not-found.json").exists()):
             raise urllib.error.HTTPError(
                 request.full_url, 404, "Not Found", {}, io.BytesIO(response.data)
             )
@@ -797,16 +805,13 @@ raise SystemExit(main())
             },
         )
 
-    def test_start_rejects_a_self_consistent_forged_acceptance_receipt(self) -> None:
+    def test_start_rejects_a_forged_acceptance_receipt(self) -> None:
         linked, gap_id = self.accepted_gap_worktree()
         store_path = linked / "docs/agent-memory/typed-memory.json"
         projection_path = linked / "docs/agent-memory/current-memory.json"
         store = json.loads(store_path.read_text(encoding="utf-8"))
         receipt = store["records"][0]["provenance"][0]["acceptance_receipt"]
-        receipt["base_sha"] = "f" * 40
-        receipt["receipt_digest"] = digest(
-            {key: value for key, value in receipt.items() if key != "receipt_digest"}
-        )
+        receipt["diff_digest"] = "f" * 64
         store_bytes = (
             json.dumps(store, ensure_ascii=True, sort_keys=True, indent=2) + "\n"
         ).encode("utf-8")
@@ -814,12 +819,14 @@ raise SystemExit(main())
         projection = json.loads(projection_path.read_text(encoding="utf-8"))
         projection["records"] = json.loads(json.dumps(store["records"]))
         projection["store_digest"] = hashlib.sha256(store_bytes).hexdigest()
-        projection_path.write_text(
-            json.dumps(projection, ensure_ascii=True, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
+        projection_path.write_bytes(
+            (
+                json.dumps(projection, ensure_ascii=True, sort_keys=True, indent=2)
+                + "\n"
+            ).encode("utf-8")
         )
         git(linked, "add", "docs/agent-memory")
-        git(linked, "commit", "-m", "forge a self-consistent receipt")
+        git(linked, "commit", "-m", "forge an untrusted receipt")
 
         contract = self.write_contract(
             linked, "forged-receipt-task", self.evolution_owned("forged-receipt-task")
@@ -1403,6 +1410,162 @@ raise SystemExit(main())
             repo, task_id, hashlib.sha256(task_id.encode()).hexdigest()
         )
         self.assertEqual(git(repo, "rev-list", "--count", f"{base}..{commit}"), "1")
+
+    def test_zero_candidate_surface_search_verifies_no_match_channels(self) -> None:
+        repo, gap_id = self.accepted_gap_worktree()
+        task_id = "zero-candidate-surface-build"
+        self.start_evolution_run(repo, task_id, gap_id)
+        value = self.surface_search_value(
+            self.surface_source("skill"), decision="build"
+        )
+        value["candidates"] = []
+        value["selected_candidate"] = None
+        value["query"] = "@modelcontextprotocol/inspector"
+        for source in value["sources_consulted"]:
+            source["result"] = "no-match"
+            if source["channel"] == "registry":
+                source["evidence_url"] = (
+                    "https://registry.modelcontextprotocol.io/v0/servers"
+                    "?search=%40modelcontextprotocol%2Finspector"
+                )
+            if source["channel"] == "package-manager":
+                source["evidence_url"] = (
+                    "https://registry.npmjs.org/"
+                    "%40modelcontextprotocol%2Finspector"
+                )
+
+        live_body = b'{"error":"Not Found"}\n'
+        (self.channel_evidence / "live-not-found.json").write_bytes(live_body)
+        live_source = next(
+            source
+            for source in value["sources_consulted"]
+            if source["channel"] == "live-github"
+        )
+        live_source["evidence_digest"] = hashlib.sha256(live_body).hexdigest()
+        live_source["evidence_bytes"] = len(live_body)
+        search = self.root / f"{task_id}-search.json"
+
+        version_scoped = json.loads(json.dumps(value))
+        next(
+            source
+            for source in version_scoped["sources_consulted"]
+            if source["channel"] == "package-manager"
+        )["evidence_url"] += "/definitely-missing"
+        search.write_text(json.dumps(version_scoped), encoding="utf-8")
+        version_result = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertNotEqual(version_result.returncode, 0, version_result.stdout)
+
+        unrelated = json.loads(json.dumps(value))
+        unrelated_sources = {
+            source["channel"]: source
+            for source in unrelated["sources_consulted"]
+        }
+        unrelated_sources["official"]["evidence_url"] = (
+            "https://raw.githubusercontent.com/other/project/"
+            + "f" * 40
+            + "/README.md"
+        )
+        unrelated_sources["registry"]["evidence_url"] = (
+            "https://registry.modelcontextprotocol.io/v0/servers?search=unrelated"
+        )
+        unrelated_sources["package-manager"]["evidence_url"] = (
+            "https://registry.npmjs.org/unrelated/0.0.0"
+        )
+        unrelated_sources["live-github"]["evidence_url"] = (
+            "https://raw.githubusercontent.com/other/project/"
+            + "f" * 40
+            + "/capability.json"
+        )
+        search.write_text(json.dumps(unrelated), encoding="utf-8")
+        unrelated_result = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertNotEqual(
+            unrelated_result.returncode, 0, unrelated_result.stdout
+        )
+
+        forged = json.loads(json.dumps(value))
+        forged["sources_consulted"][0]["evidence_digest"] = "0" * 64
+        search.write_text(json.dumps(forged), encoding="utf-8")
+        rejected = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
+
+        search.write_text(json.dumps(value), encoding="utf-8")
+        searched = self.harness_at(
+            repo,
+            "evolution",
+            "search",
+            str(search),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertEqual(searched.returncode, 0, searched.stdout)
+        self.assertEqual(json.loads(searched.stdout)["state"], "build-ready")
+
+        built = self.harness_at(
+            repo,
+            "evolution",
+            "build",
+            str(ROOT / "harness/fixtures/evolution-build-surface.json"),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertEqual(built.returncode, 0, built.stdout)
+        evaluation = self.root / f"{task_id}-evaluation.json"
+        evaluation.write_text(
+            json.dumps(
+                {
+                    "schema": "harness.evolution-evaluation-request/v1",
+                    "candidate_digest": json.loads(built.stdout)["candidate_digest"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        evaluated = self.harness_at(
+            repo,
+            "evolution",
+            "evaluate",
+            str(evaluation),
+            "--cwd",
+            str(repo),
+            "--task",
+            task_id,
+        )
+        self.assertEqual(evaluated.returncode, 0, evaluated.stdout)
+        self.assertEqual(json.loads(evaluated.stdout)["state"], "promotion-ready")
+        commit = self.accept_direct(
+            repo, task_id, hashlib.sha256(task_id.encode()).hexdigest()
+        )
+        self.assertEqual(git(repo, "rev-parse", "HEAD"), commit)
 
     def test_projection_drift_and_manual_invocation_metadata_fail_closed(self) -> None:
         source = json.loads(

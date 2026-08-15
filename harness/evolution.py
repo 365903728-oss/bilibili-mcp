@@ -851,6 +851,8 @@ def _channel_result(
     """Derive Search meaning from bounded source bytes, never caller labels."""
 
     if channel == "live-github":
+        if status == 404:
+            return "no-match"
         return (
             "candidate"
             if hashlib.sha256(raw).hexdigest() == candidate["artifact_digest"]
@@ -861,9 +863,10 @@ def _channel_result(
             text = raw.decode("utf-8", errors="strict")
         except UnicodeDecodeError as exc:
             raise EvolutionError("official channel evidence is invalid") from exc
+        markers = [candidate.get("id"), candidate.get("artifact_path")]
         return (
             "candidate"
-            if candidate["id"] in text or candidate["artifact_path"] in text
+            if any(marker and marker in text for marker in markers)
             else "no-match"
         )
     if channel == "package-manager" and status == 404:
@@ -885,9 +888,16 @@ def _channel_result(
             server = item.get("server", item)
             if not isinstance(server, dict):
                 raise EvolutionError("registry channel evidence is invalid")
+            repository = server.get("repository")
+            repository_url = (
+                repository.get("url") if isinstance(repository, dict) else repository
+            )
             if (
-                server.get("name") == candidate["id"]
-                or server.get("id") == candidate["id"]
+                (candidate.get("id") is not None and (
+                    server.get("name") == candidate["id"]
+                    or server.get("id") == candidate["id"]
+                ))
+                or repository_url == candidate.get("canonical_source")
             ):
                 matches.append(server)
         if not matches:
@@ -909,10 +919,13 @@ def _channel_result(
     if isinstance(repository_url, str):
         repository_url = repository_url.removeprefix("git+").removesuffix(".git")
     dist = payload.get("dist")
-    expected_version = candidate["package"]["version"]
+    package = candidate.get("package")
+    if not isinstance(package, dict):
+        return "rejected"
+    expected_version = package["version"]
     return (
         "candidate"
-        if payload.get("name") == candidate["package"]["name"]
+        if payload.get("name") == package["name"]
         and payload.get("version") == expected_version
         and payload.get("license") == candidate["license"]
         and repository_url == candidate["canonical_source"]
@@ -924,7 +937,7 @@ def _channel_result(
 
 
 def _verify_search_channels(
-    search: dict[str, Any], candidate: dict[str, Any]
+    search: dict[str, Any], candidate: dict[str, Any] | None
 ) -> dict[str, Any]:
     if search.get("schema") != "harness.evolution-search/v2":
         raise EvolutionError("surface candidate requires v2 Search evidence")
@@ -933,12 +946,15 @@ def _verify_search_channels(
         raw, status = _fetch_https_bytes(
             source["evidence_url"],
             "surface channel evidence",
-            allow_not_found=source["channel"] == "package-manager",
+            allow_not_found=(
+                source["result"] == "no-match"
+                and source["channel"] in {"package-manager", "live-github"}
+            ),
         )
         digest = hashlib.sha256(raw).hexdigest()
         if digest != source["evidence_digest"] or len(raw) != source["evidence_bytes"]:
             raise EvolutionError("surface channel evidence does not match its record")
-        result = _channel_result(source["channel"], raw, status, candidate)
+        result = _channel_result(source["channel"], raw, status, candidate or source)
         if result != source["result"]:
             raise EvolutionError("surface channel result does not match its response")
         observations[source["channel"]] = {
@@ -1231,17 +1247,37 @@ def _validate_search(value: Any) -> dict[str, Any]:
     )
     if not zero_candidate_build and selected not in candidate_ids:
         raise EvolutionError("evolution selected candidate is invalid")
-    if surface_search and not zero_candidate_build:
-        candidate = next(item for item in candidates if item["id"] == selected)
+    if surface_search:
         channel_sources = {item["channel"]: item for item in sources}
-        repository = candidate["canonical_source"].removeprefix("https://github.com/")
+        candidate = (
+            next(item for item in candidates if item["id"] == selected)
+            if not zero_candidate_build
+            else None
+        )
+        reference = candidate or channel_sources["live-github"]
+        source_keys = (
+            "canonical_source",
+            "immutable_revision",
+            "artifact_path",
+            "artifact_digest",
+            "license_path",
+            "license_digest",
+        )
+        if zero_candidate_build and any(
+            any(source[key] != reference[key] for key in source_keys)
+            for source in sources
+        ):
+            raise EvolutionError("surface channel evidence is not query-bound")
+        repository = reference["canonical_source"].removeprefix(
+            "https://github.com/"
+        )
         raw_prefix = (
             f"https://raw.githubusercontent.com/{repository}/"
-            f"{candidate['immutable_revision']}/"
+            f"{reference['immutable_revision']}/"
         )
         artifact_suffix = "/".join(
             urllib.parse.quote(part, safe="._-")
-            for part in PurePosixPath(candidate["artifact_path"]).parts
+            for part in PurePosixPath(reference["artifact_path"]).parts
         )
         registry_query = urllib.parse.parse_qs(
             urllib.parse.urlsplit(channel_sources["registry"]["evidence_url"]).query
@@ -1249,21 +1285,28 @@ def _validate_search(value: Any) -> dict[str, Any]:
         package_path = urllib.parse.urlsplit(
             channel_sources["package-manager"]["evidence_url"]
         ).path
-        package_coordinate = candidate["package"]
-        expected_package_path = (
-            "/"
-            + urllib.parse.quote(package_coordinate["name"], safe="")
-            + "/"
-            + urllib.parse.quote(package_coordinate["version"], safe="")
-        )
+        if candidate is None:
+            registry_coordinate = query
+            package_prefix = "/" + urllib.parse.quote(query, safe="")
+            package_bound = package_path == package_prefix
+        else:
+            registry_coordinate = candidate["id"]
+            package_coordinate = candidate["package"]
+            package_bound = package_path == (
+                "/"
+                + urllib.parse.quote(package_coordinate["name"], safe="")
+                + "/"
+                + urllib.parse.quote(package_coordinate["version"], safe="")
+            )
         if (
             not channel_sources["official"]["evidence_url"].startswith(raw_prefix)
             or channel_sources["live-github"]["evidence_url"]
             != raw_prefix + artifact_suffix
-            or registry_query.get("search") != [candidate["id"]]
-            or package_path != expected_package_path
+            or registry_query.get("search") != [registry_coordinate]
+            or not package_bound
         ):
-            raise EvolutionError("surface channel evidence is not candidate-bound")
+            boundary = "query" if candidate is None else "candidate"
+            raise EvolutionError(f"surface channel evidence is not {boundary}-bound")
     reason = _nonempty(search["reason_code"], "evolution search reason", 96)
     if not re.fullmatch(r"[a-z0-9-]+", reason):
         raise EvolutionError("evolution search reason is invalid")
@@ -1342,9 +1385,28 @@ def _validate_stored_search(value: Any) -> dict[str, Any]:
         r"[a-z0-9-]{1,96}", search["reason_code"]
     ):
         raise EvolutionError("stored evolution reason is invalid")
+    probe_query = "stored-search"
+    if surface_search and zero_candidate_build:
+        channel_sources = {
+            item.get("channel"): item
+            for item in search["sources_consulted"]
+            if isinstance(item, dict)
+        }
+        registry = channel_sources.get("registry", {})
+        registry_query = urllib.parse.parse_qs(
+            urllib.parse.urlsplit(str(registry.get("evidence_url", ""))).query
+        ).get("search")
+        if (
+            not isinstance(registry_query, list)
+            or len(registry_query) != 1
+            or hashlib.sha256(registry_query[0].encode("utf-8")).hexdigest()
+            != search["query_digest"]
+        ):
+            raise EvolutionError("stored evolution search is invalid")
+        probe_query = registry_query[0]
     query_probe = {
         "schema": search["schema"],
-        "query": "stored-search",
+        "query": probe_query,
         "installed_catalog": installed,
         "sources_consulted": search["sources_consulted"],
         "candidates": candidates,
@@ -4271,6 +4333,8 @@ def record_search(
             raise EvolutionError("Evolution Search requires a selected candidate")
         if candidate is not None:
             run["source_verification"] = _verify_pinned_candidate(candidate, search)
+        elif search["schema"] == "harness.evolution-search/v2":
+            _verify_search_channels(search, None)
         if search["decision"] == "deferred":
             run["state"] = "deferred"
             run["outcome"] = "deferred"
@@ -4369,7 +4433,12 @@ def ensure_evolution_acceptance(
             and run["candidate"] is None
             and run["source_verification"] is None
         )
-        if not zero_candidate_build and (
+        if (
+            zero_candidate_build
+            and run["search"]["schema"] == "harness.evolution-search/v2"
+        ):
+            _verify_search_channels(run["search"], None)
+        elif not zero_candidate_build and (
             run["candidate"] is None
             or _verify_pinned_candidate(run["candidate"], run["search"])
             != run["source_verification"]

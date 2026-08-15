@@ -196,16 +196,16 @@ class PaseoCollaborationError(Exception):
 def _resolve_paseo_cli() -> Path:
     """Resolve the installed Paseo CLI launcher.
 
-    On Windows the launcher is ``paseo.cmd``; ``shutil.which`` is the single
-    resolution path — no hard-coded machine paths.
+    Resolve only the platform-native launcher through ``shutil.which``; no
+    hard-coded machine paths or cross-platform command shims are executed.
     """
-    candidates = ["paseo.cmd", "paseo"]
+    candidates = ["paseo.cmd", "paseo"] if os.name == "nt" else ["paseo"]
     for name in candidates:
         resolved = shutil.which(name)
         if resolved is not None:
             return Path(resolved)
     raise PaseoCollaborationError(
-        "paseo_cli_unavailable: paseo.cmd not found on PATH"
+        "paseo_cli_unavailable: native launcher not found on PATH"
     )
 
 

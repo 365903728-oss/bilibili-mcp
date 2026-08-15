@@ -13,9 +13,10 @@ is #30 `cbd31b952aa9f820005e60852bcd2d4db886a31c` → #31
 because Issue-close and remote-write authority were not granted.
 
 Issue #36, `Three-adapter conformance, real pilots, and migration acceptance`,
-is active on branch `codex/harness-v2-three-adapter-conformance-36` from the
-exact accepted #35 commit. The user selected `codex-direct` once; that mode is
-frozen and Codex holds the only active implementation writer lease. The shared
+was accepted and pushed on branch
+`codex/harness-v2-three-adapter-conformance-36`; PR #39 is the current
+integration gate. Its review repairs continue in `codex-direct` from exact
+pushed PR heads, with one writer lease per bounded round. The shared
 conformance fixture now names all three public modes against one typed contract
 and `RULES.md` kernel, while the shared Hook-event projection carries explicit
 provenance, metadata sensitivity, a full digest, and active/stopped terminal
@@ -25,9 +26,10 @@ each. After explicit user authority for one `paseo start`, the third real pilot
 used Paseo 0.3.1 with `claude/deepseek-v4-flash`, created only `pilot.txt`, and
 was accepted as commit `27fba0dce64fb591a30f0651979940089c667fb0` with a
 released Claude lease and zero remote effects. No restart, adapter switch, or
-fallback occurred. Migration/index, package exclusion, secret/diff, and dirty
-primary isolation gates are green. Harness acceptance and the single #36-owned
-local commit are the remaining active steps.
+fallback occurred. Migration/index, package exclusion, secret/diff, and dirty-
+primary isolation gates are green. Current PR review repairs preserve those
+accepted boundaries while adding cross-platform and trust-boundary regressions
+only.
 
 The first main acceptance run stopped in a Recovery Bundle because its frozen
 owned path `harness/` overlapped immutable governed-Evolution roots. No kernel,

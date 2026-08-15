@@ -580,8 +580,9 @@ class CliAndAdapterTests(unittest.TestCase):
         expected_repairs = {
             "harness/cli.py": "pr-39-mcp-session-lifetime",
             "harness/contracts.py": "pr-39-canonical-task-source",
-            "harness/evolution.py": "pr-39-zero-candidate-local-build",
+            "harness/evolution.py": "pr-39-verified-zero-candidate-channels",
             "harness/memory.py": "pr-39-recoverable-memory-transaction",
+            "harness/paseo_collaboration.py": "pr-39-posix-native-paseo-resolution",
             "harness/safe_io.py": "pr-39-verified-jsonl-descriptor",
         }
         exact_keys(review_repairs, set(expected_repairs))

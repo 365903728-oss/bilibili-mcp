@@ -2237,3 +2237,43 @@ Six release blockers fixed; one regression proof per root cause (new tests
   migration, durable-memory, repair-hash, and diff checks all passed. Full
   Harness and npm suites were intentionally not repeated because this bounded
   repair did not touch product or package code.
+
+## 2026-08-15 — PR #39 automated-review round-4 pre-acceptance
+
+- Baseline/mode: the isolated worktree was clean at pushed PR HEAD
+  `1f638b5085568e1c87e46057df915f2ba53c348a`; `codex-direct` acquired the
+  only writer lease. The dirty primary checkout remained isolated with 58
+  status rows.
+- Red evidence: a V2 zero-candidate Search with a forged channel digest entered
+  `build-ready`; the POSIX Paseo process-boundary test returned preflight exit
+  1 because no executable native launcher existed; and the forged-receipt test
+  failed only on POSIX because checkout line endings changed its failure path.
+- Focused green: the V1 and V2 zero-candidate paths plus forged-receipt
+  rejection passed 3/3 on Windows in 89.680s. WSL passed the POSIX launcher,
+  V2 zero-result verification, and forged-receipt rejection 3/3 in 13.364s.
+- Risk-weighted final verification: six Evolution checks covering authentic
+  and forged channel results, V1 and V2 zero-candidate Build, all three adapter
+  projections, and receipt rejection passed 6/6 in 323.104s. Four POSIX Paseo
+  process-boundary checks passed 4/4 in 3.224s.
+- Independent review reproduced two P1 end-to-end gaps: allowed-host but
+  unrelated no-match URLs could still reach an accepted zero-candidate Build,
+  and WSL selected a later Windows `paseo.cmd` before the native disposable
+  launcher. A red URL/query/path regression reproduced the first 1/1.
+- The initial round-4 contract omitted the shared Paseo resolver. It entered a
+  Recovery Bundle with fingerprint
+  `cedc3edc5b54bf15ad3eb3b04133fc11186487dfe3ec255c52ebe5beb24b7f83`;
+  a reversible local stash transferred the identical ten-file diff to the
+  same-base, same-mode continuation with the resolver explicitly owned.
+- Recovery green: the full forged-coordinate Search→Build→Evaluate→Accept
+  regression passed 1/1 in 57.435s. WSL with its ordinary inherited PATH now
+  resolves the native stub and passes 1/1 in 1.563s; candidate and zero-result
+  channel checks passed 3/3 on Windows in 84.995s and 2/2 on WSL in 9.876s.
+- Re-review found that a version-scoped npm 404 proved only a missing version,
+  not a missing package. The isolated red regression reached `build-ready`;
+  zero-candidate npm evidence now requires the exact unversioned query path.
+  The end-to-end zero-result test plus both candidate channel tests pass 3/3 in
+  97.449s, and ordinary-path WSL Paseo remains green 1/1 in 0.838s.
+- Independent final re-review: PASS with no remaining P0-P3. It confirmed the
+  exact unversioned npm path, unchanged candidate name/version binding, legal
+  end-to-end acceptance, migration hashes, package exclusion, diff cleanliness,
+  product isolation, and zero remote effects.

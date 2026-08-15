@@ -533,3 +533,18 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   same accepted envelope run normally. A marker cannot authorize partial or
   extra records. An uncommitted prior pair fails closed for explicit recovery;
   startup does not gain write authority.
+
+## PR #39 review round-4 controls
+
+- A V2 zero-candidate Build still re-fetches all four bounded HTTPS channel
+  responses, verifies their recorded digests and byte counts, and derives each
+  `no-match` result from the response. All records must share one Git source,
+  the official/live URLs must bind its immutable revision and artifact, and the
+  Registry query plus exact unversioned package path must bind the original
+  query digest. A version-scoped 404 is insufficient zero-result evidence.
+- The same zero-result channel evidence is replayed before Direct acceptance;
+  stale or invented channel records cannot promote a repository-local Build.
+- Paseo resolves `.cmd` only on Windows and `paseo` only on POSIX; WSL cannot
+  select a Windows shim later on PATH ahead of the disposable native launcher.
+  Forged accepted-memory receipts are written as canonical bytes and rejected
+  before they can authorize governed Evolution.

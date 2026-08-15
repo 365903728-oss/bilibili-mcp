@@ -533,3 +533,17 @@
   independent trusted source. Restore the internally consistent pair committed
   at Git `HEAD`, then run the same accepted envelope normally; if no exact
   trusted baseline exists, fail closed for explicit recovery.
+
+## 2026-08-15 — PR #39 automated-review round 4
+
+- Lesson: A zero-candidate Build removes candidate-specific pinning, not Search
+  evidence authentication. Bind repository/revision/artifact, Registry query,
+  and the exact unversioned package coordinate before re-fetching every V2
+  channel; a missing version does not prove a missing package. Replay the same
+  check at acceptance.
+- Lesson: Process-boundary test launchers must be native to the executing OS.
+  Emit a batch launcher on Windows and an executable shell launcher on POSIX,
+  and resolve only the native launcher so WSL cannot select a Windows shim.
+- Lesson: Trust-boundary fixtures must fail for the intended reason on every
+  platform. Write canonical bytes and corrupt only the receipt authority being
+  tested so checkout line endings cannot provide a false green.

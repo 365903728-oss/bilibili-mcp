@@ -3168,9 +3168,18 @@ elif cmd == "send":
 else:
     _r(args); print(json.dumps({{}}))
 ''', encoding="utf-8")
-        (fake_dir / "paseo.cmd").write_text(
-            f'@"{sys.executable}" "%~dp0_paseo_fake.py" %*', encoding="ascii",
-        )
+        if os.name == "nt":
+            (fake_dir / "paseo.cmd").write_text(
+                f'@"{sys.executable}" "%~dp0_paseo_fake.py" %*', encoding="ascii",
+            )
+        else:
+            launcher = fake_dir / "paseo"
+            launcher.write_text(
+                "#!/bin/sh\n"
+                f'exec "{sys.executable}" "$(dirname "$0")/_paseo_fake.py" "$@"\n',
+                encoding="utf-8",
+            )
+            launcher.chmod(0o755)
 
     def test_slice3_inspect_fail_closed_on_missing_field(self) -> None:
         """Red tracer: bootstrap must enter recovery when inspect omits a
@@ -3216,7 +3225,7 @@ else:
         self.assertNotEqual(result.returncode, 0,
                             "bootstrap must fail when inspect omits Model")
         self.assertEqual(result.returncode, 6,
-                         "omitted inspect field must enter recovery (exit 6)")
+                         result.stderr or result.stdout)
 
         stdout = json.loads(result.stdout)
         self.assertEqual(stdout.get("state"), "recovery-required")
