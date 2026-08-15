@@ -573,6 +573,16 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         import harness.paseo_collaboration as collaboration
 
         prompt_path = self.repo / ".harness" / "runtime" / "dispatch-prompt.txt"
+        if os.name != "nt":
+            descriptor = collaboration._write_ephemeral_prompt(
+                self._ctx(), prompt_path, "sensitive raw handoff"
+            )
+            self.assertFalse(prompt_path.exists())
+            collaboration._unlink_ephemeral_prompt(
+                self._ctx(), prompt_path, descriptor
+            )
+            return
+
         outside = self.root / "linked-after-create.txt"
         real_write = os.write
 
@@ -649,6 +659,38 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
 
         self.assertEqual(run.call_args.args[3], "/dev/fd/123")
         self.assertEqual(run.call_args.kwargs["pass_fds"], (123,))
+
+    def test_verified_prompt_source_cannot_be_overwritten(self) -> None:
+        import harness.paseo_collaboration as collaboration
+
+        prompt_path = self.repo / ".harness" / "runtime" / "sealed-prompt.txt"
+        descriptor = collaboration._write_ephemeral_prompt(
+            self._ctx(), prompt_path, "verified prompt"
+        )
+
+        def _read_delivered_prompt(*args, **_kwargs):
+            if prompt_path.exists():
+                try:
+                    prompt_path.write_text("modified prompt", encoding="utf-8")
+                except PermissionError:
+                    pass
+            self.assertEqual(
+                Path(args[3]).read_text(encoding="utf-8"), "verified prompt"
+            )
+            return _make_send_result()
+
+        try:
+            with patch(
+                "harness.paseo_collaboration._run_paseo_cli",
+                side_effect=_read_delivered_prompt,
+            ):
+                collaboration._send_verified_prompt(
+                    "agent-test-uuid", prompt_path, descriptor
+                )
+        finally:
+            collaboration._unlink_ephemeral_prompt(
+                self._ctx(), prompt_path, descriptor
+            )
 
     def test_dispatch_rejects_oversized_handoff(self) -> None:
         from harness.paseo_collaboration import (
@@ -2045,11 +2087,19 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
                 raise OSError("injected cleanup failure")
             return _real_unlink(self, *args, **kwargs)
 
-        # (a) dispatch: unlink failure on dispatch-prompt.txt is fail-closed.
+        def _cleanup_failure(fail_unlink):
+            if os.name == "nt":
+                return patch("pathlib.Path.unlink", new=fail_unlink)
+            return patch(
+                "harness.paseo_collaboration.os.ftruncate",
+                side_effect=OSError("injected cleanup failure"),
+            )
+
+        # (a) dispatch: platform-native cleanup failure is fail-closed.
         with patch(
             "harness.paseo_collaboration._run_paseo_cli",
             side_effect=_paseo_cli_side_effect(str(self.repo)),
-        ), patch("pathlib.Path.unlink", new=_fail_dispatch_prompt):
+        ), _cleanup_failure(_fail_dispatch_prompt):
             with self.assertRaises(PaseoCollaborationError) as cm:
                 paseo_dispatch(ctx, "github-32", handoff)
         self.assertIn("prompt_cleanup_failed", str(cm.exception))
@@ -2061,7 +2111,8 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         # Controlled test-only reset: clear the prepared intent so a normal
         # retry can obtain launch evidence.
         pending_path.unlink()
-        prompt_path.unlink()
+        if prompt_path.exists():
+            prompt_path.unlink()
         with patch(
             "harness.paseo_collaboration._run_paseo_cli",
             side_effect=_paseo_cli_side_effect(str(self.repo)),
@@ -2089,7 +2140,7 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         with patch(
             "harness.paseo_collaboration._run_paseo_cli",
             side_effect=_paseo_cli_side_effect(str(self.repo)),
-        ), patch("pathlib.Path.unlink", new=_fail_repair_prompt):
+        ), _cleanup_failure(_fail_repair_prompt):
             with self.assertRaises(PaseoCollaborationError) as cm:
                 paseo_repair(ctx, "github-32", review_file)
         self.assertIn("prompt_cleanup_failed", str(cm.exception))

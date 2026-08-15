@@ -14,6 +14,7 @@ import os
 import shutil
 import stat
 import subprocess
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -111,6 +112,15 @@ def _prompt_identity_matches(
 ) -> bool:
     try:
         opened = os.fstat(descriptor)
+    except OSError:
+        return False
+    if os.name != "nt":
+        return (
+            stat.S_ISREG(opened.st_mode)
+            and opened.st_nlink == 0
+            and (expected_size is None or opened.st_size == expected_size)
+        )
+    try:
         current = os.stat(prompt_path, follow_symlinks=False)
     except OSError:
         return False
@@ -120,6 +130,56 @@ def _prompt_identity_matches(
         and (opened.st_dev, opened.st_ino) == (current.st_dev, current.st_ino)
         and (expected_size is None or opened.st_size == expected_size)
     )
+
+
+def _open_private_prompt(prompt_path: Path) -> int:
+    if os.name != "nt":
+        try:
+            os.lstat(prompt_path)
+        except FileNotFoundError:
+            pass
+        else:
+            raise FileExistsError(prompt_path)
+        with tempfile.TemporaryFile(dir=prompt_path.parent) as private:
+            return os.dup(private.fileno())
+
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = (
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    )
+    create_file.restype = wintypes.HANDLE
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = (wintypes.HANDLE,)
+    close_handle.restype = wintypes.BOOL
+    handle = create_file(
+        str(prompt_path),
+        0xC0000000,  # GENERIC_READ | GENERIC_WRITE
+        0x00000001,  # FILE_SHARE_READ
+        None,
+        1,  # CREATE_NEW
+        0x00000100,  # FILE_ATTRIBUTE_TEMPORARY
+        None,
+    )
+    if handle == wintypes.HANDLE(-1).value:
+        raise OSError(ctypes.get_last_error(), "private prompt creation failed")
+    try:
+        return msvcrt.open_osfhandle(
+            handle, os.O_RDWR | getattr(os, "O_BINARY", 0)
+        )
+    except OSError:
+        close_handle(handle)
+        raise
 
 
 def _unlink_ephemeral_prompt(
@@ -142,6 +202,8 @@ def _unlink_ephemeral_prompt(
             ) from exc
         finally:
             os.close(descriptor)
+        if os.name != "nt":
+            return
     try:
         ensure_no_link_components(context.root, prompt_path)
         current = prompt_path.stat(follow_symlinks=False)
@@ -169,9 +231,7 @@ def _write_ephemeral_prompt(
     prompt_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         ensure_no_link_components(context.root, prompt_path)
-        flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
-        flags |= getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(prompt_path, flags, 0o600)
+        descriptor = _open_private_prompt(prompt_path)
     except (OSError, ValueError) as exc:
         raise PaseoCollaborationError(
             f"ephemeral_prompt_unavailable: {prompt_path.name}"
@@ -224,8 +284,8 @@ def _send_verified_prompt(
     prompt_source = str(prompt_path)
     pass_fds: tuple[int, ...] = ()
     if os.name != "nt":
-        # POSIX Paseo reads the inherited verified inode, not a swappable path.
-        # Windows keeps the source handle open, which denies path replacement.
+        # POSIX Paseo reads an anonymous inherited file. Windows keeps the
+        # private source handle open, denying writes and path replacement.
         os.lseek(descriptor, 0, os.SEEK_SET)
         prompt_source = f"/dev/fd/{descriptor}"
         pass_fds = (descriptor,)
