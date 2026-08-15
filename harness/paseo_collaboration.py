@@ -348,16 +348,14 @@ def _resolve_provider(prefs: dict[str, Any], override: str | None) -> tuple[str,
             parts = override.split("/", 1)
             return parts[0], parts[1]
         return override, ""
-    impl = (
-        prefs.get("providers", {})
-        .get("impl", "")
-    )
-    if not impl or "/" not in impl:
+    providers = prefs.get("providers")
+    impl = providers.get("impl") if isinstance(providers, dict) else None
+    parts = impl.split("/", 1) if isinstance(impl, str) else []
+    if len(parts) != 2 or not all(parts):
         raise PaseoCollaborationError(
             "provider_not_resolved: set providers.impl in "
             "~/.paseo/orchestration-preferences.json or pass --provider"
         )
-    parts = impl.split("/", 1)
     return parts[0], parts[1]
 
 

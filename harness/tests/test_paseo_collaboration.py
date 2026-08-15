@@ -292,6 +292,22 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         self.assertEqual(result["model"], "deepseek-v4-flash")
         self.assertEqual(result["source"], "explicit-override")
 
+    def test_preflight_malformed_provider_preferences_fail_closed(self) -> None:
+        from harness.paseo_collaboration import paseo_preflight
+
+        malformed = (None, [], "claude/deepseek-v4-flash", {"impl": None})
+        for providers in malformed:
+            with self.subTest(providers=providers), patch(
+                "harness.paseo_collaboration._read_orchestration_prefs",
+                return_value={"providers": providers},
+            ), patch(
+                "harness.paseo_collaboration._run_paseo_cli",
+                side_effect=_paseo_cli_side_effect(str(self.repo)),
+            ):
+                result = paseo_preflight(self._ctx())
+                self.assertFalse(result["available"])
+                self.assertIn("provider_not_resolved", result["error"])
+
     def test_preflight_daemon_not_running(self) -> None:
         from harness.paseo_collaboration import paseo_preflight
 
