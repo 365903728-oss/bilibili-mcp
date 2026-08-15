@@ -65,6 +65,14 @@ SURFACE_ADAPTERS = [
     "claude-direct",
     "codex-paseo-claude",
 ]
+MCP_LATEST_PROTOCOL_VERSION = "2025-11-25"
+MCP_SUPPORTED_PROTOCOL_VERSIONS = (
+    MCP_LATEST_PROTOCOL_VERSION,
+    "2025-06-18",
+    "2025-03-26",
+    "2024-11-05",
+    "2024-10-07",
+)
 SEARCH_CHANNELS = ["official", "registry", "package-manager", "live-github"]
 SEARCH_CHANNEL_HOSTS = {
     "official": {"raw.githubusercontent.com"},
@@ -2170,12 +2178,18 @@ def mcp_surface_message(
                         _bounded_string(size, "MCP client icon size", 32)
                 if "theme" in icon and icon["theme"] not in {"light", "dark"}:
                     raise EvolutionError("MCP client icon theme is invalid")
-        if initialize["protocolVersion"] != "2025-11-25" or not isinstance(
-            initialize["capabilities"], dict
-        ):
+        requested_protocol = _bounded_string(
+            initialize["protocolVersion"], "MCP protocol version", 64
+        )
+        if not isinstance(initialize["capabilities"], dict):
             raise EvolutionError("MCP initialize params are unsupported")
+        protocol_version = (
+            requested_protocol
+            if requested_protocol in MCP_SUPPORTED_PROTOCOL_VERSIONS
+            else MCP_LATEST_PROTOCOL_VERSION
+        )
         result = {
-            "protocolVersion": "2025-11-25",
+            "protocolVersion": protocol_version,
             "capabilities": {"tools": {"listChanged": False}},
             "serverInfo": {"name": canonical["name"], "version": canonical["version"]},
         }
@@ -2306,7 +2320,7 @@ def smoke_surface_capability(
                 "id": 1,
                 "method": "initialize",
                 "params": {
-                    "protocolVersion": "2025-11-25",
+                    "protocolVersion": MCP_LATEST_PROTOCOL_VERSION,
                     "capabilities": {},
                     "clientInfo": {"name": "harness-smoke", "version": "1"},
                 },
@@ -2344,7 +2358,7 @@ def smoke_surface_capability(
             ),
         }
         observations = {
-            "protocol_version": "2025-11-25",
+            "protocol_version": MCP_LATEST_PROTOCOL_VERSION,
             "methods": {
                 method: _digest(response)
                 for method, response in responses.items()

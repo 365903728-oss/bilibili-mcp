@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from harness.evolution import (
     EvolutionError,
@@ -782,6 +783,51 @@ raise SystemExit(main())
                 paths["report"],
             ]
         )
+
+    def test_mcp_initialize_negotiates_supported_protocol_versions(self) -> None:
+        from harness.evolution import mcp_surface_message
+
+        canonical = {
+            "name": "safe-build-fixture",
+            "version": "1.0.0",
+            "surface": {"kind": "mcp"},
+        }
+        versions = (
+            "2025-11-25",
+            "2025-06-18",
+            "2025-03-26",
+            "2024-11-05",
+            "2024-10-07",
+            "unsupported-version",
+        )
+        with patch(
+            "harness.evolution.discover_surface_capabilities",
+            return_value={"capabilities": [{"name": canonical["name"]}]},
+        ), patch("harness.evolution._surface_canonical", return_value=canonical):
+            for requested in versions:
+                with self.subTest(requested=requested):
+                    response = mcp_surface_message(
+                        object(),
+                        name=canonical["name"],
+                        adapter="codex-direct",
+                        value={
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "initialize",
+                            "params": {
+                                "protocolVersion": requested,
+                                "capabilities": {},
+                                "clientInfo": {"name": "test", "version": "1"},
+                            },
+                        },
+                    )
+                    self.assertIsNotNone(response)
+                    self.assertEqual(
+                        response["result"]["protocolVersion"],
+                        requested
+                        if requested != "unsupported-version"
+                        else "2025-11-25",
+                    )
 
     def test_start_rejects_a_gap_that_is_not_in_accepted_current_memory(self) -> None:
         request = self.request()
@@ -2275,7 +2321,7 @@ raise SystemExit(main())
                             "id": 1,
                             "method": "initialize",
                             "params": {
-                                "protocolVersion": "2025-11-25",
+                                "protocolVersion": "2025-03-26",
                                 "capabilities": {},
                                 "clientInfo": {
                                     "name": "harness-test",
@@ -2335,6 +2381,9 @@ raise SystemExit(main())
                     ]
                     self.assertEqual(
                         [item["id"] for item in responses], [1, 2, 3, 4]
+                    )
+                    self.assertEqual(
+                        responses[0]["result"]["protocolVersion"], "2025-03-26"
                     )
                     self.assertEqual(responses[1]["result"], {})
                     self.assertEqual(
