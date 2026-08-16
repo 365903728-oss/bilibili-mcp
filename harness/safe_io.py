@@ -501,7 +501,6 @@ def _atomic_write_bytes(path: Path, content: bytes, *, mode: int = 0o600) -> Non
                 with os.fdopen(descriptor, "wb") as handle:
                     handle.write(content)
                     handle.flush()
-                    os.fchmod(handle.fileno(), mode)
                     os.fsync(handle.fileno())
                 os.replace(temporary_name, path)
             finally:

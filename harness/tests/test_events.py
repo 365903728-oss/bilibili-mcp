@@ -335,6 +335,19 @@ class HookEventTests(unittest.TestCase):
                 list(range(24)),
             )
 
+    @unittest.skipUnless(os.name == "nt", "Windows compatibility regression")
+    def test_atomic_writes_do_not_require_windows_fchmod(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "state.txt"
+            with patch.object(
+                os,
+                "fchmod",
+                create=True,
+                side_effect=AttributeError("fchmod is unavailable"),
+            ):
+                write_bounded_text(target, "trusted\n", 1024)
+            self.assertEqual(target.read_text(encoding="utf-8"), "trusted\n")
+
     @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
     def test_atomic_writers_fail_closed_when_parent_path_is_replaced(self) -> None:
         for name, writer in (

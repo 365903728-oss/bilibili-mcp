@@ -30,7 +30,7 @@
       },
       "harness/safe_io.py": {
         "finding": "pr-39-verified-jsonl-descriptor",
-        "sha256": "77e5baa9999ca651084e56cad890c26d3fef9dcfcc1359ffd822d248f2daf8e7"
+        "sha256": "eb186dd9364b9c9473954b7af0583fd1d254c189f2be6bc7f90e3a3035a7786b"
       }
     }
   },
