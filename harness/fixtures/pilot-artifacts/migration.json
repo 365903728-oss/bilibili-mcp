@@ -18,7 +18,7 @@
       },
       "harness/evolution.py": {
         "finding": "pr-39-verified-zero-candidate-channels",
-        "sha256": "f46d1209b861c21c0704f9fea38247435a2195c5565cf9faadcfeda4592897e0"
+        "sha256": "1db2ce9d37ecf712ef4b82aa11e540f62485652f2960341f7726868a3c116be0"
       },
       "harness/memory.py": {
         "finding": "pr-39-recoverable-memory-transaction",
@@ -26,11 +26,11 @@
       },
       "harness/paseo_collaboration.py": {
         "finding": "pr-39-private-ephemeral-prompt-files",
-        "sha256": "80cd36429b99975064103526d753164e285d13f1a63924f143d1ac4e5a2b92e2"
+        "sha256": "a39644f70d038d215d4d053ece5d4f871c73811aa677f0d1a39b92157f67f11b"
       },
       "harness/safe_io.py": {
         "finding": "pr-39-verified-jsonl-descriptor",
-        "sha256": "3c353f21987e17878d4ae9d46895f0eb9e028f56ceed37c3fb506258d865d5e0"
+        "sha256": "77e5baa9999ca651084e56cad890c26d3fef9dcfcc1359ffd822d248f2daf8e7"
       }
     }
   },

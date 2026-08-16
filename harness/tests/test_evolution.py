@@ -829,6 +829,31 @@ raise SystemExit(main())
                         else "2025-11-25",
                     )
 
+    def test_mcp_cancellation_notification_is_ignored(self) -> None:
+        from harness.evolution import mcp_surface_message
+
+        canonical = {
+            "name": "safe-build-fixture",
+            "version": "1.0.0",
+            "surface": {"kind": "mcp"},
+        }
+        with patch(
+            "harness.evolution.discover_surface_capabilities",
+            return_value={"capabilities": [{"name": canonical["name"]}]},
+        ), patch("harness.evolution._surface_canonical", return_value=canonical):
+            self.assertIsNone(
+                mcp_surface_message(
+                    object(),
+                    name=canonical["name"],
+                    adapter="codex-direct",
+                    value={
+                        "jsonrpc": "2.0",
+                        "method": "notifications/cancelled",
+                        "params": {"requestId": 7, "reason": "user cancelled"},
+                    },
+                )
+            )
+
     def test_start_rejects_a_gap_that_is_not_in_accepted_current_memory(self) -> None:
         request = self.request()
 

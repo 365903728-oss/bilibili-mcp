@@ -8,7 +8,6 @@ import os
 import re
 import shutil
 import stat
-import tempfile
 import tomllib
 import urllib.error
 import urllib.parse
@@ -38,6 +37,9 @@ from harness.memory import (
     startup_memory,
 )
 from harness.safe_io import (
+    _atomic_write_bytes,
+    _rmdir_nofollow,
+    _unlink_nofollow,
     bounded_file_lock,
     ensure_no_link_components,
     read_bounded_bytes,
@@ -2107,16 +2109,22 @@ def mcp_surface_message(
         raise EvolutionError("surface capability is not an MCP server")
     if not isinstance(value, dict) or value.get("jsonrpc") != "2.0":
         raise EvolutionError("MCP message is invalid")
-    method = value.get("method")
-    if method in ("notifications/initialized", "tools/list", "ping"):
+    if "id" not in value:
         value = {"params": {}, **value}
-    if method == "notifications/initialized":
         notification = _exact(
-            value, {"jsonrpc", "method", "params"}, "MCP initialized notification"
+            value, {"jsonrpc", "method", "params"}, "MCP notification"
         )
-        if notification["params"] != {}:
-            raise EvolutionError("MCP initialized notification is invalid")
+        method = _nonempty(notification["method"], "MCP notification method", 128)
+        if not method.startswith("notifications/") or not isinstance(
+            notification["params"], dict
+        ) or (
+            method == "notifications/initialized" and notification["params"] != {}
+        ):
+            raise EvolutionError("MCP notification is invalid")
         return None
+    method = value.get("method")
+    if method in ("tools/list", "ping"):
+        value = {"params": {}, **value}
     request = _exact(value, {"jsonrpc", "id", "method", "params"}, "MCP request")
     request_id = request["id"]
     if (
@@ -2450,7 +2458,7 @@ def smoke_surface_capability(
                 ensure_no_link_components(context.root, path)
                 if snapshot is None:
                     if path.is_file() and not path.is_symlink():
-                        path.unlink()
+                        _unlink_nofollow(path)
                 else:
                     write_bounded_text(
                         path, snapshot.decode("utf-8", errors="strict"), 256 * 1024
@@ -3569,20 +3577,7 @@ def _assert_frozen_baseline(context: WorktreeContext, run: dict[str, Any]) -> No
 
 
 def _write_bytes(path: Path, content: bytes, mode: int) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.chmod(temporary, mode)
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    _atomic_write_bytes(path, content, mode=mode)
 
 
 def _clear_managed_files(context: WorktreeContext, run: dict[str, Any]) -> None:
@@ -3612,25 +3607,33 @@ def _clear_managed_files(context: WorktreeContext, run: dict[str, Any]) -> None:
                 "evolution rollback found drifted capability files"
             )
     for path in sorted(actual.values(), key=lambda item: len(item.parts), reverse=True):
-        path.unlink()
+        _unlink_nofollow(path)
     paths = _capability_paths(run["task_id"], run["capability_name"])
-    for raw_root in (paths["package"], paths["codex_skill"], paths["claude_skill"]):
-        root = context.root / raw_root
-        if root.exists():
-            directories = sorted(
-                (path for path in root.rglob("*") if path.is_dir()),
-                key=lambda item: len(item.parts),
-                reverse=True,
-            )
-            for directory in directories:
-                try:
-                    directory.rmdir()
-                except OSError:
-                    pass
-            try:
-                root.rmdir()
-            except OSError:
-                pass
+    roots = [
+        context.root / paths[key]
+        for key in ("package", "codex_skill", "claude_skill")
+    ]
+    directories = set(roots)
+    for path in actual.values():
+        for root in roots:
+            if path.is_relative_to(root):
+                directories.update(path.parents[: len(path.parents) - len(root.parents)])
+                break
+    protected_directories: set[Path] = set()
+    for relative in baseline:
+        path = context.root / relative
+        for root in roots:
+            if path.is_relative_to(root):
+                protected_directories.update(
+                    path.parents[: len(path.parents) - len(root.parents)]
+                )
+                break
+    directories -= protected_directories
+    for directory in sorted(directories, key=lambda item: len(item.parts), reverse=True):
+        try:
+            _rmdir_nofollow(directory)
+        except OSError:
+            pass
 
 
 def _rollback_outputs(context: WorktreeContext, run: dict[str, Any]) -> None:

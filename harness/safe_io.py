@@ -479,7 +479,19 @@ def _unlink_nofollow(path: Path, *, missing_ok: bool = False) -> None:
         os.close(parent_descriptor)
 
 
-def _atomic_write_bytes(path: Path, content: bytes) -> None:
+def _rmdir_nofollow(path: Path) -> None:
+    if os.name == "nt":
+        with _hold_windows_directory_chain(path.parent):
+            os.rmdir(path)
+        return
+    parent_descriptor = _open_directory_nofollow(path.parent)
+    try:
+        os.rmdir(path.name, dir_fd=parent_descriptor)
+    finally:
+        os.close(parent_descriptor)
+
+
+def _atomic_write_bytes(path: Path, content: bytes, *, mode: int = 0o600) -> None:
     if os.name == "nt":
         with _hold_windows_directory_chain(path.parent):
             descriptor, temporary_name = tempfile.mkstemp(
@@ -489,6 +501,7 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
                 with os.fdopen(descriptor, "wb") as handle:
                     handle.write(content)
                     handle.flush()
+                    os.fchmod(handle.fileno(), mode)
                     os.fsync(handle.fileno())
                 os.replace(temporary_name, path)
             finally:
@@ -524,13 +537,14 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
         descriptor = os.open(
             temporary_name,
             temporary_flags,
-            0o600,
+            mode,
             dir_fd=parent_descriptor,
         )
         temporary_created = True
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(content)
             handle.flush()
+            os.fchmod(handle.fileno(), mode)
             os.fsync(handle.fileno())
         if not parent_is_current():
             raise ValueError("atomic write parent changed during write")

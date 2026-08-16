@@ -97,6 +97,49 @@ class CliAndAdapterTests(unittest.TestCase):
         responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
         self.assertEqual([item["id"] for item in responses], [1, *range(2, 35)])
 
+    def test_capability_serve_rejects_initialize_as_a_notification(self) -> None:
+        stdin = io.TextIOWrapper(
+            io.BytesIO(b'{"jsonrpc":"2.0","method":"initialize","params":{}}\n')
+        )
+        stdout = io.StringIO()
+        canonical = {
+            "name": "safe-build-fixture",
+            "version": "1.0.0",
+            "surface": {"kind": "mcp"},
+        }
+        context = WorktreeContext(
+            root=ROOT,
+            git_dir=ROOT / ".git",
+            common_git_dir=ROOT / ".git",
+            head_sha="0" * 40,
+            worktree_id="wt-test",
+            repository_id="repo-test",
+        )
+
+        with patch("sys.stdin", stdin), patch(
+            "harness.cli.discover_worktree", return_value=context
+        ), patch(
+            "harness.evolution.discover_surface_capabilities",
+            return_value={"capabilities": [{"name": canonical["name"]}]},
+        ), patch(
+            "harness.evolution._surface_canonical", return_value=canonical
+        ), redirect_stdout(stdout):
+            status = main(
+                [
+                    "capability",
+                    "serve",
+                    "--cwd",
+                    str(ROOT),
+                    "--name",
+                    canonical["name"],
+                    "--adapter",
+                    "codex-direct",
+                ]
+            )
+
+        self.assertEqual(status, 2)
+        self.assertIn("MCP notification is invalid", stdout.getvalue())
+
     def test_three_adapter_conformance_uses_one_contract_and_kernel(self) -> None:
         fixture = json.loads(
             (

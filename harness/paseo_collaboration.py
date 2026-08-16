@@ -63,6 +63,7 @@ from harness.codex_direct import (
 )
 from harness.capabilities import check_manual_skill
 from harness.contracts import ContractError, validate_task_contract
+from harness.safe_io import _unlink_nofollow
 
 COLLAB_GUARD_ACTIONS = GUARDED_ACTIONS | {"stage", "review", "verify", "explore", "accept"}
 from harness.context import WorktreeContext
@@ -1401,7 +1402,7 @@ def paseo_dispatch(
 
         # --- at-most-once: persist launch BEFORE deleting pending ---
         _write_json(context, launch_path, launch)
-        pending_path.unlink(missing_ok=True)
+        _unlink_nofollow(pending_path, missing_ok=True)
         return launch
 
 
@@ -1984,7 +1985,7 @@ def paseo_repair(
             "dispatched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
         _write_json(context, repair_dispatch_path, dispatch_evidence)
-        repair_pending_path.unlink(missing_ok=True)
+        _unlink_nofollow(repair_pending_path, missing_ok=True)
 
         return control, ec
 
