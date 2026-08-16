@@ -2113,6 +2113,29 @@ def _bounded_mcp_object(
     return value
 
 
+def _bounded_mcp_metadata(value: Any, label: str) -> dict[str, Any]:
+    metadata = _bounded_mcp_object(value, label)
+    if "progressToken" in metadata:
+        token = metadata["progressToken"]
+        if isinstance(token, str):
+            _bounded_string(token, "MCP progress token", 128)
+        elif (
+            not isinstance(token, int)
+            or isinstance(token, bool)
+            or abs(token) > 2**53 - 1
+        ):
+            raise EvolutionError("MCP progress token is invalid")
+    if "io.modelcontextprotocol/related-task" in metadata:
+        related = _bounded_mcp_object(
+            metadata["io.modelcontextprotocol/related-task"],
+            "MCP related task metadata",
+        )
+        if "taskId" not in related:
+            raise EvolutionError("MCP related task metadata is invalid")
+        _bounded_string(related["taskId"], "MCP related task id", 128)
+    return metadata
+
+
 def mcp_surface_message(
     context: WorktreeContext,
     *,
@@ -2142,7 +2165,7 @@ def mcp_surface_message(
             max_bytes=64 * 1024,
         )
         if "_meta" in params:
-            _bounded_mcp_object(params["_meta"], "MCP notification metadata")
+            _bounded_mcp_metadata(params["_meta"], "MCP notification metadata")
         if not method.startswith("notifications/"):
             raise EvolutionError("MCP notification is invalid")
         return None
@@ -2157,16 +2180,21 @@ def mcp_surface_message(
     ):
         raise EvolutionError("MCP request id is invalid")
     params = request["params"]
+    if not isinstance(params, dict):
+        raise EvolutionError("MCP request params are invalid")
+    if "_meta" in params:
+        _bounded_mcp_metadata(params["_meta"], "MCP request metadata")
     if method == "ping":
-        if params != {}:
+        if not set(params) <= {"_meta"}:
             raise EvolutionError("MCP ping params are invalid")
         result = {}
     elif method == "initialize":
-        initialize = _exact(
-            params,
-            {"protocolVersion", "capabilities", "clientInfo"},
-            "MCP initialize params",
-        )
+        initialize_keys = {"protocolVersion", "capabilities", "clientInfo"}
+        if not initialize_keys.issubset(params) or not set(params) <= (
+            initialize_keys | {"_meta"}
+        ):
+            raise EvolutionError("MCP initialize params is invalid")
+        initialize = params
         client = initialize["clientInfo"]
         client_keys = {"name", "version", "title", "icons", "websiteUrl", "description"}
         if (
@@ -2225,7 +2253,7 @@ def mcp_surface_message(
             "serverInfo": {"name": canonical["name"], "version": canonical["version"]},
         }
     elif method == "tools/list":
-        if params != {}:
+        if not set(params) <= {"_meta"}:
             raise EvolutionError("MCP tools/list params are invalid")
         result = {
             "tools": [
@@ -2251,17 +2279,6 @@ def mcp_surface_message(
         arguments = params.get("arguments", {})
         if arguments != {}:
             raise EvolutionError("MCP tool arguments are invalid")
-        meta = _bounded_mcp_object(params.get("_meta", {}), "MCP tool metadata")
-        if "progressToken" in meta:
-            token = meta["progressToken"]
-            if isinstance(token, str):
-                _bounded_string(token, "MCP progress token", 128)
-            elif (
-                not isinstance(token, int)
-                or isinstance(token, bool)
-                or abs(token) > 2**53 - 1
-            ):
-                raise EvolutionError("MCP progress token is invalid")
         operation = _nonempty(params["name"], "MCP tool name", 64)
         if operation not in canonical["skill"]["interface"]["operations"]:
             return {

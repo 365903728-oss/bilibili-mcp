@@ -939,6 +939,74 @@ raise SystemExit(main())
                         },
                     )
 
+    def test_mcp_requests_accept_bounded_base_metadata(self) -> None:
+        from harness.evolution import mcp_surface_message
+
+        canonical = {
+            "name": "safe-build-fixture",
+            "version": "1.0.0",
+            "surface": {"kind": "mcp"},
+            "skill": {"interface": {"operations": ["inspect"]}},
+        }
+        with patch(
+            "harness.evolution.discover_surface_capabilities",
+            return_value={"capabilities": [{"name": canonical["name"]}]},
+        ), patch("harness.evolution._surface_canonical", return_value=canonical):
+            requests = (
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test", "version": "1"},
+                        "_meta": {
+                            "io.modelcontextprotocol/related-task": {
+                                "taskId": "task-1"
+                            }
+                        },
+                    },
+                },
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "ping",
+                    "params": {"_meta": {"progressToken": "ping-1"}},
+                },
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/list",
+                    "params": {"_meta": {"extension.trace": "bounded"}},
+                },
+            )
+            for request in requests:
+                with self.subTest(method=request["method"]):
+                    response = mcp_surface_message(
+                        object(),
+                        name=canonical["name"],
+                        adapter="codex-direct",
+                        value=request,
+                    )
+                    self.assertEqual(response["id"], request["id"])
+            with self.assertRaisesRegex(EvolutionError, "related task id"):
+                mcp_surface_message(
+                    object(),
+                    name=canonical["name"],
+                    adapter="codex-direct",
+                    value={
+                        "jsonrpc": "2.0",
+                        "id": 4,
+                        "method": "ping",
+                        "params": {
+                            "_meta": {
+                                "io.modelcontextprotocol/related-task": {"taskId": []}
+                            }
+                        },
+                    },
+                )
+
     def test_start_rejects_a_gap_that_is_not_in_accepted_current_memory(self) -> None:
         request = self.request()
 
@@ -2448,6 +2516,11 @@ raise SystemExit(main())
                                         }
                                     ],
                                 },
+                                "_meta": {
+                                    "io.modelcontextprotocol/related-task": {
+                                        "taskId": "task-1"
+                                    }
+                                },
                             },
                         },
                         {
@@ -2458,11 +2531,13 @@ raise SystemExit(main())
                             "jsonrpc": "2.0",
                             "id": 2,
                             "method": "ping",
+                            "params": {"_meta": {"progressToken": "ping-1"}},
                         },
                         {
                             "jsonrpc": "2.0",
                             "id": 3,
                             "method": "tools/list",
+                            "params": {"_meta": {"extension.trace": "bounded"}},
                         },
                         {
                             "jsonrpc": "2.0",

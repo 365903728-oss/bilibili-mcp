@@ -150,6 +150,9 @@ class CliAndAdapterTests(unittest.TestCase):
                     "protocolVersion": "2025-11-25",
                     "capabilities": {},
                     "clientInfo": {"name": "test-client", "version": "1"},
+                    "_meta": {
+                        "io.modelcontextprotocol/related-task": {"taskId": "task-1"}
+                    },
                 },
             },
             {
@@ -164,7 +167,12 @@ class CliAndAdapterTests(unittest.TestCase):
                 "method": "tools/call",
                 "params": {"name": "stale-tool"},
             },
-            {"jsonrpc": "2.0", "id": 4, "method": "ping"},
+            {
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "ping",
+                "params": {"_meta": {"progressToken": "ping-1"}},
+            },
         ]
         stdin = io.TextIOWrapper(
             io.BytesIO(

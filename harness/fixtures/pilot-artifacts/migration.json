@@ -22,7 +22,7 @@
       },
       "harness/evolution.py": {
         "finding": "pr-39-verified-zero-candidate-channels",
-        "sha256": "94bd9e7777cafa55ecaebfb7664ff250f51bb9b72a9929f69717777d87526f85"
+        "sha256": "10a02cc3c87ba12f08abe93c5a43cc305b0f9d38d4017062df9fd39ba0a645e2"
       },
       "harness/memory.py": {
         "finding": "pr-39-recoverable-memory-transaction",
