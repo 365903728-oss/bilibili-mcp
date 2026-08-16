@@ -37,6 +37,7 @@ the migration clean-room test can inspect its exact accepted #35 base.
 - `npm run build`: PASS.
 - `npm pack --dry-run`: PASS, 185 files; no Harness or agent-memory paths.
 - Windows Harness core shard: 92 tests PASS, 11 expected platform skips.
+- Migration conformance after durable-memory receipt refresh: 1/1 PASS.
 - `git diff --check`: PASS.
 - Adapter and Evolution shards were not repeated locally; the current PR HEAD
   already carries their accepted evidence, and the new live workflow runs both
@@ -58,11 +59,15 @@ the migration clean-room test can inspect its exact accepted #35 base.
 - Initial matrix composition mixed an `os` axis with partial `include` rows,
   which could create rows without an OS. It was corrected before execution to
   six explicit, complete matrix rows.
+- First live run `31941296075` correctly failed both core jobs after this
+  report's codemap/decision updates made their migration receipts stale. The
+  same test reproduced locally; the two LF-normalized durable-memory digests
+  and outer migration digest were refreshed and the focused test passed.
 
 ## Risks, Skipped Checks, Recovery Bundle
 
 - GitHub is authoritative for final workflow schema acceptance and hosted
-  runner behavior. The first pushed run will be monitored; any failure is a
+  runner behavior. The repair push will be monitored; any failure is a
   blocking delivery result, not a green claim.
 - Rollback is one scoped revert of the CI commit. No Recovery Bundle is needed.
 
