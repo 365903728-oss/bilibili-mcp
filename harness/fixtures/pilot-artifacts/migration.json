@@ -26,7 +26,7 @@
       },
       "harness/memory.py": {
         "finding": "pr-39-recoverable-memory-transaction",
-        "sha256": "e82625fd39bde5627b6529f713a7d83cd82e8a3c3a49f5ea58682bd10aa588fa"
+        "sha256": "8f7f9a27c09271173610e19b4122fe6b0c90b7ffbf32cacded8d30a248953bc0"
       },
       "harness/paseo_collaboration.py": {
         "finding": "pr-39-private-ephemeral-prompt-files",

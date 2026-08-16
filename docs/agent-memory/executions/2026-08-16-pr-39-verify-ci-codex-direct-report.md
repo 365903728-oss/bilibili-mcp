@@ -41,6 +41,8 @@ the migration clean-room test can inspect its exact accepted #35 base.
 - `git diff --check`: PASS.
 - Windows adapters shard after the hosted-run repair: 153 tests PASS, 2
   expected platform skips.
+- Typed-memory module after the final review repair: 40 tests PASS, 2 expected
+  platform skips; migration conformance 1/1 PASS.
 
 ## Acceptance Criteria
 
@@ -68,6 +70,12 @@ the migration clean-room test can inspect its exact accepted #35 base.
   Windows 8.3 path prefixes before containment checks while retaining its
   junction/symlink rejection. Three focused regressions and the complete local
   adapters shard pass.
+- Final Codex Review found one remaining pathname directory-creation race in
+  typed memory. A Windows junction regression reproduced external
+  `agent-memory` creation before the anchored writer rejected the path. Both
+  tracked memory artifacts and transaction markers now reuse the shared
+  no-follow directory creator; Windows focused checks pass 3/3 with one
+  expected POSIX-only skip, and WSL passes 3/3.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

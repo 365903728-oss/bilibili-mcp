@@ -274,6 +274,51 @@ class MemoryProjectionTests(unittest.TestCase):
                     if displaced.exists():
                         displaced.rename(parent)
 
+    def test_memory_directory_creation_refuses_a_swapped_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "root"
+            external = Path(temp) / "external"
+            root.mkdir()
+            external.mkdir()
+            docs = root / "docs"
+            real_guard = memory_module.ensure_no_link_components
+            swapped = False
+
+            def swap_after_guard(boundary: Path, target: Path) -> None:
+                nonlocal swapped
+                real_guard(boundary, target)
+                if swapped:
+                    return
+                if os.name == "nt":
+                    subprocess.run(
+                        ["cmd", "/c", "mklink", "/J", str(docs), str(external)],
+                        check=True,
+                        capture_output=True,
+                    )
+                else:
+                    docs.symlink_to(external, target_is_directory=True)
+                swapped = True
+
+            try:
+                with patch(
+                    "harness.memory.ensure_no_link_components",
+                    side_effect=swap_after_guard,
+                ):
+                    with self.assertRaises((OSError, ValueError)):
+                        memory_module._write_exact(
+                            root,
+                            Path("docs/agent-memory/typed-memory.json"),
+                            b"{}\n",
+                            1024,
+                        )
+                self.assertTrue(swapped)
+                self.assertFalse((external / "agent-memory").exists())
+            finally:
+                if docs.is_junction():
+                    os.rmdir(docs)
+                elif docs.is_symlink():
+                    docs.unlink()
+
     @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
     def test_memory_deletes_fail_closed_when_parent_is_a_symlink(self) -> None:
         for name, delete in (

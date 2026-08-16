@@ -30,6 +30,7 @@ from harness.codex_direct import (
 from harness.context import WorktreeContext
 from harness.safe_io import (
     _atomic_write_bytes,
+    _ensure_directory_nofollow,
     _unlink_nofollow,
     append_bounded_jsonl,
     bounded_file_lock,
@@ -955,7 +956,7 @@ def _write_exact(root: Path, relative: Path, content: bytes, limit: int) -> None
     ensure_no_link_components(root, path.parent)
     if path.is_symlink():
         raise MemoryProjectionError("memory artifact path cannot be a link")
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_directory_nofollow(path.parent)
     _atomic_write_bytes(path, content)
     if read_bounded_bytes(path, limit) != content:
         raise MemoryProjectionError("memory artifact persistence was not durable")
@@ -963,7 +964,7 @@ def _write_exact(root: Path, relative: Path, content: bytes, limit: int) -> None
 
 def _write_transaction_marker(path: Path, marker: dict[str, Any]) -> None:
     content = _pretty_bytes(marker, MAX_TRANSACTION_BYTES)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_directory_nofollow(path.parent)
     if path.is_symlink():
         raise MemoryProjectionError("memory transaction marker is unsafe")
     _atomic_write_bytes(path, content)
