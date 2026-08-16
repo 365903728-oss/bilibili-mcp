@@ -140,6 +140,70 @@ class CliAndAdapterTests(unittest.TestCase):
         self.assertEqual(status, 2)
         self.assertIn("MCP notification is invalid", stdout.getvalue())
 
+    def test_capability_serve_returns_method_not_found_and_continues(self) -> None:
+        messages = [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "1"},
+                },
+            },
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "resources/list"},
+            {"jsonrpc": "2.0", "id": 3, "method": "ping"},
+        ]
+        stdin = io.TextIOWrapper(
+            io.BytesIO(
+                "".join(json.dumps(item) + "\n" for item in messages).encode()
+            )
+        )
+        stdout = io.StringIO()
+        canonical = {
+            "name": "safe-build-fixture",
+            "version": "1.0.0",
+            "surface": {"kind": "mcp"},
+            "skill": {"interface": {"operations": ["inspect"]}},
+        }
+        context = WorktreeContext(
+            root=ROOT,
+            git_dir=ROOT / ".git",
+            common_git_dir=ROOT / ".git",
+            head_sha="0" * 40,
+            worktree_id="wt-test",
+            repository_id="repo-test",
+        )
+
+        with patch("sys.stdin", stdin), patch(
+            "harness.cli.discover_worktree", return_value=context
+        ), patch(
+            "harness.evolution.discover_surface_capabilities",
+            return_value={"capabilities": [{"name": canonical["name"]}]},
+        ), patch(
+            "harness.evolution._surface_canonical", return_value=canonical
+        ), redirect_stdout(stdout):
+            status = main(
+                [
+                    "capability",
+                    "serve",
+                    "--cwd",
+                    str(ROOT),
+                    "--name",
+                    canonical["name"],
+                    "--adapter",
+                    "codex-direct",
+                ]
+            )
+
+        self.assertEqual(status, 0, stdout.getvalue())
+        responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        self.assertEqual([item["id"] for item in responses], [1, 2, 3])
+        self.assertEqual(responses[1]["error"]["code"], -32601)
+        self.assertEqual(responses[2]["result"], {})
+
     def test_three_adapter_conformance_uses_one_contract_and_kernel(self) -> None:
         fixture = json.loads(
             (
@@ -622,6 +686,7 @@ class CliAndAdapterTests(unittest.TestCase):
         review_repairs = clean_room["review_repairs"]
         expected_repairs = {
             "harness/cli.py": "pr-39-mcp-session-lifetime",
+            "harness/codex_direct.py": "pr-39-verified-index-installation",
             "harness/contracts.py": "pr-39-canonical-task-source",
             "harness/evolution.py": "pr-39-verified-zero-candidate-channels",
             "harness/memory.py": "pr-39-recoverable-memory-transaction",

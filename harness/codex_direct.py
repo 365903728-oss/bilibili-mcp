@@ -15,12 +15,14 @@ import threading
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from harness.capabilities import check_manual_skill, manual_skill_reminder_id
 from harness.context import WorktreeContext, git_environment
 from harness.contracts import ACCEPTANCE_OWNERS, WRITERS, validate_direct_contract
 from harness.safe_io import (
+    _hold_windows_directory_chain,
+    _open_directory_nofollow,
     bounded_file_lock,
     ensure_no_link_components,
     read_bounded_bytes,
@@ -2390,32 +2392,143 @@ def _index_from_tree(
         return snapshot, index_bytes
 
 
-def _open_index_lock(context: WorktreeContext) -> tuple[int, Path, Path]:
+@contextmanager
+def _open_index_lock(
+    context: WorktreeContext,
+) -> Iterator[tuple[int, Callable[[], None]]]:
     lock_path = context.git_dir / "index.lock"
     index_path = context.git_dir / "index"
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor: int | None = None
+    parent_descriptor: int | None = None
+    installed = False
+    directory_identity: tuple[int, int] | None = None
     try:
-        descriptor = os.open(lock_path, flags, 0o600)
+        if os.name == "nt":
+            with _hold_windows_directory_chain(context.git_dir):
+                directory = os.stat(context.git_dir, follow_symlinks=False)
+                directory_identity = (directory.st_dev, directory.st_ino)
+                descriptor = os.open(lock_path, flags, 0o600)
+                current = os.stat(lock_path, follow_symlinks=False)
+        else:
+            parent_descriptor = _open_directory_nofollow(context.git_dir)
+            directory = os.fstat(parent_descriptor)
+            directory_identity = (directory.st_dev, directory.st_ino)
+            descriptor = os.open(
+                lock_path.name, flags, 0o600, dir_fd=parent_descriptor
+            )
+            current = os.stat(
+                lock_path.name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
         opened = os.fstat(descriptor)
-        current = os.stat(lock_path, follow_symlinks=False)
         if (
             not stat.S_ISREG(opened.st_mode)
             or opened.st_nlink != 1
             or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
         ):
             raise OSError("Git index lock identity changed")
-    except OSError as exc:
+        if parent_descriptor is not None:
+            visible_directory = os.stat(context.git_dir, follow_symlinks=False)
+            if directory_identity != (
+                visible_directory.st_dev,
+                visible_directory.st_ino,
+            ):
+                raise OSError("canonical Git directory identity changed")
+    except (OSError, ValueError) as exc:
+        lock_created = descriptor is not None
         if descriptor is not None:
             try:
                 os.close(descriptor)
             except OSError:
                 pass
-        raise CodexDirectAdapterError("canonical Git index lock is unavailable") from exc
-    assert descriptor is not None
-    return descriptor, lock_path, index_path
+            descriptor = None
+        if lock_created:
+            try:
+                if parent_descriptor is None:
+                    with _hold_windows_directory_chain(context.git_dir):
+                        lock_path.unlink(missing_ok=True)
+                else:
+                    os.unlink(lock_path.name, dir_fd=parent_descriptor)
+            except (OSError, ValueError):
+                pass
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+            parent_descriptor = None
+        raise CodexDirectAdapterError(
+            "canonical Git index lock is unavailable"
+        ) from exc
+
+    identity = (opened.st_dev, opened.st_ino)
+
+    def install() -> None:
+        nonlocal descriptor, installed
+        assert descriptor is not None
+        if parent_descriptor is None:
+            try:
+                with _hold_windows_directory_chain(context.git_dir):
+                    directory = os.stat(context.git_dir, follow_symlinks=False)
+                    if directory_identity != (directory.st_dev, directory.st_ino):
+                        raise OSError("canonical Git directory identity changed")
+                    visible = os.stat(lock_path, follow_symlinks=False)
+                    if identity != (visible.st_dev, visible.st_ino):
+                        raise OSError("Git index lock identity changed")
+                    os.close(descriptor)
+                    descriptor = None
+                    os.replace(lock_path, index_path)
+                    installed = True
+                    visible = os.stat(index_path, follow_symlinks=False)
+            except ValueError as exc:
+                raise OSError("canonical Git directory is unavailable") from exc
+        else:
+            visible = os.stat(
+                lock_path.name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+            if identity != (visible.st_dev, visible.st_ino):
+                raise OSError("Git index lock identity changed")
+            os.replace(
+                lock_path.name,
+                index_path.name,
+                src_dir_fd=parent_descriptor,
+                dst_dir_fd=parent_descriptor,
+            )
+            installed = True
+            visible = os.stat(
+                index_path.name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+            os.close(descriptor)
+            descriptor = None
+        if identity != (visible.st_dev, visible.st_ino):
+            raise OSError("installed Git index identity changed")
+
+    try:
+        yield descriptor, install
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        if not installed:
+            if parent_descriptor is None:
+                try:
+                    with _hold_windows_directory_chain(context.git_dir):
+                        directory = os.stat(context.git_dir, follow_symlinks=False)
+                        if directory_identity == (directory.st_dev, directory.st_ino):
+                            lock_path.unlink(missing_ok=True)
+                except (OSError, ValueError):
+                    pass
+            else:
+                try:
+                    os.unlink(lock_path.name, dir_fd=parent_descriptor)
+                except FileNotFoundError:
+                    pass
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
 
 
 def _write_locked_index(descriptor: int, index_bytes: bytes) -> None:
@@ -2493,41 +2606,31 @@ def _commit_unlocked(
                 raise CodexDirectError(
                     "accepted ticket commit has unresolved working tree changes"
                 )
-            descriptor: int | None = None
-            lock_path: Path | None = None
             try:
-                descriptor, lock_path, index_path = _open_index_lock(context)
-                if (
-                    _git(context.root, "rev-parse", "HEAD").lower() != current_head
-                    or _path_snapshot(context.root, paths) != accepted_diff["snapshot"]
-                    or _changed_paths(context.root) != paths
-                ):
-                    raise CodexDirectError(
-                        "accepted ticket commit changed during index recovery"
+                with _open_index_lock(context) as (descriptor, install_index):
+                    if (
+                        _git(context.root, "rev-parse", "HEAD").lower()
+                        != current_head
+                        or _path_snapshot(context.root, paths)
+                        != accepted_diff["snapshot"]
+                        or _changed_paths(context.root) != paths
+                    ):
+                        raise CodexDirectError(
+                            "accepted ticket commit changed during index recovery"
+                        )
+                    recovered_snapshot, index_bytes = _index_from_tree(
+                        context, current_head, paths
                     )
-                recovered_snapshot, index_bytes = _index_from_tree(
-                    context, current_head, paths
-                )
-                if recovered_snapshot != accepted_diff["index_snapshot"]:
-                    raise CodexDirectError(
-                        "accepted ticket commit index cannot be recovered exactly"
-                    )
-                _write_locked_index(descriptor, index_bytes)
-                os.close(descriptor)
-                descriptor = None
-                os.replace(lock_path, index_path)
+                    if recovered_snapshot != accepted_diff["index_snapshot"]:
+                        raise CodexDirectError(
+                            "accepted ticket commit index cannot be recovered exactly"
+                        )
+                    _write_locked_index(descriptor, index_bytes)
+                    install_index()
             except OSError as exc:
                 raise CodexDirectAdapterError(
                     "accepted ticket commit index recovery failed"
                 ) from exc
-            finally:
-                if descriptor is not None:
-                    os.close(descriptor)
-                if lock_path is not None and lock_path.exists():
-                    try:
-                        lock_path.unlink()
-                    except OSError:
-                        pass
             if not _accepted_commit_is_exact(context, run, current_head):
                 raise CodexDirectAdapterError(
                     "accepted ticket commit recovery failed its postcondition"
@@ -2561,65 +2664,66 @@ def _commit_unlocked(
         raise CodexDirectError("accepted local commit contains an unowned path")
 
     identity_environment = _commit_identity_environment(context.root)
-    descriptor: int | None = None
-    lock_path: Path | None = None
     try:
-        descriptor, lock_path, index_path = _open_index_lock(context)
-        branch_ref = _git(context.root, "symbolic-ref", "--quiet", "HEAD")
-        if branch_ref != f"refs/heads/{contract['execution']['branch']}":
-            raise CodexDirectError("branch changed before the accepted local commit")
-        if (
-            _git(context.root, "rev-parse", "HEAD").lower() != base_sha
-            or _changed_paths(context.root) != changed_paths
-            or _path_snapshot(context.root, changed_paths) != accepted_diff["snapshot"]
-        ):
-            raise CodexDirectError("working tree changed before isolated staging")
-        index_snapshot, tree_sha, index_bytes = _build_ticket_index(
-            context,
-            base_sha=base_sha,
-            paths=changed_paths,
-            write_objects=True,
-        )
-        if index_snapshot != accepted_diff.get("index_snapshot"):
-            raise CodexDirectAdapterError(
-                "isolated index no longer matches the accepted canonical tree"
+        with _open_index_lock(context) as (descriptor, install_index):
+            branch_ref = _git(context.root, "symbolic-ref", "--quiet", "HEAD")
+            if branch_ref != f"refs/heads/{contract['execution']['branch']}":
+                raise CodexDirectError(
+                    "branch changed before the accepted local commit"
+                )
+            if (
+                _git(context.root, "rev-parse", "HEAD").lower() != base_sha
+                or _changed_paths(context.root) != changed_paths
+                or _path_snapshot(context.root, changed_paths)
+                != accepted_diff["snapshot"]
+            ):
+                raise CodexDirectError("working tree changed before isolated staging")
+            index_snapshot, tree_sha, index_bytes = _build_ticket_index(
+                context,
+                base_sha=base_sha,
+                paths=changed_paths,
+                write_objects=True,
             )
-        commit_message = f"{message}\n\n{trailer}\n".encode("utf-8")
-        commit_sha = _run_git_bytes(
-            context.root,
-            ("-c", "i18n.commitEncoding=UTF-8", "commit-tree", tree_sha, "-p", base_sha),
-            input_bytes=commit_message,
-            env_overrides=identity_environment,
-        ).decode("ascii", errors="strict").strip().lower()
-        if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit_sha):
-            raise CodexDirectAdapterError("created commit identity is invalid")
-        if not _accepted_commit_structure_is_exact(context, run, commit_sha):
-            raise CodexDirectAdapterError(
-                "created commit failed the ticket-scope structural postcondition"
-            )
-        if (
-            _git(context.root, "rev-parse", "HEAD").lower() != base_sha
-            or _changed_paths(context.root) != changed_paths
-            or _path_snapshot(context.root, changed_paths) != accepted_diff["snapshot"]
-        ):
-            raise CodexDirectError("working tree changed during accepted commit creation")
-        _write_locked_index(descriptor, index_bytes)
-        _git(context.root, "update-ref", branch_ref, commit_sha, base_sha)
-        os.close(descriptor)
-        descriptor = None
-        os.replace(lock_path, index_path)
+            if index_snapshot != accepted_diff.get("index_snapshot"):
+                raise CodexDirectAdapterError(
+                    "isolated index no longer matches the accepted canonical tree"
+                )
+            commit_message = f"{message}\n\n{trailer}\n".encode("utf-8")
+            commit_sha = _run_git_bytes(
+                context.root,
+                (
+                    "-c",
+                    "i18n.commitEncoding=UTF-8",
+                    "commit-tree",
+                    tree_sha,
+                    "-p",
+                    base_sha,
+                ),
+                input_bytes=commit_message,
+                env_overrides=identity_environment,
+            ).decode("ascii", errors="strict").strip().lower()
+            if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit_sha):
+                raise CodexDirectAdapterError("created commit identity is invalid")
+            if not _accepted_commit_structure_is_exact(context, run, commit_sha):
+                raise CodexDirectAdapterError(
+                    "created commit failed the ticket-scope structural postcondition"
+                )
+            if (
+                _git(context.root, "rev-parse", "HEAD").lower() != base_sha
+                or _changed_paths(context.root) != changed_paths
+                or _path_snapshot(context.root, changed_paths)
+                != accepted_diff["snapshot"]
+            ):
+                raise CodexDirectError(
+                    "working tree changed during accepted commit creation"
+                )
+            _write_locked_index(descriptor, index_bytes)
+            _git(context.root, "update-ref", branch_ref, commit_sha, base_sha)
+            install_index()
     except UnicodeDecodeError as exc:
         raise CodexDirectAdapterError("created commit identity is invalid") from exc
     except OSError as exc:
         raise CodexDirectAdapterError("accepted Git index installation failed") from exc
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
-        if lock_path is not None and lock_path.exists():
-            try:
-                lock_path.unlink()
-            except OSError:
-                pass
 
     if not _accepted_commit_is_exact(context, run, commit_sha):
         raise CodexDirectAdapterError(

@@ -12,13 +12,17 @@
         "finding": "pr-39-mcp-session-lifetime",
         "sha256": "0f0bde21aa509794294ff29c1e5980f6a4246f2d7e99522eeff2539c49dc997f"
       },
+      "harness/codex_direct.py": {
+        "finding": "pr-39-verified-index-installation",
+        "sha256": "3299c69e5a8f24ad3c0d47178bd4c09250e5f5f6ccbc895dcbe43aa4a26be1ab"
+      },
       "harness/contracts.py": {
         "finding": "pr-39-canonical-task-source",
         "sha256": "0f31d1e6748df6e4f92af861621b5330f35030aab9577333ec91009723d3931a"
       },
       "harness/evolution.py": {
         "finding": "pr-39-verified-zero-candidate-channels",
-        "sha256": "87cf59979232ea0e2a63a5dc03e7d2b55adc445ab9b402d0fc1c5ab50e5ec112"
+        "sha256": "491c05230f71276baf1771e8aa1bda11bb334f2cbe61e8810571d9facc8748c1"
       },
       "harness/memory.py": {
         "finding": "pr-39-recoverable-memory-transaction",

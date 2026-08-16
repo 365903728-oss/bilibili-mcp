@@ -1995,12 +1995,14 @@ class CodexDirectProcessTests(unittest.TestCase):
         original_replace = controller.os.replace
         failed = False
 
-        def fail_index_install(source: object, target: object) -> None:
+        def fail_index_install(
+            source: object, target: object, *args: object, **kwargs: object
+        ) -> None:
             nonlocal failed
             if not failed and Path(source).name == "index.lock":
                 failed = True
                 raise OSError("simulated post-ref index install failure")
-            original_replace(source, target)
+            original_replace(source, target, *args, **kwargs)
 
         with patch.object(controller.os, "replace", side_effect=fail_index_install):
             with self.assertRaises(controller.CodexDirectAdapterError):
@@ -2022,6 +2024,53 @@ class CodexDirectProcessTests(unittest.TestCase):
             git(self.repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"),
             "harness-only.txt",
         )
+
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_index_lock_rejects_git_directory_swap_before_open(self) -> None:
+        import harness.codex_direct as controller
+
+        context = discover_worktree(self.repo)
+        displaced = self.root / "git-displaced"
+        external = self.root / "external-git"
+        external.mkdir()
+        external_index = external / "index"
+        external_index.write_bytes(b"external-index")
+        real_open = controller.os.open
+        swapped = False
+
+        def raced_open(
+            candidate: os.PathLike[str] | str | bytes,
+            flags: int,
+            mode: int = 0o777,
+            *,
+            dir_fd: int | None = None,
+        ) -> int:
+            nonlocal swapped
+            if (
+                not swapped
+                and dir_fd is not None
+                and Path(candidate).name == "index.lock"
+            ):
+                context.git_dir.rename(displaced)
+                context.git_dir.symlink_to(external, target_is_directory=True)
+                swapped = True
+            if dir_fd is None:
+                return real_open(candidate, flags, mode)
+            return real_open(candidate, flags, mode, dir_fd=dir_fd)
+
+        try:
+            with patch.object(controller.os, "open", new=raced_open):
+                with self.assertRaises(controller.CodexDirectAdapterError):
+                    with controller._open_index_lock(context):
+                        pass
+            self.assertTrue(swapped)
+            self.assertEqual(external_index.read_bytes(), b"external-index")
+            self.assertFalse((external / "index.lock").exists())
+        finally:
+            if context.git_dir.is_symlink():
+                context.git_dir.unlink()
+            if displaced.exists():
+                displaced.rename(context.git_dir)
 
     def test_automatic_commit_adapter_failure_writes_recovery_bundle(self) -> None:
         self.prepare_reviewed_diff()

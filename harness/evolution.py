@@ -2124,8 +2124,7 @@ def mcp_surface_message(
             raise EvolutionError("MCP notification is invalid")
         return None
     method = value.get("method")
-    if method in ("tools/list", "ping"):
-        value = {"params": {}, **value}
+    value = {"params": {}, **value}
     request = _exact(value, {"jsonrpc", "id", "method", "params"}, "MCP request")
     request_id = request["id"]
     if (
@@ -2255,7 +2254,11 @@ def mcp_surface_message(
             "isError": False,
         }
     else:
-        raise EvolutionError("MCP method is unsupported")
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {"code": -32601, "message": "Method not found"},
+        }
     return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 
