@@ -154,7 +154,13 @@ class CliAndAdapterTests(unittest.TestCase):
             },
             {"jsonrpc": "2.0", "method": "notifications/initialized"},
             {"jsonrpc": "2.0", "id": 2, "method": "resources/list"},
-            {"jsonrpc": "2.0", "id": 3, "method": "ping"},
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {"name": "stale-tool"},
+            },
+            {"jsonrpc": "2.0", "id": 4, "method": "ping"},
         ]
         stdin = io.TextIOWrapper(
             io.BytesIO(
@@ -200,9 +206,10 @@ class CliAndAdapterTests(unittest.TestCase):
 
         self.assertEqual(status, 0, stdout.getvalue())
         responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
-        self.assertEqual([item["id"] for item in responses], [1, 2, 3])
+        self.assertEqual([item["id"] for item in responses], [1, 2, 3, 4])
         self.assertEqual(responses[1]["error"]["code"], -32601)
-        self.assertEqual(responses[2]["result"], {})
+        self.assertEqual(responses[2]["error"]["code"], -32602)
+        self.assertEqual(responses[3]["result"], {})
 
     def test_three_adapter_conformance_uses_one_contract_and_kernel(self) -> None:
         fixture = json.loads(

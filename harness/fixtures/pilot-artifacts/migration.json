@@ -14,7 +14,7 @@
       },
       "harness/codex_direct.py": {
         "finding": "pr-39-verified-index-installation",
-        "sha256": "3299c69e5a8f24ad3c0d47178bd4c09250e5f5f6ccbc895dcbe43aa4a26be1ab"
+        "sha256": "6a5bfa93b5222bad7a944b5839649e75f33f19dd4f4b5614db26ed033e3eec76"
       },
       "harness/contracts.py": {
         "finding": "pr-39-canonical-task-source",
@@ -22,7 +22,7 @@
       },
       "harness/evolution.py": {
         "finding": "pr-39-verified-zero-candidate-channels",
-        "sha256": "491c05230f71276baf1771e8aa1bda11bb334f2cbe61e8810571d9facc8748c1"
+        "sha256": "882630638d0c22ddadd3198af977f02738c87060c08eda97e1a43c21cb25924d"
       },
       "harness/memory.py": {
         "finding": "pr-39-recoverable-memory-transaction",
@@ -34,7 +34,7 @@
       },
       "harness/safe_io.py": {
         "finding": "pr-39-verified-jsonl-descriptor",
-        "sha256": "c66e36ebde2e94a5dd49699da5d6bc0ec5232595a4145a47141690ad7ff97037"
+        "sha256": "d6781fadffcc2f235227fcbed5e0c49e7c1b01a162ba56d7854986fc731aaed2"
       }
     }
   },

@@ -12,6 +12,7 @@ import tempfile
 import time
 from collections import deque
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, BinaryIO, Iterator
 
@@ -26,6 +27,34 @@ SAFE_LABEL_RE = re.compile(r"[^A-Za-z0-9_.:-]+")
 SAFE_PATH_COMPONENT_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 SAFE_CATEGORIES = {"build", "test", "lint", "package", "git", "shell"}
 SAFE_AGENTS = {"codex", "claude"}
+_ACTIVE_LOCK_PARENTS: ContextVar[
+    tuple[tuple[str, int | None, int, int], ...]
+] = ContextVar(
+    "harness_active_lock_parents", default=()
+)
+
+
+def _active_lock_parent(path: Path) -> tuple[str, int | None, int, int] | None:
+    normalized = os.path.normcase(os.path.abspath(path))
+    for active in reversed(_ACTIVE_LOCK_PARENTS.get()):
+        if normalized == active[0]:
+            return active
+    return None
+
+
+def _verify_active_lock_parent(path: Path) -> None:
+    active = _active_lock_parent(path)
+    if active is None:
+        return
+    try:
+        current = os.stat(path, follow_symlinks=False)
+    except OSError as exc:
+        raise ValueError("runtime lock directory changed") from exc
+    if not stat.S_ISDIR(current.st_mode) or (current.st_dev, current.st_ino) != (
+        active[2],
+        active[3],
+    ):
+        raise ValueError("runtime lock directory changed")
 
 
 def _validate_shape(
@@ -177,14 +206,33 @@ def read_bounded_jsonl(
     if max_rows <= 0 or max_bytes <= 0:
         return []
     descriptor: int | None = None
+    parent_descriptor: int | None = None
+    windows_guard: Iterator[None] | None = None
+    windows_guard_entered = False
     try:
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(path, flags)
+        if os.name == "nt":
+            windows_guard = _hold_windows_directory_chain(path.parent)
+            windows_guard.__enter__()
+            windows_guard_entered = True
+            _verify_active_lock_parent(path.parent)
+            candidate: Path | str = path
+        else:
+            parent_descriptor = _open_directory_nofollow(path.parent)
+            candidate = path.name
+        if parent_descriptor is None:
+            descriptor = os.open(candidate, flags)
+            visible = os.stat(candidate, follow_symlinks=False)
+        else:
+            descriptor = os.open(candidate, flags, dir_fd=parent_descriptor)
+            visible = os.stat(
+                candidate, dir_fd=parent_descriptor, follow_symlinks=False
+            )
         opened = os.fstat(descriptor)
-        visible = os.stat(path, follow_symlinks=False)
         if (
             not stat.S_ISREG(opened.st_mode)
-            or _is_link_like(path)
+            or not stat.S_ISREG(visible.st_mode)
+            or (parent_descriptor is None and _is_link_like(path))
             or (opened.st_dev, opened.st_ino) != (visible.st_dev, visible.st_ino)
         ):
             return []
@@ -194,7 +242,12 @@ def read_bounded_jsonl(
                 handle.seek(opened.st_size - max_bytes)
             raw = handle.read(max_bytes)
             closed = os.fstat(handle.fileno())
-            visible_after = os.stat(path, follow_symlinks=False)
+            if parent_descriptor is None:
+                visible_after = os.stat(candidate, follow_symlinks=False)
+            else:
+                visible_after = os.stat(
+                    candidate, dir_fd=parent_descriptor, follow_symlinks=False
+                )
         if (
             len(raw) != min(opened.st_size, max_bytes)
             or (closed.st_dev, closed.st_ino, closed.st_size)
@@ -209,11 +262,15 @@ def read_bounded_jsonl(
             if not separator:
                 return []
         raw_lines = deque(raw.splitlines(), maxlen=max_rows)
-    except OSError:
+    except (OSError, ValueError):
         return []
     finally:
         if descriptor is not None:
             os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+        if windows_guard_entered and windows_guard is not None:
+            windows_guard.__exit__(None, None, None)
     rows: list[dict[str, Any]] = []
     for raw_line in raw_lines:
         if len(raw_line) > MAX_RECORD_BYTES:
@@ -232,15 +289,34 @@ def read_bounded_bytes(path: Path, max_bytes: int) -> bytes | None:
     if max_bytes <= 0:
         return None
     descriptor: int | None = None
+    parent_descriptor: int | None = None
+    windows_guard: Iterator[None] | None = None
+    windows_guard_entered = False
     try:
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(path, flags)
+        if os.name == "nt":
+            windows_guard = _hold_windows_directory_chain(path.parent)
+            windows_guard.__enter__()
+            windows_guard_entered = True
+            _verify_active_lock_parent(path.parent)
+            candidate: Path | str = path
+        else:
+            parent_descriptor = _open_directory_nofollow(path.parent)
+            candidate = path.name
+        if parent_descriptor is None:
+            descriptor = os.open(candidate, flags)
+            visible = os.stat(candidate, follow_symlinks=False)
+        else:
+            descriptor = os.open(candidate, flags, dir_fd=parent_descriptor)
+            visible = os.stat(
+                candidate, dir_fd=parent_descriptor, follow_symlinks=False
+            )
         opened = os.fstat(descriptor)
-        visible = os.stat(path, follow_symlinks=False)
         if (
             not stat.S_ISREG(opened.st_mode)
+            or not stat.S_ISREG(visible.st_mode)
             or opened.st_size > max_bytes
-            or _is_link_like(path)
+            or (parent_descriptor is None and _is_link_like(path))
             or (opened.st_dev, opened.st_ino) != (visible.st_dev, visible.st_ino)
         ):
             return None
@@ -250,11 +326,15 @@ def read_bounded_bytes(path: Path, max_bytes: int) -> bytes | None:
         if len(raw) > max_bytes:
             return None
         return raw
-    except OSError:
+    except (OSError, ValueError):
         return None
     finally:
         if descriptor is not None:
             os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+        if windows_guard_entered and windows_guard is not None:
+            windows_guard.__exit__(None, None, None)
 
 
 def read_bounded_json_object(
@@ -299,78 +379,80 @@ def _unlock_descriptor(descriptor: int) -> None:
         fcntl.flock(descriptor, fcntl.LOCK_UN)
 
 
-def _acquire_lock(lock_path: Path, *, create: bool = True) -> int | None:
-    def acquire(parent_descriptor: int | None) -> int | None:
-        candidate: Path | str = (
-            lock_path if parent_descriptor is None else lock_path.name
-        )
+def _acquire_lock_at(
+    lock_path: Path, parent_descriptor: int | None, *, create: bool
+) -> int | None:
+    candidate: Path | str = lock_path if parent_descriptor is None else lock_path.name
 
-        def current() -> os.stat_result:
+    def current() -> os.stat_result:
+        if parent_descriptor is None:
+            return os.stat(candidate, follow_symlinks=False)
+        return os.stat(candidate, dir_fd=parent_descriptor, follow_symlinks=False)
+
+    for _ in range(200):
+        if parent_descriptor is None and _is_link_like(lock_path):
+            return None
+        flags = os.O_RDWR | (os.O_CREAT if create else 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
             if parent_descriptor is None:
-                return os.stat(candidate, follow_symlinks=False)
-            return os.stat(
-                candidate, dir_fd=parent_descriptor, follow_symlinks=False
-            )
-
-        for _ in range(200):
-            if parent_descriptor is None and _is_link_like(lock_path):
-                return None
-            flags = os.O_RDWR | (os.O_CREAT if create else 0)
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            try:
-                if parent_descriptor is None:
-                    descriptor = os.open(candidate, flags, 0o600)
-                else:
-                    descriptor = os.open(
-                        candidate, flags, 0o600, dir_fd=parent_descriptor
-                    )
-            except OSError:
-                return None
-            try:
-                opened = os.fstat(descriptor)
-                visible = current()
-                if (
-                    not stat.S_ISREG(opened.st_mode)
-                    or opened.st_nlink != 1
-                    or (opened.st_dev, opened.st_ino)
-                    != (visible.st_dev, visible.st_ino)
-                ):
-                    os.close(descriptor)
-                    return None
-                if opened.st_size == 0:
-                    if not create:
-                        os.close(descriptor)
-                        return None
-                    os.write(descriptor, b"0")
-                    os.fsync(descriptor)
-                _lock_descriptor(descriptor)
-                visible = current()
-                if (opened.st_dev, opened.st_ino) != (
-                    visible.st_dev,
-                    visible.st_ino,
-                ):
-                    os.close(descriptor)
-                    return None
-                return descriptor
-            except OSError:
+                descriptor = os.open(candidate, flags, 0o600)
+            else:
+                descriptor = os.open(
+                    candidate, flags, 0o600, dir_fd=parent_descriptor
+                )
+        except OSError:
+            return None
+        try:
+            opened = os.fstat(descriptor)
+            visible = current()
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or (opened.st_dev, opened.st_ino)
+                != (visible.st_dev, visible.st_ino)
+            ):
                 os.close(descriptor)
-                time.sleep(0.025)
-        return None
+                return None
+            if opened.st_size == 0:
+                if not create:
+                    os.close(descriptor)
+                    return None
+                os.write(descriptor, b"0")
+                os.fsync(descriptor)
+            _lock_descriptor(descriptor)
+            visible = current()
+            if (opened.st_dev, opened.st_ino) != (
+                visible.st_dev,
+                visible.st_ino,
+            ):
+                os.close(descriptor)
+                return None
+            return descriptor
+        except OSError:
+            os.close(descriptor)
+            time.sleep(0.025)
+    return None
+
+
+def _acquire_lock(lock_path: Path, *, create: bool = True) -> int | None:
 
     if os.name == "nt":
         try:
             with _hold_windows_directory_chain(lock_path.parent):
-                return acquire(None)
+                return _acquire_lock_at(lock_path, None, create=create)
         except (OSError, ValueError):
             return None
     try:
         parent_descriptor = _open_directory_nofollow(lock_path.parent)
-    except OSError:
+    except (OSError, ValueError):
         return None
     try:
         opened_parent = os.fstat(parent_descriptor)
-        descriptor = acquire(parent_descriptor)
+        descriptor = _acquire_lock_at(
+            lock_path, parent_descriptor, create=create
+        )
         try:
             visible_parent = os.stat(lock_path.parent, follow_symlinks=False)
         except OSError:
@@ -391,24 +473,117 @@ def _acquire_lock(lock_path: Path, *, create: bool = True) -> int | None:
 def bounded_file_lock(lock_path: Path, *, create: bool = True) -> Iterator[None]:
     """Serialize one bounded runtime-state transaction."""
     if create:
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if _active_lock_parent(lock_path.parent) is None:
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
     elif not lock_path.is_file():
         raise ValueError("existing lock file is unavailable")
     if _is_link_like(lock_path):
         raise ValueError("runtime lock path cannot be a link")
-    descriptor = _acquire_lock(lock_path, create=create)
+    if os.name == "nt":
+        guard = _hold_windows_directory_chain(lock_path.parent)
+        guard_entered = False
+        try:
+            guard.__enter__()
+            guard_entered = True
+            parent = os.stat(lock_path.parent, follow_symlinks=False)
+            descriptor = _acquire_lock_at(lock_path, None, create=create)
+        except (OSError, ValueError) as exc:
+            if guard_entered:
+                guard.__exit__(None, None, None)
+            raise ValueError("runtime lock is unavailable") from exc
+        guard.__exit__(None, None, None)
+        if descriptor is None:
+            raise ValueError("runtime lock is unavailable")
+        token = _ACTIVE_LOCK_PARENTS.set(
+            (
+                *_ACTIVE_LOCK_PARENTS.get(),
+                (
+                    os.path.normcase(os.path.abspath(lock_path.parent)),
+                    None,
+                    parent.st_dev,
+                    parent.st_ino,
+                ),
+            )
+        )
+        try:
+            yield
+            with _hold_windows_directory_chain(lock_path.parent):
+                _verify_active_lock_parent(lock_path.parent)
+        finally:
+            try:
+                _ACTIVE_LOCK_PARENTS.reset(token)
+                _unlock_descriptor(descriptor)
+            finally:
+                os.close(descriptor)
+        return
+
+    try:
+        parent_descriptor = _open_directory_nofollow(lock_path.parent)
+    except (OSError, ValueError) as exc:
+        raise ValueError("runtime lock is unavailable") from exc
+    parent = os.fstat(parent_descriptor)
+    descriptor = _acquire_lock_at(lock_path, parent_descriptor, create=create)
     if descriptor is None:
+        os.close(parent_descriptor)
         raise ValueError("runtime lock is unavailable")
+    token = _ACTIVE_LOCK_PARENTS.set(
+        (
+            *_ACTIVE_LOCK_PARENTS.get(),
+            (
+                os.path.normcase(os.path.abspath(lock_path.parent)),
+                parent_descriptor,
+                parent.st_dev,
+                parent.st_ino,
+            ),
+        )
+    )
     try:
         yield
+        try:
+            current_descriptor = _open_directory_nofollow(
+                lock_path.parent, bind_transaction=False
+            )
+        except (OSError, ValueError) as exc:
+            raise ValueError("runtime lock directory changed") from exc
+        try:
+            current = os.fstat(current_descriptor)
+        finally:
+            os.close(current_descriptor)
+        if (parent.st_dev, parent.st_ino) != (current.st_dev, current.st_ino):
+            raise ValueError("runtime lock directory changed")
     finally:
         try:
+            _ACTIVE_LOCK_PARENTS.reset(token)
             _unlock_descriptor(descriptor)
         finally:
             os.close(descriptor)
+            os.close(parent_descriptor)
 
 
-def _open_directory_nofollow(path: Path) -> int:
+def _open_directory_nofollow(
+    path: Path, *, bind_transaction: bool = True
+) -> int:
+    active = _active_lock_parent(path) if bind_transaction else None
+    if active is not None:
+        assert active[1] is not None
+        try:
+            current_descriptor = _open_directory_nofollow(
+                path, bind_transaction=False
+            )
+        except (OSError, ValueError) as exc:
+            raise ValueError("runtime lock directory changed") from exc
+        try:
+            current = os.fstat(current_descriptor)
+        finally:
+            os.close(current_descriptor)
+        if (current.st_dev, current.st_ino) != (active[2], active[3]):
+            raise ValueError("runtime lock directory changed")
+        descriptor = os.dup(active[1])
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) != (active[2], active[3]):
+            os.close(descriptor)
+            raise OSError("runtime lock directory is unavailable")
+        return descriptor
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
@@ -518,6 +693,7 @@ def _hold_windows_directory_chain(path: Path) -> Iterator[None]:
 def _unlink_nofollow(path: Path, *, missing_ok: bool = False) -> None:
     if os.name == "nt":
         with _hold_windows_directory_chain(path.parent):
+            _verify_active_lock_parent(path.parent)
             path.unlink(missing_ok=missing_ok)
         return
     parent_descriptor = _open_directory_nofollow(path.parent)
@@ -534,6 +710,7 @@ def _unlink_nofollow(path: Path, *, missing_ok: bool = False) -> None:
 def _rmdir_nofollow(path: Path) -> None:
     if os.name == "nt":
         with _hold_windows_directory_chain(path.parent):
+            _verify_active_lock_parent(path.parent)
             os.rmdir(path)
         return
     parent_descriptor = _open_directory_nofollow(path.parent)
@@ -546,6 +723,7 @@ def _rmdir_nofollow(path: Path) -> None:
 def _atomic_write_bytes(path: Path, content: bytes, *, mode: int = 0o600) -> None:
     if os.name == "nt":
         with _hold_windows_directory_chain(path.parent):
+            _verify_active_lock_parent(path.parent)
             descriptor, temporary_name = tempfile.mkstemp(
                 prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
             )
@@ -568,7 +746,9 @@ def _atomic_write_bytes(path: Path, content: bytes, *, mode: int = 0o600) -> Non
 
         def parent_is_current() -> bool:
             try:
-                current_descriptor = _open_directory_nofollow(path.parent)
+                current_descriptor = _open_directory_nofollow(
+                    path.parent, bind_transaction=False
+                )
             except (OSError, ValueError):
                 return False
             try:
@@ -625,7 +805,8 @@ def append_bounded_jsonl(
 ) -> bool | None:
     """Append under one lock; return None when the unique value already exists."""
     _validate_shape(row)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if _active_lock_parent(path.parent) is None:
+        path.parent.mkdir(parents=True, exist_ok=True)
     if _is_link_like(path):
         return False
     encoded = json.dumps(
@@ -635,37 +816,40 @@ def append_bounded_jsonl(
         raise ValueError("hook record exceeds byte limit")
 
     lock_path = path.with_suffix(path.suffix + ".lock")
-    lock_fd = _acquire_lock(lock_path)
-    if lock_fd is None:
-        return False
     try:
-        rows = read_bounded_jsonl(path, MAX_JSONL_ROWS - 1, MAX_JSONL_BYTES)
-        if unique_field is not None and any(
-            item.get(unique_field) == row.get(unique_field) for item in rows
-        ):
-            return None
-        lines = [
-            json.dumps(item, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            for item in rows
-        ]
-        lines.append(encoded)
-        while len(lines) > MAX_JSONL_ROWS or sum(len(line) + 1 for line in lines) > MAX_JSONL_BYTES:
-            lines.pop(0)
+        with bounded_file_lock(lock_path):
+            rows = read_bounded_jsonl(path, MAX_JSONL_ROWS - 1, MAX_JSONL_BYTES)
+            if unique_field is not None and any(
+                item.get(unique_field) == row.get(unique_field) for item in rows
+            ):
+                return None
+            lines = [
+                json.dumps(
+                    item,
+                    ensure_ascii=True,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                for item in rows
+            ]
+            lines.append(encoded)
+            while len(lines) > MAX_JSONL_ROWS or sum(
+                len(line) + 1 for line in lines
+            ) > MAX_JSONL_BYTES:
+                lines.pop(0)
 
-        _atomic_write_bytes(path, b"".join(line + b"\n" for line in lines))
-        return True
-    finally:
-        try:
-            _unlock_descriptor(lock_fd)
-        finally:
-            os.close(lock_fd)
+            _atomic_write_bytes(path, b"".join(line + b"\n" for line in lines))
+            return True
+    except ValueError:
+        return False
 
 
 def write_bounded_text(path: Path, content: str, max_bytes: int) -> None:
     encoded = content.encode("utf-8")
     if len(encoded) > max_bytes:
         encoded = encoded[:max_bytes].decode("utf-8", errors="ignore").encode("utf-8")
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if _active_lock_parent(path.parent) is None:
+        path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and path.is_symlink():
         return
     _atomic_write_bytes(path, encoded)

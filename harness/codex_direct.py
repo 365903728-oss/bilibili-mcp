@@ -23,6 +23,7 @@ from harness.contracts import ACCEPTANCE_OWNERS, WRITERS, validate_direct_contra
 from harness.safe_io import (
     _hold_windows_directory_chain,
     _open_directory_nofollow,
+    _unlink_nofollow,
     bounded_file_lock,
     ensure_no_link_components,
     read_bounded_bytes,
@@ -3131,7 +3132,7 @@ def _rollback_unstable_start(
     if exit_code == 0:
         run_path = _task_dir(context, contract["task"]["id"]) / "run.json"
         if run_path.is_file() and not run_path.is_symlink():
-            run_path.unlink()
+            _unlink_nofollow(run_path)
     elif exit_code == 3 and control.get("manual_skill", {}).get("status") == "reminder-emitted":
         skill = next(
             item for item in contract["required_manual_skills"] if item["status"] != "invoked"
@@ -3144,7 +3145,7 @@ def _rollback_unstable_start(
         )
         marker = context.runtime_root / "manual-skill-reminders" / f"{reminder_id}.json"
         if marker.is_file() and not marker.is_symlink():
-            marker.unlink()
+            _unlink_nofollow(marker)
 
 
 def start_direct(

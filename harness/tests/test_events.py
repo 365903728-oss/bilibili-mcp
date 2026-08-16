@@ -137,7 +137,9 @@ class HookEventTests(unittest.TestCase):
                 *,
                 dir_fd: int | None = None,
             ) -> int:
-                if Path(candidate) == ledger:
+                if Path(candidate) == ledger or (
+                    dir_fd is not None and Path(candidate).name == ledger.name
+                ):
                     swap()
                 if dir_fd is None:
                     return real_os_open(candidate, flags, mode)
@@ -543,7 +545,7 @@ class HookEventTests(unittest.TestCase):
 
             try:
                 with patch("harness.safe_io.os.open", new=raced_open):
-                    with self.assertRaisesRegex(ValueError, "lock is unavailable"):
+                    with self.assertRaisesRegex(ValueError, "lock directory changed"):
                         with bounded_file_lock(lock_path):
                             pass
                 self.assertTrue(swapped)
@@ -554,6 +556,52 @@ class HookEventTests(unittest.TestCase):
                     runtime.unlink()
                 if displaced.exists():
                     displaced.rename(runtime)
+
+    @unittest.skipIf(os.name == "nt", "open lock files already block directory rename")
+    def test_nested_lock_rejects_replaced_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            runtime = root / "runtime"
+            displaced = root / "displaced"
+            runtime.mkdir()
+            lock_path = runtime / "state.lock"
+            state_path = runtime / "state.json"
+
+            with self.assertRaisesRegex(ValueError, "runtime lock is unavailable"):
+                with bounded_file_lock(lock_path):
+                    runtime.rename(displaced)
+                    runtime.mkdir()
+                    state_path.write_text("replacement\n", encoding="utf-8")
+                    with bounded_file_lock(runtime / "nested.lock"):
+                        write_bounded_text(state_path, "transaction\n", 1024)
+
+            self.assertEqual(state_path.read_text(encoding="utf-8"), "replacement\n")
+            self.assertFalse((displaced / "state.json").exists())
+
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_nested_lock_does_not_create_through_replaced_ancestor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            scope = root / "scope"
+            runtime = scope / "runtime"
+            displaced = root / "displaced"
+            external = root / "external"
+            runtime.mkdir(parents=True)
+            external.mkdir()
+
+            try:
+                with self.assertRaisesRegex(ValueError, "runtime lock is unavailable"):
+                    with bounded_file_lock(runtime / "outer.lock"):
+                        scope.rename(displaced)
+                        scope.symlink_to(external, target_is_directory=True)
+                        with bounded_file_lock(runtime / "inner.lock"):
+                            pass
+                self.assertFalse((external / "runtime").exists())
+            finally:
+                if scope.is_symlink():
+                    scope.unlink()
+                if displaced.exists():
+                    displaced.rename(scope)
 
 
 if __name__ == "__main__":

@@ -2247,6 +2247,12 @@ def mcp_surface_message(
             ):
                 raise EvolutionError("MCP progress token is invalid")
         operation = _nonempty(params["name"], "MCP tool name", 64)
+        if operation not in canonical["skill"]["interface"]["operations"]:
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {"code": -32602, "message": "Invalid params"},
+            }
         operation_result = _surface_operation_result(context, canonical, operation)
         result = {
             "content": [{"type": "text", "text": _canonical_text(operation_result)}],
