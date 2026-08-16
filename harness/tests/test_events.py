@@ -603,6 +603,71 @@ class HookEventTests(unittest.TestCase):
                 if displaced.exists():
                     displaced.rename(scope)
 
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_lock_creation_does_not_follow_a_swapped_missing_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            scope = root / "scope"
+            runtime = scope / "runtime"
+            displaced = root / "displaced"
+            external = root / "external"
+            scope.mkdir()
+            external.mkdir()
+            real_mkdir = os.mkdir
+            swapped = False
+
+            def raced_mkdir(
+                candidate: os.PathLike[str] | str | bytes,
+                mode: int = 0o777,
+                *,
+                dir_fd: int | None = None,
+            ) -> None:
+                nonlocal swapped
+                if not swapped and (
+                    Path(candidate) == runtime or Path(candidate).name == runtime.name
+                ):
+                    scope.rename(displaced)
+                    scope.symlink_to(external, target_is_directory=True)
+                    swapped = True
+                real_mkdir(candidate, mode, dir_fd=dir_fd)
+
+            try:
+                with patch("harness.safe_io.os.mkdir", new=raced_mkdir):
+                    with self.assertRaisesRegex(ValueError, "runtime lock is unavailable"):
+                        with bounded_file_lock(runtime / "task" / "run.lock"):
+                            pass
+                self.assertTrue(swapped)
+                self.assertFalse((external / "runtime").exists())
+            finally:
+                if scope.is_symlink():
+                    scope.unlink()
+                if displaced.exists():
+                    displaced.rename(scope)
+
+    @unittest.skipIf(os.name == "nt", "directory flock is POSIX-only")
+    def test_replaced_lock_inode_cannot_admit_a_second_writer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runtime = Path(temp) / "runtime"
+            runtime.mkdir()
+            lock_path = runtime / "run.lock"
+            contender: list[str] = []
+
+            def try_second_writer() -> None:
+                try:
+                    with bounded_file_lock(lock_path):
+                        contender.append("acquired")
+                except ValueError:
+                    contender.append("rejected")
+
+            with self.assertRaisesRegex(ValueError, "runtime lock file changed"):
+                with bounded_file_lock(lock_path):
+                    lock_path.unlink()
+                    lock_path.write_text("replacement", encoding="utf-8")
+                    with ThreadPoolExecutor(max_workers=1) as executor:
+                        executor.submit(try_second_writer).result(timeout=10)
+
+            self.assertEqual(contender, ["rejected"])
+
 
 if __name__ == "__main__":
     unittest.main()

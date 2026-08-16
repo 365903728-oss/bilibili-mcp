@@ -559,10 +559,31 @@ def main(argv: Sequence[str] | None = None) -> int:
                         or (method in {"tools/list", "tools/call"} and not ready)
                     ):
                         raise ValueError("MCP stdio lifecycle is invalid")
-                    response = mcp_surface_message(
-                        context, name=args.name, adapter=args.adapter, value=value
-                    )
-                    if method == "initialize":
+                    try:
+                        response = mcp_surface_message(
+                            context, name=args.name, adapter=args.adapter, value=value
+                        )
+                    except EvolutionError as exc:
+                        request_id = value.get("id") if isinstance(value, dict) else None
+                        if (
+                            method in {"initialize", "ping", "tools/list", "tools/call"}
+                            and isinstance(request_id, (str, int))
+                            and not isinstance(request_id, bool)
+                            and len(str(request_id)) <= 64
+                            and str(exc).startswith("MCP ")
+                        ):
+                            response = {
+                                "jsonrpc": "2.0",
+                                "id": request_id,
+                                "error": {"code": -32602, "message": "Invalid params"},
+                            }
+                        else:
+                            raise
+                    if (
+                        method == "initialize"
+                        and response is not None
+                        and "result" in response
+                    ):
                         initialized = True
                     elif method == "notifications/initialized":
                         ready = True

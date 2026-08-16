@@ -10,7 +10,7 @@
     "review_repairs": {
       "harness/cli.py": {
         "finding": "pr-39-mcp-session-lifetime",
-        "sha256": "0f0bde21aa509794294ff29c1e5980f6a4246f2d7e99522eeff2539c49dc997f"
+        "sha256": "6bf071b53a778a483a22196455872242061fdcf83147e77d97771f9f9fa78bb1"
       },
       "harness/codex_direct.py": {
         "finding": "pr-39-verified-index-installation",
@@ -34,7 +34,7 @@
       },
       "harness/safe_io.py": {
         "finding": "pr-39-verified-jsonl-descriptor",
-        "sha256": "d6781fadffcc2f235227fcbed5e0c49e7c1b01a162ba56d7854986fc731aaed2"
+        "sha256": "1be53ac60860ef536aa7c342d3a7cf4145843eeb4c7525c6784ed46ceb4850b7"
       }
     }
   },
