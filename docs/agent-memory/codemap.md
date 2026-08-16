@@ -141,7 +141,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `tests/pinned-https.test.ts`: DNS/public-address rejection, connection
   pinning, TLS hostname retention, header stripping, and host enforcement.
 - `tests/publish-workflow-pins.test.ts`: full immutable SHA enforcement for
-  every third-party publish Action.
+  every third-party Action across all repository workflows.
 - `tests/subtitle-fallback-security.test.ts`: malformed subtitle fail-closed
   behavior and exact ASR eligibility.
 - `tests/helpers/mcp.ts`: centralized test access to MCP request handlers.
@@ -176,6 +176,8 @@ Default verification:
 
 - `package.json`: npm metadata, binary mapping, scripts, dependencies, and publish file allowlist.
 - `package-lock.json`: npm lockfile; update through npm tooling, not manual edits.
+- `.github/workflows/verify.yml`: read-only pull-request/default-branch CI for
+  product build/test/package checks and sharded Windows/Linux Harness tests.
 - `.github/workflows/publish.yml`: trusted-publishing npm release workflow for version tags.
 - `README.md`, `README_EN.md`: concise bilingual landing pages with project value, verified evidence workflow, installation and verification flow, task-oriented tool selection, CLI status gates, product limits, privacy and safety boundaries, plus prominent links to the canonical setup and tool references; they do not duplicate exhaustive installation or configuration methods.
 - `docs/client-setup.md`, `docs/client-setup.en.md`: canonical bilingual source for the Agent installation prompt, npm/global/source installation, all supported MCP client configurations, credential setup and login validation, and optional runtime configuration.

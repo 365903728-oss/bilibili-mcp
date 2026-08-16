@@ -1,0 +1,116 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  product:
+    name: Product
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # v7.0.1 resolved from the official actions/checkout repository on 2026-08-16.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      # v7.0.0 resolved from the official actions/setup-node repository on 2026-08-16.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.14.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check package contents
+        run: npm pack --dry-run
+
+  harness:
+    name: Harness (${{ matrix.os }}, ${{ matrix.shard }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shard: core
+            modules: >-
+              harness.tests.test_contracts
+              harness.tests.test_events
+              harness.tests.test_cli_and_adapters
+              harness.tests.test_memory
+          - os: windows-latest
+            shard: core
+            modules: >-
+              harness.tests.test_contracts
+              harness.tests.test_events
+              harness.tests.test_cli_and_adapters
+              harness.tests.test_memory
+          - os: ubuntu-latest
+            shard: adapters
+            modules: >-
+              harness.tests.test_codex_direct
+              harness.tests.test_claude_direct
+              harness.tests.test_paseo_collaboration
+          - os: windows-latest
+            shard: adapters
+            modules: >-
+              harness.tests.test_codex_direct
+              harness.tests.test_claude_direct
+              harness.tests.test_paseo_collaboration
+          - os: ubuntu-latest
+            shard: evolution
+            modules: harness.tests.test_evolution
+          - os: windows-latest
+            shard: evolution
+            modules: harness.tests.test_evolution
+    steps:
+      # v7.0.1 resolved from the official actions/checkout repository on 2026-08-16.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # v7.0.0 resolved from the official actions/setup-python repository on 2026-08-16.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: 3.13.7
+
+      - name: Run ${{ matrix.shard }} tests
+        env:
+          PYTHONUTF8: "1"
+        run: python -m unittest ${{ matrix.modules }}
+
+  required:
+    name: Required
+    if: always()
+    needs:
+      - product
+      - harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all verification jobs
+        env:
+          PRODUCT_RESULT: ${{ needs.product.result }}
+          HARNESS_RESULT: ${{ needs.harness.result }}
+        run: test "$PRODUCT_RESULT" = success && test "$HARNESS_RESULT" = success

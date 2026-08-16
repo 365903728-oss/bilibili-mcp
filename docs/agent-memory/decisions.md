@@ -731,3 +731,16 @@
   Paseo 0.3.1 and `claude/deepseek-v4-flash` with
   `restarted_daemon=false` and `fallback_chosen=false`; the accepted run kept
   `codex-paseo-claude` through commit and lease release.
+
+## 2026-08-16 — Pull-request verification CI
+
+- Decision: Add one read-only `Verify` workflow for pull requests, `master`
+  pushes, and manual runs; keep npm publication in the existing tag-only
+  workflow.
+- Reason: Automated review and release-time testing do not provide a
+  deterministic clean-runner gate for every proposed commit. Product checks
+  need one Linux job, while Harness filesystem and adapter behavior needs
+  sharded Windows/Linux coverage without a 30-minute monolithic suite.
+- Evidence: The workflow fixes official Actions to full immutable SHAs, grants
+  only `contents: read`, cancels superseded branch runs, and exposes one stable
+  `Required` gate over product plus six Harness matrix jobs.
