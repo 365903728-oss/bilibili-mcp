@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import stat
 import sys
 import tempfile
@@ -355,6 +356,100 @@ def bounded_file_lock(lock_path: Path, *, create: bool = True) -> Iterator[None]
             os.close(descriptor)
 
 
+def _open_directory_nofollow(path: Path) -> int:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    anchor = path.anchor or "."
+    parts = path.parts[1:] if path.anchor else path.parts
+    descriptor = os.open(anchor, flags)
+    try:
+        for component in parts:
+            if component in ("", "."):
+                continue
+            if component == "..":
+                raise ValueError("atomic write parent cannot traverse upward")
+            next_descriptor = os.open(component, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = next_descriptor
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _atomic_write_bytes(path: Path, content: bytes) -> None:
+    if os.name == "nt":
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+        )
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary_name, path)
+        finally:
+            if os.path.exists(temporary_name):
+                os.unlink(temporary_name)
+        return
+
+    temporary_name = f".{path.name}.{secrets.token_hex(8)}.tmp"
+    parent_descriptor = _open_directory_nofollow(path.parent)
+    temporary_created = False
+    try:
+        opened_parent = os.fstat(parent_descriptor)
+
+        def parent_is_current() -> bool:
+            try:
+                current_descriptor = _open_directory_nofollow(path.parent)
+            except (OSError, ValueError):
+                return False
+            try:
+                current_parent = os.fstat(current_descriptor)
+                return (opened_parent.st_dev, opened_parent.st_ino) == (
+                    current_parent.st_dev,
+                    current_parent.st_ino,
+                )
+            finally:
+                os.close(current_descriptor)
+
+        if not stat.S_ISDIR(opened_parent.st_mode) or not parent_is_current():
+            raise ValueError("atomic write parent is unavailable")
+        temporary_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            temporary_flags |= os.O_CLOEXEC
+        descriptor = os.open(
+            temporary_name,
+            temporary_flags,
+            0o600,
+            dir_fd=parent_descriptor,
+        )
+        temporary_created = True
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if not parent_is_current():
+            raise ValueError("atomic write parent changed during write")
+        os.replace(
+            temporary_name,
+            path.name,
+            src_dir_fd=parent_descriptor,
+            dst_dir_fd=parent_descriptor,
+        )
+        temporary_created = False
+    finally:
+        try:
+            if temporary_created:
+                try:
+                    os.unlink(temporary_name, dir_fd=parent_descriptor)
+                except FileNotFoundError:
+                    pass
+        finally:
+            os.close(parent_descriptor)
+
+
 def append_bounded_jsonl(
     path: Path,
     row: dict[str, Any],
@@ -390,19 +485,7 @@ def append_bounded_jsonl(
         while len(lines) > MAX_JSONL_ROWS or sum(len(line) + 1 for line in lines) > MAX_JSONL_BYTES:
             lines.pop(0)
 
-        fd, temporary_name = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-        )
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                for line in lines:
-                    handle.write(line + b"\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary_name, path)
-        finally:
-            if os.path.exists(temporary_name):
-                os.unlink(temporary_name)
+        _atomic_write_bytes(path, b"".join(line + b"\n" for line in lines))
         return True
     finally:
         try:
@@ -418,15 +501,4 @@ def write_bounded_text(path: Path, content: str, max_bytes: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and path.is_symlink():
         return
-    fd, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_name, path)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+    _atomic_write_bytes(path, encoded)

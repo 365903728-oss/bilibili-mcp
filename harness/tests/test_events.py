@@ -20,6 +20,7 @@ from harness.safe_io import (
     bounded_file_lock,
     read_bounded_json_stream,
     read_bounded_jsonl,
+    write_bounded_text,
 )
 
 
@@ -333,6 +334,145 @@ class HookEventTests(unittest.TestCase):
                 sorted(row["index"] for row in read_bounded_jsonl(ledger)),
                 list(range(24)),
             )
+
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_atomic_writers_fail_closed_when_parent_path_is_replaced(self) -> None:
+        for name, writer in (
+            ("state.txt", lambda path: write_bounded_text(path, "trusted\n", 1024)),
+            ("events.jsonl", lambda path: append_bounded_jsonl(path, {"trusted": True})),
+        ):
+            for replace_ancestor in (False, True):
+                with (
+                    self.subTest(name=name, replace_ancestor=replace_ancestor),
+                    tempfile.TemporaryDirectory() as temp,
+                ):
+                    root = Path(temp)
+                    scope = root / "scope"
+                    runtime = scope / "runtime"
+                    displaced = root / "displaced"
+                    external = root / "external"
+                    runtime.mkdir(parents=True)
+                    (external / "runtime").mkdir(parents=True)
+                    replaced = scope if replace_ancestor else runtime
+                    external_link = external if replace_ancestor else external / "runtime"
+                    external_target = external / "runtime" / name
+                    target = runtime / name
+                    real_mkstemp = tempfile.mkstemp
+                    real_open = os.open
+                    swapped = False
+
+                    def swap_parent() -> None:
+                        nonlocal swapped
+                        if swapped:
+                            return
+                        replaced.rename(displaced)
+                        replaced.symlink_to(external_link, target_is_directory=True)
+                        swapped = True
+
+                    def raced_mkstemp(*args: object, **kwargs: object):
+                        if Path(kwargs["dir"]) == runtime:
+                            swap_parent()
+                        return real_mkstemp(*args, **kwargs)
+
+                    def raced_open(
+                        candidate: os.PathLike[str] | str | bytes,
+                        flags: int,
+                        mode: int = 0o777,
+                        *,
+                        dir_fd: int | None = None,
+                    ) -> int:
+                        if dir_fd is None and Path(candidate) == runtime:
+                            swap_parent()
+                        elif (
+                            dir_fd is not None
+                            and not flags & os.O_CREAT
+                            and Path(candidate).name == replaced.name
+                        ):
+                            swap_parent()
+                        if dir_fd is None:
+                            return real_open(candidate, flags, mode)
+                        return real_open(candidate, flags, mode, dir_fd=dir_fd)
+
+                    try:
+                        with (
+                            patch("harness.safe_io.tempfile.mkstemp", new=raced_mkstemp),
+                            patch("harness.safe_io.os.open", new=raced_open),
+                        ):
+                            with self.assertRaises((ValueError, OSError)):
+                                writer(target)
+                        self.assertTrue(swapped)
+                        self.assertFalse(external_target.exists())
+                    finally:
+                        if replaced.is_symlink():
+                            replaced.unlink()
+                        if displaced.exists():
+                            displaced.rename(replaced)
+
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_atomic_writer_generates_temp_name_before_opening_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "state.txt"
+            real_open = os.open
+            opened = 0
+
+            def recording_open(*args: object, **kwargs: object) -> int:
+                nonlocal opened
+                opened += 1
+                return real_open(*args, **kwargs)
+
+            with (
+                patch("harness.safe_io.os.open", new=recording_open),
+                patch(
+                    "harness.safe_io.secrets.token_hex",
+                    side_effect=OSError("random source failed"),
+                ),
+            ):
+                with self.assertRaisesRegex(OSError, "random source failed"):
+                    write_bounded_text(target, "trusted\n", 1024)
+            self.assertEqual(opened, 0)
+
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_atomic_writer_closes_parent_when_temp_cleanup_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "state.txt"
+            real_open = os.open
+            real_close = os.close
+            parent_descriptor: int | None = None
+            closed: list[int] = []
+
+            def recording_open(
+                candidate: os.PathLike[str] | str | bytes,
+                flags: int,
+                mode: int = 0o777,
+                *,
+                dir_fd: int | None = None,
+            ) -> int:
+                nonlocal parent_descriptor
+                if dir_fd is None:
+                    descriptor = real_open(candidate, flags, mode)
+                    if Path(candidate) == target.parent:
+                        parent_descriptor = descriptor
+                    return descriptor
+                descriptor = real_open(candidate, flags, mode, dir_fd=dir_fd)
+                if parent_descriptor is None and Path(candidate).name == target.parent.name:
+                    parent_descriptor = descriptor
+                return descriptor
+
+            def recording_close(descriptor: int) -> None:
+                closed.append(descriptor)
+                real_close(descriptor)
+
+            with (
+                patch("harness.safe_io.os.open", new=recording_open),
+                patch("harness.safe_io.os.close", new=recording_close),
+                patch("harness.safe_io.os.replace", side_effect=OSError("replace failed")),
+                patch("harness.safe_io.os.unlink", side_effect=OSError("cleanup failed")),
+            ):
+                with self.assertRaisesRegex(OSError, "cleanup failed"):
+                    write_bounded_text(target, "trusted\n", 1024)
+
+            self.assertIsNotNone(parent_descriptor)
+            self.assertIn(parent_descriptor, closed)
 
     def test_lock_initialization_rejects_hard_link_without_touching_target(
         self,
