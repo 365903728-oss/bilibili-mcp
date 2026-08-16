@@ -2095,6 +2095,24 @@ def call_surface_capability(
     }
 
 
+def _bounded_mcp_object(
+    value: Any,
+    label: str,
+    *,
+    max_nodes: int = 64,
+    max_depth: int = 4,
+    max_bytes: int = 4096,
+) -> dict[str, Any]:
+    try:
+        validate_json_shape(value, max_nodes=max_nodes, max_depth=max_depth)
+        encoded_size = len(_canonical_text(value).encode("utf-8"))
+    except (TypeError, ValueError) as exc:
+        raise EvolutionError(f"{label} is invalid") from exc
+    if not isinstance(value, dict) or encoded_size > max_bytes:
+        raise EvolutionError(f"{label} is invalid")
+    return value
+
+
 def mcp_surface_message(
     context: WorktreeContext,
     *,
@@ -2116,11 +2134,16 @@ def mcp_surface_message(
             value, {"jsonrpc", "method", "params"}, "MCP notification"
         )
         method = _nonempty(notification["method"], "MCP notification method", 128)
-        if not method.startswith("notifications/") or not isinstance(
-            notification["params"], dict
-        ) or (
-            method == "notifications/initialized" and notification["params"] != {}
-        ):
+        params = _bounded_mcp_object(
+            notification["params"],
+            "MCP notification params",
+            max_nodes=512,
+            max_depth=8,
+            max_bytes=64 * 1024,
+        )
+        if "_meta" in params:
+            _bounded_mcp_object(params["_meta"], "MCP notification metadata")
+        if not method.startswith("notifications/"):
             raise EvolutionError("MCP notification is invalid")
         return None
     method = value.get("method")
@@ -2228,14 +2251,7 @@ def mcp_surface_message(
         arguments = params.get("arguments", {})
         if arguments != {}:
             raise EvolutionError("MCP tool arguments are invalid")
-        meta = params.get("_meta", {})
-        try:
-            validate_json_shape(meta, max_nodes=64, max_depth=4)
-            meta_size = len(_canonical_text(meta).encode("utf-8"))
-        except (TypeError, ValueError) as exc:
-            raise EvolutionError("MCP tool metadata are invalid") from exc
-        if not isinstance(meta, dict) or meta_size > 4096:
-            raise EvolutionError("MCP tool metadata are invalid")
+        meta = _bounded_mcp_object(params.get("_meta", {}), "MCP tool metadata")
         if "progressToken" in meta:
             token = meta["progressToken"]
             if isinstance(token, str):

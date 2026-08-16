@@ -152,7 +152,11 @@ class CliAndAdapterTests(unittest.TestCase):
                     "clientInfo": {"name": "test-client", "version": "1"},
                 },
             },
-            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {"_meta": {"trace": "bounded"}},
+            },
             {"jsonrpc": "2.0", "id": 2, "method": "resources/list"},
             {
                 "jsonrpc": "2.0",

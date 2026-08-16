@@ -829,7 +829,7 @@ raise SystemExit(main())
                         else "2025-11-25",
                     )
 
-    def test_mcp_cancellation_notification_is_ignored(self) -> None:
+    def test_mcp_notifications_accept_bounded_metadata(self) -> None:
         from harness.evolution import mcp_surface_message
 
         canonical = {
@@ -853,6 +853,32 @@ raise SystemExit(main())
                     },
                 )
             )
+            self.assertIsNone(
+                mcp_surface_message(
+                    object(),
+                    name=canonical["name"],
+                    adapter="codex-direct",
+                    value={
+                        "jsonrpc": "2.0",
+                        "method": "notifications/initialized",
+                        "params": {"_meta": {"trace": "bounded"}},
+                    },
+                )
+            )
+            for meta in ("invalid", {"trace": "x" * 4096}):
+                with self.assertRaisesRegex(
+                    EvolutionError, "notification (params|metadata)"
+                ):
+                    mcp_surface_message(
+                        object(),
+                        name=canonical["name"],
+                        adapter="codex-direct",
+                        value={
+                            "jsonrpc": "2.0",
+                            "method": "notifications/initialized",
+                            "params": {"_meta": meta},
+                        },
+                    )
 
     def test_mcp_tool_call_accepts_optional_arguments_and_progress_meta(self) -> None:
         from harness.evolution import mcp_surface_message
