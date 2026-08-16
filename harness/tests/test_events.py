@@ -18,6 +18,7 @@ from harness.safe_io import (
     MAX_STDIN_BYTES,
     append_bounded_jsonl,
     bounded_file_lock,
+    ensure_no_link_components,
     read_bounded_json_stream,
     read_bounded_jsonl,
     write_bounded_text,
@@ -32,6 +33,20 @@ def load_fixture(name: str) -> dict[str, object]:
 
 
 class HookEventTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Windows 8.3 aliases only")
+    def test_link_guard_accepts_equivalent_windows_short_aliases(self) -> None:
+        boundary = Path(r"C:\Users\runneradmin\AppData\Local\Temp\repo")
+        target = Path(r"C:\Users\RUNNER~1\AppData\Local\Temp\repo\handoff.md")
+
+        def expand(path: Path) -> Path:
+            return Path(str(path).replace("RUNNER~1", "runneradmin"))
+
+        with (
+            patch("harness.safe_io._windows_long_path", side_effect=expand),
+            patch("harness.safe_io._is_link_like", return_value=False),
+        ):
+            ensure_no_link_components(boundary, target)
+
     def test_codex_and_claude_replay_to_equivalent_semantics(self) -> None:
         codex = normalize_hook_event(
             "codex", "post-tool-use", load_fixture("codex-post-tool-use.json")

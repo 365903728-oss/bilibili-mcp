@@ -165,10 +165,46 @@ def _is_link_like(path: Path) -> bool:
     return bool(is_junction and is_junction())
 
 
+def _windows_long_path(path: Path) -> Path:
+    """Expand an existing Windows 8.3 prefix without resolving reparse points."""
+    if os.name != "nt":
+        return path
+
+    import ctypes
+    from ctypes import wintypes
+
+    existing = path
+    missing: list[str] = []
+    while not os.path.lexists(existing):
+        if existing.parent == existing:
+            return path
+        missing.append(existing.name)
+        existing = existing.parent
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_long_path_name = kernel32.GetLongPathNameW
+    get_long_path_name.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+    ]
+    get_long_path_name.restype = wintypes.DWORD
+    required = get_long_path_name(str(existing), None, 0)
+    if required == 0:
+        return path
+    buffer = ctypes.create_unicode_buffer(required)
+    if get_long_path_name(str(existing), buffer, required) == 0:
+        return path
+    expanded = Path(buffer.value)
+    for component in reversed(missing):
+        expanded /= component
+    return expanded
+
+
 def ensure_no_link_components(boundary: Path, target: Path) -> None:
     """Reject a target that escapes a boundary or traverses a link/junction."""
-    boundary_abs = Path(os.path.abspath(boundary))
-    target_abs = Path(os.path.abspath(target))
+    boundary_abs = _windows_long_path(Path(os.path.abspath(boundary)))
+    target_abs = _windows_long_path(Path(os.path.abspath(target)))
     try:
         relative = target_abs.relative_to(boundary_abs)
     except ValueError as exc:

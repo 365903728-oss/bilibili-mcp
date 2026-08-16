@@ -39,9 +39,8 @@ the migration clean-room test can inspect its exact accepted #35 base.
 - Windows Harness core shard: 92 tests PASS, 11 expected platform skips.
 - Migration conformance after durable-memory receipt refresh: 1/1 PASS.
 - `git diff --check`: PASS.
-- Adapter and Evolution shards were not repeated locally; the current PR HEAD
-  already carries their accepted evidence, and the new live workflow runs both
-  shards on Windows and Ubuntu before delivery is declared complete.
+- Windows adapters shard after the hosted-run repair: 153 tests PASS, 2
+  expected platform skips.
 
 ## Acceptance Criteria
 
@@ -63,6 +62,12 @@ the migration clean-room test can inspect its exact accepted #35 base.
   report's codemap/decision updates made their migration receipts stale. The
   same test reproduced locally; the two LF-normalized durable-memory digests
   and outer migration digest were refreshed and the focused test passed.
+- Second live run `31941505324` passed product and five Harness matrix jobs but
+  exposed that GitHub's Windows runner spells the same temporary directory as
+  both `RUNNER~1` and `runneradmin`. The shared link guard now expands existing
+  Windows 8.3 path prefixes before containment checks while retaining its
+  junction/symlink rejection. Three focused regressions and the complete local
+  adapters shard pass.
 
 ## Risks, Skipped Checks, Recovery Bundle
 
@@ -91,4 +96,6 @@ the migration clean-room test can inspect its exact accepted #35 base.
 
 ## Local Commit
 
-Pending exact-diff acceptance.
+- `f77db023ef351ab452a566d3ee561df0405bfbb4`: CI workflow and durable record.
+- `70fe1b644a32269163a05d873009af0275c37363`: migration receipt refresh.
+- This report is committed with the final Windows 8.3 compatibility repair.
