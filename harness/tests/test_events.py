@@ -411,8 +411,11 @@ class HookEventTests(unittest.TestCase):
                             patch("harness.safe_io.tempfile.mkstemp", new=raced_mkstemp),
                             patch("harness.safe_io.os.open", new=raced_open),
                         ):
-                            with self.assertRaises((ValueError, OSError)):
-                                writer(target)
+                            if name == "events.jsonl":
+                                self.assertFalse(writer(target))
+                            else:
+                                with self.assertRaises((ValueError, OSError)):
+                                    writer(target)
                         self.assertTrue(swapped)
                         self.assertFalse(external_target.exists())
                     finally:
@@ -505,6 +508,52 @@ class HookEventTests(unittest.TestCase):
                 with bounded_file_lock(lock_path):
                     self.fail("hard-linked lock must not be acquired")
             self.assertEqual(external.read_bytes(), b"")
+
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_lock_open_is_anchored_when_parent_is_replaced(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            runtime = root / "runtime"
+            displaced = root / "displaced"
+            external = root / "external"
+            runtime.mkdir()
+            external.mkdir()
+            lock_path = runtime / "state.lock"
+            real_open = os.open
+            swapped = False
+
+            def raced_open(
+                candidate: os.PathLike[str] | str | bytes,
+                flags: int,
+                mode: int = 0o777,
+                *,
+                dir_fd: int | None = None,
+            ) -> int:
+                nonlocal swapped
+                if not swapped and (
+                    Path(candidate) == lock_path
+                    or (dir_fd is not None and Path(candidate).name == lock_path.name)
+                ):
+                    runtime.rename(displaced)
+                    runtime.symlink_to(external, target_is_directory=True)
+                    swapped = True
+                if dir_fd is None:
+                    return real_open(candidate, flags, mode)
+                return real_open(candidate, flags, mode, dir_fd=dir_fd)
+
+            try:
+                with patch("harness.safe_io.os.open", new=raced_open):
+                    with self.assertRaisesRegex(ValueError, "lock is unavailable"):
+                        with bounded_file_lock(lock_path):
+                            pass
+                self.assertTrue(swapped)
+                self.assertFalse((external / lock_path.name).exists())
+                self.assertTrue((displaced / lock_path.name).is_file())
+            finally:
+                if runtime.is_symlink():
+                    runtime.unlink()
+                if displaced.exists():
+                    displaced.rename(runtime)
 
 
 if __name__ == "__main__":

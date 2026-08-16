@@ -18,7 +18,7 @@
       },
       "harness/evolution.py": {
         "finding": "pr-39-verified-zero-candidate-channels",
-        "sha256": "1db2ce9d37ecf712ef4b82aa11e540f62485652f2960341f7726868a3c116be0"
+        "sha256": "87cf59979232ea0e2a63a5dc03e7d2b55adc445ab9b402d0fc1c5ab50e5ec112"
       },
       "harness/memory.py": {
         "finding": "pr-39-recoverable-memory-transaction",
@@ -30,7 +30,7 @@
       },
       "harness/safe_io.py": {
         "finding": "pr-39-verified-jsonl-descriptor",
-        "sha256": "eb186dd9364b9c9473954b7af0583fd1d254c189f2be6bc7f90e3a3035a7786b"
+        "sha256": "c66e36ebde2e94a5dd49699da5d6bc0ec5232595a4145a47141690ad7ff97037"
       }
     }
   },

@@ -854,6 +854,65 @@ raise SystemExit(main())
                 )
             )
 
+    def test_mcp_tool_call_accepts_optional_arguments_and_progress_meta(self) -> None:
+        from harness.evolution import mcp_surface_message
+
+        canonical = {
+            "name": "safe-build-fixture",
+            "version": "1.0.0",
+            "surface": {"kind": "mcp"},
+            "skill": {"interface": {"operations": ["inspect"]}},
+        }
+        with patch(
+            "harness.evolution.discover_surface_capabilities",
+            return_value={"capabilities": [{"name": canonical["name"]}]},
+        ), patch(
+            "harness.evolution._surface_canonical", return_value=canonical
+        ), patch(
+            "harness.evolution._surface_operation_result",
+            return_value={"operation": "inspect"},
+        ):
+            for request_id, params in (
+                (1, {"name": "inspect"}),
+                (
+                    2,
+                    {
+                        "name": "inspect",
+                        "arguments": {},
+                        "_meta": {"progressToken": "progress-1"},
+                    },
+                ),
+            ):
+                response = mcp_surface_message(
+                    object(),
+                    name=canonical["name"],
+                    adapter="codex-direct",
+                    value={
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "method": "tools/call",
+                        "params": params,
+                    },
+                )
+                self.assertEqual(response["id"], request_id)
+                self.assertFalse(response["result"]["isError"])
+            for meta in (
+                {"progressToken": []},
+                {"progressToken": "x" * 129},
+            ):
+                with self.assertRaisesRegex(EvolutionError, "progress token"):
+                    mcp_surface_message(
+                        object(),
+                        name=canonical["name"],
+                        adapter="codex-direct",
+                        value={
+                            "jsonrpc": "2.0",
+                            "id": 3,
+                            "method": "tools/call",
+                            "params": {"name": "inspect", "_meta": meta},
+                        },
+                    )
+
     def test_start_rejects_a_gap_that_is_not_in_accepted_current_memory(self) -> None:
         request = self.request()
 

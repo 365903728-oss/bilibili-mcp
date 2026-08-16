@@ -300,39 +300,91 @@ def _unlock_descriptor(descriptor: int) -> None:
 
 
 def _acquire_lock(lock_path: Path, *, create: bool = True) -> int | None:
-    for _ in range(200):
-        if _is_link_like(lock_path):
-            return None
-        flags = os.O_RDWR | (os.O_CREAT if create else 0)
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        try:
-            descriptor = os.open(lock_path, flags, 0o600)
-        except OSError:
-            return None
-        try:
-            opened = os.fstat(descriptor)
-            current = os.stat(lock_path, follow_symlinks=False)
-            if (
-                not stat.S_ISREG(opened.st_mode)
-                or opened.st_nlink != 1
-                or _is_link_like(lock_path)
-                or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
-            ):
-                os.close(descriptor)
+    def acquire(parent_descriptor: int | None) -> int | None:
+        candidate: Path | str = (
+            lock_path if parent_descriptor is None else lock_path.name
+        )
+
+        def current() -> os.stat_result:
+            if parent_descriptor is None:
+                return os.stat(candidate, follow_symlinks=False)
+            return os.stat(
+                candidate, dir_fd=parent_descriptor, follow_symlinks=False
+            )
+
+        for _ in range(200):
+            if parent_descriptor is None and _is_link_like(lock_path):
                 return None
-            if opened.st_size == 0:
-                if not create:
+            flags = os.O_RDWR | (os.O_CREAT if create else 0)
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            try:
+                if parent_descriptor is None:
+                    descriptor = os.open(candidate, flags, 0o600)
+                else:
+                    descriptor = os.open(
+                        candidate, flags, 0o600, dir_fd=parent_descriptor
+                    )
+            except OSError:
+                return None
+            try:
+                opened = os.fstat(descriptor)
+                visible = current()
+                if (
+                    not stat.S_ISREG(opened.st_mode)
+                    or opened.st_nlink != 1
+                    or (opened.st_dev, opened.st_ino)
+                    != (visible.st_dev, visible.st_ino)
+                ):
                     os.close(descriptor)
                     return None
-                os.write(descriptor, b"0")
-                os.fsync(descriptor)
-            _lock_descriptor(descriptor)
-            return descriptor
+                if opened.st_size == 0:
+                    if not create:
+                        os.close(descriptor)
+                        return None
+                    os.write(descriptor, b"0")
+                    os.fsync(descriptor)
+                _lock_descriptor(descriptor)
+                visible = current()
+                if (opened.st_dev, opened.st_ino) != (
+                    visible.st_dev,
+                    visible.st_ino,
+                ):
+                    os.close(descriptor)
+                    return None
+                return descriptor
+            except OSError:
+                os.close(descriptor)
+                time.sleep(0.025)
+        return None
+
+    if os.name == "nt":
+        try:
+            with _hold_windows_directory_chain(lock_path.parent):
+                return acquire(None)
+        except (OSError, ValueError):
+            return None
+    try:
+        parent_descriptor = _open_directory_nofollow(lock_path.parent)
+    except OSError:
+        return None
+    try:
+        opened_parent = os.fstat(parent_descriptor)
+        descriptor = acquire(parent_descriptor)
+        try:
+            visible_parent = os.stat(lock_path.parent, follow_symlinks=False)
         except OSError:
-            os.close(descriptor)
-            time.sleep(0.025)
-    return None
+            visible_parent = None
+        if visible_parent is None or (opened_parent.st_dev, opened_parent.st_ino) != (
+            visible_parent.st_dev,
+            visible_parent.st_ino,
+        ):
+            if descriptor is not None:
+                os.close(descriptor)
+            return None
+        return descriptor
+    finally:
+        os.close(parent_descriptor)
 
 
 @contextmanager

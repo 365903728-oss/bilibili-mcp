@@ -44,6 +44,7 @@ from harness.safe_io import (
     ensure_no_link_components,
     read_bounded_bytes,
     read_bounded_json_object,
+    validate_json_shape,
     write_bounded_text,
 )
 
@@ -2219,10 +2220,34 @@ def mcp_surface_message(
             ]
         }
     elif method == "tools/call":
-        call = _exact(params, {"name", "arguments"}, "MCP tools/call params")
-        if call["arguments"] != {}:
+        if (
+            not isinstance(params, dict)
+            or "name" not in params
+            or not set(params) <= {"name", "arguments", "_meta"}
+        ):
+            raise EvolutionError("MCP tools/call params are invalid")
+        arguments = params.get("arguments", {})
+        if arguments != {}:
             raise EvolutionError("MCP tool arguments are invalid")
-        operation = _nonempty(call["name"], "MCP tool name", 64)
+        meta = params.get("_meta", {})
+        try:
+            validate_json_shape(meta, max_nodes=64, max_depth=4)
+            meta_size = len(_canonical_text(meta).encode("utf-8"))
+        except (TypeError, ValueError) as exc:
+            raise EvolutionError("MCP tool metadata are invalid") from exc
+        if not isinstance(meta, dict) or meta_size > 4096:
+            raise EvolutionError("MCP tool metadata are invalid")
+        if "progressToken" in meta:
+            token = meta["progressToken"]
+            if isinstance(token, str):
+                _bounded_string(token, "MCP progress token", 128)
+            elif (
+                not isinstance(token, int)
+                or isinstance(token, bool)
+                or abs(token) > 2**53 - 1
+            ):
+                raise EvolutionError("MCP progress token is invalid")
+        operation = _nonempty(params["name"], "MCP tool name", 64)
         operation_result = _surface_operation_result(context, canonical, operation)
         result = {
             "content": [{"type": "text", "text": _canonical_text(operation_result)}],
