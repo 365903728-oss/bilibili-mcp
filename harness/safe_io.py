@@ -378,20 +378,122 @@ def _open_directory_nofollow(path: Path) -> int:
         raise
 
 
+@contextmanager
+def _hold_windows_directory_chain(path: Path) -> Iterator[None]:
+    if os.name != "nt":
+        yield
+        return
+
+    import ctypes
+    from ctypes import wintypes
+
+    class ByHandleFileInformation(ctypes.Structure):
+        _fields_ = [
+            ("file_attributes", wintypes.DWORD),
+            ("creation_time", wintypes.FILETIME),
+            ("last_access_time", wintypes.FILETIME),
+            ("last_write_time", wintypes.FILETIME),
+            ("volume_serial_number", wintypes.DWORD),
+            ("file_size_high", wintypes.DWORD),
+            ("file_size_low", wintypes.DWORD),
+            ("number_of_links", wintypes.DWORD),
+            ("file_index_high", wintypes.DWORD),
+            ("file_index_low", wintypes.DWORD),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
+    create_file.restype = wintypes.HANDLE
+    file_information = kernel32.GetFileInformationByHandle
+    file_information.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(ByHandleFileInformation),
+    ]
+    file_information.restype = wintypes.BOOL
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = [wintypes.HANDLE]
+    close_handle.restype = wintypes.BOOL
+
+    absolute = Path(os.path.abspath(path))
+    current = Path(absolute.anchor)
+    candidates = [current]
+    for component in absolute.parts[1:]:
+        current = current / component
+        candidates.append(current)
+    handles: list[int] = []
+    invalid_handle = ctypes.c_void_p(-1).value
+    try:
+        for candidate in candidates:
+            for access in (0x00010080, 0x00000080):
+                handle = create_file(
+                    str(candidate),
+                    access,
+                    0x00000001 | 0x00000002,
+                    None,
+                    3,
+                    0x02000000 | 0x00200000,
+                    None,
+                )
+                if handle != invalid_handle:
+                    break
+                error = ctypes.get_last_error()
+                if error not in (5, 32) or access == 0x00000080:
+                    raise ctypes.WinError(error)
+            info = ByHandleFileInformation()
+            if not file_information(handle, ctypes.byref(info)):
+                error = ctypes.get_last_error()
+                close_handle(handle)
+                raise ctypes.WinError(error)
+            if not info.file_attributes & 0x00000010 or info.file_attributes & 0x00000400:
+                close_handle(handle)
+                raise ValueError("atomic path cannot traverse a reparse point")
+            handles.append(handle)
+        yield
+    finally:
+        for handle in reversed(handles):
+            close_handle(handle)
+
+
+def _unlink_nofollow(path: Path, *, missing_ok: bool = False) -> None:
+    if os.name == "nt":
+        with _hold_windows_directory_chain(path.parent):
+            path.unlink(missing_ok=missing_ok)
+        return
+    parent_descriptor = _open_directory_nofollow(path.parent)
+    try:
+        try:
+            os.unlink(path.name, dir_fd=parent_descriptor)
+        except FileNotFoundError:
+            if not missing_ok:
+                raise
+    finally:
+        os.close(parent_descriptor)
+
+
 def _atomic_write_bytes(path: Path, content: bytes) -> None:
     if os.name == "nt":
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-        )
-        try:
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary_name, path)
-        finally:
-            if os.path.exists(temporary_name):
-                os.unlink(temporary_name)
+        with _hold_windows_directory_chain(path.parent):
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+            )
+            try:
+                with os.fdopen(descriptor, "wb") as handle:
+                    handle.write(content)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary_name, path)
+            finally:
+                if os.path.exists(temporary_name):
+                    os.unlink(temporary_name)
         return
 
     temporary_name = f".{path.name}.{secrets.token_hex(8)}.tmp"

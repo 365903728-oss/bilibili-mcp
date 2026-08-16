@@ -201,6 +201,177 @@ class MemoryProjectionTests(unittest.TestCase):
         self.assertEqual(record["supersedes"], None)
         self.assertEqual(projection["records"], [record])
 
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_memory_writers_fail_closed_when_parent_becomes_a_symlink(self) -> None:
+        for name, writer in (
+            (
+                "typed-memory.json",
+                lambda root, target: memory_module._write_exact(
+                    root, Path("agent-memory") / target.name, b"{}\n", 1024
+                ),
+            ),
+            (
+                "project-transaction.json",
+                lambda root, target: memory_module._write_transaction_marker(
+                    target, {"schema": "test"}
+                ),
+            ),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "root"
+                parent = root / "agent-memory"
+                displaced = Path(temp) / "displaced"
+                external = Path(temp) / "external"
+                parent.mkdir(parents=True)
+                external.mkdir()
+                target = parent / name
+                real_mkstemp = tempfile.mkstemp
+                real_open = os.open
+                swapped = False
+
+                def swap_parent() -> None:
+                    nonlocal swapped
+                    if swapped:
+                        return
+                    parent.rename(displaced)
+                    parent.symlink_to(external, target_is_directory=True)
+                    swapped = True
+
+                def raced_mkstemp(*args: object, **kwargs: object):
+                    if Path(kwargs["dir"]) == parent:
+                        swap_parent()
+                    return real_mkstemp(*args, **kwargs)
+
+                def raced_open(
+                    candidate: os.PathLike[str] | str | bytes,
+                    flags: int,
+                    mode: int = 0o777,
+                    *,
+                    dir_fd: int | None = None,
+                ) -> int:
+                    if (
+                        dir_fd is not None
+                        and flags & os.O_DIRECTORY
+                        and Path(candidate).name == parent.name
+                    ):
+                        swap_parent()
+                    if dir_fd is None:
+                        return real_open(candidate, flags, mode)
+                    return real_open(candidate, flags, mode, dir_fd=dir_fd)
+
+                try:
+                    with (
+                        patch("tempfile.mkstemp", new=raced_mkstemp),
+                        patch("harness.safe_io.os.open", new=raced_open),
+                    ):
+                        with self.assertRaises((OSError, ValueError)):
+                            writer(root, target)
+                    self.assertTrue(swapped)
+                    self.assertFalse((external / name).exists())
+                finally:
+                    if parent.is_symlink():
+                        parent.unlink()
+                    if displaced.exists():
+                        displaced.rename(parent)
+
+    @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
+    def test_memory_deletes_fail_closed_when_parent_is_a_symlink(self) -> None:
+        for name, delete in (
+            (
+                "typed-memory.json",
+                lambda root, target: memory_module._restore_artifact(
+                    root, Path("agent-memory") / target.name, None, 1024
+                ),
+            ),
+            (
+                "project-transaction.json",
+                lambda _root, target: memory_module._clear_transaction_marker(target),
+            ),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "root"
+                parent = root / "agent-memory"
+                displaced = Path(temp) / "displaced"
+                external = Path(temp) / "external"
+                parent.mkdir(parents=True)
+                external.mkdir()
+                target = parent / name
+                external_target = external / name
+                external_target.write_text("outside\n", encoding="utf-8")
+                parent.rename(displaced)
+                parent.symlink_to(external, target_is_directory=True)
+                try:
+                    with self.assertRaises((OSError, ValueError)):
+                        delete(root, target)
+                    self.assertEqual(
+                        external_target.read_text(encoding="utf-8"), "outside\n"
+                    )
+                finally:
+                    parent.unlink(missing_ok=True)
+                    displaced.rename(parent)
+
+    @unittest.skipUnless(os.name == "nt", "NTFS junctions are Windows-only")
+    def test_memory_writes_and_deletes_refuse_parent_junctions(self) -> None:
+        for operation in ("write-race", "delete"):
+            with self.subTest(operation=operation), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "root"
+                parent = root / "agent-memory"
+                displaced = Path(temp) / "displaced"
+                external = Path(temp) / "external"
+                parent.mkdir(parents=True)
+                external.mkdir()
+                target = parent / "typed-memory.json"
+                external_target = external / target.name
+                real_mkstemp = tempfile.mkstemp
+                attempted = False
+
+                def install_junction() -> None:
+                    nonlocal attempted
+                    attempted = True
+                    parent.rename(displaced)
+                    subprocess.run(
+                        ["cmd", "/c", "mklink", "/J", str(parent), str(external)],
+                        check=True,
+                        capture_output=True,
+                    )
+
+                def raced_mkstemp(*args: object, **kwargs: object):
+                    if Path(kwargs["dir"]) == parent:
+                        install_junction()
+                    return real_mkstemp(*args, **kwargs)
+
+                try:
+                    if operation == "write-race":
+                        with patch("tempfile.mkstemp", new=raced_mkstemp):
+                            with self.assertRaises((OSError, ValueError)):
+                                memory_module._write_exact(
+                                    root,
+                                    Path("agent-memory") / target.name,
+                                    b"{}\n",
+                                    1024,
+                                )
+                        self.assertTrue(attempted)
+                    else:
+                        external_target.write_text("outside\n", encoding="utf-8")
+                        install_junction()
+                        with self.assertRaises((OSError, ValueError)):
+                            memory_module._restore_artifact(
+                                root,
+                                Path("agent-memory") / target.name,
+                                None,
+                                1024,
+                            )
+                        self.assertEqual(
+                            external_target.read_text(encoding="utf-8"), "outside\n"
+                        )
+                    if operation == "write-race":
+                        self.assertFalse(external_target.exists())
+                finally:
+                    if parent.is_junction():
+                        os.rmdir(parent)
+                    if displaced.exists():
+                        displaced.rename(parent)
+
     def test_replay_is_idempotent_and_no_change_is_audited(self) -> None:
         first = self.project()
         store_path = self.repo / "docs/agent-memory/typed-memory.json"

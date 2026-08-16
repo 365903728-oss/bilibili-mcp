@@ -9,7 +9,6 @@ import math
 import os
 import re
 import stat
-import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
@@ -30,6 +29,8 @@ from harness.codex_direct import (
 )
 from harness.context import WorktreeContext
 from harness.safe_io import (
+    _atomic_write_bytes,
+    _unlink_nofollow,
     append_bounded_jsonl,
     bounded_file_lock,
     ensure_no_link_components,
@@ -955,18 +956,7 @@ def _write_exact(root: Path, relative: Path, content: bytes, limit: int) -> None
     if path.is_symlink():
         raise MemoryProjectionError("memory artifact path cannot be a link")
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_name, path)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+    _atomic_write_bytes(path, content)
     if read_bounded_bytes(path, limit) != content:
         raise MemoryProjectionError("memory artifact persistence was not durable")
 
@@ -976,25 +966,14 @@ def _write_transaction_marker(path: Path, marker: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_symlink():
         raise MemoryProjectionError("memory transaction marker is unsafe")
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_name, path)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+    _atomic_write_bytes(path, content)
     if read_bounded_json_object(path, MAX_TRANSACTION_BYTES) != marker:
         raise MemoryProjectionError("memory transaction marker was not durable")
 
 
 def _clear_transaction_marker(path: Path) -> None:
     try:
-        path.unlink(missing_ok=True)
+        _unlink_nofollow(path, missing_ok=True)
     except OSError as exc:
         raise MemoryProjectionError(
             "memory transaction marker could not be cleared"
@@ -1014,7 +993,7 @@ def _restore_artifact(
     path = root / relative
     if content is None:
         try:
-            path.unlink(missing_ok=True)
+            _unlink_nofollow(path, missing_ok=True)
         except OSError as exc:
             raise MemoryProjectionError("memory artifact rollback failed") from exc
     elif read_bounded_bytes(path, limit) != content:
