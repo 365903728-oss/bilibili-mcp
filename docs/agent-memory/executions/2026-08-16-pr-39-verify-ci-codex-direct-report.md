@@ -139,6 +139,15 @@ the migration clean-room test can inspect its exact accepted #35 base.
   ancestor replacement cannot redirect the read. MCP decoding/JSON failures
   are contained to the offending frame, matching the pinned SDK transport's
   session behavior.
+- The next review required accepted snapshots to retain metadata-change time
+  and all bounded structural/protocol MCP failures to remain per-frame. Direct
+  snapshots now persist POSIX ctime or Windows `FILE_BASIC_INFO.ChangeTime`,
+  and MCP returns `-32600`/`-32602` when an ID is safely available before
+  continuing. The failing Windows adapters shard also reproduced locally: the
+  controller removed the test's safe null-device Git-config disable markers,
+  read host `core.autocrlf`, and installed an LF index beside a CRLF worktree.
+  Git environment sanitization now preserves only those exact disable sentinels;
+  all three failed Direct/Claude lifecycle assertions pass locally.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

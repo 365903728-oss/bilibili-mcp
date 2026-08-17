@@ -14,11 +14,15 @@
       },
       "harness/cli.py": {
         "finding": "pr-39-mcp-session-lifetime",
-        "sha256": "7fac9e7c79d9d97eaad72a9c4166f851a23e4ac18b949d6cc0748c9ed0b1090e"
+        "sha256": "b94aa9d2af24e6d18fbfc250dc0f4a8a9e0e737bb03f2ef653eaf98a0d922204"
       },
       "harness/codex_direct.py": {
         "finding": "pr-39-verified-index-installation",
-        "sha256": "a0751a2962efd3193d1e3265473dd48bb3e67fdb72cfb0267c724f37c7709437"
+        "sha256": "776944ee01a664d5fc5f8a0942026865356051fec5937b11f99b582e688e9c0f"
+      },
+      "harness/context.py": {
+        "finding": "pr-39-safe-git-config-disable",
+        "sha256": "620de2810d6ccd8e79f383daf9264541084aaa4bd959f2be77dd6fefd361e461"
       },
       "harness/contracts.py": {
         "finding": "pr-39-canonical-task-source",
@@ -90,7 +94,7 @@
     "docs/agent-memory/decisions.md": "131719aeb2a27cc96ea8ae4d591197a2a7313248986dcd8384d5dc71fe31f250",
     "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
     "docs/agent-memory/harness-eval.md": "5dd81a625132ebcbbd2552221b53aaffa40d5e13f87a0852b2949142513d43fb",
-    "docs/agent-memory/harness-security.md": "c48e6a383f280feb06589be836567c3cf7d3b83b096fd5b9f18f3adf00f31572",
+    "docs/agent-memory/harness-security.md": "72d3439ed70291207924cc4c6a9edd0ab7d3138c9a2ad09381b325c50be20a1f",
     "docs/agent-memory/lessons-learned.md": "278d674253d1723e5b984daf45da29a02f90fdf2454c4d775583f804455c825c",
     "docs/agent-memory/project-facts.md": "8b7c6f8d5ade7a763263839040c80ee2ad7123ec9651a92a20af6bcafbd7aee9",
     "docs/agent-memory/verification-log.md": "e95d39757baf6e3ff6d397032ef8d717d13d33776dcae1169377b77709764180"

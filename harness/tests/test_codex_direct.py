@@ -7,6 +7,7 @@ import hashlib
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stdout
@@ -1194,6 +1195,21 @@ class CodexDirectProcessTests(unittest.TestCase):
             controller._canonical_index_snapshot(
                 discover_worktree(self.repo), ["owned/file.txt"]
             )
+
+    def test_snapshot_binds_metadata_change_time(self) -> None:
+        import harness.codex_direct as controller
+
+        owned = self.repo / "harness-only.txt"
+        owned.write_bytes(b"stable\n")
+        initial = owned.stat()
+        before = controller._path_snapshot(self.repo, ["harness-only.txt"])
+        time.sleep(0.02)
+        owned.write_bytes(b"stable\n")
+        os.utime(owned, ns=(initial.st_atime_ns, initial.st_mtime_ns))
+        after = controller._path_snapshot(self.repo, ["harness-only.txt"])
+
+        self.assertIn("change_time_ns", before[0])
+        self.assertNotEqual(before, after)
 
     def test_acceptance_requires_typed_checks_review_criteria_and_risks(self) -> None:
         start = self.harness(
@@ -2384,6 +2400,27 @@ class CodexDirectProcessTests(unittest.TestCase):
         self.assertEqual(json.loads(accepted.stdout)["commit_status"], "created")
         self.assertFalse(alternate_index.exists())
         self.assertEqual(git(self.repo, "status", "--short"), "")
+
+    def test_git_environment_preserves_only_safe_config_disables(self) -> None:
+        from harness.context import git_environment
+
+        with patch.dict(
+            os.environ,
+            {
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_INDEX_FILE": str(self.root / "outside.index"),
+            },
+        ):
+            environment = git_environment()
+        self.assertEqual(environment["GIT_CONFIG_GLOBAL"], os.devnull)
+        self.assertEqual(environment["GIT_CONFIG_NOSYSTEM"], "1")
+        self.assertNotIn("GIT_INDEX_FILE", environment)
+
+        with patch.dict(
+            os.environ, {"GIT_CONFIG_GLOBAL": str(self.root / "outside.config")}
+        ):
+            self.assertNotIn("GIT_CONFIG_GLOBAL", git_environment())
 
     def test_repair_limit_is_finite_even_when_diff_and_evidence_change(self) -> None:
         contract = json.loads(self.contract_path.read_text(encoding="utf-8"))

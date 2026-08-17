@@ -387,9 +387,17 @@ def _valid_snapshot(snapshot: Any, paths: list[str]) -> bool:
             "kind",
             "digest",
         }
+        if kind == "file" and "change_time_ns" in item:
+            expected.add("change_time_ns")
         if set(item) != expected or kind not in {"file", "symlink", "deleted"}:
             return False
         if kind == "file" and not isinstance(item.get("executable"), bool):
+            return False
+        if "change_time_ns" in item and (
+            not isinstance(item["change_time_ns"], int)
+            or isinstance(item["change_time_ns"], bool)
+            or item["change_time_ns"] < 0
+        ):
             return False
         digest = item.get("digest")
         if kind == "deleted":
@@ -1220,6 +1228,34 @@ def _reject_in_progress_git_operation(context: WorktreeContext) -> None:
         raise CodexDirectError("an in-progress Git operation prevents ticket control")
 
 
+def _file_change_time_ns(descriptor: int, file_stat: os.stat_result) -> int:
+    if os.name != "nt":
+        return file_stat.st_ctime_ns
+
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    class FileBasicInfo(ctypes.Structure):
+        _fields_ = [
+            ("creation_time", ctypes.c_longlong),
+            ("last_access_time", ctypes.c_longlong),
+            ("last_write_time", ctypes.c_longlong),
+            ("change_time", ctypes.c_longlong),
+            ("file_attributes", wintypes.DWORD),
+        ]
+
+    get_info = ctypes.WinDLL("kernel32", use_last_error=True).GetFileInformationByHandleEx
+    get_info.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD]
+    get_info.restype = wintypes.BOOL
+    info = FileBasicInfo()
+    if not get_info(
+        msvcrt.get_osfhandle(descriptor), 0, ctypes.byref(info), ctypes.sizeof(info)
+    ):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return int(info.change_time) * 100
+
+
 def _read_ticket_paths(
     root: Path, paths: list[str]
 ) -> tuple[list[dict[str, Any]], dict[str, bytes]]:
@@ -1307,6 +1343,7 @@ def _read_ticket_paths(
                 )
                 descriptor = os.open(candidate, flags, dir_fd=parent_descriptor)
                 opened = os.fstat(descriptor)
+                change_time_ns = _file_change_time_ns(descriptor, opened)
                 visible = os.stat(
                     candidate,
                     dir_fd=parent_descriptor,
@@ -1353,12 +1390,15 @@ def _read_ticket_paths(
                         content.extend(chunk)
                         remaining -= len(chunk)
                     closed = os.fstat(handle.fileno())
+                    closed_change_time_ns = _file_change_time_ns(
+                        handle.fileno(), closed
+                    )
                 visible_after = os.stat(
                     candidate,
                     dir_fd=parent_descriptor,
                     follow_symlinks=False,
                 )
-                if identity != (
+                if change_time_ns != closed_change_time_ns or identity != (
                     closed.st_dev,
                     closed.st_ino,
                     closed.st_size,
@@ -1386,6 +1426,7 @@ def _read_ticket_paths(
                     "path": relative,
                     "kind": "file",
                     "executable": executable,
+                    "change_time_ns": change_time_ns,
                     "digest": digest.hexdigest(),
                 }
             )

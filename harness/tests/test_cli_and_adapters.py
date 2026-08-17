@@ -22,6 +22,7 @@ from harness.cli import _hook_control, main
 from harness.codex_direct import _validate_recovery_bundle_shape, _validate_run_shape
 from harness.context import WorktreeContext, discover_worktree
 from harness.events import normalize_hook_event
+from harness.evolution import EvolutionError
 from harness.safe_io import read_bounded_jsonl
 
 
@@ -147,10 +148,12 @@ class CliAndAdapterTests(unittest.TestCase):
         responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
         self.assertEqual([item["id"] for item in responses], [1, 2])
 
-    def test_capability_serve_rejects_initialize_as_a_notification(self) -> None:
-        stdin = io.TextIOWrapper(
-            io.BytesIO(b'{"jsonrpc":"2.0","method":"initialize","params":{}}\n')
+    def test_capability_serve_discards_invalid_notification_and_continues(self) -> None:
+        messages = (
+            b'{"jsonrpc":"2.0","method":"initialize","params":{}}\n'
+            b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n'
         )
+        stdin = io.TextIOWrapper(io.BytesIO(messages))
         stdout = io.StringIO()
         canonical = {
             "name": "safe-build-fixture",
@@ -187,8 +190,82 @@ class CliAndAdapterTests(unittest.TestCase):
                 ]
             )
 
-        self.assertEqual(status, 2)
-        self.assertIn("MCP notification is invalid", stdout.getvalue())
+        self.assertEqual(status, 0, stdout.getvalue())
+        responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        self.assertEqual([item["id"] for item in responses], [1])
+
+    def test_capability_serve_contains_structural_errors_per_frame(self) -> None:
+        too_deep: object = {}
+        for _ in range(10):
+            too_deep = {"nested": too_deep}
+        messages = [
+            {"jsonrpc": "2.0", "id": 9, "method": "ping", "params": too_deep},
+            ["not", "a", "request"],
+            {"jsonrpc": "2.0", "id": {"invalid": True}, "method": "ping"},
+            {"id": 6, "method": "ping", "params": {}},
+            {"jsonrpc": "1.0", "id": 5, "method": "ping", "params": {}},
+            {"jsonrpc": "2.0", "id": 4, "method": "ping", "params": {"bad": 1}},
+            {
+                "jsonrpc": "2.0", "id": 8,
+                "method": "notifications/initialized", "params": {},
+            },
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+            {"jsonrpc": "2.0", "id": 7, "method": "tools/list"},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "ping"},
+        ]
+        stdin = io.TextIOWrapper(
+            io.BytesIO("".join(json.dumps(item) + "\n" for item in messages).encode())
+        )
+        stdout = io.StringIO()
+        context = WorktreeContext(
+            root=ROOT,
+            git_dir=ROOT / ".git",
+            common_git_dir=ROOT / ".git",
+            head_sha="0" * 40,
+            worktree_id="wt-test",
+            repository_id="repo-test",
+        )
+
+        def respond(
+            _context: WorktreeContext, *, name: str, adapter: str, value: object
+        ) -> dict[str, object] | None:
+            del name, adapter
+            message = value if isinstance(value, dict) else {}
+            if message.get("jsonrpc") != "2.0":
+                raise EvolutionError("MCP message is invalid")
+            if message.get("method") == "notifications/initialized":
+                return None
+            request_id = message.get("id")
+            if not isinstance(request_id, (str, int)) or isinstance(request_id, bool):
+                raise EvolutionError("MCP request is invalid")
+            if message.get("method") == "ping" and message.get("params") == {"bad": 1}:
+                raise EvolutionError("MCP ping params are invalid")
+            return {"jsonrpc": "2.0", "id": request_id, "result": {}}
+
+        with patch("sys.stdin", stdin), patch(
+            "harness.cli.discover_worktree", return_value=context
+        ), patch(
+            "harness.cli.mcp_surface_message", side_effect=respond
+        ), redirect_stdout(stdout):
+            status = main(
+                [
+                    "capability", "serve", "--cwd", str(ROOT), "--name",
+                    "safe-build-fixture", "--adapter", "codex-direct",
+                ]
+            )
+
+        self.assertEqual(status, 0, stdout.getvalue())
+        responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        self.assertEqual(
+            [item["id"] for item in responses], [9, 6, 5, 4, 8, 1, 7, 2]
+        )
+        self.assertEqual(responses[0]["error"]["code"], -32600)
+        self.assertEqual(responses[1]["error"]["code"], -32600)
+        self.assertEqual(responses[2]["error"]["code"], -32600)
+        self.assertEqual(responses[3]["error"]["code"], -32602)
+        self.assertEqual(responses[4]["error"]["code"], -32600)
+        self.assertEqual(responses[6]["error"]["code"], -32600)
 
     def test_capability_serve_returns_method_not_found_and_continues(self) -> None:
         messages = [
@@ -826,6 +903,7 @@ class CliAndAdapterTests(unittest.TestCase):
             ".gitattributes": "pr-39-head-bound-memory-eol",
             "harness/cli.py": "pr-39-mcp-session-lifetime",
             "harness/codex_direct.py": "pr-39-verified-index-installation",
+            "harness/context.py": "pr-39-safe-git-config-disable",
             "harness/contracts.py": "pr-39-canonical-task-source",
             "harness/evolution.py": "pr-39-verified-zero-candidate-channels",
             "harness/memory.py": "pr-39-recoverable-memory-transaction",

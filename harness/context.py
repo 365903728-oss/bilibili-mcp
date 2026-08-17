@@ -29,6 +29,8 @@ class WorktreeContext:
 
 def git_environment() -> dict[str, str]:
     env = os.environ.copy()
+    disabled_global = env.get("GIT_CONFIG_GLOBAL")
+    disabled_system = env.get("GIT_CONFIG_NOSYSTEM")
     for key in list(env):
         if key.upper().startswith("GIT_") or key.upper() in {
             "SSH_ASKPASS",
@@ -36,6 +38,13 @@ def git_environment() -> dict[str, str]:
             "GCM_TRACE",
         }:
             env.pop(key, None)
+    if (
+        disabled_global is not None
+        and os.path.normcase(disabled_global) == os.path.normcase(os.devnull)
+    ):
+        env["GIT_CONFIG_GLOBAL"] = os.devnull
+    if disabled_system == "1":
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
     env["GIT_LITERAL_PATHSPECS"] = "1"
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
     env["GIT_OPTIONAL_LOCKS"] = "0"

@@ -577,9 +577,15 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
 - Direct acceptance holds a no-follow parent descriptor on POSIX or the
   verified directory HANDLE chain on Windows, opens every owned regular file
   without following the final link, requires one visible link and stable
-  descriptor/path identity before and after the bounded read, and feeds only
-  those captured bytes to the isolated Git index. A swapped ancestor or hard
-  link created after the edit guard cannot import an external inode.
-- Harness MCP stdio discards malformed UTF-8 or JSON one frame at a time. The
-  64-KiB frame bound and valid-message lifecycle checks remain fail closed,
-  while a later valid frame continues on the same session.
+  descriptor/path identity plus the platform metadata-change token before and
+  after the bounded read, and feeds only those captured bytes to the isolated
+  Git index. The token is persisted in accepted snapshots, so an in-place
+  rewrite cannot be hidden by restoring size and mtime.
+- Harness MCP stdio contains malformed UTF-8/JSON, bounded shape failures,
+  invalid notifications/IDs, lifecycle violations, and MCP protocol validation
+  to one frame. It returns bounded `-32600`/`-32602` errors when a safe request
+  ID exists and otherwise discards the frame; later valid frames continue.
+- Git subprocess sanitization preserves only the exact `GIT_CONFIG_GLOBAL`
+  null-device and `GIT_CONFIG_NOSYSTEM=1` disable sentinels. Repository/index/
+  object redirections and arbitrary config paths remain excluded, while a
+  caller's explicit hermetic configuration cannot be replaced by host settings.

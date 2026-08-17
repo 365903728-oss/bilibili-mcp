@@ -551,41 +551,76 @@ def main(argv: Sequence[str] | None = None) -> int:
                         value = json.loads(raw.decode("utf-8", errors="strict"))
                     except (UnicodeDecodeError, json.JSONDecodeError):
                         continue
-                    validate_json_shape(value, max_nodes=512, max_depth=8)
+                    request_id = value.get("id") if isinstance(value, dict) else None
                     method = value.get("method") if isinstance(value, dict) else None
-                    if (
-                        (method == "initialize" and initialized)
-                        or (method == "notifications/initialized" and not initialized)
-                        or (method in {"tools/list", "tools/call"} and not ready)
-                    ):
-                        raise ValueError("MCP stdio lifecycle is invalid")
+                    valid_request_id = (
+                        isinstance(request_id, (str, int))
+                        and not isinstance(request_id, bool)
+                        and len(str(request_id)) <= 64
+                    )
+                    valid_request_envelope = (
+                        isinstance(value, dict)
+                        and value.get("jsonrpc") == "2.0"
+                        and set(value) <= {"jsonrpc", "id", "method", "params"}
+                        and "id" in value
+                        and valid_request_id
+                        and isinstance(method, str)
+                        and bool(method)
+                    )
                     try:
-                        response = mcp_surface_message(
-                            context, name=args.name, adapter=args.adapter, value=value
-                        )
-                    except EvolutionError as exc:
-                        request_id = value.get("id") if isinstance(value, dict) else None
+                        validate_json_shape(value, max_nodes=512, max_depth=8)
                         if (
-                            method in {"initialize", "ping", "tools/list", "tools/call"}
-                            and isinstance(request_id, (str, int))
-                            and not isinstance(request_id, bool)
-                            and len(str(request_id)) <= 64
-                            and str(exc).startswith("MCP ")
+                            (method == "initialize" and initialized)
+                            or (method == "notifications/initialized" and not initialized)
+                            or (method in {"tools/list", "tools/call"} and not ready)
                         ):
+                            raise ValueError("MCP stdio lifecycle is invalid")
+                        try:
+                            response = mcp_surface_message(
+                                context, name=args.name, adapter=args.adapter, value=value
+                            )
+                        except EvolutionError as exc:
+                            if not str(exc).startswith("MCP "):
+                                raise
+                            if not valid_request_id:
+                                continue
                             response = {
                                 "jsonrpc": "2.0",
                                 "id": request_id,
-                                "error": {"code": -32602, "message": "Invalid params"},
+                                "error": {
+                                    "code": (
+                                        -32602
+                                        if valid_request_envelope
+                                        and method
+                                        in {"initialize", "ping", "tools/list", "tools/call"}
+                                        else -32600
+                                    ),
+                                    "message": (
+                                        "Invalid params"
+                                        if valid_request_envelope
+                                        and method
+                                        in {"initialize", "ping", "tools/list", "tools/call"}
+                                        else "Invalid Request"
+                                    ),
+                                },
                             }
-                        else:
-                            raise
+                    except EvolutionError:
+                        raise
+                    except ValueError:
+                        if not valid_request_id:
+                            continue
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": request_id,
+                            "error": {"code": -32600, "message": "Invalid Request"},
+                        }
                     if (
                         method == "initialize"
                         and response is not None
                         and "result" in response
                     ):
                         initialized = True
-                    elif method == "notifications/initialized":
+                    elif method == "notifications/initialized" and response is None:
                         ready = True
                     if response is not None:
                         _print_json(response)
