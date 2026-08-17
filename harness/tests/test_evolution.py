@@ -978,7 +978,10 @@ raise SystemExit(main())
                     "jsonrpc": "2.0",
                     "id": 3,
                     "method": "tools/list",
-                    "params": {"_meta": {"extension.trace": "bounded"}},
+                    "params": {
+                        "cursor": "opaque-cursor",
+                        "_meta": {"extension.trace": "bounded"},
+                    },
                 },
             )
             for request in requests:
@@ -1006,6 +1009,21 @@ raise SystemExit(main())
                         },
                     },
                 )
+            for cursor in ([], "x" * 2049, "bad\ncursor"):
+                with self.subTest(cursor=cursor), self.assertRaisesRegex(
+                    EvolutionError, "cursor"
+                ):
+                    mcp_surface_message(
+                        object(),
+                        name=canonical["name"],
+                        adapter="codex-direct",
+                        value={
+                            "jsonrpc": "2.0",
+                            "id": 5,
+                            "method": "tools/list",
+                            "params": {"cursor": cursor},
+                        },
+                    )
 
     def test_start_rejects_a_gap_that_is_not_in_accepted_current_memory(self) -> None:
         request = self.request()
@@ -2537,7 +2555,10 @@ raise SystemExit(main())
                             "jsonrpc": "2.0",
                             "id": 3,
                             "method": "tools/list",
-                            "params": {"_meta": {"extension.trace": "bounded"}},
+                            "params": {
+                                "cursor": "opaque-cursor",
+                                "_meta": {"extension.trace": "bounded"},
+                            },
                         },
                         {
                             "jsonrpc": "2.0",
@@ -2575,6 +2596,7 @@ raise SystemExit(main())
                         [tool["name"] for tool in responses[2]["result"]["tools"]],
                         ["inspect", "report"],
                     )
+                    self.assertNotIn("nextCursor", responses[2]["result"])
                     self.assertFalse(responses[3]["result"]["isError"])
                 if kind == "hook":
                     payload = self.root / f"{task_id}-hook.json"

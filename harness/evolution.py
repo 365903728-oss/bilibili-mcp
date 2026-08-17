@@ -2253,8 +2253,10 @@ def mcp_surface_message(
             "serverInfo": {"name": canonical["name"], "version": canonical["version"]},
         }
     elif method == "tools/list":
-        if not set(params) <= {"_meta"}:
+        if not set(params) <= {"cursor", "_meta"}:
             raise EvolutionError("MCP tools/list params are invalid")
+        if "cursor" in params:
+            _bounded_string(params["cursor"], "MCP tools/list cursor", 2048)
         result = {
             "tools": [
                 {

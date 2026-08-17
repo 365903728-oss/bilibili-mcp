@@ -557,6 +557,9 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
 - POSIX atomic state installation fsyncs the verified parent descriptor after
   replacement. Success therefore covers both file contents and the directory
   entry used by at-most-once state and recovery records.
+- Harness MCP `tools/list` accepts the SDK's optional opaque cursor only as a
+  bounded, control-free string. The repository-local capability set remains a
+  complete single page, so the response intentionally omits `nextCursor`.
 - POSIX Paseo prompts are created and immediately unlinked relative to the
   active task-lock directory descriptor. Prompt creation and send both reject
   a replaced visible task directory; a post-send identity failure is classified

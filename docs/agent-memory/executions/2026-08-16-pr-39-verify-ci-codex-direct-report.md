@@ -53,6 +53,8 @@ the migration clean-room test can inspect its exact accepted #35 base.
   42/42 with two expected platform skips; WSL projection tests pass 40/40 with
   one expected platform skip; accepted-gap Evolution checks pass 2/2 on
   Windows.
+- MCP tools/list cursor repair: bounded schema test 1/1 and the real
+  four-surface, three-adapter process-boundary lifecycle 1/1 PASS.
 
 ## Acceptance Criteria
 
@@ -120,6 +122,10 @@ the migration clean-room test can inspect its exact accepted #35 base.
   `core.autocrlf=true` checkout whose CRLF working bytes would fail that strict
   comparison. Repository attributes now fix both formal-memory paths to LF;
   fresh-checkout and forged-pair regressions cover both sides of the boundary.
+- The following MCP review found that `tools/list` rejected the pinned SDK's
+  optional pagination cursor. The Harness now accepts a control-free cursor up
+  to 2048 characters and deliberately returns the complete tool set as one
+  page without `nextCursor`; malformed and oversized cursors fail closed.
 
 ## Risks, Skipped Checks, Recovery Bundle
 
