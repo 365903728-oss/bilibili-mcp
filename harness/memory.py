@@ -1380,8 +1380,18 @@ def startup_memory(context: WorktreeContext) -> dict[str, Any]:
         STORE_PATH.as_posix().encode("utf-8"),
         PROJECTION_PATH.as_posix().encode("utf-8"),
     }
+    trusted_store = _head_artifact_bytes(
+        context.root, STORE_PATH, MAX_STORE_BYTES
+    )
+    trusted_projection = _head_artifact_bytes(
+        context.root, PROJECTION_PATH, MAX_PROJECTION_BYTES
+    )
     if not path.exists():
-        if store_path.exists():
+        if (
+            store_path.exists()
+            or trusted_store is not None
+            or trusted_projection is not None
+        ):
             raise MemoryProjectionError("current memory projection is missing")
         projection = {
             "schema": "harness.current-memory/v1",
@@ -1400,6 +1410,13 @@ def startup_memory(context: WorktreeContext) -> dict[str, Any]:
         if projection_bytes is None:
             raise MemoryProjectionError("current memory projection is invalid")
         store_bytes = read_bounded_bytes(store_path, MAX_STORE_BYTES)
+        if (
+            store_bytes != trusted_store
+            or projection_bytes != trusted_projection
+        ):
+            raise MemoryProjectionError(
+                "current memory projection is not accepted in HEAD"
+            )
         try:
             if path.stat().st_nlink != 1 or store_path.stat().st_nlink != 1:
                 raise MemoryProjectionError(

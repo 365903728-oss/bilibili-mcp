@@ -565,3 +565,9 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   Once locked, it performs no pathname directory creation before saving state,
   so a replaced `tasks` ancestor fails the existing link check without an
   external filesystem mutation.
+- Startup memory acceptance binds both bounded working-tree artifacts directly
+  to their raw Git `HEAD` blobs before parsing or projection. A clean/smudge
+  filter cannot make different working bytes authoritative merely by making
+  `git status` report a clean tree. Repository attributes fix both generated
+  artifact paths to LF so a normal Windows `core.autocrlf=true` checkout keeps
+  the same trusted bytes.

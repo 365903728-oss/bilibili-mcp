@@ -773,6 +773,7 @@ class CliAndAdapterTests(unittest.TestCase):
             )
         review_repairs = clean_room["review_repairs"]
         expected_repairs = {
+            ".gitattributes": "pr-39-head-bound-memory-eol",
             "harness/cli.py": "pr-39-mcp-session-lifetime",
             "harness/codex_direct.py": "pr-39-verified-index-installation",
             "harness/contracts.py": "pr-39-canonical-task-source",
@@ -788,11 +789,16 @@ class CliAndAdapterTests(unittest.TestCase):
             self.assertEqual(repair["finding"], finding)
             repaired = (ROOT / relative).read_bytes().replace(b"\r\n", b"\n")
             self.assertEqual(hashlib.sha256(repaired).hexdigest(), repair["sha256"])
-            baseline = subprocess.check_output(
+            baseline = subprocess.run(
                 ["git", "show", f"{clean_room['base_sha']}:{relative}"],
                 cwd=ROOT,
+                capture_output=True,
             )
-            self.assertNotEqual(baseline, repaired)
+            if relative == ".gitattributes":
+                self.assertNotEqual(baseline.returncode, 0)
+            else:
+                self.assertEqual(baseline.returncode, 0)
+                self.assertNotEqual(baseline.stdout, repaired)
 
         forbidden_raw_keys = {
             "command",

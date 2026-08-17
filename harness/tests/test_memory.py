@@ -178,6 +178,19 @@ class MemoryProjectionTests(unittest.TestCase):
                 self.context, envelope, target_task_id="memory-target"
             )
 
+    def startup(self) -> dict[str, object]:
+        def accepted_artifact(root: Path, relative: Path, limit: int) -> bytes | None:
+            path = root / relative
+            content = path.read_bytes() if path.exists() else None
+            if content is not None:
+                self.assertLessEqual(len(content), limit)
+            return content
+
+        with patch(
+            "harness.memory._head_artifact_bytes", side_effect=accepted_artifact
+        ):
+            return startup_memory(self.context)
+
     def test_verified_fact_projects_one_typed_current_record(self) -> None:
         result = self.project()
 
@@ -566,7 +579,7 @@ class MemoryProjectionTests(unittest.TestCase):
         self.assertFalse(marker.exists())
         self.assertTrue(recovered["changed"])
         self.assertEqual(
-            [record["value"] for record in startup_memory(self.context)["records"]],
+            [record["value"] for record in self.startup()["records"]],
             [11],
         )
 
@@ -630,7 +643,7 @@ class MemoryProjectionTests(unittest.TestCase):
         self.assertEqual(old["validity"]["to"], "2026-08-12T13:00:00Z")
         self.assertEqual(old["superseded_by"], new["record_id"])
         self.assertEqual(new["supersedes"], old["record_id"])
-        projection = startup_memory(self.context)
+        projection = self.startup()
         self.assertEqual([item["value"] for item in projection["records"]], [11])
 
     def test_newest_fact_can_return_to_a_previously_seen_value(self) -> None:
@@ -649,7 +662,7 @@ class MemoryProjectionTests(unittest.TestCase):
             ["2026-08-12T13:00:00Z", "2026-08-12T14:00:00Z", None],
         )
         self.assertEqual(
-            [item["value"] for item in startup_memory(self.context)["records"]], [10]
+            [item["value"] for item in self.startup()["records"]], [10]
         )
 
     def test_conflicting_facts_at_the_same_validity_start_are_rejected(self) -> None:
@@ -658,7 +671,7 @@ class MemoryProjectionTests(unittest.TestCase):
         with self.assertRaisesRegex(MemoryProjectionError, "ambiguous current facts"):
             self.project(self.envelope(value=11))
 
-        projection = startup_memory(self.context)
+        projection = self.startup()
         self.assertEqual([item["value"] for item in projection["records"]], [10])
 
     def test_user_correction_promotes_once_but_one_task_cannot_promote_a_lesson(self) -> None:
@@ -727,7 +740,7 @@ class MemoryProjectionTests(unittest.TestCase):
             {item["task_id"] for item in record["provenance"]},
             {"source-task", "source-task-2"},
         )
-        self.assertEqual(len(startup_memory(self.context)["records"]), 1)
+        self.assertEqual(len(self.startup()["records"]), 1)
 
     def test_weak_evidence_from_an_independent_task_does_not_promote_a_lesson(self) -> None:
         lesson = self.envelope(
@@ -752,7 +765,7 @@ class MemoryProjectionTests(unittest.TestCase):
             (self.repo / "docs/agent-memory/typed-memory.json").read_text(encoding="utf-8")
         )["records"][0]
         self.assertEqual(record["validation"], "proposed")
-        self.assertEqual(startup_memory(self.context)["records"], [])
+        self.assertEqual(self.startup()["records"], [])
 
     def test_weak_claims_are_stored_only_as_non_authoritative_records(self) -> None:
         envelope = self.envelope()
@@ -780,7 +793,7 @@ class MemoryProjectionTests(unittest.TestCase):
         self.assertEqual(
             {item["validation"] for item in records}, {"deferred", "proposed"}
         )
-        self.assertEqual(startup_memory(self.context)["records"], [])
+        self.assertEqual(self.startup()["records"], [])
 
     def test_secret_and_raw_operational_values_are_rejected_without_persistence(self) -> None:
         cases: tuple[object, ...] = (
@@ -1030,6 +1043,52 @@ class MemoryProjectionTests(unittest.TestCase):
         ):
             startup_memory(self.context)
 
+    def test_startup_rejects_memory_bytes_hidden_by_a_clean_filter(self) -> None:
+        self.project()
+        # setUp makes Harness status report clean, as a clean filter can.
+        git(
+            self.repo,
+            "add",
+            "docs/agent-memory/typed-memory.json",
+            "docs/agent-memory/current-memory.json",
+        )
+        git(self.repo, "commit", "-m", "trusted memory baseline")
+        store_path = self.repo / "docs/agent-memory/typed-memory.json"
+        projection_path = self.repo / "docs/agent-memory/current-memory.json"
+        store = json.loads(store_path.read_text(encoding="utf-8"))
+        store["records"][0]["value"] = 99
+        store["records"][0]["record_id"] = memory_module._record_id(
+            store["records"][0]
+        )
+        store_bytes = memory_module._pretty_bytes(store, memory_module.MAX_STORE_BYTES)
+        store_digest = hashlib.sha256(store_bytes).hexdigest()
+        projection_bytes = memory_module._pretty_bytes(
+            memory_module._projection(store["records"], store_digest),
+            memory_module.MAX_PROJECTION_BYTES,
+        )
+        store_path.write_bytes(store_bytes)
+        projection_path.write_bytes(projection_bytes)
+
+        with self.assertRaisesRegex(MemoryProjectionError, "accepted in HEAD"):
+            startup_memory(self.context)
+
+    def test_startup_accepts_fresh_autocrlf_checkout_of_head_memory(self) -> None:
+        self.project()
+        attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+        (self.repo / ".gitattributes").write_text(attributes, encoding="utf-8")
+        git(self.repo, "config", "core.autocrlf", "true")
+        git(self.repo, "add", ".gitattributes", "docs/agent-memory")
+        git(self.repo, "commit", "-m", "trusted memory baseline")
+        store_path = self.repo / "docs/agent-memory/typed-memory.json"
+        projection_path = self.repo / "docs/agent-memory/current-memory.json"
+        store_path.unlink()
+        projection_path.unlink()
+        git(self.repo, "checkout", "--", str(store_path), str(projection_path))
+
+        self.assertNotIn(b"\r\n", store_path.read_bytes())
+        self.assertNotIn(b"\r\n", projection_path.read_bytes())
+        startup_memory(self.context)
+
     def test_startup_rejects_an_untracked_or_ignored_memory_pair(self) -> None:
         self.project()
 
@@ -1116,7 +1175,7 @@ class MemoryProjectionTests(unittest.TestCase):
 
         self.project(envelope)
 
-        records = startup_memory(self.context)["records"]
+        records = self.startup()["records"]
         self.assertEqual({item["type"] for item in records}, {item[0] for item in mappings})
         self.assertTrue(all(item["validation"] == "accepted" for item in records))
 
@@ -1142,7 +1201,7 @@ class MemoryProjectionTests(unittest.TestCase):
         self.assertLessEqual(len(projection_path.read_bytes()), MAX_PROJECTION_BYTES)
         self.assertLess(len(projection["records"]), 60)
         self.assertEqual(projection["records"][0]["subject"], "bounded.record-59")
-        self.assertEqual(startup_memory(self.context)["records"], projection["records"])
+        self.assertEqual(self.startup()["records"], projection["records"])
 
     def test_generated_projection_is_loadable_at_its_node_bound(self) -> None:
         envelope = self.envelope()
@@ -1160,7 +1219,7 @@ class MemoryProjectionTests(unittest.TestCase):
 
         self.project(envelope)
 
-        self.assertEqual(len(startup_memory(self.context)["records"]), 60)
+        self.assertEqual(len(self.startup()["records"]), 60)
 
     def test_codex_and_claude_packages_compile_from_one_versioned_source(self) -> None:
         packages = {

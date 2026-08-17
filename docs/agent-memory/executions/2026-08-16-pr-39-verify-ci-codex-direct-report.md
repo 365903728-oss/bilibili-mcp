@@ -49,6 +49,10 @@ the migration clean-room test can inspect its exact accepted #35 base.
   conformance 1/1 PASS.
 - After the first environment-isolation push, Paseo CLI tests pass 22/22 on
   both Windows and WSL with a file-backed disposable fake configuration.
+- HEAD-bound startup-memory repair: the full Windows memory module passes
+  42/42 with two expected platform skips; WSL projection tests pass 40/40 with
+  one expected platform skip; accepted-gap Evolution checks pass 2/2 on
+  Windows.
 
 ## Acceptance Criteria
 
@@ -108,6 +112,14 @@ the migration clean-room test can inspect its exact accepted #35 base.
   proved the old path created the task hash outside the worktree. Removing that
   one call leaves directory creation to the descriptor-safe lock helper; the
   existing link check now rejects the swap before state or external writes.
+- The next review found that startup memory trusted `git status`, whose clean
+  comparison may apply configured filters. A self-consistent forged pair with
+  a simulated clean status reproduced the bypass. Startup now compares both
+  bounded raw working-tree artifacts byte-for-byte with their Git `HEAD` blobs
+  before parsing. Independent review then reproduced a legitimate Windows
+  `core.autocrlf=true` checkout whose CRLF working bytes would fail that strict
+  comparison. Repository attributes now fix both formal-memory paths to LF;
+  fresh-checkout and forged-pair regressions cover both sides of the boundary.
 
 ## Risks, Skipped Checks, Recovery Bundle
 
