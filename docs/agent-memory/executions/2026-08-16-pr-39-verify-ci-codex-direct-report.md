@@ -47,6 +47,8 @@ the migration clean-room test can inspect its exact accepted #35 base.
   Hook-event tests 23 PASS with 10 platform skips; WSL Hook-event tests plus
   the environment regression 24 PASS with 2 platform skips; migration
   conformance 1/1 PASS.
+- After the first environment-isolation push, Paseo CLI tests pass 22/22 on
+  both Windows and WSL with a file-backed disposable fake configuration.
 
 ## Acceptance Criteria
 
@@ -88,6 +90,11 @@ the migration clean-room test can inspect its exact accepted #35 base.
   the repaired tests and a real read-only Paseo status/preflight call pass.
   Preflight reported the existing `daemon_not_running: stale_pid` without a
   restart, provider switch, fallback, or implementation write.
+- GitHub run `31995957515` then exposed that legacy CLI tests configured their
+  disposable fake Paseo through inherited `PASEO_FAKE_*` variables. Production
+  code correctly removed those variables, so the test fake was moved to an
+  adjacent private JSON config instead of weakening the allowlist. The exact
+  Ubuntu failure reproduced in WSL; Windows and WSL CLI suites now pass 22/22.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

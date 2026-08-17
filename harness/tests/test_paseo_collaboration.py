@@ -270,9 +270,13 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
             return FakeProcess()
 
         sensitive = {
+            "ANTHROPIC_API_KEY": "synthetic-secret",
             "BILIBILI_SESSDATA": "synthetic-secret",
             "GITHUB_TOKEN": "synthetic-secret",
             "NPM_TOKEN": "synthetic-secret",
+            "PASEO_FAKE_EVENTS": "synthetic-secret",
+            "PASEO_HUB_API_KEY": "synthetic-secret",
+            "PASEO_PASSWORD": "synthetic-secret",
             "SSH_AUTH_SOCK": "synthetic-secret",
         }
         with (
@@ -3311,6 +3315,12 @@ class PaseoCollaborationCLITests(_PaseoTestBase):
             "Handoff content must appear after the /implement line",
         )
 
+    def _configure_fake_paseo(self, fake_dir: Path, **updates: object) -> None:
+        config_path = fake_dir / "_paseo_fake_config.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config.update(updates)
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+
     def _write_fake_paseo(self, fake_dir: Path, events_path: str, repo: str,
                           *, omit_inspect_model: bool = False,
                           empty_models: bool = False,
@@ -3322,7 +3332,7 @@ class PaseoCollaborationCLITests(_PaseoTestBase):
         ``Model`` field so fail-closed tests can verify rejection.
         When *empty_models* is True the model list is empty.
         When *inspect_model* is set the default inspect model is overridden.
-        The env var PASEO_FAKE_INSPECT_MODEL overrides at runtime.
+        The adjacent config file supports bounded runtime test overrides.
         *connected_daemon* controls the daemon status connectedDaemon field.
         """
         if omit_inspect_model:
@@ -3332,11 +3342,22 @@ class PaseoCollaborationCLITests(_PaseoTestBase):
         else:
             default_model = "deepseek-v4-flash"
         models_json = "[]" if empty_models else '[{"id":"deepseek-v4-flash","model":"deepseek-v4-flash","description":"Fast model"}]'
+        (fake_dir / "_paseo_fake_config.json").write_text(
+            json.dumps({
+                "events": events_path,
+                "repo": repo,
+                "connected_daemon": connected_daemon,
+                "inspect_json": None,
+                "inspect_model": default_model,
+            }),
+            encoding="utf-8",
+        )
         (fake_dir / "_paseo_fake.py").write_text(f'''\
 import sys, json, os
 from pathlib import Path
-ep = os.environ.get("PASEO_FAKE_EVENTS","")
-repo = os.environ.get("PASEO_FAKE_REPO","")
+config = json.loads(Path(__file__).with_name("_paseo_fake_config.json").read_text("utf-8"))
+ep = config["events"]
+repo = config["repo"]
 def _r(a,**kw):
     if ep:
         with open(ep,"a",encoding="utf-8") as f:
@@ -3353,7 +3374,7 @@ if not args:
 cmd = args[0]
 if cmd == "daemon":
     _r(args)
-    cd = os.environ.get("PASEO_FAKE_CONNECTED_DAEMON", {json.dumps(connected_daemon)})
+    cd = config["connected_daemon"]
     print(json.dumps({{"localDaemon":"running","connectedDaemon":cd,"daemonVersion":"1.0.0","cliVersion":"1.0.0"}}))
 elif cmd == "provider":
     sub = args[1] if len(args) > 1 else ""
@@ -3373,14 +3394,14 @@ elif cmd == "run":
 elif cmd == "inspect":
     _r(args)
     agent_id = args[1] if len(args) > 1 else "agent-fake-00000000"
-    override = os.environ.get("PASEO_FAKE_INSPECT_JSON", "")
+    override = config.get("inspect_json")
     if override:
-        resp = json.loads(override)
+        resp = dict(override)
         if "Id" not in resp:
             resp["Id"] = agent_id
         print(json.dumps(resp))
     else:
-        m = os.environ.get("PASEO_FAKE_INSPECT_MODEL", {json.dumps(default_model)})
+        m = config.get("inspect_model", "")
         resp = {{"Id":agent_id,"Provider":"claude","Cwd":repo,"Status":"idle","Mode":"bypassPermissions","Archived":False}}
         if m:
             resp["Model"] = m
@@ -4152,8 +4173,8 @@ else:
         bridge_data["handoff_digest"] = handoff_digest
         bridge_path.write_text(json.dumps(bridge_data), encoding="utf-8")
 
-        # Mutate: fake inspect now returns "wrong-model" via env var
-        env["PASEO_FAKE_INSPECT_MODEL"] = "wrong-model"
+        # Mutate: fake inspect now returns "wrong-model" via its private config.
+        self._configure_fake_paseo(fake_dir, inspect_model="wrong-model")
 
         # Dispatch — must reject because inspect model drifted
         disp = subprocess.run(
@@ -4203,8 +4224,8 @@ else:
         env["PATH"] = str(fake_dir) + os.pathsep + env.get("PATH", "")
         env["PASEO_FAKE_EVENTS"] = events_path
         env["PASEO_FAKE_REPO"] = str(self.repo)
-        # Override inspect to omit Archived entirely
-        env["PASEO_FAKE_INSPECT_JSON"] = json.dumps({
+        # Override inspect to omit Archived entirely.
+        self._configure_fake_paseo(fake_dir, inspect_json={
             "Provider": "claude",
             "Model": "deepseek-v4-flash", "Cwd": str(self.repo),
             "Status": "idle", "Mode": "bypassPermissions",
@@ -4257,7 +4278,7 @@ else:
         env["PATH"] = str(fake_dir) + os.pathsep + env.get("PATH", "")
         env["PASEO_FAKE_EVENTS"] = events_path
         env["PASEO_FAKE_REPO"] = str(self.repo)
-        env["PASEO_FAKE_INSPECT_JSON"] = json.dumps({
+        self._configure_fake_paseo(fake_dir, inspect_json={
             "Provider": "claude",
             "Model": "deepseek-v4-flash", "Cwd": str(self.repo),
             "Status": "idle", "Mode": "auto", "Archived": False,
@@ -4331,7 +4352,7 @@ else:
 
         # Mutate: inspect now returns Provider=codex instead of claude
         # Omit Id so the fake Paseo fills it from the CLI args (real agent_id)
-        env["PASEO_FAKE_INSPECT_JSON"] = json.dumps({
+        self._configure_fake_paseo(fake_dir, inspect_json={
             "Provider": "codex",
             "Model": "deepseek-v4-flash", "Cwd": str(self.repo),
             "Status": "idle", "Mode": "bypassPermissions", "Archived": False,
@@ -4418,7 +4439,7 @@ else:
 
         # Make inspect return Status=active (not idle/stopped). Omit Id so
         # the fake Paseo fills it from the CLI args (real agent_id).
-        env["PASEO_FAKE_INSPECT_JSON"] = json.dumps({
+        self._configure_fake_paseo(fake_dir, inspect_json={
             "Provider": "claude",
             "Model": "deepseek-v4-flash", "Cwd": str(self.repo),
             "Status": "active", "Mode": "bypassPermissions", "Archived": False,
@@ -4574,8 +4595,9 @@ else:
         # Use PASEO_FAKE_EVENTS reset so old events don't confuse
         events2 = str(fake_dir / "events2.jsonl")
         env2 = dict(env)
-        env2["PASEO_FAKE_EVENTS"] = events2
-        env2["PASEO_FAKE_REPO"] = str(linked_wt)
+        self._configure_fake_paseo(
+            fake_dir, events=events2, repo=str(linked_wt)
+        )
         r2 = subprocess.run(
             [sys.executable, "-m", "harness", "codex-paseo-claude",
              "bootstrap", str(cp_linked),
@@ -4701,8 +4723,9 @@ else:
         # -- call 2: linked worktree → SHOULD be rejected (same task source) --
         events2 = str(fake_dir / "events2.jsonl")
         env2 = dict(env)
-        env2["PASEO_FAKE_EVENTS"] = events2
-        env2["PASEO_FAKE_REPO"] = str(linked_wt)
+        self._configure_fake_paseo(
+            fake_dir, events=events2, repo=str(linked_wt)
+        )
         r2 = subprocess.run(
             [sys.executable, "-m", "harness", "codex-paseo-claude",
              "bootstrap", str(cp_linked),
