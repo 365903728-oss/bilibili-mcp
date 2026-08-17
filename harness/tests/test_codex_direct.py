@@ -1152,6 +1152,49 @@ class CodexDirectProcessTests(unittest.TestCase):
         self.assertEqual(guarded.returncode, 5, guarded.stderr or guarded.stdout)
         self.assertEqual(json.loads(guarded.stdout)["reason_code"], "unsafe-path-boundary")
 
+    def test_acceptance_rejects_hard_link_created_after_edit_guard(self) -> None:
+        self.prepare_reviewed_diff()
+        owned = self.repo / "harness-only.txt"
+        outside = self.root / "outside.txt"
+        outside.write_bytes(owned.read_bytes())
+        owned.unlink()
+        os.link(outside, owned)
+
+        accepted = self.harness(
+            "codex-direct", "accept", "--cwd", str(self.repo), "--task", "pilot-30"
+        )
+
+        self.assertEqual(accepted.returncode, 2, accepted.stderr or accepted.stdout)
+        self.assertIn("hard link", json.loads(accepted.stdout)["error"].lower())
+
+    def test_canonical_staging_rejects_hard_linked_owned_file(self) -> None:
+        import harness.codex_direct as controller
+
+        outside = self.root / "outside.txt"
+        outside.write_text("outside\n", encoding="utf-8")
+        os.link(outside, self.repo / "harness-only.txt")
+
+        with self.assertRaisesRegex(controller.CodexDirectError, "hard link"):
+            controller._canonical_index_snapshot(
+                discover_worktree(self.repo), ["harness-only.txt"]
+            )
+
+    def test_canonical_staging_rejects_linked_parent_directory(self) -> None:
+        import harness.codex_direct as controller
+
+        outside = self.root / "outside"
+        outside.mkdir()
+        (outside / "file.txt").write_text("external\n", encoding="utf-8")
+        try:
+            os.symlink(outside, self.repo / "owned", target_is_directory=True)
+        except OSError as exc:
+            self.skipTest(f"directory symlinks unavailable: {exc}")
+
+        with self.assertRaises((controller.CodexDirectError, OSError)):
+            controller._canonical_index_snapshot(
+                discover_worktree(self.repo), ["owned/file.txt"]
+            )
+
     def test_acceptance_requires_typed_checks_review_criteria_and_risks(self) -> None:
         start = self.harness(
             "codex-direct", "start", "--cwd", str(self.repo), str(self.contract_path)
@@ -2178,7 +2221,7 @@ class CodexDirectProcessTests(unittest.TestCase):
 
         def race(root: Path, args: tuple[str, ...], *pos: object, **kwargs: object) -> bytes:
             nonlocal injected
-            if not injected and "add" in args:
+            if not injected and "hash-object" in args:
                 injected = True
                 (self.repo / ".gitattributes").write_text(
                     "harness-only.txt filter=late\n", encoding="utf-8"

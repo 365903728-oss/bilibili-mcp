@@ -12,7 +12,7 @@ import stat
 import subprocess
 import tempfile
 import threading
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from functools import wraps
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterator
@@ -1220,66 +1220,182 @@ def _reject_in_progress_git_operation(context: WorktreeContext) -> None:
         raise CodexDirectError("an in-progress Git operation prevents ticket control")
 
 
-def _path_snapshot(root: Path, paths: list[str]) -> list[dict[str, Any]]:
+def _read_ticket_paths(
+    root: Path, paths: list[str]
+) -> tuple[list[dict[str, Any]], dict[str, bytes]]:
     if len(paths) > 4096:
         raise CodexDirectError("ticket path snapshot exceeds its bound")
     snapshot: list[dict[str, Any]] = []
+    payloads: dict[str, bytes] = {}
     remaining = MAX_GIT_OUTPUT_BYTES
     for relative in paths:
         path = root / PurePosixPath(relative)
-        if path.is_symlink():
-            try:
-                target = os.readlink(path).encode(
-                    "utf-8", errors="surrogateescape"
+        stack = ExitStack()
+        try:
+            if os.name == "nt":
+                stack.enter_context(_hold_windows_directory_chain(path.parent))
+                parent_descriptor: int | None = None
+                candidate: Path | str = path
+            else:
+                parent_descriptor = _open_directory_nofollow(
+                    path.parent, bind_transaction=False
                 )
+                stack.callback(os.close, parent_descriptor)
+                candidate = path.name
+        except FileNotFoundError:
+            snapshot.append({"path": relative, "kind": "deleted", "digest": None})
+            continue
+        try:
+            try:
+                visible = os.stat(
+                    candidate,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                snapshot.append({"path": relative, "kind": "deleted", "digest": None})
+                continue
+            if stat.S_ISLNK(visible.st_mode):
+                try:
+                    target = os.readlink(
+                        candidate, dir_fd=parent_descriptor
+                    ).encode("utf-8", errors="surrogateescape")
+                    visible_after = os.stat(
+                        candidate,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                except OSError as exc:
+                    raise CodexDirectAdapterError(
+                        "unable to fingerprint the accepted diff"
+                    ) from exc
+                if visible.st_nlink != 1 or (
+                    visible.st_dev,
+                    visible.st_ino,
+                    visible.st_mode,
+                    visible.st_nlink,
+                ) != (
+                    visible_after.st_dev,
+                    visible_after.st_ino,
+                    visible_after.st_mode,
+                    visible_after.st_nlink,
+                ):
+                    raise CodexDirectError(
+                        "ticket diff contains a hard link or changed path"
+                    )
+                if len(target) > remaining:
+                    raise CodexDirectError("ticket path snapshot exceeds its byte limit")
+                remaining -= len(target)
+                payloads[relative] = target
+                snapshot.append(
+                    {
+                        "path": relative,
+                        "kind": "symlink",
+                        "digest": hashlib.sha256(target).hexdigest(),
+                    }
+                )
+                continue
+            if not stat.S_ISREG(visible.st_mode):
+                raise CodexDirectError("ticket diff contains an unsupported file type")
+            digest = hashlib.sha256()
+            descriptor: int | None = None
+            try:
+                flags = (
+                    os.O_RDONLY
+                    | getattr(os, "O_BINARY", 0)
+                    | getattr(os, "O_NOFOLLOW", 0)
+                )
+                descriptor = os.open(candidate, flags, dir_fd=parent_descriptor)
+                opened = os.fstat(descriptor)
+                visible = os.stat(
+                    candidate,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+                if (
+                    not stat.S_ISREG(opened.st_mode)
+                    or not stat.S_ISREG(visible.st_mode)
+                    or opened.st_nlink != 1
+                    or visible.st_nlink != 1
+                ):
+                    raise CodexDirectError(
+                        "ticket diff contains a hard link or unsupported file"
+                    )
+                identity = (
+                    opened.st_dev,
+                    opened.st_ino,
+                    opened.st_size,
+                    opened.st_mtime_ns,
+                    opened.st_nlink,
+                )
+                if identity != (
+                    visible.st_dev,
+                    visible.st_ino,
+                    visible.st_size,
+                    visible.st_mtime_ns,
+                    visible.st_nlink,
+                ):
+                    raise CodexDirectError("ticket path changed during snapshot")
+                if opened.st_size > remaining:
+                    raise CodexDirectError("ticket path snapshot exceeds its byte limit")
+                content = bytearray()
+                with os.fdopen(descriptor, "rb") as handle:
+                    descriptor = None
+                    while True:
+                        chunk = handle.read(min(1024 * 1024, remaining + 1))
+                        if not chunk:
+                            break
+                        if len(chunk) > remaining:
+                            raise CodexDirectError(
+                                "ticket path snapshot exceeds its byte limit"
+                            )
+                        digest.update(chunk)
+                        content.extend(chunk)
+                        remaining -= len(chunk)
+                    closed = os.fstat(handle.fileno())
+                visible_after = os.stat(
+                    candidate,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+                if identity != (
+                    closed.st_dev,
+                    closed.st_ino,
+                    closed.st_size,
+                    closed.st_mtime_ns,
+                    closed.st_nlink,
+                ) or identity != (
+                    visible_after.st_dev,
+                    visible_after.st_ino,
+                    visible_after.st_size,
+                    visible_after.st_mtime_ns,
+                    visible_after.st_nlink,
+                ):
+                    raise CodexDirectError("ticket path changed during snapshot")
+                executable = bool(opened.st_mode & stat.S_IXUSR)
+                payloads[relative] = bytes(content)
             except OSError as exc:
                 raise CodexDirectAdapterError(
                     "unable to fingerprint the accepted diff"
                 ) from exc
-            if len(target) > remaining:
-                raise CodexDirectError("ticket path snapshot exceeds its byte limit")
-            remaining -= len(target)
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
             snapshot.append(
                 {
                     "path": relative,
-                    "kind": "symlink",
-                    "digest": hashlib.sha256(target).hexdigest(),
+                    "kind": "file",
+                    "executable": executable,
+                    "digest": digest.hexdigest(),
                 }
             )
-            continue
-        if not path.exists():
-            snapshot.append({"path": relative, "kind": "deleted", "digest": None})
-            continue
-        if not path.is_file():
-            raise CodexDirectError("ticket diff contains an unsupported file type")
-        digest = hashlib.sha256()
-        try:
-            file_stat = path.stat()
-            if file_stat.st_size > remaining:
-                raise CodexDirectError("ticket path snapshot exceeds its byte limit")
-            with path.open("rb") as handle:
-                while True:
-                    chunk = handle.read(min(1024 * 1024, remaining + 1))
-                    if not chunk:
-                        break
-                    if len(chunk) > remaining:
-                        raise CodexDirectError(
-                            "ticket path snapshot exceeds its byte limit"
-                        )
-                    digest.update(chunk)
-                    remaining -= len(chunk)
-            executable = bool(file_stat.st_mode & stat.S_IXUSR)
-        except OSError as exc:
-            raise CodexDirectAdapterError("unable to fingerprint the accepted diff") from exc
-        snapshot.append(
-            {
-                "path": relative,
-                "kind": "file",
-                "executable": executable,
-                "digest": digest.hexdigest(),
-            }
-        )
-    return snapshot
+        finally:
+            stack.close()
+    return snapshot, payloads
+
+
+def _path_snapshot(root: Path, paths: list[str]) -> list[dict[str, Any]]:
+    return _read_ticket_paths(root, paths)[0]
 
 
 def _snapshot_digest(snapshot: list[dict[str, Any]]) -> str:
@@ -2306,6 +2422,13 @@ def _build_ticket_index(
         )
     _reject_filtered_paths(context.root, paths)
     config_args = _hermetic_config_args(context.root)
+    working_snapshot, payloads = _read_ticket_paths(context.root, paths)
+    filemode = _git(
+        context.root, "config", "--default=true", "core.filemode"
+    ).lower() == "true"
+    symlinks = _git(
+        context.root, "config", "--default=true", "core.symlinks"
+    ).lower() == "true"
     with _hermetic_index_environment(
         context, write_objects=write_objects
     ) as (environment, index_path):
@@ -2314,19 +2437,67 @@ def _build_ticket_index(
             (*config_args, "read-tree", base_sha),
             env_overrides=environment,
         )
-        for batch in _path_argument_batches(paths):
-            _run_git_bytes(
+        for entry in working_snapshot:
+            path = entry["path"]
+            if entry["kind"] == "deleted":
+                _run_git_bytes(
+                    context.root,
+                    (*config_args, "update-index", "--force-remove", "--", path),
+                    env_overrides=environment,
+                )
+                continue
+            base_mode = _git(
+                context.root,
+                "ls-tree",
+                "--format=%(objectmode)",
+                base_sha,
+                "--",
+                path,
+            )
+            if base_mode not in {"", "100644", "100755", "120000"}:
+                raise CodexDirectAdapterError("base tree entry type is unsupported")
+            if entry["kind"] == "symlink" or (
+                base_mode == "120000" and not symlinks
+            ):
+                mode = "120000"
+                path_args: tuple[str, ...] = ()
+            else:
+                mode = (
+                    base_mode
+                    if not filemode and base_mode in {"100644", "100755"}
+                    else "100755" if entry["executable"] else "100644"
+                )
+                path_args = (f"--path={path}",)
+            object_id = _run_git_bytes(
                 context.root,
                 (
                     *config_args,
                     f"--attr-source={base_sha}",
-                    "add",
-                    "-A",
-                    "--",
-                    *batch,
+                    "hash-object",
+                    "-w",
+                    *path_args,
+                    "--stdin",
+                ),
+                input_bytes=payloads[path],
+                env_overrides=environment,
+            ).decode("ascii", errors="strict").strip().lower()
+            if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", object_id):
+                raise CodexDirectAdapterError("Git returned an invalid object identity")
+            _run_git_bytes(
+                context.root,
+                (
+                    *config_args,
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    mode,
+                    object_id,
+                    path,
                 ),
                 env_overrides=environment,
             )
+        if _read_ticket_paths(context.root, paths)[0] != working_snapshot:
+            raise CodexDirectError("ticket paths changed during canonical staging")
         staged_paths = _git_paths(
             context.root,
             *config_args,

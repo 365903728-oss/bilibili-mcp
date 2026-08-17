@@ -97,6 +97,56 @@ class CliAndAdapterTests(unittest.TestCase):
         responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
         self.assertEqual([item["id"] for item in responses], [1, *range(2, 35)])
 
+    def test_capability_serve_discards_malformed_frames_and_continues(self) -> None:
+        messages = (
+            b"\xff\n"
+            b"{not-json}\n"
+            b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n'
+            b'{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}\n'
+            b'{"jsonrpc":"2.0","id":2,"method":"ping","params":{}}\n'
+        )
+        stdin = io.TextIOWrapper(io.BytesIO(messages))
+        stdout = io.StringIO()
+        context = WorktreeContext(
+            root=ROOT,
+            git_dir=ROOT / ".git",
+            common_git_dir=ROOT / ".git",
+            head_sha="0" * 40,
+            worktree_id="wt-test",
+            repository_id="repo-test",
+        )
+
+        def respond(
+            _context: WorktreeContext, *, name: str, adapter: str, value: object
+        ) -> dict[str, object] | None:
+            del name, adapter
+            message = value if isinstance(value, dict) else {}
+            if message.get("method") == "notifications/initialized":
+                return None
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {}}
+
+        with patch("sys.stdin", stdin), patch(
+            "harness.cli.discover_worktree", return_value=context
+        ), patch(
+            "harness.cli.mcp_surface_message", side_effect=respond
+        ), redirect_stdout(stdout):
+            status = main(
+                [
+                    "capability",
+                    "serve",
+                    "--cwd",
+                    str(ROOT),
+                    "--name",
+                    "safe-build-fixture",
+                    "--adapter",
+                    "codex-direct",
+                ]
+            )
+
+        self.assertEqual(status, 0, stdout.getvalue())
+        responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
+        self.assertEqual([item["id"] for item in responses], [1, 2])
+
     def test_capability_serve_rejects_initialize_as_a_notification(self) -> None:
         stdin = io.TextIOWrapper(
             io.BytesIO(b'{"jsonrpc":"2.0","method":"initialize","params":{}}\n')

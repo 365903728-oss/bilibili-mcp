@@ -55,6 +55,10 @@ the migration clean-room test can inspect its exact accepted #35 base.
   Windows.
 - MCP tools/list cursor repair: bounded schema test 1/1 and the real
   four-surface, three-adapter process-boundary lifecycle 1/1 PASS.
+- Final hard-link/MCP frame repair: acceptance and canonical staging reject
+  single-path hard links to external inodes; malformed UTF-8 and JSON frames
+  are discarded while later valid initialize/ping frames complete. Adjacent
+  CRLF, symlink, filter, index-recovery, and exact-commit regressions pass.
 
 ## Acceptance Criteria
 
@@ -126,6 +130,15 @@ the migration clean-room test can inspect its exact accepted #35 base.
   optional pagination cursor. The Harness now accepts a control-free cursor up
   to 2048 characters and deliberately returns the complete tool set as one
   page without `nextCursor`; malformed and oversized cursors fail closed.
+- The latest review found that an owned file created as a hard link after the
+  pre-write guard could be reopened by acceptance and Git staging, and that a
+  malformed MCP frame ended the stdio process. Acceptance now performs one
+  parent-anchored, descriptor-bound, single-link read and constructs the
+  isolated Git index only from those captured bytes. POSIX holds a no-follow
+  parent descriptor and Windows holds the verified directory HANDLE chain, so
+  ancestor replacement cannot redirect the read. MCP decoding/JSON failures
+  are contained to the offending frame, matching the pinned SDK transport's
+  session behavior.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

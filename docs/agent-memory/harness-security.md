@@ -574,3 +574,12 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   `git status` report a clean tree. Repository attributes fix both generated
   artifact paths to LF so a normal Windows `core.autocrlf=true` checkout keeps
   the same trusted bytes.
+- Direct acceptance holds a no-follow parent descriptor on POSIX or the
+  verified directory HANDLE chain on Windows, opens every owned regular file
+  without following the final link, requires one visible link and stable
+  descriptor/path identity before and after the bounded read, and feeds only
+  those captured bytes to the isolated Git index. A swapped ancestor or hard
+  link created after the edit guard cannot import an external inode.
+- Harness MCP stdio discards malformed UTF-8 or JSON one frame at a time. The
+  64-KiB frame bound and valid-message lifecycle checks remain fail closed,
+  while a later valid frame continues on the same session.

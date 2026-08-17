@@ -549,8 +549,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                         raise ValueError("MCP stdio input exceeds its bound")
                     try:
                         value = json.loads(raw.decode("utf-8", errors="strict"))
-                    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                        raise ValueError("MCP stdio input is invalid") from exc
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        continue
                     validate_json_shape(value, max_nodes=512, max_depth=8)
                     method = value.get("method") if isinstance(value, dict) else None
                     if (
