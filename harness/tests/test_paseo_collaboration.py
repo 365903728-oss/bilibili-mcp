@@ -614,6 +614,52 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
             self.assertTrue(prompt_path.exists(), "untrusted link must not be removed")
             prompt_path.unlink()
 
+    def test_ephemeral_prompt_creation_stays_in_locked_task_directory(self) -> None:
+        if os.name == "nt":
+            self.skipTest("POSIX directory-descriptor binding")
+
+        import harness.paseo_collaboration as collaboration
+        from harness.safe_io import bounded_file_lock
+
+        task_dir = self.repo / ".harness" / "runtime" / "prompt-race"
+        task_dir.mkdir(parents=True)
+        detached = self.root / "detached-prompt-race"
+        replacement = self.root / "replacement-prompt-race"
+        replacement.mkdir()
+        prompt_path = task_dir / "dispatch-prompt.txt"
+        real_open = collaboration._open_private_prompt
+        descriptor = None
+        error = None
+
+        def _swap_then_open(path):
+            task_dir.rename(detached)
+            os.symlink(replacement, task_dir, target_is_directory=True)
+            return real_open(path)
+
+        with bounded_file_lock(task_dir / "run.lock"):
+            try:
+                with patch(
+                    "harness.paseo_collaboration._open_private_prompt",
+                    side_effect=_swap_then_open,
+                ):
+                    try:
+                        descriptor = collaboration._write_ephemeral_prompt(
+                            self._ctx(), prompt_path, "sensitive raw handoff"
+                        )
+                    except collaboration.PaseoCollaborationError as exc:
+                        error = exc
+            finally:
+                task_dir.unlink()
+                detached.rename(task_dir)
+                if descriptor is not None:
+                    collaboration._unlink_ephemeral_prompt(
+                        self._ctx(), prompt_path, descriptor
+                    )
+
+        self.assertIsNotNone(error)
+        self.assertIn("ephemeral_prompt_unavailable", str(error))
+        self.assertEqual(list(replacement.iterdir()), [])
+
     def test_ephemeral_prompt_scrubs_links_added_after_create(self) -> None:
         import harness.paseo_collaboration as collaboration
 
@@ -689,6 +735,7 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
         self.assertIn("prompt_identity_changed", str(cm.exception))
         self.assertEqual(identity.call_count, 2)
 
+        posix_prompt_path = Path("dispatch-prompt.txt")
         with patch.object(collaboration.os, "name", "posix"), patch(
             "harness.paseo_collaboration.os.lseek",
         ), patch(
@@ -699,11 +746,37 @@ class PaseoCollaborationFunctionTests(_PaseoTestBase):
             return_value=_make_send_result(),
         ) as run:
             collaboration._send_verified_prompt(
-                "agent-test-uuid", Path("dispatch-prompt.txt"), 123
+                "agent-test-uuid", posix_prompt_path, 123
             )
 
         self.assertEqual(run.call_args.args[3], "/dev/fd/123")
         self.assertEqual(run.call_args.kwargs["pass_fds"], (123,))
+
+    def test_verified_prompt_send_converts_lock_identity_failure(self) -> None:
+        import harness.paseo_collaboration as collaboration
+
+        prompt_path = self.repo / ".harness" / "runtime" / "locked-prompt.txt"
+        descriptor = collaboration._write_ephemeral_prompt(
+            self._ctx(), prompt_path, "verified prompt"
+        )
+        try:
+            with patch(
+                "harness.paseo_collaboration._verify_active_lock_parent",
+                side_effect=(None, ValueError("runtime lock directory changed")),
+            ), patch(
+                "harness.paseo_collaboration._run_paseo_cli",
+                return_value=_make_send_result(),
+            ):
+                with self.assertRaises(collaboration.PaseoCollaborationError) as cm:
+                    collaboration._send_verified_prompt(
+                        "agent-test-uuid", prompt_path, descriptor
+                    )
+        finally:
+            collaboration._unlink_ephemeral_prompt(
+                self._ctx(), prompt_path, descriptor
+            )
+
+        self.assertIn("prompt_task_directory_changed", str(cm.exception))
 
     def test_verified_prompt_source_cannot_be_overwritten(self) -> None:
         import harness.paseo_collaboration as collaboration

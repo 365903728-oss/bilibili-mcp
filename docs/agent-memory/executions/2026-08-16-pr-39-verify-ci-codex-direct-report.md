@@ -95,6 +95,14 @@ the migration clean-room test can inspect its exact accepted #35 base.
   code correctly removed those variables, so the test fake was moved to an
   adjacent private JSON config instead of weakening the allowlist. The exact
   Ubuntu failure reproduced in WSL; Windows and WSL CLI suites now pass 22/22.
+- The next Codex review reproduced a POSIX task-directory replacement between
+  pending-intent persistence and anonymous prompt creation. Prompt files now
+  use the active lock directory descriptor for exclusive creation and unlink,
+  and the task directory is revalidated immediately before and after send.
+  A post-send identity failure is converted to the collaboration error family,
+  preserving the existing CLI recovery-required transition.
+  The focused race test fails on the old path and passes after the repair;
+  Windows and WSL Paseo function suites pass 58/58 (one Windows-only skip).
 
 ## Risks, Skipped Checks, Recovery Bundle
 

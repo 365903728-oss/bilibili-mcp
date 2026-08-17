@@ -557,3 +557,7 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
 - POSIX atomic state installation fsyncs the verified parent descriptor after
   replacement. Success therefore covers both file contents and the directory
   entry used by at-most-once state and recovery records.
+- POSIX Paseo prompts are created and immediately unlinked relative to the
+  active task-lock directory descriptor. Prompt creation and send both reject
+  a replaced visible task directory; a post-send identity failure is classified
+  as a collaboration error so pending intent enters the existing recovery path.

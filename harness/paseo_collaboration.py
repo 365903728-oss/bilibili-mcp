@@ -11,10 +11,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import secrets
 import shutil
 import stat
 import subprocess
-import tempfile
 import threading
 import time
 from pathlib import Path
@@ -63,7 +63,13 @@ from harness.codex_direct import (
 )
 from harness.capabilities import check_manual_skill
 from harness.contracts import ContractError, validate_task_contract
-from harness.safe_io import _unlink_nofollow
+from harness.safe_io import (
+    _active_lock_parent,
+    _ensure_directory_nofollow,
+    _open_directory_nofollow,
+    _unlink_nofollow,
+    _verify_active_lock_parent,
+)
 
 COLLAB_GUARD_ACTIONS = GUARDED_ACTIONS | {"stage", "review", "verify", "explore", "accept"}
 from harness.context import WorktreeContext
@@ -135,14 +141,48 @@ def _prompt_identity_matches(
 
 def _open_private_prompt(prompt_path: Path) -> int:
     if os.name != "nt":
+        parent_descriptor = _open_directory_nofollow(prompt_path.parent)
+        descriptor = None
         try:
-            os.lstat(prompt_path)
-        except FileNotFoundError:
-            pass
-        else:
-            raise FileExistsError(prompt_path)
-        with tempfile.TemporaryFile(dir=prompt_path.parent) as private:
-            return os.dup(private.fileno())
+            try:
+                os.stat(
+                    prompt_path.name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                pass
+            else:
+                raise FileExistsError(prompt_path)
+            flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+            if hasattr(os, "O_CLOEXEC"):
+                flags |= os.O_CLOEXEC
+            temporary_name = ""
+            for _ in range(16):
+                temporary_name = f".{prompt_path.name}.{secrets.token_hex(8)}.tmp"
+                try:
+                    descriptor = os.open(
+                        temporary_name,
+                        flags,
+                        0o600,
+                        dir_fd=parent_descriptor,
+                    )
+                    break
+                except FileExistsError:
+                    continue
+            if descriptor is None:
+                raise FileExistsError("private prompt name unavailable")
+            os.unlink(temporary_name, dir_fd=parent_descriptor)
+            opened = os.fstat(descriptor)
+            if not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 0:
+                raise OSError("private prompt could not be anonymized")
+            return descriptor
+        except BaseException:
+            if descriptor is not None:
+                os.close(descriptor)
+            raise
+        finally:
+            os.close(parent_descriptor)
 
     import ctypes
     import msvcrt
@@ -229,8 +269,9 @@ def _write_ephemeral_prompt(
     if len(raw) > PROMPT_FILE_MAX_BYTES:
         raise PaseoCollaborationError("ephemeral_prompt_oversized")
 
-    prompt_path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        if _active_lock_parent(prompt_path.parent) is None:
+            _ensure_directory_nofollow(prompt_path.parent)
         ensure_no_link_components(context.root, prompt_path)
         descriptor = _open_private_prompt(prompt_path)
     except (OSError, ValueError) as exc:
@@ -280,6 +321,10 @@ def _send_verified_prompt(
     prompt_path: Path,
     descriptor: int,
 ) -> dict[str, Any]:
+    try:
+        _verify_active_lock_parent(prompt_path.parent)
+    except ValueError as exc:
+        raise PaseoCollaborationError("prompt_task_directory_changed") from exc
     if not _prompt_identity_matches(prompt_path, descriptor):
         raise PaseoCollaborationError("prompt_identity_changed")
     prompt_source = str(prompt_path)
@@ -297,6 +342,10 @@ def _send_verified_prompt(
         timeout=PASEO_RUN_TIMEOUT,
         pass_fds=pass_fds,
     )
+    try:
+        _verify_active_lock_parent(prompt_path.parent)
+    except ValueError as exc:
+        raise PaseoCollaborationError("prompt_task_directory_changed") from exc
     if not _prompt_identity_matches(prompt_path, descriptor):
         raise PaseoCollaborationError("prompt_identity_changed")
     return result
