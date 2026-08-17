@@ -548,3 +548,12 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   select a Windows shim later on PATH ahead of the disposable native launcher.
   Forged accepted-memory receipts are written as canonical bytes and rejected
   before they can authorize governed Evolution.
+
+## PR #39 final review controls
+
+- Every Paseo subprocess receives only an explicit platform/configuration
+  environment allowlist. Bilibili credentials, GitHub/npm tokens, SSH-agent
+  variables, provider API keys, and arbitrary inherited variables are excluded.
+- POSIX atomic state installation fsyncs the verified parent descriptor after
+  replacement. Success therefore covers both file contents and the directory
+  entry used by at-most-once state and recovery records.

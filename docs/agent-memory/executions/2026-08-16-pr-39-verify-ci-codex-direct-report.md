@@ -43,6 +43,10 @@ the migration clean-room test can inspect its exact accepted #35 base.
   expected platform skips.
 - Typed-memory module after the final review repair: 40 tests PASS, 2 expected
   platform skips; migration conformance 1/1 PASS.
+- Final Paseo/safe-I/O review repair: Paseo function tests 57/57 PASS; Windows
+  Hook-event tests 23 PASS with 10 platform skips; WSL Hook-event tests plus
+  the environment regression 24 PASS with 2 platform skips; migration
+  conformance 1/1 PASS.
 
 ## Acceptance Criteria
 
@@ -76,6 +80,14 @@ the migration clean-room test can inspect its exact accepted #35 base.
   tracked memory artifacts and transaction markers now reuse the shared
   no-follow directory creator; Windows focused checks pass 3/3 with one
   expected POSIX-only skip, and WSL passes 3/3.
+- The next review found inherited credential exposure at the Paseo process
+  boundary and missing POSIX directory durability after atomic replacement.
+  Every Paseo call now receives one explicit platform/configuration allowlist,
+  while `safe_io` fsyncs its verified parent descriptor after replacement.
+  Synthetic credential and directory-fsync red tests reproduced both gaps;
+  the repaired tests and a real read-only Paseo status/preflight call pass.
+  Preflight reported the existing `daemon_not_running: stale_pid` without a
+  restart, provider switch, fallback, or implementation write.
 
 ## Risks, Skipped Checks, Recovery Bundle
 
@@ -88,8 +100,9 @@ the migration clean-room test can inspect its exact accepted #35 base.
 
 - Model-invoked Skills: `bilibili-mcp-memory`, `github-actions-docs`,
   `git-publish`.
-- Agents/reviewers: none before commit; Codex cloud review will be requested
-  after the authorized push because workflow files are a supply-chain surface.
+- Agents/reviewers: one independent read-only risk reviewer returned PASS with
+  no reproducible P0-P3; Codex cloud review will be requested after the
+  authorized push because Harness/CI files are security-sensitive surfaces.
 - MCP/tools/CLI: local Git/npm/Node/Python, official GitHub documentation, and
   read-only `gh` action-ref/PR inspection.
 

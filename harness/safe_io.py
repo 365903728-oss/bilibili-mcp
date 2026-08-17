@@ -940,6 +940,7 @@ def _atomic_write_bytes(path: Path, content: bytes, *, mode: int = 0o600) -> Non
             src_dir_fd=parent_descriptor,
             dst_dir_fd=parent_descriptor,
         )
+        os.fsync(parent_descriptor)
         temporary_created = False
     finally:
         try:

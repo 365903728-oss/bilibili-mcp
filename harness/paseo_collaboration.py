@@ -362,6 +362,14 @@ MAX_STDOUT = 256 * 1024
 MAX_STDERR = 64 * 1024
 PROMPT_FILE_MAX_BYTES = 128 * 1024
 
+PASEO_ENV_KEYS = (
+    "APPDATA", "COMSPEC", "HOME", "LANG", "LC_ALL", "LC_CTYPE",
+    "LOCALAPPDATA", "PATH", "PATHEXT", "SHELL", "SYSTEMDRIVE",
+    "SYSTEMROOT", "TEMP", "TMP", "TMPDIR", "USERPROFILE", "WINDIR",
+    "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
+    "XDG_RUNTIME_DIR", "XDG_STATE_HOME", "PASEO_HOME",
+)
+
 # Evidence fields we never persist
 REDACTED_KEYS = frozenset({
     "stdout", "stderr", "command", "prompt", "absolute_path",
@@ -376,6 +384,10 @@ REDACTED_KEYS = frozenset({
 
 class PaseoCollaborationError(Exception):
     """Fail-closed Paseo collaboration error."""
+
+
+def _paseo_subprocess_environment() -> dict[str, str]:
+    return {key: os.environ[key] for key in PASEO_ENV_KEYS if key in os.environ}
 
 
 def _resolve_paseo_cli() -> Path:
@@ -420,6 +432,7 @@ def _run_paseo_cli(
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=_paseo_subprocess_environment(),
             **popen_options,
         )
     except (OSError, subprocess.SubprocessError):

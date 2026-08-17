@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import stat
 import subprocess
 import tempfile
 import time
@@ -463,6 +464,22 @@ class HookEventTests(unittest.TestCase):
                 with self.assertRaisesRegex(OSError, "random source failed"):
                     write_bounded_text(target, "trusted\n", 1024)
             self.assertEqual(opened, 0)
+
+    @unittest.skipIf(os.name == "nt", "directory fsync is POSIX-only")
+    def test_atomic_writer_fsyncs_parent_after_replace(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "state.txt"
+            real_fsync = os.fsync
+            synced_modes: list[int] = []
+
+            def recording_fsync(descriptor: int) -> None:
+                synced_modes.append(os.fstat(descriptor).st_mode)
+                real_fsync(descriptor)
+
+            with patch("harness.safe_io.os.fsync", new=recording_fsync):
+                write_bounded_text(target, "trusted\n", 1024)
+
+            self.assertTrue(any(stat.S_ISDIR(mode) for mode in synced_modes))
 
     @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
     def test_atomic_writer_closes_parent_when_temp_cleanup_fails(self) -> None:

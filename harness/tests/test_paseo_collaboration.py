@@ -7,6 +7,7 @@ CLI tests verify the subcommand is registered (subprocess, no mock).
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -248,6 +249,46 @@ class _PaseoTestBase(unittest.TestCase):
 @unittest.skipIf(GIT_EXE is None, "git not on PATH — inject PATH at command line")
 class PaseoCollaborationFunctionTests(_PaseoTestBase):
     """Tests calling paseo_* functions directly with mocked Paseo CLI."""
+
+    def test_paseo_subprocess_receives_allowlisted_environment(self) -> None:
+        from harness.paseo_collaboration import _run_paseo_cli
+
+        captured: dict[str, object] = {}
+
+        class FakeProcess:
+            stdout = io.BytesIO(b"{}")
+            stderr = io.BytesIO()
+
+            def wait(self, timeout: int) -> int:
+                return 0
+
+            def kill(self) -> None:
+                pass
+
+        def fake_popen(*args: object, **kwargs: object) -> FakeProcess:
+            captured.update(kwargs)
+            return FakeProcess()
+
+        sensitive = {
+            "BILIBILI_SESSDATA": "synthetic-secret",
+            "GITHUB_TOKEN": "synthetic-secret",
+            "NPM_TOKEN": "synthetic-secret",
+            "SSH_AUTH_SOCK": "synthetic-secret",
+        }
+        with (
+            patch.dict(os.environ, {**sensitive, "PASEO_HOME": str(self.root)}),
+            patch(
+                "harness.paseo_collaboration._resolve_paseo_cli",
+                return_value=Path("paseo"),
+            ),
+            patch("harness.paseo_collaboration.subprocess.Popen", new=fake_popen),
+        ):
+            self.assertEqual(_run_paseo_cli("daemon", "status"), {})
+
+        child_env = captured["env"]
+        self.assertIsInstance(child_env, dict)
+        self.assertTrue(set(sensitive).isdisjoint(child_env))
+        self.assertEqual(child_env.get("PASEO_HOME"), str(self.root))
 
     # ---- preflight (findings #1, #2) ----
 
