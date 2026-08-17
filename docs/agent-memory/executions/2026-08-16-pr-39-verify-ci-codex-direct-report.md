@@ -102,7 +102,12 @@ the migration clean-room test can inspect its exact accepted #35 base.
   A post-send identity failure is converted to the collaboration error family,
   preserving the existing CLI recovery-required transition.
   The focused race test fails on the old path and passes after the repair;
-  Windows and WSL Paseo function suites pass 58/58 (one Windows-only skip).
+  Windows and WSL Paseo function suites pass 59/59 (one Windows-only skip).
+- The following review found a redundant pathname `mkdir` after Direct start
+  had already acquired its task-directory lock. A POSIX ancestor-swap red test
+  proved the old path created the task hash outside the worktree. Removing that
+  one call leaves directory creation to the descriptor-safe lock helper; the
+  existing link check now rejects the swap before state or external writes.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

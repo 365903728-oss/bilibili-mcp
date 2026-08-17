@@ -561,3 +561,7 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   active task-lock directory descriptor. Prompt creation and send both reject
   a replaced visible task directory; a post-send identity failure is classified
   as a collaboration error so pending intent enters the existing recovery path.
+- Direct start relies on `bounded_file_lock` as the sole task-directory creator.
+  Once locked, it performs no pathname directory creation before saving state,
+  so a replaced `tasks` ancestor fails the existing link check without an
+  external filesystem mutation.

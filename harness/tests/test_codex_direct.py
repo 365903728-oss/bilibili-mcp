@@ -589,6 +589,44 @@ class CodexDirectProcessTests(unittest.TestCase):
                 controller.start_codex_direct(context, contract)
         self.assertEqual(list(context.runtime_root.glob("tasks/*/run.json")), [])
 
+    @unittest.skipIf(os.name == "nt", "open task locks block ancestor replacement")
+    def test_start_does_not_create_through_replaced_tasks_ancestor(self) -> None:
+        import harness.codex_direct as controller
+
+        context = discover_worktree(self.repo)
+        contract = json.loads(self.contract_path.read_text(encoding="utf-8"))
+        task_dir = controller._task_dir(context, "pilot-30")
+        tasks_dir = task_dir.parent
+        displaced = context.runtime_root / "displaced-tasks"
+        external = self.root / "external-tasks"
+        external.mkdir()
+        real_reject = controller._reject_ticket_in_other_worktree
+        swapped = False
+
+        def _swap_after_reject(*args, **kwargs):
+            nonlocal swapped
+            result = real_reject(*args, **kwargs)
+            tasks_dir.rename(displaced)
+            tasks_dir.symlink_to(external, target_is_directory=True)
+            swapped = True
+            return result
+
+        try:
+            with patch.object(
+                controller,
+                "_reject_ticket_in_other_worktree",
+                side_effect=_swap_after_reject,
+            ):
+                with self.assertRaises((controller.CodexDirectError, ValueError)):
+                    controller.start_codex_direct(context, contract)
+            self.assertTrue(swapped)
+            self.assertFalse((external / task_dir.name).exists())
+        finally:
+            if tasks_dir.is_symlink():
+                tasks_dir.unlink()
+            if displaced.exists():
+                displaced.rename(tasks_dir)
+
     def test_frozen_canonical_worktree_rejects_second_linked_writer(self) -> None:
         linked = self.root / "linked"
         git(self.repo, "worktree", "add", "-b", "linked", str(linked))

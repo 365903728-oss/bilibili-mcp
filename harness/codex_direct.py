@@ -3106,7 +3106,6 @@ def _start_codex_direct_unlocked(
         "commit_sha": None,
     }
     _reject_ticket_in_other_worktree(context, known_roots, task_id, source_digest)
-    task_dir.mkdir(parents=True, exist_ok=True)
     ensure_no_link_components(context.root, task_dir)
     _save_run(context, run_path, run)
     return _control(run), 0
