@@ -115,6 +115,7 @@ describe("handler validation and transcript output", () => {
       "BV1T6PQzQErF",
       "ai-zh",
       undefined,
+      false,
     );
   });
 
@@ -151,6 +152,8 @@ describe("handler validation and transcript output", () => {
       undefined,
       undefined,
       undefined,
+      false,
+      false,
       false,
     );
   });
@@ -259,6 +262,101 @@ describe("handler validation and transcript output", () => {
     expect(result.content[0].text).toBe(JSON.stringify(fixture, null, 2));
   });
 
+  it("forwards exclude_ai_subtitles to get_video_info subtitle selection", async () => {
+    mockGetVideoInfoWithSubtitle.mockResolvedValueOnce({
+      data_source: "subtitle",
+      video_info: { title: "AI subtitle fixture" },
+    });
+
+    const handler = getCallToolHandler();
+    await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 51,
+      params: {
+        name: "get_video_info",
+        arguments: {
+          bvid_or_url: "BV1T6PQzQErF",
+          exclude_ai_subtitles: true,
+        },
+      },
+    });
+
+    expect(mockGetVideoInfoWithSubtitle).toHaveBeenCalledWith(
+      "BV1T6PQzQErF",
+      "zh-Hans",
+      undefined,
+      true,
+    );
+  });
+
+  it("forwards exclude_ai_subtitles and force_asr to get_video_transcript", async () => {
+    mockGetVideoTranscriptData.mockResolvedValueOnce({
+      bvid: "BV1T6PQzQErF",
+      data_source: "subtitle",
+      language: "zh-Hans",
+      transcript: "AI subtitle fixture",
+      title: "AI subtitle fixture",
+      source_url: "https://www.bilibili.com/video/BV1T6PQzQErF/",
+    });
+
+    const handler = getCallToolHandler();
+    await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 52,
+      params: {
+        name: "get_video_transcript",
+        arguments: {
+          bvid_or_url: "BV1T6PQzQErF",
+          exclude_ai_subtitles: true,
+          force_asr: true,
+        },
+      },
+    });
+
+    expect(mockGetVideoTranscriptData).toHaveBeenCalledWith(
+      "BV1T6PQzQErF",
+      "zh-Hans",
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      true,
+      true,
+    );
+  });
+
+  it.each([
+    ["get_video_info", "exclude_ai_subtitles"],
+    ["get_video_transcript", "exclude_ai_subtitles"],
+    ["get_video_transcript", "force_asr"],
+  ])("%s rejects a non-boolean %s before business work", async (name, argName) => {
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 53,
+      params: {
+        name,
+        arguments: {
+          bvid_or_url: "BV1T6PQzQErF",
+          [argName]: "yes",
+        },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    expect(mockGetVideoInfoWithSubtitle).not.toHaveBeenCalled();
+    expect(mockGetVideoTranscriptData).not.toHaveBeenCalled();
+  });
+
   it("forwards explicit ASR opt-in and returns identical ASR text/structured output", async () => {
     const fixture = {
       bvid: "BV1T6PQzQErF",
@@ -285,7 +383,7 @@ describe("handler validation and transcript output", () => {
       },
     });
 
-    expect(mockGetVideoTranscriptData.mock.calls[0].at(-1)).toBe(true);
+    expect(mockGetVideoTranscriptData.mock.calls[0][8]).toBe(true);
     expect(result.structuredContent).toEqual(fixture);
     expect(JSON.parse(result.content[0].text)).toEqual(fixture);
   });

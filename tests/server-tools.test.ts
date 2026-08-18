@@ -117,6 +117,15 @@ describe("MCP tool list baseline", () => {
       expect(prop.type).toBe("integer");
       expect(prop.minimum).toBe(1);
     });
+
+    it("accepts optional exclude_ai_subtitles (boolean, default-off)", () => {
+      schema = toolsResult.tools.find((t) => t.name === "get_video_info")!;
+      const prop = schema.inputSchema.properties
+        .exclude_ai_subtitles as { type?: string; description?: string };
+      expect(prop).toBeDefined();
+      expect(prop.type).toBe("boolean");
+      expect(prop.description).toContain("ai");
+    });
   });
 
   describe("get_video_comments schema", () => {
@@ -254,6 +263,28 @@ describe("MCP tool list baseline", () => {
       expect(prop.type).toBe("boolean");
     });
 
+    it("accepts optional exclude_ai_subtitles (boolean, default-off)", () => {
+      schema = toolsResult.tools.find(
+        (t) => t.name === "get_video_transcript",
+      )!;
+      const prop = schema.inputSchema.properties
+        .exclude_ai_subtitles as { type?: string; description?: string };
+      expect(prop).toBeDefined();
+      expect(prop.type).toBe("boolean");
+      expect(prop.description).toContain("ai");
+    });
+
+    it("accepts optional force_asr (boolean, default-off)", () => {
+      schema = toolsResult.tools.find(
+        (t) => t.name === "get_video_transcript",
+      )!;
+      const prop = schema.inputSchema.properties
+        .force_asr as { type?: string; description?: string };
+      expect(prop).toBeDefined();
+      expect(prop.type).toBe("boolean");
+      expect(prop.description).toContain("ASR");
+    });
+
     it("accepts optional page (integer, min 1), include_timestamps, start_seconds, end_seconds", () => {
       schema = toolsResult.tools.find(
         (t) => t.name === "get_video_transcript",
@@ -311,7 +342,7 @@ describe("MCP tool list baseline", () => {
           bvid: { type: "string" },
           data_source: {
             type: "string",
-            enum: ["subtitle", "description", "asr"],
+            enum: ["subtitle", "ai_subtitle", "description", "asr"],
           },
           language: { type: "string" },
           transcript: { type: "string" },

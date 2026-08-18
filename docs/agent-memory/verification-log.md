@@ -1571,3 +1571,59 @@
   independently queryable. The immutable release tag remains on `2a33520`;
   this post-publication section belongs in a separate docs-only master update
   and does not move the tag.
+
+## 2026-08-18 — Issue #40 AI Subtitle Integrity Candidate
+
+- Command: `npx vitest run tests/bilibili-transcript.test.ts tests/server-tools.test.ts tests/server-handler-sanitization.test.ts tests/server-error-next-steps.test.ts`
+- Result: 4 files / 194 tests passed under independent Codex execution.
+- Area: AI source classification, exclusion/force inputs, fallback stability,
+  schema, handler validation, and error guidance.
+
+- Command: `npm run build` and `npm test`
+- Result: TypeScript build passed; 41 files / 885 tests passed.
+- Area: full candidate regression matrix.
+
+- Command: `npm pack --dry-run --json --ignore-scripts` and `git diff --check`
+- Result: 185 package files; diff check clean; no new dependency or package
+  boundary change.
+- Area: package contents and repository hygiene.
+
+- Command: post-review `npx vitest run tests/bilibili-transcript.test.ts`
+- Result: 1 file / 76 tests passed after strengthening the explicit
+  `preferred_lang: ai-zh` exclusion assertion; documentation contradiction was
+  corrected in both languages.
+- Caveat: the live Bilibili field case timed out before returning a transcript,
+  so deterministic injected regressions are the acceptance authority. No local
+  ready ASR model was installed or changed.
+
+## 2026-08-18 Roadmap Subtitle Integrity + Scriptable Setup (vertical slices)
+
+- Command: `npx vitest run tests/bilibili-transcript.test.ts` (slice 1 red to
+  green)
+- Result: red-capable — 2 integrity tests failed while language/topic checks
+  were temporarily neutralized; green — 83/83 passed with the pure-function
+  module and the transcript unconditional double-read.
+- Area: `src/bilibili/subtitle-integrity.ts` + transcript integration.
+
+- Command: `npx vitest run tests/bilibili-transcript.test.ts` (slice 2 red to
+  green)
+- Result: red — unstable `ai-zh` failed the `NoSubtitleError` expectation;
+  green — 85/85 passed including the video-info uncached-description describe.
+- Area: `getVideoInfoWithSubtitle` integrity block.
+
+- Command: `npx vitest run tests/cli.test.ts` (slice 3 red to green)
+- Result: red — 4 non-interactive tests failed before implementation (one
+  earlier vitest OOM came from a non-terminating `askHiddenFn` mock, fixed by
+  returning "n"); green — 69/69 passed.
+- Area: `SetupCredentialsOptions` + Commander `--non-interactive` /
+  `--asr-model`.
+
+- Command: post-build child smoke (`node dist/cli.js setup --non-interactive`
+  variants) with piped/closed stdin and synthetic environment credentials.
+- Result: 4/4 cases passed; no prompt, no stdin/argv read, no synthetic
+  credential value in stdout or stderr.
+- Area: slice 4 non-TTY smoke.
+
+- Command: `npm run build`
+- Result: passed after all four slices.
+- Area: TypeScript compilation.

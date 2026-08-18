@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### 新增
+- 区分 Bilibili AI 识别字幕与人工字幕：选中任意 Bilibili AI 字幕（`ai-zh`、`ai-en` 等 `ai-*` 语言）时，`get_video_transcript` 与 `get_video_info` 返回 `data_source: "ai_subtitle"`（不再是 `"subtitle"`；本地 ASR 仍为 `"asr"`）。`ai_subtitle` 是 Bilibili 的 AI 转录，可能不准确，不能当作人工校验过的引用。
+- `get_video_transcript` 与 `get_video_info` 新增可选参数 `exclude_ai_subtitles`（默认 `false`）：过滤 AI 字幕、优先返回人工字幕；仅剩 AI 字幕时视为无字幕，transcript 可配合显式 ASR/描述降级，video-info 返回简介。video-info 缓存键包含该选项。
+- `get_video_transcript` 新增可选参数 `force_asr`（默认 `false`）：绕过字幕选择直接用已就绪的本地 ASR 转录当前 Part，无需同时设置 `fallback_to_asr`，并优先于 `exclude_ai_subtitles`。
+- 对每个选中的 `ai-*` 无条件双读并做确定性完整性评估，通过后才返回正文：跨读取稳定性（两次读取的正文不一致即不可用，适用于所有 `ai-*`）、语言（仅针对 `ai-zh`：正文含至少 80 个 Unicode 字母且 Han 占比低于 10% 视为不匹配；其他 `ai-*` 语言不因非中文正文被拒绝）。不通过时 `fallback_to_asr: true` 调用本地 ASR，否则遵循 `fallback_to_description`，无授权回退时返回 `SUBTITLE_UNAVAILABLE`；video-info 返回简介且不缓存。稳定但同语言语义不符的正文是已接受的限制，可用 `force_asr` / `exclude_ai_subtitles` 控制；第二次读取的传输/超时/认证/解析失败照常作为错误返回，不会被伪装成完整性失败或触发 ASR。
+- `setup` 新增 `--non-interactive`（使用已有的环境变量或全局配置凭据，绝不提示、也绝不从 stdin/argv 读取凭据值；无 `--asr-model` 时仅确认凭据可加载即成功退出）与 `--asr-model <tiny|base|small>`（需与 `--non-interactive` 同用，安装指定模型）。
+
 ---
 
 ## [1.11.4] - 2026-08-09

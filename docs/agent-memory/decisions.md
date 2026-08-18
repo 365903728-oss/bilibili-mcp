@@ -414,3 +414,65 @@
   `io.github.XZXZZX-Ai/*`.
 - Evidence: the v1.11.2 403 response and the successful v1.11.3 publication and
   exact-match Official Registry API response.
+
+## 2026-08-18
+
+- Decision: Treat Bilibili `lan === "ai-zh"` as the distinct public source
+  `ai_subtitle`; keep human subtitles as `subtitle` and local transcription as
+  `asr`.
+- Reason: Issue #40 is a provenance bug. Source identity is deterministic and
+  should not be inferred from transcript text.
+- Evidence: GitHub Issue #40, shared `isAiSubtitle` classification, MCP schema
+  regressions, and transcript/video-info tests.
+
+- Decision: Validate AI-body stability only when `fallback_to_asr` is explicitly
+  enabled, and provide `force_asr` as the deterministic override. Do not add a
+  title-topic or language heuristic in this fix.
+- Reason: a second read directly detects the reported six-different-bodies
+  failure without adding dependencies or false-positive semantic guesses;
+  stable but wrong text cannot be proven locally with a reliable rule.
+- Evidence: injected inconsistent/stable/transport-failure regressions and the
+  Issue #40 execution handoff.
+
+- Decision: Keep non-TTY `setup` support as a separate credential-input task.
+- Reason: it is not in the subtitle provenance/fallback path and needs its own
+  security and scripting contract.
+- Evidence: Roadmap comparison in the Issue #40 handoff and QA checklist.
+
+- Decision: Assess every selected `ai-zh` track unconditionally, with frozen
+  deterministic integrity checks: collision-free canonical stability and a
+  conservative language check; the checks are not configurable and are not
+  exposed over MCP. Title-topic lexical overlap is not a rejection gate — a
+  stable same-language semantic mismatch is an accepted limitation controlled
+  by the caller via `force_asr` / `exclude_ai_subtitles`.
+- Reason: the Issue #40 fix gated the double-read behind explicit
+  `fallback_to_asr` and deferred semantic heuristics. The
+  ROADMAP-2026-08-18-INTEGRITY-SETUP PRD supersedes that gating: every selected
+  `ai-zh` is read twice and assessed (stability via canonical `JSON.stringify`
+  [from,to,content] tuple comparison; language via >=80 Unicode letters with
+  <10% Han). The initial `Intl.Segmenter` title-topic lexical-overlap gate was
+  removed after independent review: it false-accepted unrelated bodies
+  (cooking video vs Python tutorial) and false-rejected valid AI discussion.
+  A same-language body is accepted even when it does not discuss the title
+  topic. Insufficient signals pass as inconclusive, and second-read
+  transport/timeout/auth/parse failures propagate as errors, never as integrity
+  failures or ASR triggers. Unusable bodies are never returned, logged, or
+  cached (video-info returns an uncached description; transcript follows the
+  existing absence path with ASR only when `fallback_to_asr` authorizes it).
+- Evidence: `docs/subtitle-integrity-and-scriptable-setup-prd.md` v1.1,
+  `src/bilibili/subtitle-integrity.ts`, and the transcript/video-info integrity
+  regressions (stability, canonical-collision, language, same-language
+  acceptance).
+
+- Decision: Add credential-safe `setup --non-interactive` with optional
+  `--asr-model <tiny|base|small>` for automated environments.
+- Reason: automation needs a deterministic setup path without a TTY, while
+  credential values must never enter argv, stdin, prompts, or logs.
+  Non-interactive mode therefore loads only from environment variables or the
+  global config file, completes credential-only when no model is given, runs
+  ASR exactly once with a model, and exits 1 with value-free guidance when
+  credentials are unloadable or a model is passed without
+  `--non-interactive`. The interactive path is unchanged.
+- Evidence: `src/cli.ts` `SetupCredentialsOptions`, focused CLI tests, and
+  post-build child smoke with piped/closed stdin and synthetic environment
+  credentials.

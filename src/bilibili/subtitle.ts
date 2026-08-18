@@ -14,6 +14,7 @@ import { logger, redactSecrets } from "../utils/logger.js";
 import { SECURITY_LIMITS, utf8ByteLength } from "../security/limits.js";
 import { throwIfAborted } from "../security/operation-context.js";
 import { boundedRemoteText } from "../utils/bounded-text.js";
+import { assessAiSubtitleIntegrity } from "./subtitle-integrity.js";
 import type {
   BilibiliSubtitleItem,
   PartInfo,
@@ -25,7 +26,7 @@ import type {
 
 
 export interface SubtitleData {
-  data_source: "subtitle" | "description";
+  data_source: "subtitle" | "ai_subtitle" | "description";
   video_info: {
     title: string;
     description: string;
@@ -72,6 +73,14 @@ async function verifyLoginForEmptySubtitles(bvid: string): Promise<void> {
 }
 
 
+
+/**
+ * 判断字幕是否为 Bilibili AI 识别字幕（任意 ai-* 语言，如 ai-zh/ai-en/ai-ja）。
+ * transcript 与 video-info 两个流程共用此分类：data_source、排除与双读均以它为准。
+ */
+function isAiSubtitle(subtitle: BilibiliSubtitleItem): boolean {
+  return subtitle.lan.startsWith("ai-");
+}
 
 /**
  * 选择最佳字幕语言
@@ -290,6 +299,8 @@ export async function getVideoTranscriptData(
   endSeconds?: number,
   searchOptions?: TranscriptSearchOptions,
   fallbackToAsr?: boolean,
+  excludeAiSubtitles?: boolean,
+  forceAsr?: boolean,
   signal?: AbortSignal,
 ): Promise<VideoTranscriptData> {
   throwIfAborted(signal);
@@ -304,7 +315,7 @@ export async function getVideoTranscriptData(
 
   const buildSegmentResult = (
     body: SubtitleBodyItem[],
-    dataSource: "subtitle" | "asr",
+    dataSource: "subtitle" | "ai_subtitle" | "asr",
     language?: string,
   ): VideoTranscriptData => {
     const filteredBody = filterSegmentsByRange(body, startSeconds, endSeconds);
@@ -387,8 +398,9 @@ export async function getVideoTranscriptData(
 
   const handleDefinitiveSubtitleAbsence = async (
     reason: string,
+    runAsr = fallbackToAsr,
   ): Promise<VideoTranscriptData> => {
-    if (fallbackToAsr) {
+    if (runAsr) {
       throwIfAborted(signal);
       const exactPart = pages.find((part) => part.cid === cid);
       const durationSeconds =
@@ -428,6 +440,14 @@ export async function getVideoTranscriptData(
     return buildDescriptionFallback(reason);
   };
 
+  // force_asr 显式授权运行本地 ASR：绕过字幕元数据与内容选择
+  if (forceAsr) {
+    return await handleDefinitiveSubtitleAbsence(
+      "ASR was explicitly requested with force_asr: true",
+      true,
+    );
+  }
+
   // 获取字幕列表
   try {
     const subtitleData = await getVideoSubtitle(bvid, cid);
@@ -442,8 +462,19 @@ export async function getVideoTranscriptData(
       );
     }
 
+    let availableSubtitles = subtitleData.subtitle.subtitles;
+    if (excludeAiSubtitles) {
+      const humanSubtitles = availableSubtitles.filter((s) => !isAiSubtitle(s));
+      if (humanSubtitles.length === 0) {
+        return await handleDefinitiveSubtitleAbsence(
+          `Video ${bvid} has only AI subtitles and exclude_ai_subtitles is enabled`,
+        );
+      }
+      availableSubtitles = humanSubtitles;
+    }
+
     const bestSubtitle = selectBestSubtitle(
-      subtitleData.subtitle.subtitles,
+      availableSubtitles,
       preferredLang,
     );
 
@@ -463,7 +494,28 @@ export async function getVideoTranscriptData(
       );
     }
 
-    return buildSegmentResult(subtitleContent.body, "subtitle", bestSubtitle.lan);
+    // 对每个选中的 ai-* 无条件做确定性完整性评估（稳定性 → 语言，语言仅针对 ai-zh）；
+    // 不通过则绝不返回正文，进入既有确定性缺失路径（ASR/description/错误）；
+    // 同语言语义偏差为接受限制（force_asr/exclude_ai_subtitles 控制）；人工字幕保持单读路径
+    if (isAiSubtitle(bestSubtitle)) {
+      const secondContent = await getSubtitleContent(bestSubtitle.subtitle_url);
+      const assessment = assessAiSubtitleIntegrity(
+        subtitleContent?.body ?? [],
+        secondContent?.body ?? [],
+        bestSubtitle.lan,
+      );
+      if (!assessment.usable) {
+        return await handleDefinitiveSubtitleAbsence(
+          `AI subtitle ${bvid} ${assessment.reason}`,
+        );
+      }
+    }
+
+    return buildSegmentResult(
+      subtitleContent.body,
+      isAiSubtitle(bestSubtitle) ? "ai_subtitle" : "subtitle",
+      bestSubtitle.lan,
+    );
   } catch (error) {
     // COOKIE_EXPIRED must propagate
     if (
@@ -499,12 +551,13 @@ export async function getVideoInfoWithSubtitle(
   bvidOrUrl: string,
   preferredLang?: string,
   page?: number,
+  excludeAiSubtitles?: boolean,
 ): Promise<SubtitleData> {
   try {
     const bvid = extractBVId(bvidOrUrl);
 
-    // 生成缓存键（包含 page）— 在 resolvePartCid 之前检查以避免网络请求
-    const cacheKey = cacheManager.generateKey('video', bvid, preferredLang, page);
+    // 生成缓存键（包含 page 与 exclude 选项）— 在 resolvePartCid 之前检查以避免网络请求
+    const cacheKey = cacheManager.generateKey('video', bvid, preferredLang, page, excludeAiSubtitles ?? false);
     const cachedData = cacheManager.getVideoInfo(cacheKey) as SubtitleData | undefined;
     if (cachedData) {
       logger.debug("Video cache hit", { bvid, cacheKey }, { type: "subtitle" });
@@ -521,6 +574,18 @@ export async function getVideoInfoWithSubtitle(
     const pubdate = videoData.pubdate;
     const formattedDate = pubdate ? formatPublishDate(pubdate) : undefined;
 
+    // 简介降级结果（无字幕/被过滤/不可用统一路径）
+    const descriptionFallback = (): SubtitleData => ({
+      data_source: "description",
+      video_info: {
+        title,
+        description: description || "该视频没有可用的简介",
+        tags: tags.length > 0 ? tags : ["无标签"],
+        pubdate: formattedDate,
+        pubdate_timestamp: pubdate,
+      },
+    });
+
     // 尝试获取字幕
     try {
       const subtitleData = await getVideoSubtitle(bvid, cid);
@@ -535,16 +600,7 @@ export async function getVideoInfoWithSubtitle(
           { type: "subtitle" },
         );
 
-        const result: SubtitleData = {
-          data_source: "description",
-          video_info: {
-            title,
-            description: description || "该视频没有可用的简介",
-            tags: tags.length > 0 ? tags : ["无标签"],
-            pubdate: formattedDate,
-            pubdate_timestamp: pubdate,
-          },
-        };
+        const result = descriptionFallback();
         // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
         logger.debug(
           "Not caching fallback result to allow future retries",
@@ -555,19 +611,25 @@ export async function getVideoInfoWithSubtitle(
       }
 
       // 选择最佳字幕
-      const bestSubtitle = selectBestSubtitle(subtitleData.subtitle.subtitles, preferredLang);
+      const availableSubtitles = excludeAiSubtitles
+        ? subtitleData.subtitle.subtitles.filter((s) => !isAiSubtitle(s))
+        : subtitleData.subtitle.subtitles;
+
+      if (availableSubtitles.length === 0) {
+        const result = descriptionFallback();
+        // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
+        logger.debug(
+          "Not caching exclude-filtered fallback result to allow future retries",
+          { bvid },
+          { type: "subtitle" },
+        );
+        return result;
+      }
+
+      const bestSubtitle = selectBestSubtitle(availableSubtitles, preferredLang);
 
       if (!bestSubtitle) {
-        const result: SubtitleData = {
-          data_source: "description",
-          video_info: {
-            title,
-            description: description || "该视频没有可用的简介",
-            tags: tags.length > 0 ? tags : ["无标签"],
-            pubdate: formattedDate,
-            pubdate_timestamp: pubdate,
-          },
-        };
+        const result = descriptionFallback();
         // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
         logger.debug(
           "Not caching fallback result to allow future retries",
@@ -581,16 +643,7 @@ export async function getVideoInfoWithSubtitle(
       const subtitleContent = await getSubtitleContent(bestSubtitle.subtitle_url);
 
       if (!subtitleContent?.body || subtitleContent.body.length === 0) {
-        const result: SubtitleData = {
-          data_source: "description",
-          video_info: {
-            title,
-            description: description || "该视频没有可用的简介",
-            tags: tags.length > 0 ? tags : ["无标签"],
-            pubdate: formattedDate,
-            pubdate_timestamp: pubdate,
-          },
-        };
+        const result = descriptionFallback();
         // 不缓存无字幕结果，以便下次重试时能拉取最新生成的字幕
         logger.debug(
           "Not caching fallback result to allow future retries",
@@ -600,11 +653,31 @@ export async function getVideoInfoWithSubtitle(
         return result;
       }
 
+      // 对选中的 ai-* 无条件做确定性完整性评估（语言仅针对 ai-zh）；不通过则返回 description 且不缓存
+      if (isAiSubtitle(bestSubtitle)) {
+        const secondContent = await getSubtitleContent(bestSubtitle.subtitle_url);
+        const assessment = assessAiSubtitleIntegrity(
+          subtitleContent.body,
+          secondContent?.body ?? [],
+          bestSubtitle.lan,
+        );
+        if (!assessment.usable) {
+          const result = descriptionFallback();
+          // 不缓存不可用结果，以便下次重试时能拉取最新生成的字幕
+          logger.debug(
+            "Not caching unusable ai-* fallback result to allow future retries",
+            { bvid },
+            { type: "subtitle" },
+          );
+          return result;
+        }
+      }
+
       // 合并字幕文本
       const subtitleText = mergeSubtitleText(subtitleContent.body);
 
       const result: SubtitleData = {
-        data_source: "subtitle",
+        data_source: isAiSubtitle(bestSubtitle) ? "ai_subtitle" : "subtitle",
         video_info: {
           title,
           description,

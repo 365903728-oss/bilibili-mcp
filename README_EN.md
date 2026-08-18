@@ -54,7 +54,7 @@ Please help me install the Bilibili MCP server: @xzxzzx/bilibili-mcp.
    npx -y @xzxzzx/bilibili-mcp@latest check
    npx -y @xzxzzx/bilibili-mcp@latest doctor --json
    doctor --json checks local configuration only; it does not replace the live login verification below.
-   setup will ask about installing the optional local ASR model; choosing no is fine.
+   setup will ask about installing the optional local ASR model; choosing no is fine. Automated environments can run setup --non-interactive (credentials come from existing environment variables or the global config file; no prompts, and credential values are never read from stdin/argv); add --asr-model <tiny|base|small> to also install a given model.
 5. Ask me to restart or reconnect the client. When you can't do it for me,
    tell me explicitly to do it myself.
 6. After reconnect, call the MCP tool check_bilibili_credentials.
@@ -144,6 +144,15 @@ text.
 
 This requires a model installed through `setup` and `doctor --json` reporting `asr.status: ready`; otherwise the call returns `ASR_NOT_READY` with setup guidance. Native subtitles always win: a local transcription starts only when subtitles are confirmed unavailable, returns `data_source: "asr"`, and reuses the same timestamps, range filters, keyword search, and moment links. See [Local ASR](#local-asr-optional).
 
+### Distinguishing AI subtitles (ai-*) from human subtitles
+
+Bilibili marks some videos' AI-generated subtitles as `ai-zh`, `ai-en`, `ai-ja`, and other `ai-*` languages. To keep them distinguishable from human subtitles, when any `ai-*` track is selected both `get_video_transcript` and `get_video_info` return `data_source: "ai_subtitle"` (not `"subtitle"`; managed local ASR stays `"asr"`).
+
+- `ai_subtitle` is Bilibili AI transcription; it may be inaccurate and is not equivalent to a human-checked citation.
+- `exclude_ai_subtitles: true` (both tools, default `false`): filters out all Bilibili AI tracks (`ai-zh`, `ai-en`, etc.) before selection and prefers any remaining human subtitle. If only AI tracks remain, the result is treated as definitive absence — `get_video_transcript` may use explicit `fallback_to_asr` / `fallback_to_description`, and `get_video_info` returns the description.
+- `force_asr: true` (transcript only, default `false`): bypasses subtitle metadata and content selection and transcribes the resolved Part with the local ASR, even when valid human subtitles exist. It does not require `fallback_to_asr: true` and wins over `exclude_ai_subtitles`.
+- Every selected `ai-*` track is unconditionally read twice and passes a deterministic integrity assessment before its body is returned: cross-read stability (two reads with different normalized bodies are unusable; applies to every `ai-*` language) and language (ai-zh only: a body with at least 80 Unicode letters and under 10% Han letters is an `ai-zh` mismatch; other `ai-*` languages are not rejected for being non-Chinese). An unusable track invokes the local ASR with `fallback_to_asr: true`, otherwise the existing `fallback_to_description` contract applies; video-info returns the description without caching it. Stable same-language bodies that are semantically off-topic are an accepted limitation, controlled by `force_asr` or `exclude_ai_subtitles`. Human subtitles stay single-read, and a transport, timeout, auth, or parse failure on the second read remains an error.
+
 ## Local ASR (optional)
 
 Some videos ship without any subtitle. Once you install a local ASR model, `get_video_transcript` can run one bounded local transcription of the resolved Part when you explicitly pass `fallback_to_asr`.
@@ -161,6 +170,7 @@ The runtime is pinned to `faster-whisper==1.2.1`. Models live under `~/.bilibili
 **Boundaries:** local transcription stays within safe bounds — opt-in, resource-capped, Cookie-isolated:
 
 - Native Bilibili subtitles always win; transcription starts only on confirmed no-subtitle states with an explicit `fallback_to_asr: true`.
+- `force_asr: true` is explicit authorization to transcribe the resolved Part directly, regardless of subtitle availability and without requiring `fallback_to_asr`.
 - MCP calls never download or switch models; models install only through `setup`.
 - One transcription at a time; per-Part duration capped at 2 hours, audio at 128 MiB, transcription timeout at 30 minutes.
 - Temporary audio is removed on every success, failure, and timeout path.
@@ -191,7 +201,8 @@ Complete parameters, JSON examples, and error semantics: [tool reference](./docs
 - **Favorites traversal is caller-driven:** "every Favorite Folder" means Folders created by the currently logged-in account and currently visible through the Bilibili API. Each call reads at most one 20-row upstream page; the Agent must keep following `next_cursor`. Traversal is live best effort, not a snapshot.
 - **No cross-Folder deduplication:** the same BVID appearing in multiple Folders stays visible in each Folder context.
 - **Skipped entries are not replaced:** entries that cannot be safely normalized count toward `skipped_count`; no replacement entry is fetched for that page.
-- **ASR is an explicit fallback, not automatic:** behavior is unchanged unless you pass `fallback_to_asr`; even then, at most one transcription runs on confirmed no-subtitle states, and only with a ready local model.
+- **ASR is an explicit fallback, not automatic:** every selected `ai-*` track is always double-read and may become unavailable even on a default call (degrading to the description result or `SUBTITLE_UNAVAILABLE`); local transcription runs only on such confirmed no-subtitle states — or on explicit `force_asr` — when you pass `fallback_to_asr` / `force_asr`, at most once per call, and only with a ready local model.
+- **AI subtitles are distinguishable from human subtitles:** when Bilibili's AI-generated track (`ai-zh` or another `ai-*` language) is selected, `data_source` is `ai_subtitle`. It is Bilibili AI transcription, may be inaccurate, and is not equivalent to a human-checked citation. Use `exclude_ai_subtitles: true` when only human subtitles are acceptable.
 - **Downgrades are explicit:** `get_video_transcript` returns `SUBTITLE_UNAVAILABLE` by default when no subtitle exists. Description fallback (`fallback_to_description`) is incompatible with keyword search, timestamp output, and time-range filters.
 - **No access bypass:** the project does not bypass paid, member-only, regional, private, removed, or other Bilibili access restrictions.
 - **Video search and Favorites discovery both require logged-in credentials** and do not fall back to anonymous access.

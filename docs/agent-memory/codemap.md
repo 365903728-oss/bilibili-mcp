@@ -84,7 +84,8 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
   response validation.
 - `src/bilibili/video-api.ts`: video/subtitle/player API calls and response safety checks.
 - `src/bilibili/navigation.ts`: shared Part/CID resolution for multi-Part videos.
-- `src/bilibili/subtitle.ts`: native subtitle selection plus explicit ASR/description fallback precedence, shared segment formatting, timestamp output, range filtering, keyword/context search, and evidence-link behavior.
+- `src/bilibili/subtitle.ts`: native subtitle selection (human `subtitle` vs Bilibili AI `ai_subtitle` for every `ai-*` language), explicit ASR/description fallback precedence, `exclude_ai_subtitles` filtering with AI-only treated as deterministic absence, `force_asr` bypass, unconditional ai-* integrity assessment (double-read; unusable → `handleDefinitiveSubtitleAbsence` or uncached description), shared segment formatting, timestamp output, range filtering, keyword/context search, and evidence-link behavior.
+- `src/bilibili/subtitle-integrity.ts`: pure-function deterministic integrity module (no IO, no logging of comparison text/tokens): `assessAiSubtitleIntegrity` over canonical cross-read bodies (collision-free `JSON.stringify` of each [from,to,content] tuple), conservative language check limited to `ai-zh` (≥80 Unicode letters, <10% Han); other `ai-*` languages are not rejected for being non-Chinese. Title-topic lexical overlap is not assessed — a stable same-language semantic mismatch is an accepted limitation controlled by `force_asr` / `exclude_ai_subtitles` (PRD v1.1 → v1.2). Frozen PRD checks, not configurable, not exposed over MCP.
 - `src/bilibili/playback.ts`: authenticated first-party playurl request for one
   resolved BVID/CID, 1 MiB JSON and representation/backup/candidate limits,
   strict duration/DASH/audio validation, Bilibili-specific HTTPS CDN

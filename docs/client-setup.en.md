@@ -76,6 +76,11 @@ Please help me install the Bilibili MCP server: @xzxzzx/bilibili-mcp.
    After installation, I may explicitly set fallback_to_asr=true on
    get_video_transcript when I need no-subtitle fallback. Default calls never
    run ASR, and MCP calls never download or switch models.
+   For automated / terminal-less environments: bilibili-mcp setup --non-interactive
+   uses already-loadable credentials from environment variables or the global
+   config file, never reading credential values from stdin/argv and never prompting. Without
+   --asr-model it confirms loadability and exits successfully (exit 0); adding
+   --asr-model <tiny|base|small> installs that model (requires --non-interactive).
 
 6. After configuration, restart or reconnect this MCP server so it reloads
    the credentials.
