@@ -100,45 +100,30 @@ when required but not invoked.
 
 ## Published Product Baseline
 
-Status: `v1.11.4` is published to npm, GitHub Releases, and the Official MCP
-Registry as `io.github.XZXZZX-Ai/bilibili-mcp`. Release commit `2a33520`
-contains the five synchronized version fields, bilingual changelogs, and
-release records for merged PR #26 and PR #27. Annotated tag `v1.11.4` peels to
-that exact commit. GitHub Actions run `31296387097` passed tests, build, and npm
-trusted publishing; npm `latest` is `1.11.4` with registry signature and SLSA
-provenance. The public GitHub Release is non-draft/non-prerelease, and the
-Official Registry reports `1.11.4` as `active` and `isLatest=true`.
+Status: `v1.12.0` is published to npm and GitHub Releases. Release commit
+`a31fafb1f27ddb52cbca0abb0111dc4a73664da3` is on `master`; annotated tag
+`v1.12.0` peels to that exact commit. GitHub Actions run `32107346010` passed
+install, 41 files / 906 tests, build, and trusted npm publishing. npm `latest`
+is `1.12.0` with registry signatures and SLSA provenance. The bilingual public
+GitHub Release is non-draft, non-prerelease, and latest.
 
-The release publishes PR #26 for comments, language, credential, numeric-
-config, dotenv-order, and endpoint-aware `-403` contracts, plus PR #27 for
-fail-closed malformed search responses. Both remain merged through base commit
-`1067e02`; the release metadata adds no runtime, dependency, workflow, README,
-or ten-tool boundary change.
+The release ships merged PR #42 / Issue #40 plus the related locally recorded
+Issue #41 defects: every Bilibili `ai-*` track is distinguishable as
+`ai_subtitle`; callers can exclude AI subtitles or force local ASR; selected
+AI subtitle bodies are double-read for deterministic stability with a
+conservative `ai-zh` language guard; and `setup` supports non-interactive,
+credential-safe scripted use. The existing bounded ASR audio candidates and
+actionable `ASR_AUDIO_UNAVAILABLE` guidance remain unchanged.
 
-The local `1.11.4` candidate passed exact publish-runner Node `22.14.0` / npm
-`11.18.0` clean install, build, 41 files / 862 tests, 2 files / 19 focused
-stdio tests, a 185-file package, zero-vulnerability production audit, live
-official Registry schema validation, strict UTF-8/diff checks, and scoped
-credential scans. Credential-safe live MCP stdio calls reported a valid login,
-three stable searches for `五道口纳什`, and real comment limits of 21 and 50
-without printing Cookie values. Full development-tree audit findings remain
-separately recorded in the release QA and are not production dependencies.
-Independent release, standards/security, and specification reviews returned
-PASS with no remaining P0-P3.
+Known boundary: stable, same-language but semantically unrelated AI subtitle
+bodies may still pass the deterministic integrity guard. This is documented
+and controllable with `force_asr` or `exclude_ai_subtitles`; the release does
+not claim general semantic topic validation.
 
-Post-publication verification installed exact npm package `1.11.4` in an
-isolated directory, verified all 97 installed-package registry signatures and
-10 attestations, and ran the package under Node `22.14.0`. MCP initialize
-reported server `bilibili-mcp-server` version `1.11.4`, listed exactly ten tools,
-and an authenticated live `五道口纳什` search returned five results containing
-the target author. No credential value was recorded.
-
-The published `v1.11.3` release verification passed the TypeScript build, 39 files / 803 tests,
-production audit with zero vulnerabilities, a 181-file package with required
-dist entry points and no forbidden paths, Registry metadata validation,
-diff/UTF-8/value-free secret checks, two independent read-only reviews, and an
-isolated exact-version CLI smoke. The main user worktree and its review-gated
-learning-proposal change remained outside the clean release worktree.
+Post-publication verification installed exact npm package `1.12.0` under Node
+`22.14.0`, verified 97 registry signatures and 10 attestations, reported MCP
+server version `1.12.0` with protocol `2025-06-18`, and listed the unchanged
+ten-tool surface. No credential value was printed or recorded.
 
 The ten-tool product boundary and legacy stdio compatibility remain fixed. ASR
 is explicit, default-off, native-subtitle-first, and ready-state-only. The local
@@ -151,6 +136,11 @@ the clean #29 worktree. Typed accepted-evidence memory automation is scoped to
 #33; #29 hooks only write ignored redacted events. Files under
 `docs/superpowers/` are historical records only and must not trigger any
 `superpowers:*` skill.
+
+The Official MCP Registry now reports `1.12.0` as `active` and
+`isLatest=true`, with the npm identifier and package version both matching the
+public package. The dirty primary worktree and its future-only CI/CD roadmap
+note remain outside the release.
 
 ## Future Direction — Not Active
 

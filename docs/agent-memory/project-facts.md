@@ -704,3 +704,57 @@
   lease, and acceptance owner after one user-authorized daemon start.
 - Impact: Mocked adapter tests are not used as substitutes for any of the three
   required real runtime pilots.
+## 2026-08-18
+
+- Fact: An isolated, uncommitted Issue #40 + Roadmap candidate classifies
+  every selected Bilibili `ai-*` track (`ai-zh`, `ai-en`, `ai-ja`, …) as
+  `ai_subtitle`, supports default-off AI exclusion in transcript/video-info,
+  supports transcript-only `force_asr`, and unconditionally double-reads every
+  selected `ai-*` body.
+- Evidence: deterministic handler/schema/subtitle regressions, TypeScript build,
+  41 files / 906 tests, 189-file package dry run, Codex diff review, and live
+  read-only evidence (public `BV15kyBB5Eg8` exposes `[ai-zh, ai-en, ai-ja,
+  ai-es, ai-ar, ai-pt]`).
+- Impact: callers can distinguish or exclude Bilibili AI subtitles; ASR
+  fallback can transcribe an `ai-*` body that fails the unconditional
+  integrity checks. The candidate is not on master or npm yet.
+
+- Fact: The existing ASR audio path already bounds playback to three candidate
+  URLs and maps `ASR_AUDIO_UNAVAILABLE` to retryable bilingual guidance.
+- Evidence: `src/asr/transcription.ts`, `src/utils/error-guidance.ts`, and the
+  existing ASR/playback and structured-error regressions.
+- Impact: Issue #40 does not need an additional nested retry layer for this
+  Roadmap item; stable-but-semantically-wrong AI text remains a named residual
+  (now a documented accepted limitation controlled by `force_asr` /
+  `exclude_ai_subtitles`).
+
+- Fact: The isolated roadmap worktree adds unconditional ai-* integrity
+  assessment to both transcript and video-info flows, plus credential-safe
+  `setup --non-interactive` / `--asr-model <tiny|base|small>`.
+- Evidence: `src/bilibili/subtitle-integrity.ts` (pure-function assessment, no
+  IO), the transcript/video-info double-read regressions, `src/cli.ts`
+  `SetupCredentialsOptions`, focused CLI tests, and the post-build child smoke
+  (4/4 cases) with piped/closed stdin and synthetic environment credentials.
+- Impact: every selected `ai-*` is double-read and deterministically assessed
+  (canonical stability for all `ai-*`; conservative language check limited to
+  `ai-zh`; PRD v1.1 removed the title-topic lexical-overlap gate, PRD v1.2
+  widened AI classification to every `ai-*` language — a stable same-language
+  semantic mismatch is an accepted limitation controlled by `force_asr` /
+  `exclude_ai_subtitles`);
+  unusable bodies are never returned or cached (video-info returns an uncached
+  description; transcript follows `handleDefinitiveSubtitleAbsence`), human
+  subtitles stay single-read, and second-read failures remain errors.
+  Non-interactive setup never prompts and never reads credential values from
+  stdin/argv, and requires an env/global-config source with loadable
+  credentials; `--asr-model` without `--non-interactive` is a validation error
+  with value-free guidance. Integrity processing never logs or returns
+  comparison text, tokens, hashes, or signed subtitle URLs.
+
+- Fact: `v1.12.0` publishes the merged AI subtitle integrity and scriptable
+  setup work to npm and GitHub Releases.
+- Evidence: release commit `a31fafb`, annotated tag `v1.12.0`, successful
+  Actions run `32107346010`, npm `latest=1.12.0` with SLSA provenance, and the
+  public bilingual GitHub Release.
+- Impact: Issue #40 and the related locally recorded Issue #41 defects are now
+  available from npm and the Official MCP Registry. After follow-up user
+  authorization, Registry `1.12.0` is `active` and `isLatest=true`.

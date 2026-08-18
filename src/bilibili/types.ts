@@ -110,7 +110,7 @@ export interface ProcessedComment {
 
 // 视频总结响应类型
 export interface VideoSummary {
-  data_source: 'subtitle' | 'description';
+  data_source: 'subtitle' | 'ai_subtitle' | 'description';
   video_info: {
     title: string;
     description: string;
@@ -182,7 +182,7 @@ export interface TranscriptMatch {
 // 视频转录数据类型
 export interface VideoTranscriptData {
   bvid: string;
-  data_source: "subtitle" | "description" | "asr";
+  data_source: "subtitle" | "ai_subtitle" | "description" | "asr";
   language?: string;
   transcript: string;
   title: string;

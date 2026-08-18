@@ -56,6 +56,11 @@ export const toolSchemas: Tool[] = [
           description:
             "可选，多P视频的分集编号（从1开始的正整数）。不指定时使用默认CID。",
         },
+        exclude_ai_subtitles: {
+          type: "boolean",
+          description:
+            "可选，排除 Bilibili AI 识别字幕（ai-zh、ai-en 等全部 ai-* 语言），只保留人工字幕；仅剩 AI 字幕时视为无字幕并返回简介。默认 false。Optional; filters out Bilibili AI subtitles (all ai-* languages such as ai-zh and ai-en) so only human subtitles remain. Default false.",
+        },
       },
       required: ["bvid_or_url"],
     },
@@ -126,6 +131,16 @@ export const toolSchemas: Tool[] = [
           description:
             "确认没有可用字幕时，是否使用已通过 setup 安装并由 doctor 确认 ready 的本地 ASR。默认 false；不会在 MCP 调用中下载或切换模型。",
         },
+        exclude_ai_subtitles: {
+          type: "boolean",
+          description:
+            "可选，排除 Bilibili AI 识别字幕（ai-zh、ai-en 等全部 ai-* 语言），只保留人工字幕；仅剩 AI 字幕时视为无字幕（可配合 fallback_to_asr / fallback_to_description）。默认 false。Optional; filters out Bilibili AI subtitles (all ai-* languages such as ai-zh and ai-en). Default false.",
+        },
+        force_asr: {
+          type: "boolean",
+          description:
+            "可选，绕过字幕元数据与内容选择，直接使用已安装的本地 ASR 转录当前分集；即使存在有效人工字幕也生效，无需同时设置 fallback_to_asr。默认 false。Optional; bypasses subtitle selection and always uses the local ASR. Default false.",
+        },
         page: {
           type: "integer",
           minimum: 1,
@@ -176,7 +191,7 @@ export const toolSchemas: Tool[] = [
         bvid: { type: "string" },
         data_source: {
           type: "string",
-          enum: ["subtitle", "description", "asr"],
+          enum: ["subtitle", "ai_subtitle", "description", "asr"],
         },
         language: { type: "string" },
         transcript: { type: "string" },

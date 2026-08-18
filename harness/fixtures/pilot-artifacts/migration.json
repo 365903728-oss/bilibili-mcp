@@ -89,957 +89,977 @@
     }
   ],
   "durable_memory": {
-    "docs/agent-memory/active-work.md": "767aa08f01a5bdaafd40516138c24beaa024844def36e477c223a1eba828b22b",
-    "docs/agent-memory/codemap.md": "b1c2a31b599dc18353411e99aaf4fb431490cbc7d6ad54ad015e224cd3c6ec9e",
-    "docs/agent-memory/decisions.md": "131719aeb2a27cc96ea8ae4d591197a2a7313248986dcd8384d5dc71fe31f250",
+    "docs/agent-memory/active-work.md": "9a9898a73b7677100765e381e1ca09067e3932e8b0e60a5b6766234d73e14c85",
+    "docs/agent-memory/codemap.md": "af7c4e2900ed9fc9d02c764fd43293810b8b53f518b4686b26743d64e55549e9",
+    "docs/agent-memory/decisions.md": "44d1383db124476159d0f21bd0fa0dc349cdabc633ff6f03031a54b8799f81a3",
     "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
-    "docs/agent-memory/harness-eval.md": "5dd81a625132ebcbbd2552221b53aaffa40d5e13f87a0852b2949142513d43fb",
+    "docs/agent-memory/harness-eval.md": "5018e0ac09016fbbbfc024b08208de6808a014f3bb5732f116a393040cb9a5b3",
     "docs/agent-memory/harness-security.md": "3125c4046123cb10a6c19cbf398d5dfb9e1f9ba202837631a25458cc620d62af",
-    "docs/agent-memory/lessons-learned.md": "278d674253d1723e5b984daf45da29a02f90fdf2454c4d775583f804455c825c",
-    "docs/agent-memory/project-facts.md": "8b7c6f8d5ade7a763263839040c80ee2ad7123ec9651a92a20af6bcafbd7aee9",
-    "docs/agent-memory/verification-log.md": "e95d39757baf6e3ff6d397032ef8d717d13d33776dcae1169377b77709764180"
+    "docs/agent-memory/lessons-learned.md": "6a0e45bc73159237fb3200a3725d12d54dd0d83aa5c8eebcec5ffb9bd2efb7d7",
+    "docs/agent-memory/project-facts.md": "f31fbfb9575a170073dadb19398dfb05e3ba504dd883f3af6b9c9d59489b92a5",
+    "docs/agent-memory/verification-log.md": "2a7fe9605b1d4c3ad59ce48a3a635ab030f5884a6d305c7a9a852104b305a285"
   },
   "package": {
-    "output_digest": "d1bcf0dbfe699ba997d4b75e2e687e7a2b05c6c44423c28ab9a96b99eae4bcf6",
+    "output_digest": "5fb82717c9cc28b113da45686671b5d62ca3310b170f2b58b0fe3cd86a83c84c",
     "pack_output": [
       {
-        "bundled": [],
-        "entryCount": 185,
-        "filename": "xzxzzx-bilibili-mcp-1.11.4.tgz",
+        "id": "@xzxzzx/bilibili-mcp@1.12.0",
+        "name": "@xzxzzx/bilibili-mcp",
+        "version": "1.12.0",
+        "size": 1096272,
+        "unpackedSize": 1747998,
+        "shasum": "2b59ce28e5d8bdffa8ab0b87e2b6365c1f59de31",
+        "integrity": "sha512-cgEKJi0b+nC+DI1uHFsI3nDDJv6skpevNDnWfvZyLA008eOlKEIBvA65usgACeGLBvRCcH+HBT2Kl1dVaApNQw==",
+        "filename": "xzxzzx-bilibili-mcp-1.12.0.tgz",
         "files": [
           {
-            "mode": 420,
             "path": "LICENSE",
-            "size": 35154
+            "size": 35154,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "README_EN.md",
-            "size": 15588
+            "size": 18657,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "README.md",
-            "size": 14514
+            "size": 17221,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "assets/readme/hero-en.svg",
-            "size": 6313
+            "size": 6313,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "assets/readme/hero-overview.png",
-            "size": 901119
+            "size": 901119,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "assets/readme/hero.svg",
-            "size": 6496
+            "size": 6496,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "assets/readme/install-flow-en.svg",
-            "size": 8101
+            "size": 8101,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "assets/readme/install-flow.svg",
-            "size": 8305
+            "size": 8305,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/installer.d.ts",
-            "size": 2126
+            "size": 2126,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/installer.d.ts.map",
-            "size": 2204
+            "size": 2204,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/installer.js",
-            "size": 18289
+            "size": 18289,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/installer.js.map",
-            "size": 16699
+            "size": 16699,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/state.d.ts",
-            "size": 2237
+            "size": 2237,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/state.d.ts.map",
-            "size": 1625
+            "size": 1625,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/state.js",
-            "size": 8573
+            "size": 8573,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/state.js.map",
-            "size": 7546
+            "size": 7546,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/transcription.d.ts",
-            "size": 2662
+            "size": 2662,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/transcription.d.ts.map",
-            "size": 2496
+            "size": 2496,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/transcription.js",
-            "size": 24700
+            "size": 24700,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/asr/transcription.js.map",
-            "size": 19815
+            "size": 19815,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/chapters.d.ts",
-            "size": 369
+            "size": 369,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/chapters.d.ts.map",
-            "size": 282
+            "size": 282,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/chapters.js",
-            "size": 1352
+            "size": 1352,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/chapters.js.map",
-            "size": 1206
+            "size": 1206,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/client.d.ts",
-            "size": 353
+            "size": 353,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/client.d.ts.map",
-            "size": 368
+            "size": 368,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/client.js",
-            "size": 397
+            "size": 397,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/client.js.map",
-            "size": 379
+            "size": 379,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/comments-api.d.ts",
-            "size": 258
+            "size": 258,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/comments-api.d.ts.map",
-            "size": 282
+            "size": 282,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/comments-api.js",
-            "size": 4727
+            "size": 4727,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/comments-api.js.map",
-            "size": 3904
+            "size": 3904,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/comments.d.ts",
-            "size": 823
+            "size": 823,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/comments.d.ts.map",
-            "size": 513
+            "size": 513,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/comments.js",
-            "size": 9445
+            "size": 9445,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/comments.js.map",
-            "size": 7808
+            "size": 7808,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/favorites.d.ts",
-            "size": 653
+            "size": 653,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/favorites.d.ts.map",
-            "size": 594
+            "size": 594,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/favorites.js",
-            "size": 11146
+            "size": 11146,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/favorites.js.map",
-            "size": 10709
+            "size": 10709,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/fingerprint.d.ts",
-            "size": 348
+            "size": 348,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/fingerprint.d.ts.map",
-            "size": 251
+            "size": 251,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/fingerprint.js",
-            "size": 3872
+            "size": 3872,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/fingerprint.js.map",
-            "size": 3373
+            "size": 3373,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/http.d.ts",
-            "size": 1233
+            "size": 1233,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/http.d.ts.map",
-            "size": 1109
+            "size": 1109,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/http.js",
-            "size": 14216
+            "size": 14216,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/http.js.map",
-            "size": 11470
+            "size": 11470,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/metadata.d.ts",
-            "size": 270
+            "size": 270,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/metadata.d.ts.map",
-            "size": 255
+            "size": 255,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/metadata.js",
-            "size": 1528
+            "size": 1528,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/metadata.js.map",
-            "size": 1515
+            "size": 1515,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/navigation.d.ts",
-            "size": 1035
+            "size": 1035,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/navigation.d.ts.map",
-            "size": 761
+            "size": 761,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/navigation.js",
-            "size": 2028
+            "size": 2028,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/navigation.js.map",
-            "size": 1916
+            "size": 1916,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/playback.d.ts",
-            "size": 985
+            "size": 985,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/playback.d.ts.map",
-            "size": 969
+            "size": 969,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/playback.js",
-            "size": 5887
+            "size": 5887,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/playback.js.map",
-            "size": 5411
+            "size": 5411,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/search.d.ts",
-            "size": 190
+            "size": 190,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/search.d.ts.map",
-            "size": 252
+            "size": 252,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/search.js",
-            "size": 5152
+            "size": 5152,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/search.js.map",
-            "size": 5171
+            "size": 5171,
+            "mode": 420
           },
           {
-            "mode": 420,
+            "path": "dist/bilibili/subtitle-integrity.d.ts",
+            "size": 633,
+            "mode": 420
+          },
+          {
+            "path": "dist/bilibili/subtitle-integrity.d.ts.map",
+            "size": 438,
+            "mode": 420
+          },
+          {
+            "path": "dist/bilibili/subtitle-integrity.js",
+            "size": 2108,
+            "mode": 420
+          },
+          {
+            "path": "dist/bilibili/subtitle-integrity.js.map",
+            "size": 1476,
+            "mode": 420
+          },
+          {
             "path": "dist/bilibili/subtitle.d.ts",
-            "size": 1304
+            "size": 1400,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/subtitle.d.ts.map",
-            "size": 915
+            "size": 1007,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/subtitle.js",
-            "size": 19128
+            "size": 21804,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/subtitle.js.map",
-            "size": 14925
+            "size": 16583,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/types.d.ts",
-            "size": 5072
+            "size": 5104,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/types.d.ts.map",
-            "size": 5365
+            "size": 5385,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/types.js",
-            "size": 280
+            "size": 280,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/types.js.map",
-            "size": 251
+            "size": 251,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/video-api.d.ts",
-            "size": 1742
+            "size": 1742,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/video-api.d.ts.map",
-            "size": 1365
+            "size": 1365,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/video-api.js",
-            "size": 13940
+            "size": 13940,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/video-api.js.map",
-            "size": 12620
+            "size": 12620,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/wbi.d.ts",
-            "size": 438
+            "size": 438,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/wbi.d.ts.map",
-            "size": 478
+            "size": 478,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/wbi.js",
-            "size": 7767
+            "size": 7767,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/bilibili/wbi.js.map",
-            "size": 7629
+            "size": 7629,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/cli.d.ts",
-            "size": 1361
+            "size": 1654,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/cli.d.ts.map",
-            "size": 1287
+            "size": 1426,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/cli.js",
-            "size": 12954
+            "size": 16111,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/cli.js.map",
-            "size": 11881
+            "size": 13784,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/config.d.ts",
-            "size": 667
+            "size": 667,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/config.d.ts.map",
-            "size": 619
+            "size": 619,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/config.js",
-            "size": 2915
+            "size": 2915,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/config.js.map",
-            "size": 2256
+            "size": 2256,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/index.d.ts",
-            "size": 120
+            "size": 120,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/index.d.ts.map",
-            "size": 185
+            "size": 185,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/index.js",
-            "size": 817
+            "size": 817,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/index.js.map",
-            "size": 838
+            "size": 838,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/load-env.d.ts",
-            "size": 49
+            "size": 49,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/load-env.d.ts.map",
-            "size": 110
+            "size": 110,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/load-env.js",
-            "size": 576
+            "size": 576,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/load-env.js.map",
-            "size": 550
+            "size": 550,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/limits.d.ts",
-            "size": 1004
+            "size": 1004,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/limits.d.ts.map",
-            "size": 237
+            "size": 237,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/limits.js",
-            "size": 1138
+            "size": 1138,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/limits.js.map",
-            "size": 1055
+            "size": 1055,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/operation-context.d.ts",
-            "size": 607
+            "size": 607,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/operation-context.d.ts.map",
-            "size": 622
+            "size": 622,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/operation-context.js",
-            "size": 1583
+            "size": 1583,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/operation-context.js.map",
-            "size": 1752
+            "size": 1752,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/pinned-https.d.ts",
-            "size": 678
+            "size": 678,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/pinned-https.d.ts.map",
-            "size": 724
+            "size": 724,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/pinned-https.js",
-            "size": 8199
+            "size": 8199,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/security/pinned-https.js.map",
-            "size": 9406
+            "size": 9406,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server.d.ts",
-            "size": 1060
+            "size": 1060,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server.d.ts.map",
-            "size": 212
+            "size": 212,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server.js",
-            "size": 1472
+            "size": 1472,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server.js.map",
-            "size": 1437
+            "size": 1437,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/bounded-stdio-transport.d.ts",
-            "size": 1405
+            "size": 1405,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/bounded-stdio-transport.d.ts.map",
-            "size": 1131
+            "size": 1131,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/bounded-stdio-transport.js",
-            "size": 4879
+            "size": 4879,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/bounded-stdio-transport.js.map",
-            "size": 4686
+            "size": 4686,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/error-response.d.ts",
-            "size": 716
+            "size": 716,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/error-response.d.ts.map",
-            "size": 466
+            "size": 466,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/error-response.js",
-            "size": 2240
+            "size": 2240,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/error-response.js.map",
-            "size": 1912
+            "size": 1912,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/tool-handlers.d.ts",
-            "size": 281
+            "size": 281,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/tool-handlers.d.ts.map",
-            "size": 290
+            "size": 290,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/tool-handlers.js",
-            "size": 10198
+            "size": 10308,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/tool-handlers.js.map",
-            "size": 7538
+            "size": 7643,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/tool-schemas.d.ts",
-            "size": 148
+            "size": 148,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/tool-schemas.d.ts.map",
-            "size": 217
+            "size": 217,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/tool-schemas.js",
-            "size": 17082
+            "size": 18397,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/server/tool-schemas.js.map",
-            "size": 6778
+            "size": 6995,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bounded-response.d.ts",
-            "size": 300
+            "size": 300,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bounded-response.d.ts.map",
-            "size": 381
+            "size": 381,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bounded-response.js",
-            "size": 2279
+            "size": 2279,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bounded-response.js.map",
-            "size": 2240
+            "size": 2240,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bounded-text.d.ts",
-            "size": 988
+            "size": 988,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bounded-text.d.ts.map",
-            "size": 521
+            "size": 521,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bounded-text.js",
-            "size": 4667
+            "size": 4667,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bounded-text.js.map",
-            "size": 4127
+            "size": 4127,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bvid.d.ts",
-            "size": 1215
+            "size": 1215,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bvid.d.ts.map",
-            "size": 522
+            "size": 522,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bvid.js",
-            "size": 2388
+            "size": 2388,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/bvid.js.map",
-            "size": 1658
+            "size": 1658,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/cache.d.ts",
-            "size": 962
+            "size": 962,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/cache.d.ts.map",
-            "size": 937
+            "size": 937,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/cache.js",
-            "size": 5281
+            "size": 5281,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/cache.js.map",
-            "size": 5652
+            "size": 5652,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/credential-guidance.d.ts",
-            "size": 1331
+            "size": 1331,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/credential-guidance.d.ts.map",
-            "size": 1213
+            "size": 1213,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/credential-guidance.js",
-            "size": 3487
+            "size": 3487,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/credential-guidance.js.map",
-            "size": 1778
+            "size": 1778,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/credentials.d.ts",
-            "size": 1834
+            "size": 1834,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/credentials.d.ts.map",
-            "size": 1063
+            "size": 1063,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/credentials.js",
-            "size": 5043
+            "size": 5043,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/credentials.js.map",
-            "size": 4327
+            "size": 4327,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/error-guidance.d.ts",
-            "size": 1175
+            "size": 1175,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/error-guidance.d.ts.map",
-            "size": 1053
+            "size": 1053,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/error-guidance.js",
-            "size": 15817
+            "size": 15817,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/error-guidance.js.map",
-            "size": 7501
+            "size": 7501,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/errors.d.ts",
-            "size": 2277
+            "size": 2277,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/errors.d.ts.map",
-            "size": 1614
+            "size": 1614,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/errors.js",
-            "size": 3587
+            "size": 3587,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/errors.js.map",
-            "size": 2956
+            "size": 2956,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/logger.d.ts",
-            "size": 1670
+            "size": 1670,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/logger.d.ts.map",
-            "size": 1743
+            "size": 1743,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/logger.js",
-            "size": 6006
+            "size": 6006,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/logger.js.map",
-            "size": 5585
+            "size": 5585,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/retry.d.ts",
-            "size": 1200
+            "size": 1200,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/retry.d.ts.map",
-            "size": 1027
+            "size": 1027,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/retry.js",
-            "size": 4443
+            "size": 4443,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/retry.js.map",
-            "size": 3817
+            "size": 3817,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/sanitization.d.ts",
-            "size": 300
+            "size": 300,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/sanitization.d.ts.map",
-            "size": 266
+            "size": 266,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/sanitization.js",
-            "size": 837
+            "size": 837,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/sanitization.js.map",
-            "size": 676
+            "size": 676,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/update-check.d.ts",
-            "size": 831
+            "size": 831,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/update-check.d.ts.map",
-            "size": 822
+            "size": 822,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/update-check.js",
-            "size": 7184
+            "size": 7184,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/update-check.js.map",
-            "size": 5675
+            "size": 5675,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/validation.d.ts",
-            "size": 2131
+            "size": 2131,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/validation.d.ts.map",
-            "size": 1401
+            "size": 1401,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/validation.js",
-            "size": 6540
+            "size": 6540,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "dist/utils/validation.js.map",
-            "size": 5386
+            "size": 5386,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "docs/client-setup.en.md",
-            "size": 36189
+            "size": 36611,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "docs/client-setup.md",
-            "size": 34717
+            "size": 35084,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "docs/tool-reference.en.md",
-            "size": 23564
+            "size": 26857,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "docs/tool-reference.md",
-            "size": 22935
+            "size": 25936,
+            "mode": 420
           },
           {
-            "mode": 420,
             "path": "package.json",
-            "size": 2668
+            "size": 2668,
+            "mode": 420
           }
         ],
-        "id": "@xzxzzx/bilibili-mcp@1.11.4",
-        "integrity": "sha512-4/i73Imc4Gbl2N6ywayagKauFhAQNXGrXAVxeoDLxZQyWYTS0EqgYfsv/Rep38l6JIxzZcMuliOjz6FCMvnF3g==",
-        "name": "@xzxzzx/bilibili-mcp",
-        "shasum": "b1d2b6ebf7bb7d698cbe8150b5acf07441741fdd",
-        "size": 1088657,
-        "unpackedSize": 1718671,
-        "version": "1.11.4"
+        "entryCount": 189,
+        "bundled": []
       }
     ]
   },

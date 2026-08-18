@@ -2277,3 +2277,87 @@ Six release blockers fixed; one regression proof per root cause (new tests
   exact unversioned npm path, unchanged candidate name/version binding, legal
   end-to-end acceptance, migration hashes, package exclusion, diff cleanliness,
   product isolation, and zero remote effects.
+## 2026-08-18 — Issue #40 AI Subtitle Integrity Candidate
+
+- Command: `npx vitest run tests/bilibili-transcript.test.ts tests/server-tools.test.ts tests/server-handler-sanitization.test.ts tests/server-error-next-steps.test.ts`
+- Result: 4 files / 194 tests passed under independent Codex execution.
+- Area: AI source classification, exclusion/force inputs, fallback stability,
+  schema, handler validation, and error guidance.
+
+- Command: `npm run build` and `npm test`
+- Result: TypeScript build passed; 41 files / 885 tests passed.
+- Area: full candidate regression matrix.
+
+- Command: `npm pack --dry-run --json --ignore-scripts` and `git diff --check`
+- Result: 185 package files; diff check clean; no new dependency or package
+  boundary change.
+- Area: package contents and repository hygiene.
+
+- Command: post-review `npx vitest run tests/bilibili-transcript.test.ts`
+- Result: 1 file / 76 tests passed after strengthening the explicit
+  `preferred_lang: ai-zh` exclusion assertion; documentation contradiction was
+  corrected in both languages.
+- Caveat: the live Bilibili field case timed out before returning a transcript,
+  so deterministic injected regressions are the acceptance authority. No local
+  ready ASR model was installed or changed.
+
+## 2026-08-18 Roadmap Subtitle Integrity + Scriptable Setup (vertical slices)
+
+- Command: `npx vitest run tests/bilibili-transcript.test.ts` (slice 1 red to
+  green)
+- Result: red-capable — 2 integrity tests failed while language/topic checks
+  were temporarily neutralized; green — 83/83 passed with the pure-function
+  module and the transcript unconditional double-read.
+- Area: `src/bilibili/subtitle-integrity.ts` + transcript integration.
+
+- Command: `npx vitest run tests/bilibili-transcript.test.ts` (slice 2 red to
+  green)
+- Result: red — unstable `ai-zh` failed the `NoSubtitleError` expectation;
+  green — 85/85 passed including the video-info uncached-description describe.
+- Area: `getVideoInfoWithSubtitle` integrity block.
+
+- Command: `npx vitest run tests/cli.test.ts` (slice 3 red to green)
+- Result: red — 4 non-interactive tests failed before implementation (one
+  earlier vitest OOM came from a non-terminating `askHiddenFn` mock, fixed by
+  returning "n"); green — 69/69 passed.
+- Area: `SetupCredentialsOptions` + Commander `--non-interactive` /
+  `--asr-model`.
+
+- Command: post-build child smoke (`node dist/cli.js setup --non-interactive`
+  variants) with piped/closed stdin and synthetic environment credentials.
+- Result: 4/4 cases passed; no prompt, no stdin/argv read, no synthetic
+  credential value in stdout or stderr.
+- Area: slice 4 non-TTY smoke.
+
+- Command: `npm run build`
+- Result: passed after all four slices.
+- Area: TypeScript compilation.
+
+## 2026-08-18 — v1.12.0 Publication And Public Artifact Verification
+
+- Release commit: `a31fafb1f27ddb52cbca0abb0111dc4a73664da3` on
+  `master`; annotated `v1.12.0` peels to the same commit.
+- Local candidate: Node `22.14.0` / npm `11.18.0` build passed; 41 files / 906
+  tests passed; 189-file package dry run passed; 97 production dependencies
+  audited with zero vulnerabilities; scoped secret and Smithery checks passed.
+- Independent release-verifier: PASS after correcting one stale Chinese README
+  limitation sentence; no remaining candidate blocker.
+- Trusted publication: GitHub Actions run `32107346010` completed successfully;
+  npm `latest=1.12.0` exposes integrity, shasum, and SLSA provenance.
+- Exact public artifact: isolated install verified 97 registry signatures and
+  10 attestations; under Node `22.14.0`, CLI reported `1.12.0`, MCP initialize
+  reported server `bilibili-mcp-server` `1.12.0` / protocol `2025-06-18`, and
+  tools/list returned exactly ten tools.
+- GitHub Release: bilingual `v1.12.0 - AI 字幕完整性 / AI Subtitle Integrity`
+  is public, latest, non-draft, and non-prerelease at
+  `https://github.com/XZXZZX-Ai/bilibili-mcp/releases/tag/v1.12.0`.
+- Official Registry follow-up: after explicit user authorization, official
+  `mcp-publisher` v1.8.1 archive SHA-256 matched upstream digest
+  `399ad0d6e00a50812b563a71d8bfbff5160c085e6b13aac6ec083d98d5ff7c45`;
+  live schema and `mcp-publisher validate` checks passed. The saved Registry
+  JWT was expired; GitHub authentication refreshed it without recording token
+  values. Publish succeeded, and the public API reports `1.12.0` active/latest
+  with matching npm identifier and package version.
+- Boundary: the dirty primary worktree and future CI/CD roadmap note stayed out
+  of the immutable release tag; Registry publication did not move the tag,
+  republish npm, or change the workflow.

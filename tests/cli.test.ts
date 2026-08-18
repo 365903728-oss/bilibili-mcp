@@ -57,6 +57,16 @@ describe("CLI help and commands", () => {
     expect(output).toContain("version");
   });
 
+  it("setup subcommand help documents the non-interactive flags", () => {
+    const cli = createCli();
+    const setupCmd = cli.commands.find((c) => c.name() === "setup");
+    expect(setupCmd).toBeDefined();
+    const output = setupCmd!.helpInformation();
+
+    expect(output).toContain("--non-interactive");
+    expect(output).toContain("--asr-model");
+  });
+
   it("help output does not contain duplicated [command] placeholder in a single line", () => {
     const cli = createCli();
     const output = cli.helpInformation();
@@ -663,6 +673,139 @@ describe("setup credential loadability", () => {
     expect(errCalls).not.toMatch(/abc123def456/);
     // Must never contain the raw bili_jct value
     expect(errCalls).not.toMatch(/xyz789/);
+  });
+
+  describe("non-interactive setup", () => {
+    it("exits 1 with value-free guidance when credentials are unloadable", async () => {
+      Object.defineProperty(process.stdin, "isTTY", {
+        configurable: true,
+        value: true,
+      });
+      vi.spyOn(credentialManager, "getCredentialSource").mockReturnValue("none");
+      vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
+      const configure = vi.fn(async () => {});
+      const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
+      const askHiddenFn = vi.fn(async () => "n");
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      process.exitCode = undefined;
+
+      await setupCredentials(configure, runAsr, askHiddenFn, {
+        nonInteractive: true,
+      });
+
+      expect(process.exitCode).toBe(1);
+      expect(configure).not.toHaveBeenCalled();
+      expect(askHiddenFn).not.toHaveBeenCalled();
+      expect(runAsr).not.toHaveBeenCalled();
+      const errCalls = errSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+      expect(errCalls).toContain("BILIBILI_SESSDATA");
+      expect(errCalls).toContain("BILIBILI_BILI_JCT");
+      expect(errCalls).toContain("BILIBILI_DEDEUSERID");
+    });
+
+    it("completes credential-only with non-TTY stdin and an env source, without prompting", async () => {
+      Object.defineProperty(process.stdin, "isTTY", {
+        configurable: true,
+        value: false,
+      });
+      vi.spyOn(credentialManager, "getCredentialSource").mockReturnValue("env");
+      vi.spyOn(credentialManager, "getCredentials").mockReturnValue({
+        sessdata: "s", bili_jct: "j", dedeuserid: "d", expiresAt: Date.now() + 86400000,
+      });
+      const configure = vi.fn(async () => {});
+      const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
+      const askHiddenFn = vi.fn(async () => "n");
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      process.exitCode = undefined;
+
+      await setupCredentials(configure, runAsr, askHiddenFn, {
+        nonInteractive: true,
+      });
+
+      expect(process.exitCode).toBeUndefined();
+      expect(configure).not.toHaveBeenCalled();
+      expect(askHiddenFn).not.toHaveBeenCalled();
+      expect(runAsr).not.toHaveBeenCalled();
+      expect(logSpy.mock.calls.flat().join("\n")).toContain("ASR");
+    });
+
+    it("with a model calls the installer exactly once with that model", async () => {
+      Object.defineProperty(process.stdin, "isTTY", {
+        configurable: true,
+        value: false,
+      });
+      vi.spyOn(credentialManager, "getCredentialSource").mockReturnValue("global_config");
+      vi.spyOn(credentialManager, "getCredentials").mockReturnValue({
+        sessdata: "s", bili_jct: "j", dedeuserid: "d", expiresAt: Date.now() + 86400000,
+      });
+      const configure = vi.fn(async () => {});
+      const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
+      const askHiddenFn = vi.fn(async () => "n");
+      vi.spyOn(console, "log").mockImplementation(() => {});
+      process.exitCode = undefined;
+
+      await setupCredentials(configure, runAsr, askHiddenFn, {
+        nonInteractive: true,
+        asrModel: "tiny",
+      });
+
+      expect(process.exitCode).toBeUndefined();
+      expect(configure).not.toHaveBeenCalled();
+      expect(askHiddenFn).not.toHaveBeenCalled();
+      expect(runAsr).toHaveBeenCalledOnce();
+      expect(runAsr).toHaveBeenCalledWith("tiny");
+    });
+
+    it("rejects non-interactive setup when the credential source is none even with loadable credentials", async () => {
+      Object.defineProperty(process.stdin, "isTTY", {
+        configurable: true,
+        value: false,
+      });
+      vi.spyOn(credentialManager, "getCredentialSource").mockReturnValue("none");
+      vi.spyOn(credentialManager, "getCredentials").mockReturnValue({
+        sessdata: "s", bili_jct: "j", dedeuserid: "d", expiresAt: Date.now() + 86400000,
+      });
+      const configure = vi.fn(async () => {});
+      const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
+      const askHiddenFn = vi.fn(async () => "n");
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      process.exitCode = undefined;
+
+      await setupCredentials(configure, runAsr, askHiddenFn, {
+        nonInteractive: true,
+      });
+
+      expect(process.exitCode).toBe(1);
+      expect(configure).not.toHaveBeenCalled();
+      expect(askHiddenFn).not.toHaveBeenCalled();
+      expect(runAsr).not.toHaveBeenCalled();
+      expect(errSpy.mock.calls.flat().join("\n")).toContain("BILIBILI_SESSDATA");
+    });
+
+    it("rejects a model without non-interactive mode as a validation error", async () => {
+      Object.defineProperty(process.stdin, "isTTY", {
+        configurable: true,
+        value: true,
+      });
+      vi.spyOn(credentialManager, "getCredentials").mockReturnValue({
+        sessdata: "s", bili_jct: "j", dedeuserid: "d", expiresAt: Date.now() + 86400000,
+      });
+      const configure = vi.fn(async () => {});
+      const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
+      const askHiddenFn = vi.fn(async () => "n");
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      process.exitCode = undefined;
+
+      await setupCredentials(configure, runAsr, askHiddenFn, {
+        asrModel: "small",
+      });
+
+      expect(process.exitCode).toBe(1);
+      expect(configure).not.toHaveBeenCalled();
+      expect(askHiddenFn).not.toHaveBeenCalled();
+      expect(runAsr).not.toHaveBeenCalled();
+      expect(errSpy.mock.calls.flat().join("\n")).toContain("--non-interactive");
+    });
   });
 });
 

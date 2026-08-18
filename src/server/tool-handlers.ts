@@ -84,19 +84,21 @@ export async function handleToolCall(
       const bvidOrUrl = args?.bvid_or_url as string;
       const preferredLang = args?.preferred_lang as string | undefined;
       const page = args?.page as number | undefined;
+      const excludeAiSubtitles = (args?.exclude_ai_subtitles as boolean) || false;
 
       let sanitizedBvidOrUrl: string;
       try {
         validateBVInput(bvidOrUrl);
         validateLanguage(preferredLang);
         validatePage(page);
+        validateBoolean(args?.exclude_ai_subtitles, "exclude_ai_subtitles");
         sanitizedBvidOrUrl = sanitizeBVInput(bvidOrUrl);
       } catch (error) {
         return toErrorTextContent(buildValidationErrorPayload(error));
       }
 
       const normalizedLang = getPreferredLanguage(preferredLang);
-      const result = await getVideoInfoWithSubtitle(sanitizedBvidOrUrl, normalizedLang, page);
+      const result = await getVideoInfoWithSubtitle(sanitizedBvidOrUrl, normalizedLang, page, excludeAiSubtitles);
 
       return toTextContent(result);
     }
@@ -137,6 +139,8 @@ export async function handleToolCall(
       const preferredLang = args?.preferred_lang as string | undefined;
       const fallbackToDescription = (args?.fallback_to_description as boolean) || false;
       const fallbackToAsr = (args?.fallback_to_asr as boolean) || false;
+      const excludeAiSubtitles = (args?.exclude_ai_subtitles as boolean) || false;
+      const forceAsr = (args?.force_asr as boolean) || false;
       const page = args?.page as number | undefined;
       const includeTimestamps = args?.include_timestamps as boolean | undefined;
       const startSeconds = args?.start_seconds as number | undefined;
@@ -149,17 +153,13 @@ export async function handleToolCall(
       try {
         validateBVInput(bvidOrUrl);
         validateLanguage(preferredLang);
-        validateBoolean(fallbackToDescription, "fallback_to_description");
-        validateBoolean(fallbackToAsr, "fallback_to_asr");
         validatePage(page);
+        validateBoolean(args?.fallback_to_description, "fallback_to_description");
+        validateBoolean(args?.fallback_to_asr, "fallback_to_asr");
         validateBoolean(includeTimestamps, "include_timestamps");
         validateTimestampRange(startSeconds, endSeconds);
-        if (args?.fallback_to_description !== undefined && typeof args.fallback_to_description !== "boolean") {
-          throw new ValidationError("fallback_to_description must be a boolean");
-        }
-        if (args?.fallback_to_asr !== undefined && typeof args.fallback_to_asr !== "boolean") {
-          throw new ValidationError("fallback_to_asr must be a boolean");
-        }
+        validateBoolean(args?.exclude_ai_subtitles, "exclude_ai_subtitles");
+        validateBoolean(args?.force_asr, "force_asr");
         validateQuery(query);
         validateMaxMatches(maxMatches);
         validateContextSegments(contextSegments);
@@ -189,6 +189,8 @@ export async function handleToolCall(
           endSeconds,
           searchOptions,
           fallbackToAsr,
+          excludeAiSubtitles,
+          forceAsr,
         ] as const;
         const result = signal === undefined
           ? await getVideoTranscriptData(...transcriptArgs)

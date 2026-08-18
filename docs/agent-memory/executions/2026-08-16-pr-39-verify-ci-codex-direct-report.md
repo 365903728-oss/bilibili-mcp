@@ -153,6 +153,11 @@ the migration clean-room test can inspect its exact accepted #35 base.
   safe-I/O `ValueError`. The accepted-path snapshot entry now converts parent
   chain failures into one bounded `CodexDirectAdapterError`; the cross-platform
   regression asserts that public adapter boundary.
+- After the repair push, PR #39 became merge-conflicted with the already accepted
+  product v1.12.0 lineage on `master`, so GitHub did not create a new check suite.
+  A non-rewriting merge retains the Harness history and the newer product/release
+  facts; the five durable-memory conflicts are append-only factual unions. The
+  package receipt is regenerated from the merged v1.12.0 dry-run bytes.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

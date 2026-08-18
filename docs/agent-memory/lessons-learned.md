@@ -547,3 +547,33 @@
 - Lesson: Trust-boundary fixtures must fail for the intended reason on every
   platform. Write canonical bytes and corrupt only the receipt authority being
   tested so checkout line endings cannot provide a false green.
+## 2026-08-18
+
+- Lesson: Subtitle presence is not equivalent to subtitle usability, but
+  semantic correctness cannot be established by a cheap title-overlap rule.
+- Evidence: the reported `ai-zh` failure returned different unrelated bodies
+  across repeated reads, while stable AI captions can still contain ordinary
+  vocabulary or code terms that do not overlap a title.
+- Future behavior: expose provenance, use deterministic stability checks only
+  under explicit ASR fallback, preserve transport errors, and provide
+  `force_asr` for cases that require caller judgment. (Superseded for
+  stability-gating by the 2026-08-18 roadmap decision: selected `ai-zh` is now
+  assessed unconditionally with frozen thresholds.)
+
+- Lesson: A stable default mock can mask a sequential-read test by satisfying
+  the second read.
+- Evidence: the video-info integrity test first passed the stability gate on
+  the second call because `mockGetSubtitleContent`'s stable default body
+  consumed the third/fourth `mockResolvedValueOnce` reads and returned
+  `ai_subtitle`; re-configuring the mock before the second call produced the
+  intended uncached-description result.
+- Future behavior: when a test depends on N sequential reads, configure every
+  read explicitly or re-mock between calls; never rely on a stable default for
+  an assertion that requires instability.
+
+- Lesson: An unconstrained CLI mock in a red test can hang instead of failing.
+- Evidence: slice-3 red tests with `askHiddenFn` always returning "y" drove the
+  existing `while (modelKey === null)` model selector into a vitest heap OOM.
+- Future behavior: for CLI tests that must terminate existing prompt loops,
+  make mocks choose a terminating branch (for example "n" to skip ASR) and run
+  each red test in isolation.

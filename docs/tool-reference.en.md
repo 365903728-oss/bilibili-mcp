@@ -26,6 +26,9 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Automatically falls back to video title, description, and tags if no subtitles are available.
 - Supports multi-language subtitle selection (defaults to Simplified Chinese).
 - Supports explicit subtitle languages `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, and `ai-zh`; `ai-zh` reaches selection unchanged, while unsupported values return `VALIDATION_ERROR`.
+- When any of Bilibili's AI tracks (`ai-zh`, `ai-en`, etc.) is selected, `data_source` is `ai_subtitle` (not `subtitle`); `ai_subtitle` is Bilibili AI transcription, may be inaccurate, and is not equivalent to a human-checked citation.
+- Every selected `ai-*` track passes an unconditional integrity assessment first; an unusable track returns the description result (`data_source: "description"`) without caching, never its body.
+- Optional parameter `exclude_ai_subtitles`: filters out all Bilibili AI tracks (`ai-zh`, `ai-en`, etc.) so only human subtitles remain; AI-only results degrade to description (default `false`).
 
 ### 2. Comment Summarization (`get_video_comments`)
 - Retrieves popular comments to help gauge video sentiment.
@@ -48,6 +51,8 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
   - `preferred_lang`: Preferred subtitle language code: `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, or `ai-zh`. `ai-zh` reaches selection unchanged; unsupported values return `VALIDATION_ERROR`.
   - `fallback_to_description`: Fall back to video description if subtitles unavailable (default `false`).
   - `fallback_to_asr`: Run ready local ASR only after subtitles are definitively unavailable (default `false`).
+  - `exclude_ai_subtitles`: Filter out all Bilibili AI subtitles (`ai-zh`, `ai-en`, etc.) so only human subtitles remain; AI-only results are treated as definitive absence (default `false`).
+  - `force_asr`: Bypass subtitle metadata and content selection and transcribe the resolved Part with the ready local ASR, even when valid human subtitles exist; does not require `fallback_to_asr` and wins over `exclude_ai_subtitles` (default `false`).
   - `page`: Multi-Part video page number (1-based positive integer).
   - `include_timestamps`: Prefix each line with `[HH:MM:SS --> HH:MM:SS]`.
   - `start_seconds` / `end_seconds`: Only return segments overlapping this range.
@@ -56,7 +61,9 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
   - `context_segments`: Context segments per match side (0-5, default 1).
 - By default, returns `SUBTITLE_UNAVAILABLE` error when no subtitles exist.
 - Precedence is fixed: native subtitles → explicit ASR → description only when both fallbacks are explicit and playback returns a valid empty audio set.
-- ASR starts only for a confirmed empty subtitle list, selected subtitle, or subtitle body. Cookie, HTTP, timeout, parse, anti-bot, and other API errors remain visible.
+- When any `ai-*` track is selected, `data_source` is `ai_subtitle`. Every selected `ai-*` track is unconditionally read twice and passes a deterministic integrity assessment before its body is returned: cross-read stability (two reads with different normalized bodies are unusable; applies to every `ai-*` language) and language (ai-zh only: a body with at least 80 Unicode letters and under 10% Han letters is an `ai-zh` mismatch; other `ai-*` languages are not rejected for being non-Chinese). Stable same-language bodies that are semantically off-topic are an accepted limitation, controlled by `force_asr` / `exclude_ai_subtitles`. Human subtitles stay single-read and are never assessed.
+- An unusable body is never returned: `fallback_to_asr: true` invokes the local ASR; otherwise the existing `fallback_to_description` contract applies, with `SUBTITLE_UNAVAILABLE` when no fallback is authorized; `get_video_info` returns the description result without caching it. A transport, timeout, auth, or parse failure on the second read remains visible and never becomes an integrity failure or ASR trigger.
+- ASR starts only for a confirmed empty subtitle list, selected subtitle, or subtitle body, an `ai-*` track judged unusable by the integrity assessment (stability; language for ai-zh only. ASR only with explicit `fallback_to_asr`), or explicit `force_asr`. Cookie, HTTP, timeout, parse, anti-bot, and other API errors remain visible.
 - ASR uses the ready setup-managed model on CPU INT8 and one temporary audio file. MCP calls never download or switch models.
 - Bounds: one Part up to 7,200 seconds; 128 MiB audio; 3 candidate URLs with 3 redirects each; 120-second download; 30-minute transcription; 2 MiB stdout; 10,000 segments; one active job and no queue.
 - Timestamps/range filtering/keyword search is incompatible with description fallback.
@@ -290,9 +297,9 @@ Request:
 }
 ```
 
-Returns: `bvid`, `title`, `language`, `transcript` (newline-joined), `data_source` (`subtitle`, `asr`, or `description`), `page`.
+Returns: `bvid`, `title`, `language`, `transcript` (newline-joined), `data_source` (`subtitle`, `ai_subtitle`, `asr`, or `description`), `page`.
 
-> `preferred_lang` accepts only `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, or `ai-zh`. Explicit `ai-zh` is not rewritten to another language; unsupported values return `VALIDATION_ERROR`. The tool returns `SUBTITLE_UNAVAILABLE` when no subtitles exist. Set `fallback_to_description: true` to fall back.
+> `preferred_lang` accepts only `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, or `ai-zh`. Explicit `ai-zh` is not rewritten to another language; unsupported values return `VALIDATION_ERROR`. The tool returns `SUBTITLE_UNAVAILABLE` when no subtitles exist. Set `fallback_to_description: true` to fall back. `data_source: "ai_subtitle"` means Bilibili's AI track was selected — it is AI transcription, may be inaccurate, and is not equivalent to a human-checked citation.
 
 **Explicit ASR fallback example**:
 
@@ -308,7 +315,21 @@ Returns: `bvid`, `title`, `language`, `transcript` (newline-joined), `data_sourc
 }
 ```
 
-Native subtitles always win. Only a definitively subtitle-free Video with a model reported ready by `doctor --json` can return `data_source: "asr"`. ASR segments reuse the same ranges, keyword/context search, `source_url`, and `timestamp_url` pipeline.
+Native subtitles always win. Only a definitively subtitle-free Video with a model reported ready by `doctor --json` can return `data_source: "asr"`. ASR segments reuse the same ranges, keyword/context search, `source_url`, and `timestamp_url` pipeline. `force_asr: true` bypasses subtitle selection and always uses the local ASR (without requiring `fallback_to_asr`).
+
+**Excluding AI subtitles example**:
+
+```json
+{
+  "name": "get_video_transcript",
+  "arguments": {
+    "bvid_or_url": "BV1xx411c7mD",
+    "exclude_ai_subtitles": true
+  }
+}
+```
+
+With `exclude_ai_subtitles: true`, selection considers human subtitles only; AI-only results are treated as definitive absence and may combine with `fallback_to_asr` or `fallback_to_description`.
 
 **Keyword search example**:
 
@@ -391,9 +412,9 @@ Request:
 }
 ```
 
-Returns: `data_source` (`subtitle` or `description`), `video_info` (title, description, tags, subtitle text, publish date).
+Returns: `data_source` (`subtitle`, `ai_subtitle`, or `description`), `video_info` (title, description, tags, subtitle text, publish date).
 
-> `preferred_lang` accepts only `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, or `ai-zh`. Explicit `ai-zh` is not rewritten to another language; unsupported values return `VALIDATION_ERROR`. Videos without subtitles automatically degrade to description and tags (`data_source: "description"`).
+> `preferred_lang` accepts only `zh-Hans`, `zh-CN`, `zh-Hant`, `en`, `ja`, `ko`, or `ai-zh`. Explicit `ai-zh` is not rewritten to another language; unsupported values return `VALIDATION_ERROR`. Videos without subtitles automatically degrade to description and tags (`data_source: "description"`). `data_source: "ai_subtitle"` means Bilibili's AI track was selected — it is AI transcription, may be inaccurate, and is not equivalent to a human-checked citation. Pass `exclude_ai_subtitles: true` when only human subtitles are acceptable.
 
 ### `get_video_comments`
 

@@ -835,6 +835,10 @@ class CliAndAdapterTests(unittest.TestCase):
             package["pack_output"][0]["version"], live_pack_output[0]["version"]
         )
         package_files = [item["path"] for item in live_pack_output[0]["files"]]
+        recorded_package_files = [
+            item["path"] for item in package["pack_output"][0]["files"]
+        ]
+        self.assertEqual(recorded_package_files, package_files)
         forbidden = (
             "harness/",
             ".harness/",

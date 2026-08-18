@@ -72,6 +72,10 @@ bilibili-mcp --help
    自行选择或按 Enter 选择推荐的 small。
    安装完成后，可在明确需要无字幕回退时调用 get_video_transcript 并设置
    fallback_to_asr=true；默认调用不会运行 ASR，也不会在 MCP 内下载或切换模型。
+   自动化/无终端场景：bilibili-mcp setup --non-interactive 使用已有的环境变量或
+   全局配置文件凭据，绝不从 stdin/argv 读取凭据值、绝不提示；无 --asr-model 时仅确认凭据可加载
+   即成功退出（exit 0），加 --asr-model <tiny|base|small> 可安装指定模型
+   （必须与 --non-interactive 同用）。
 
 6. 配置完成后，重启或重连这个 MCP server，使其重新加载凭证。
 

@@ -53,7 +53,7 @@ Bilibili MCP 是一个本地 MCP server，让 AI Agent 读取 Bilibili 内容：
    npx -y @xzxzzx/bilibili-mcp@latest check
    npx -y @xzxzzx/bilibili-mcp@latest doctor --json
    doctor --json 只检查本机配置状态，不能代替后面的实时登录验证。
-   setup 会询问是否安装可选的本地 ASR 模型，选否即可。
+   setup 会询问是否安装可选的本地 ASR 模型，选否即可。自动化环境可用 setup --non-interactive（凭据来自已有的环境变量或全局配置，绝不提示、也绝不从 stdin/argv 读取凭据值）；加 --asr-model <tiny|base|small> 可同时安装指定模型。
 5. 让我重启或重连客户端。你无法代替我完成这一步时，请明确让我操作。
 6. 重连后调用 MCP 工具 check_bilibili_credentials。
    只有 configured: true 且 logged_in: true 才报告成功。
@@ -138,6 +138,15 @@ next_cursor 直到结束；按收藏夹列出成功读取的视频标题和 B �
 
 前提是已经通过 `setup` 安装了模型且 `doctor --json` 报告 `asr.status: ready`，否则会返回 `ASR_NOT_READY` 并附带安装指引。原生字幕始终优先：只有确认没有可用字幕时才会启动一次本地转录，结果返回 `data_source: "asr"`，并复用与字幕相同的时间戳、区间过滤、关键词搜索和时刻链接。详见[本地 ASR](#本地-asr可选)。
 
+### AI 识别字幕（ai-*）与人工字幕的区分
+
+Bilibili 会把部分视频的 AI 识别字幕标为 `ai-zh`、`ai-en`、`ai-ja` 等 `ai-*` 语言。为避免与人工字幕混淆，选中任意 `ai-*` 字幕时，`get_video_transcript` 与 `get_video_info` 的结果返回 `data_source: "ai_subtitle"`（不是 `"subtitle"`；本地 ASR 仍是 `"asr"`）。
+
+- `ai_subtitle` 是 Bilibili 的 AI 转录，可能不准确，不能当作人工校验过的引用。
+- `exclude_ai_subtitles: true`（两个工具都有，默认 `false`）：过滤全部 AI 字幕（`ai-zh`、`ai-en` 等），优先返回剩余的人工字幕；仅剩 AI 字幕时视为无字幕，`get_video_transcript` 可配合 `fallback_to_asr` / `fallback_to_description`，`get_video_info` 返回简介。
+- `force_asr: true`（仅 `get_video_transcript`，默认 `false`）：绕过字幕元数据与内容选择，直接用本地 ASR 转录当前这一 P；无需同时开启 `fallback_to_asr`，且优先于 `exclude_ai_subtitles`。
+- 每个选中的 `ai-*` 都会无条件双读并做确定性完整性评估，通过后才返回正文：跨读取稳定性（两次读取的正文不一致即不可用，适用于所有 `ai-*`）、语言（仅针对 `ai-zh`：≥80 Unicode 字母且 Han 占比 <10% 视为不匹配；其他 `ai-*` 语言不因非中文正文被拒绝）；不通过时 `fallback_to_asr: true` 调用本地 ASR，否则遵循 `fallback_to_description`；video-info 返回简介且不缓存。同语言但语义不符（稳定却离题的正文）是已接受的限制，可用 `force_asr` 或 `exclude_ai_subtitles` 控制；人工字幕保持单读，第二次读取的传输、超时、认证或解析失败照常作为错误返回。
+
 ## 本地 ASR（可选）
 
 有些视频没有任何字幕。安装本地 ASR 模型后，`get_video_transcript` 可以在你显式开启 `fallback_to_asr` 时，对已解析的这一 P 做一次本地转录。
@@ -154,7 +163,8 @@ Runtime 固定为 `faster-whisper==1.2.1`，模型存放在用户目录 `~/.bili
 
 **边界：**本地转录始终被约束在安全范围内——显式选择、资源受限、Cookie 隔离：
 
-- 原生 B 站字幕始终优先；只有确认无字幕、且你显式传了 `fallback_to_asr: true` 才启动转录。
+- 原生 B 站字幕始终优先；每个选中的 `ai-*` 都会先无条件双读评估，不通过时与无字幕一样构成确认缺失（默认返回简介或 `SUBTITLE_UNAVAILABLE`）；只有在这种确认缺失状态、且你显式传了 `fallback_to_asr: true` 时才启动转录。
+- `force_asr: true` 是显式授权直接转录当前这一 P，与是否存在字幕无关，无需同时开启 `fallback_to_asr`。
 - MCP 调用不会下载或切换模型；模型只通过 `setup` 安装。
 - 一次只运行一个转录任务；单 P 时长上限 2 小时、音频上限 128 MiB、转录超时 30 分钟。
 - 临时音频在成功、失败、超时等所有路径上都会被清理。
@@ -185,7 +195,8 @@ Runtime 固定为 `faster-whisper==1.2.1`，模型存放在用户目录 `~/.bili
 - **收藏夹遍历是调用方驱动的**："全部收藏夹"指当前登录账号创建、且 Bilibili API 当前可见的收藏夹；每次调用最多读取一个 20 条上游页面，Agent 必须持续跟随 `next_cursor`。遍历是实时 best-effort，不是快照。
 - **不跨收藏夹去重**：同一 BVID 出现在多个收藏夹时保留各自的收藏夹上下文。
 - **跳过的条目不补漏**：无法安全规范化的视频条目会计入 `skipped_count`，不会为该页拉取替代条目。
-- **ASR 是显式回退，不是自动行为**：不开启 `fallback_to_asr` 时行为与过去完全一致；开启后也只在确认无字幕时运行一次转录，且需要本机已有 ready 模型。
+- **ASR 是显式回退，不是自动行为**：每个选中的 `ai-*` 默认都会双读，完整性不通过时即使未开启 ASR 也会降级为简介或 `SUBTITLE_UNAVAILABLE`；本地转录只会在确认无字幕并显式开启 `fallback_to_asr`，或设置 `force_asr` 时运行一次，且需要本机已有 ready 模型。
+- **AI 字幕与人工字幕可区分**：选中 Bilibili AI 识别字幕（`ai-zh` 等任意 `ai-*` 语言）时 `data_source` 为 `ai_subtitle`；它是 Bilibili 的 AI 转录，可能不准确，不能当作人工校验过的引用。需要纯人工字幕时使用 `exclude_ai_subtitles: true`。
 - **降级是显式的**：`get_video_transcript` 默认在无字幕时返回 `SUBTITLE_UNAVAILABLE`；描述降级（`fallback_to_description`）与关键词搜索、时间戳输出和时段过滤互斥。
 - **无访问绕过**：不会绕过付费、会员、地区、私密、下架或其他 Bilibili 访问限制。
 - **视频搜索和收藏夹发现都需要登录凭证**，不提供匿名降级。
