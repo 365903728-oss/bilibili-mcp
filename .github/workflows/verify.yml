@@ -40,6 +40,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check migration package receipt
+        run: python3 -m unittest harness.tests.test_cli_and_adapters.CliAndAdapterTests.test_real_pilots_cover_the_shared_conformance_matrix
+
       - name: Check package contents
         run: npm pack --dry-run
 

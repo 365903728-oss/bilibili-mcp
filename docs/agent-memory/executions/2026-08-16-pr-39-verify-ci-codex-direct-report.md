@@ -158,6 +158,9 @@ the migration clean-room test can inspect its exact accepted #35 base.
   A non-rewriting merge retains the Harness history and the newer product/release
   facts; the five durable-memory conflicts are append-only factual unions. The
   package receipt is regenerated from the merged v1.12.0 dry-run bytes.
+- Package-path conformance now distinguishes an unbuilt Harness checkout from a
+  built product checkout. Core shards compare the non-`dist` manifest, while the
+  Product job runs the same conformance after build and binds all 189 paths.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

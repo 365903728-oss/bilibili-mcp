@@ -838,7 +838,13 @@ class CliAndAdapterTests(unittest.TestCase):
         recorded_package_files = [
             item["path"] for item in package["pack_output"][0]["files"]
         ]
-        self.assertEqual(recorded_package_files, package_files)
+        if (ROOT / "dist").is_dir():
+            self.assertEqual(recorded_package_files, package_files)
+        else:
+            self.assertEqual(
+                [path for path in recorded_package_files if not path.startswith("dist/")],
+                package_files,
+            )
         forbidden = (
             "harness/",
             ".harness/",
