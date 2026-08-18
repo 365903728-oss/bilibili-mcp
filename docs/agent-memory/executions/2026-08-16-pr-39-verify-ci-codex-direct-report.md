@@ -160,7 +160,8 @@ the migration clean-room test can inspect its exact accepted #35 base.
   package receipt is regenerated from the merged v1.12.0 dry-run bytes.
 - Package-path conformance now distinguishes an unbuilt Harness checkout from a
   built product checkout. Core shards compare the non-`dist` manifest, while the
-  Product job runs the same conformance after build and binds all 189 paths.
+  Product job uses full history, runs the same conformance after build, and binds
+  both the exact #35 clean-room baseline and all 189 package paths.
 
 ## Risks, Skipped Checks, Recovery Bundle
 
