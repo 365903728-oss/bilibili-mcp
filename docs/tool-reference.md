@@ -26,6 +26,9 @@
 - 无字幕时自动降级为视频标题、简介和标签
 - 支持多语言字幕选择（默认优先简体中文）
 - 可手动指定偏好字幕语言：`zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；`ai-zh` 会原样传入选择逻辑，未知值返回 `VALIDATION_ERROR`
+- 选中任意 Bilibili AI 识别字幕（`ai-zh`、`ai-en` 等 `ai-*` 语言）时结果 `data_source` 为 `ai_subtitle`（不是 `subtitle`）；`ai_subtitle` 是 Bilibili 的 AI 转录，可能不准确，不能当作人工校验过的引用
+- 每个选中的 `ai-*` 都会先做确定性完整性评估；不通过时返回简介结果（`data_source: "description"`）且不缓存，绝不返回不可用正文
+- 可选参数 `exclude_ai_subtitles`：排除全部 AI 字幕（`ai-zh`、`ai-en` 等 `ai-*` 语言），只保留人工字幕；仅剩 AI 字幕时视为无字幕并返回简介降级（默认 `false`）
 
 ### 2. 评论总结 (`get_video_comments`)
 - 获取视频热门评论，辅助判断视频真实口碑
@@ -49,6 +52,8 @@
   - `preferred_lang`: 偏好字幕语言代码，支持 `zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；`ai-zh` 会原样传入选择逻辑，未知值返回 `VALIDATION_ERROR`
   - `fallback_to_description`: 字幕不可用时是否降级为视频描述（默认 `false`）
   - `fallback_to_asr`: 确认无可用字幕时是否运行已就绪的本地 ASR（默认 `false`）
+  - `exclude_ai_subtitles`: 排除 Bilibili AI 识别字幕（`ai-zh`、`ai-en` 等 `ai-*` 语言），只保留人工字幕；仅剩 AI 字幕时视为无字幕（默认 `false`）
+  - `force_asr`: 绕过字幕元数据与内容选择，直接用已就绪的本地 ASR 转录当前 Part；无需同时设置 `fallback_to_asr`，优先于 `exclude_ai_subtitles`（默认 `false`）
   - `page`: 多P视频分集编号（从1开始的正整数）
   - `include_timestamps`: 每行添加 `[HH:MM:SS --> HH:MM:SS]` 时间戳前缀
   - `start_seconds` / `end_seconds`: 只返回与此区间重叠的字幕段
@@ -57,7 +62,9 @@
   - `context_segments`: 每个匹配前后的上下文段数（0-5，默认1）
 - 默认不降级：无字幕时返回 `SUBTITLE_UNAVAILABLE` 错误
 - 回退顺序固定为原生字幕 → 显式 ASR → 仅在播放 API 返回有效空音频集合且同时显式请求时使用视频描述
-- 只有字幕列表、选中字幕或字幕正文被确认为空时才触发 ASR；Cookie、HTTP、超时、解析、风控和其他 API 错误保持可见
+- 选中任意 `ai-*` 时 `data_source` 为 `ai_subtitle`。每个选中的 `ai-*` 都会无条件双读并做确定性完整性评估，通过后才返回正文：跨读取稳定性（两次读取的正文不一致即不可用，适用于所有 `ai-*`）、语言（仅针对 `ai-zh`：正文含至少 80 个 Unicode 字母且 Han 占比低于 10% 视为不匹配；其他 `ai-*` 语言不因非中文正文被拒绝）。稳定但同语言语义不符的正文是已接受的限制，可用 `force_asr` / `exclude_ai_subtitles` 控制。人工字幕保持单读且不做评估
+- 完整性评估不通过时绝不返回正文：`fallback_to_asr: true` 调用本地 ASR；否则遵循 `fallback_to_description`，无授权回退时返回 `SUBTITLE_UNAVAILABLE`；`get_video_info` 返回简介结果且不缓存。第二次读取的传输/超时/认证/解析错误照常可见，不会转化为完整性失败或触发 ASR
+- 只有字幕列表、选中字幕或字幕正文被确认为空、完整性评估判定选中的 `ai-*` 不可用（稳定性；语言仅针对 `ai-zh`。仅在显式开启 `fallback_to_asr` 时触发 ASR），或 `force_asr` 显式请求时才触发 ASR；Cookie、HTTP、超时、解析、风控和其他 API 错误保持可见
 - ASR 使用 setup 管理的 ready 模型、CPU INT8 和一个临时音频文件；MCP 调用不会下载或切换模型
 - 有界限制：单 Part 最长 7200 秒、音频 128 MiB、3 个候选地址/每个 3 次重定向、下载 120 秒、转录 30 分钟、stdout 2 MiB、10000 段、同时一个任务且不排队
 - 时间戳/区间过滤/关键词搜索与描述降级不兼容：请求 timed 输出或搜索时不会静默降级
@@ -294,9 +301,9 @@
 }
 ```
 
-返回内容：`bvid`、`title`、`language`、`transcript`（按行合并）、`data_source`（`subtitle`、`asr` 或 `description`）、`page`（分集编号）。
+返回内容：`bvid`、`title`、`language`、`transcript`（按行合并）、`data_source`（`subtitle`、`ai_subtitle`、`asr` 或 `description`）、`page`（分集编号）。
 
-> `preferred_lang` 仅接受 `zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；显式传入 `ai-zh` 不会被改写为其他语言，未知值返回 `VALIDATION_ERROR`。默认无字幕时返回 `SUBTITLE_UNAVAILABLE`。如需降级，设置 `fallback_to_description: true`。
+> `preferred_lang` 仅接受 `zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；显式传入 `ai-zh` 不会被改写为其他语言，未知值返回 `VALIDATION_ERROR`。默认无字幕时返回 `SUBTITLE_UNAVAILABLE`。如需降级，设置 `fallback_to_description: true`。`data_source: "ai_subtitle"` 表示选中了 Bilibili AI 识别字幕——它是 AI 转录，可能不准确，不能当作人工校验过的引用。
 
 **显式 ASR 回退示例**：
 
@@ -312,7 +319,21 @@
 }
 ```
 
-原生字幕始终优先。只有确认没有可用字幕且 `doctor --json` 报告 ready 时，结果才返回 `data_source: "asr"`；ASR 段继续使用相同的区间、关键词、上下文、`source_url` 和 `timestamp_url` 管线。
+原生字幕始终优先。只有确认没有可用字幕且 `doctor --json` 报告 ready 时，结果才返回 `data_source: "asr"`；ASR 段继续使用相同的区间、关键词、上下文、`source_url` 和 `timestamp_url` 管线。`force_asr: true` 可绕过字幕选择、无条件使用本地 ASR（无需同时设置 `fallback_to_asr`）。
+
+**排除 AI 字幕示例**：
+
+```json
+{
+  "name": "get_video_transcript",
+  "arguments": {
+    "bvid_or_url": "BV1xx411c7mD",
+    "exclude_ai_subtitles": true
+  }
+}
+```
+
+`exclude_ai_subtitles: true` 时只从人工字幕中选择；仅剩 AI 字幕（`ai-zh`、`ai-en` 等 `ai-*` 语言）时视为无字幕，可配合 `fallback_to_asr` 或 `fallback_to_description`。
 
 **关键词搜索示例**：
 
@@ -395,9 +416,9 @@
 }
 ```
 
-返回内容：`data_source`（`subtitle` 或 `description`）、`video_info`（标题、描述、标签、字幕文本、发布时间）。
+返回内容：`data_source`（`subtitle`、`ai_subtitle` 或 `description`）、`video_info`（标题、描述、标签、字幕文本、发布时间）。
 
-> `preferred_lang` 仅接受 `zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；显式传入 `ai-zh` 不会被改写为其他语言，未知值返回 `VALIDATION_ERROR`。无字幕视频会自动降级返回描述和标签（即 `data_source: "description"`）。
+> `preferred_lang` 仅接受 `zh-Hans`、`zh-CN`、`zh-Hant`、`en`、`ja`、`ko`、`ai-zh`；显式传入 `ai-zh` 不会被改写为其他语言，未知值返回 `VALIDATION_ERROR`。无字幕视频会自动降级返回描述和标签（即 `data_source: "description"`）。`data_source: "ai_subtitle"` 表示选中了 Bilibili AI 识别字幕——它是 AI 转录，可能不准确，不能当作人工校验过的引用。需要纯人工字幕时传 `exclude_ai_subtitles: true`。
 
 ### `get_video_comments`
 

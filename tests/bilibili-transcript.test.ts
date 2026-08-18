@@ -37,7 +37,9 @@ function makeFakeSubtitles(subs: Array<Record<string, unknown>>) {
   };
 }
 
-function makeFakeSubtitleContent(body: Array<{ from: number; to: number; content: string }>) {
+function makeFakeSubtitleContent(
+  body: Array<{ from: number; to: number; content: string; location?: number }>,
+) {
   return { body };
 }
 
@@ -107,6 +109,7 @@ function getTranscriptWithAsr(
     startSeconds?: number;
     endSeconds?: number;
     search?: TranscriptSearchOptions;
+    forceAsr?: boolean;
     signal?: AbortSignal;
   } = {},
 ) {
@@ -120,6 +123,8 @@ function getTranscriptWithAsr(
     options.endSeconds,
     options.search,
     true,
+    undefined,
+    options.forceAsr,
     options.signal,
   );
 }
@@ -188,6 +193,51 @@ describe("getVideoTranscriptData - subtitle success", () => {
 
     expect(result.data_source).toBe("description");
     expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+});
+
+describe("getVideoInfoWithSubtitle - ai-zh integrity assessment", () => {
+  it("returns description and does not cache an unstable ai-zh body", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "First" }]))
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "Second" }]));
+
+    const first = await getVideoInfoWithSubtitle("BV1T6PQzQErF");
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "Third" }]))
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "Fourth" }]));
+    const second = await getVideoInfoWithSubtitle("BV1T6PQzQErF");
+
+    expect(first.data_source).toBe("description");
+    expect(first.video_info.subtitle_text).toBeUndefined();
+    expect(second.data_source).toBe("description");
+    expect(mockGetVideoSubtitle).toHaveBeenCalledTimes(2);
+    expect(mockGetSubtitleContent).toHaveBeenCalledTimes(4);
+  });
+
+  it("returns description for a stable non-Chinese ai-zh body", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    const englishBody = [
+      "The quick brown fox jumps over the lazy dog while waiting for the train to arrive at the station this morning without any delay.",
+      "Farmers harvest the ripe wheat fields and load the golden grain onto wooden carts before the evening rain begins to fall.",
+    ];
+    mockGetSubtitleContent.mockResolvedValue(
+      makeFakeSubtitleContent(englishBody.map((content) => ({ from: 0, to: 1, content }))),
+    );
+
+    const result = await getVideoInfoWithSubtitle("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("description");
+    expect(result.video_info.subtitle_text).toBeUndefined();
   });
 });
 
@@ -1088,6 +1138,522 @@ describe("getVideoTranscriptData - evidence links", () => {
     await expect(
       getVideoTranscriptData("BV1T6PQzQErF", undefined, true),
     ).rejects.toThrow("Network down");
+  });
+});
+
+describe("getVideoTranscriptData - AI subtitle classification", () => {
+  it('returns data_source "ai_subtitle" for a selected Bilibili ai-zh track', async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("ai_subtitle");
+    expect(result.language).toBe("ai-zh");
+  });
+
+  it('returns data_source "ai_subtitle" for a stable ai-en track after a double read', async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-en", lan_doc: "AI English", subtitle_url: "//example.test/ai-en.json" },
+      ]),
+    );
+    // 80+ 字母的纯英文正文：若语言检查被错误地应用到 ai-en，此正文会触发 ai-zh 的不匹配信号
+    const englishBody =
+      "This is a stable English AI subtitle body with well over eighty letters in total across the whole transcript.";
+    mockGetSubtitleContent.mockResolvedValue(
+      makeFakeSubtitleContent([{ from: 0, to: 1, content: englishBody }]),
+    );
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("ai_subtitle");
+    expect(result.language).toBe("ai-en");
+    // 每个选中的 ai-* 都至少做一次双读稳定性检查
+    expect(mockGetSubtitleContent).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a stable human subtitle on the single-read path", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 1, lan: "zh-Hans", lan_doc: "Chinese", subtitle_url: "//example.test/zh.json" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("subtitle");
+    expect(result.language).toBe("zh-Hans");
+    // 人工字幕不进入 AI 双读/完整性评估路径
+    expect(mockGetSubtitleContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns data_source "ai_subtitle" in transcript search mode', async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      undefined,
+      false,
+      undefined,
+      false,
+      undefined,
+      undefined,
+      searchOpts("Hello"),
+    );
+
+    expect(result.data_source).toBe("ai_subtitle");
+  });
+});
+
+describe("getVideoInfoWithSubtitle - AI subtitle classification", () => {
+  it('returns data_source "ai_subtitle" for an ai-zh track', async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const result = await getVideoInfoWithSubtitle("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("ai_subtitle");
+    expect(result.video_info.subtitle_text).toBe("Hello\nWorld");
+  });
+});
+
+describe("getVideoTranscriptData - exclude_ai_subtitles", () => {
+  it("prefers a remaining human subtitle when exclude_ai_subtitles is true", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 1, lan: "zh-Hans", lan_doc: "Chinese", subtitle_url: "//example.test/zh.json" },
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      "ai-zh",
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      true,
+    );
+
+    expect(result.data_source).toBe("subtitle");
+    expect(result.language).toBe("zh-Hans");
+    expect(mockGetSubtitleContent).toHaveBeenCalledWith("//example.test/zh.json");
+  });
+
+  it("treats AI-only rows as definitive absence with exclude_ai_subtitles", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    await expect(
+      getVideoTranscriptData(
+        "BV1T6PQzQErF",
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        true,
+      ),
+    ).rejects.toBeInstanceOf(NoSubtitleError);
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("filters the full ai-* set (ai-zh + ai-en) to definitive absence with exclude_ai_subtitles", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+        { id: 4, lan: "ai-en", lan_doc: "AI English", subtitle_url: "//example.test/ai-en.json" },
+      ]),
+    );
+
+    await expect(
+      getVideoTranscriptData(
+        "BV1T6PQzQErF",
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        true,
+      ),
+    ).rejects.toBeInstanceOf(NoSubtitleError);
+    expect(mockGetSubtitleContent).not.toHaveBeenCalled();
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("invokes ASR when exclude_ai_subtitles leaves only AI rows and fallback_to_asr is true", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true,
+      true,
+    );
+
+    expect(result.data_source).toBe("asr");
+    expect(mockTranscribeVideoPart).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("getVideoInfoWithSubtitle - exclude_ai_subtitles", () => {
+  it("returns description for AI-only rows without caching the result", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const first = await getVideoInfoWithSubtitle("BV1T6PQzQErF", undefined, undefined, true);
+    expect(first.data_source).toBe("description");
+
+    const second = await getVideoInfoWithSubtitle("BV1T6PQzQErF", undefined, undefined, true);
+    expect(second.data_source).toBe("description");
+    expect(mockGetVideoSubtitle).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns description for an AI-only ai-zh + ai-en set with exclude_ai_subtitles", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+        { id: 4, lan: "ai-en", lan_doc: "AI English", subtitle_url: "//example.test/ai-en.json" },
+      ]),
+    );
+
+    const result = await getVideoInfoWithSubtitle("BV1T6PQzQErF", undefined, undefined, true);
+
+    expect(result.data_source).toBe("description");
+    expect(mockGetSubtitleContent).not.toHaveBeenCalled();
+  });
+
+  it("prefers a human subtitle and caches under an exclude-aware key", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 1, lan: "zh-Hans", lan_doc: "Chinese", subtitle_url: "//example.test/zh.json" },
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const excluded = await getVideoInfoWithSubtitle("BV1T6PQzQErF", undefined, undefined, true);
+    expect(excluded.data_source).toBe("subtitle");
+    expect(excluded.video_info.subtitle_text).toBe("Hello\nWorld");
+
+    const included = await getVideoInfoWithSubtitle("BV1T6PQzQErF");
+    expect(included.data_source).toBe("subtitle");
+    expect(mockGetVideoSubtitle).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("getVideoTranscriptData - force_asr", () => {
+  it("invokes ASR with force_asr even without fallback_to_asr", async () => {
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      false,
+      true,
+    );
+
+    expect(result.data_source).toBe("asr");
+    expect(mockTranscribeVideoPart).toHaveBeenCalledTimes(1);
+    expect(mockGetVideoSubtitle).not.toHaveBeenCalled();
+  });
+
+  it("force_asr bypasses a valid human subtitle track", async () => {
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      false,
+      true,
+    );
+
+    expect(result.data_source).toBe("asr");
+    expect(mockGetSubtitleContent).not.toHaveBeenCalled();
+  });
+
+  it("force_asr wins over exclude_ai_subtitles", async () => {
+    const result = await getVideoTranscriptData(
+      "BV1T6PQzQErF",
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      true,
+      true,
+    );
+
+    expect(result.data_source).toBe("asr");
+    expect(mockTranscribeVideoPart).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("getVideoTranscriptData - unstable ai-zh with explicit ASR fallback", () => {
+  it("invokes ASR when two reads of the same ai-zh track differ", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "First" }]))
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "Second" }]));
+
+    const result = await getTranscriptWithAsr();
+
+    expect(result.data_source).toBe("asr");
+    expect(mockTranscribeVideoPart).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a stable ai-zh track native without invoking ASR", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const result = await getTranscriptWithAsr();
+
+    expect(result.data_source).toBe("ai_subtitle");
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+    expect(mockGetSubtitleContent).toHaveBeenCalledTimes(2);
+  });
+
+  it("propagates a second-read transport failure without invoking ASR", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "First" }]))
+      .mockRejectedValueOnce(new Error("Temporary network failure"));
+
+    await expect(getTranscriptWithAsr()).rejects.toThrow("Temporary network failure");
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+});
+
+describe("getVideoTranscriptData - unconditional ai-zh integrity assessment", () => {
+  it("rejects an unstable ai-zh body without any fallback", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "First" }]))
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "Second" }]));
+
+    await expect(getVideoTranscriptData("BV1T6PQzQErF")).rejects.toBeInstanceOf(NoSubtitleError);
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("keeps a stable ai-zh body native after a double read", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("ai_subtitle");
+    expect(mockGetSubtitleContent).toHaveBeenCalledTimes(2);
+  });
+
+  it("detects a canonical-body collision when a segment embeds the separator pattern", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 1, to: 2, content: "a\n1|2|b" }]))
+      .mockResolvedValueOnce(makeFakeSubtitleContent([
+        { from: 1, to: 2, content: "a" },
+        { from: 1, to: 2, content: "b" },
+      ]));
+
+    await expect(getVideoTranscriptData("BV1T6PQzQErF")).rejects.toBeInstanceOf(NoSubtitleError);
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("accepts a stable ai-zh body whose reads differ only in non-canonical fields", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    const chineseBody =
+      "清晨的阳光洒在宁静的山谷之上，农夫们正在田间劳作，为即将到来的丰收做准备，孩子们在溪边嬉戏玩耍，炊烟从村舍缓缓升起。";
+    // 第一读带 location、第二读键序不同：规范化只比较精确 [from,to,content] 元组
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(
+        makeFakeSubtitleContent([{ from: 0, to: 1, location: 0, content: chineseBody.repeat(4) }]),
+      )
+      .mockResolvedValueOnce(
+        makeFakeSubtitleContent([{ content: chineseBody.repeat(4), from: 0, to: 1 }]),
+      );
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("ai_subtitle");
+    expect(mockGetSubtitleContent).toHaveBeenCalledTimes(2);
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("falls back to description for an unstable ai-zh body when authorized", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "First" }]))
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "Second" }]));
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF", undefined, true);
+
+    expect(result.data_source).toBe("description");
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("propagates a second-read transport failure without any fallback", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    mockGetSubtitleContent
+      .mockResolvedValueOnce(makeFakeSubtitleContent([{ from: 0, to: 1, content: "First" }]))
+      .mockRejectedValueOnce(new Error("Temporary network failure"));
+
+    await expect(getVideoTranscriptData("BV1T6PQzQErF")).rejects.toThrow(
+      "Temporary network failure",
+    );
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stable non-Chinese ai-zh body as a language mismatch", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    const englishBody = [
+      "The quick brown fox jumps over the lazy dog while waiting for the train to arrive at the station this morning without any delay.",
+      "Farmers harvest the ripe wheat fields and load the golden grain onto wooden carts before the evening rain begins to fall.",
+    ];
+    mockGetSubtitleContent.mockResolvedValue(makeFakeSubtitleContent(englishBody.map((content) => ({ from: 0, to: 1, content }))));
+
+    await expect(getVideoTranscriptData("BV1T6PQzQErF")).rejects.toBeInstanceOf(NoSubtitleError);
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("accepts a stable same-language ai-zh body regardless of title topic", async () => {
+    mockResolvePartCid.mockResolvedValue({
+      cid: 12345,
+      videoData: { ...defaultVideoData(), title: "Sea Monsters Documentary" },
+      pages: [{ page: 1, cid: 12345, title: "Sea Monsters Documentary", duration: 120 }],
+    });
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    const chineseBody =
+      "清晨的阳光洒在宁静的山谷之上，农夫们正在田间劳作，为即将到来的丰收做准备，孩子们在溪边嬉戏玩耍，炊烟从村舍缓缓升起。";
+    mockGetSubtitleContent.mockResolvedValue(
+      makeFakeSubtitleContent([{ from: 0, to: 1, content: chineseBody.repeat(4) }]),
+    );
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("ai_subtitle");
+    expect(mockGetSubtitleContent).toHaveBeenCalledTimes(2);
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
+  });
+
+  it("keeps a human subtitle on a single read", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 1, lan: "zh-Hans", lan_doc: "Chinese", subtitle_url: "//example.test/zh.json" },
+      ]),
+    );
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("subtitle");
+    expect(mockGetSubtitleContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts stable ai-zh when semantic signals are inconclusive", async () => {
+    mockGetVideoSubtitle.mockResolvedValue(
+      makeFakeSubtitles([
+        { id: 3, lan: "ai-zh", lan_doc: "AI Chinese", subtitle_url: "//example.test/ai-zh.json" },
+      ]),
+    );
+    const chineseBody =
+      "清晨的阳光洒在宁静的山谷之上，农夫们正在田间劳作，为即将到来的丰收做准备，孩子们在溪边嬉戏玩耍，炊烟从村舍缓缓升起。";
+    mockGetSubtitleContent.mockResolvedValue(
+      makeFakeSubtitleContent([{ from: 0, to: 1, content: chineseBody.repeat(4) }]),
+    );
+
+    const result = await getVideoTranscriptData("BV1T6PQzQErF");
+
+    expect(result.data_source).toBe("ai_subtitle");
+    expect(mockTranscribeVideoPart).not.toHaveBeenCalled();
   });
 });
 

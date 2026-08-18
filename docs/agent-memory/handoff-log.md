@@ -475,3 +475,57 @@
 - Review: complete-candidate release, standards/security, and specification
   reviewers returned PASS with no remaining P0-P3. The release-verifier's one
   initial P2 corrected encoding-gate wording before final acceptance.
+
+## 2026-08-18 Issue #40 AI Subtitle Integrity
+
+- Owner: Codex scoped and reviewed; one Paseo-managed DeepSeek V4 Flash agent
+  implemented at thinking level `max` in an isolated worktree.
+- Objective: distinguish Bilibili AI subtitles from human subtitles and align
+  the directly related Roadmap fallback defects without changing defaults.
+- Contract: `ai-zh` becomes `ai_subtitle`; add default-off
+  `exclude_ai_subtitles` and transcript-only `force_asr`; double-read selected
+  AI bodies only with explicit `fallback_to_asr`; preserve transport errors.
+- Result: implementation, tests, bilingual docs, codemap, handoff, report, and
+  QA checklist completed. Codex independently passed build, 41 files / 885
+  tests, pack dry run, diff checks, and a post-review 76-test subtitle slice.
+- Boundary: title/language semantic heuristics and non-TTY setup remain separate;
+  no commit, push, PR, Issue mutation, release, or publication occurred.
+
+## 2026-08-18 Roadmap Subtitle Integrity + Scriptable Setup
+
+- Owner: Codex scoped and reviewed; one Paseo-managed Claude Code agent
+  implemented in the same isolated worktree with vertical TDD.
+- Objective: unconditional integrity assessment for selected Bilibili AI
+  subtitles and credential-safe non-interactive setup.
+- Contract: `src/bilibili/subtitle-integrity.ts` pure-function module with
+  frozen PRD checks (collision-free canonical stability for every selected
+  `ai-*`; conservative language check limited to `ai-zh`; title-topic lexical
+  overlap removed as a rejection gate by Codex blocker review — stable
+  same-language semantic mismatch is an accepted limitation controlled by
+  `force_asr`/`exclude_ai_subtitles`; inconclusive passes; second-read errors
+  propagate); every Bilibili `ai-*` track classified as AI for `data_source`
+  and `exclude_ai_subtitles` (repair pass, PRD v1.2); unconditional double-read
+  for selected `ai-*` in transcript and video-info; `setupCredentials` options
+  object; Commander `--non-interactive` + `--asr-model <tiny|base|small>`;
+  bilingual docs/CHANGELOG/codemap/QA sync.
+- Result: 4 vertical slices red to green; blocker pass added 3 red tests
+  (source-none rejection exit 1, canonical-collision detection, stable
+  same-language acceptance, non-canonical-field stability) then green;
+  ai-* classification repair pass added 4 red tests (stable `ai-en` →
+  `ai_subtitle` with two reads; transcript/video-info `exclude_ai_subtitles`
+  filters an AI-only `ai-zh`+`ai-en` set to absence/description; human
+  single-read lock) then green; focused 7-file suite 323/323, full suite
+  41 files / 906 tests, build green,
+  pack dry-run 189 entries clean,
+  diff check clean, secret scan zero real credentials, UTF-8 clean (one
+  pre-existing HEAD U+FFFD not introduced). Report:
+  `docs/agent-memory/handoffs/2026-08-18-roadmap-subtitle-integrity-setup-claude-report.md`.
+- Boundary: no real model installed; live classification/exclusion/double-read
+  verified by a post-build authenticated read-only run on `BV15kyBB5Eg8`
+  (default transcript → `ai_subtitle`/`ai-zh` with a non-empty body;
+  `exclude_ai_subtitles=true` → `NoSubtitleError`; default video-info →
+  `ai_subtitle` with `subtitle_text`; exclude=true → description without
+  `subtitle_text`); live corrupt-body rejection and ASR fallback remain
+  unverified (`BV1ybuQ62EfK` exposes no target subtitle; no real ASR/model run
+  authorized); no commit/push/PR/Issue/release; corrupt-body/ASR live
+  verification remains a named follow-up for Codex.

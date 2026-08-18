@@ -1,5 +1,30 @@
 # Active Work
 
+Issue #40 + Roadmap (ROADMAP-2026-08-18-INTEGRITY-SETUP) have a verified,
+uncommitted implementation candidate in isolated branch
+`codex/issue-40-ai-subtitle-integrity`, based on `44ac1e7`. It separates
+every Bilibili `ai-*` track (`ai-zh`, `ai-en`, `ai-ja`, …) as
+`data_source: "ai_subtitle"`, adds default-off `exclude_ai_subtitles` to
+transcript and video-info, adds transcript-only `force_asr`, and
+unconditionally double-reads every selected `ai-*` body with a collision-free
+canonical stability check plus a conservative language check (≥80 Unicode
+letters and <10% Han → unusable) applied to `ai-zh` only — other `ai-*`
+languages are not rejected for being non-Chinese. Title-topic lexical overlap
+is not a rejection gate; a stable same-language semantic mismatch is an
+accepted limitation controlled by `force_asr` / `exclude_ai_subtitles`. An
+unstable body enters the existing ASR path; transport/parser errors remain
+visible.
+`setup --non-interactive` / `--asr-model <tiny|base|small>` is implemented:
+it requires an env/global-config credential source with loadable credentials,
+never prompts, and never reads credential values from stdin/argv. The candidate
+passed the TypeScript build, 41 files / 906 tests, a 189-file package dry run,
+and independent Codex standards/spec/risk reviews. It is not committed,
+pushed, merged, released, or published.
+
+The existing ASR download path already tries up to three bounded audio
+candidates and exposes retryable bilingual `ASR_AUDIO_UNAVAILABLE` guidance,
+so this candidate does not add another retry layer.
+
 Status: `v1.11.4` is published to npm, GitHub Releases, and the Official MCP
 Registry as `io.github.XZXZZX-Ai/bilibili-mcp`. Release commit `2a33520`
 contains the five synchronized version fields, bilingual changelogs, and

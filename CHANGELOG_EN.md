@@ -6,6 +6,13 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ## [Unreleased]
 
+### Added
+- Distinguish Bilibili AI subtitles from human subtitles: when any Bilibili AI track (`ai-zh`, `ai-en`, or another `ai-*` language) is selected, both `get_video_transcript` and `get_video_info` return `data_source: "ai_subtitle"` (no longer `"subtitle"`; managed local ASR stays `"asr"`). `ai_subtitle` is Bilibili AI transcription, may be inaccurate, and is not equivalent to a human-checked citation.
+- New optional `exclude_ai_subtitles` (default `false`) on `get_video_transcript` and `get_video_info`: filters AI tracks before selection and prefers remaining human subtitles; AI-only results are treated as definitive absence (transcript may use explicit ASR/description fallback; video-info returns the description). The video-info cache key includes this option.
+- New optional `force_asr` (default `false`) on `get_video_transcript`: bypasses subtitle selection and transcribes the resolved Part with the ready local ASR, without requiring `fallback_to_asr`, and wins over `exclude_ai_subtitles`.
+- Every selected `ai-*` track is unconditionally read twice and passes a deterministic integrity assessment before its body is returned: cross-read stability (two reads with different normalized bodies are unusable; applies to every `ai-*` language) and language (ai-zh only: a body with at least 80 Unicode letters and under 10% Han letters is an `ai-zh` mismatch; other `ai-*` languages are not rejected for being non-Chinese). An unusable track with `fallback_to_asr: true` invokes the local ASR, otherwise the existing `fallback_to_description` contract applies (`SUBTITLE_UNAVAILABLE` when no fallback is authorized); video-info returns the description without caching it. Stable same-language bodies that are semantically off-topic are an accepted limitation, controlled by `force_asr` / `exclude_ai_subtitles`. A transport, timeout, auth, or parse failure on the second read remains an error and never becomes an integrity failure or ASR trigger.
+- Added `--non-interactive` (uses already-loadable credentials from environment variables or the global config file; never prompts and never reads credential values from stdin/argv; without `--asr-model` it confirms loadability and exits successfully) and `--asr-model <tiny|base|small>` (requires `--non-interactive`; installs the given model) to `setup`.
+
 ---
 
 ## [1.11.4] - 2026-08-09

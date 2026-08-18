@@ -40,6 +40,28 @@ _Avoid_: Episode, segment, P-video
 One timed subtitle cue containing start time, end time, and text.
 _Avoid_: Chapter, caption block
 
+**Human Subtitle**:
+A Bilibili-provided subtitle track that is not identified by Bilibili as an AI
+recognition track. It remains distinct from both a Bilibili AI Subtitle and a
+Local ASR Transcript.
+_Avoid_: Native subtitle, trusted subtitle
+
+**Bilibili AI Subtitle**:
+A Bilibili-provided AI recognition track identified by an `ai-*` language code
+(such as `ai-zh`, `ai-en`, `ai-ja`). It is Bilibili-origin evidence, but it is
+not a Human Subtitle and is not assumed to be human-checked.
+_Avoid_: Subtitle, Local ASR Transcript
+
+**Local ASR Transcript**:
+A transcript generated locally from the selected Part's audio by the managed
+ASR runtime. It is distinct from every Bilibili-provided subtitle track.
+_Avoid_: Bilibili AI Subtitle, fallback subtitle
+
+**Subtitle Integrity**:
+Whether a selected subtitle is usable as transcript evidence. Mere presence of
+a subtitle track does not establish Subtitle Integrity.
+_Avoid_: Subtitle availability, transcript quality score
+
 **Transcript Range**:
 A requested time interval used to select overlapping Subtitle Segments from one Part.
 _Avoid_: Chapter range, clip

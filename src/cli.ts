@@ -269,11 +269,67 @@ export function doctorCommand(
   }
 }
 
+export interface SetupCredentialsOptions {
+  /** 非交互模式：绝不提示，也绝不从 stdin/argv 读取凭据值 */
+  nonInteractive?: boolean;
+  /** 允许列表内的 ASR 模型（仅非交互模式可用） */
+  asrModel?: AsrModelKey;
+}
+
 export async function setupCredentials(
   configure: () => Promise<boolean | void> = configureCredentials,
   runAsr: (modelKey: AsrModelKey) => Promise<{ success: boolean; error?: string }> = async () => ({ success: false, error: "installer not injected" }),
   askHiddenFn: (question: string) => Promise<string> = askHidden,
+  options: SetupCredentialsOptions = {},
 ) {
+  // --asr-model 未与 --non-interactive 同时使用：验证错误，绝不静默改变交互流程
+  if (options.asrModel !== undefined && !options.nonInteractive) {
+    console.error("Error: --asr-model requires --non-interactive.");
+    console.error(
+      "Run: bilibili-mcp setup --non-interactive --asr-model <tiny|base|small>",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  // 非交互模式：只接受 env/global config 来源的可加载凭据（内存中已有值不算，
+  // 进程内不可复现），绝不提示、也绝不从 stdin/argv 读取凭据值
+  if (options.nonInteractive) {
+    const source = credentialManager.getCredentialSource();
+    const creds = credentialManager.getCredentials();
+    if (source === "none" || creds === null) {
+      console.error(
+        "Error: setup --non-interactive requires loadable credentials from environment variables or the global config file.",
+      );
+      console.error(
+        "Set BILIBILI_SESSDATA, BILIBILI_BILI_JCT, and BILIBILI_DEDEUSERID, or run 'bilibili-mcp setup' once interactively.",
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(
+      "Credentials are loadable; non-interactive setup proceeds without prompting.",
+    );
+    if (options.asrModel === undefined) {
+      console.log("No --asr-model given; setup complete without ASR installation.");
+      return;
+    }
+    const result = await runAsr(options.asrModel);
+    if (result.success) {
+      console.log("✅ ASR 模型安装成功并通过 CPU INT8 验证。");
+      console.log(`   管理路径：~/.bilibili-mcp/asr/`);
+      console.log(
+        "   运行 bilibili-mcp doctor --json 可查看 ASR 状态。",
+      );
+    } else {
+      console.error(`❌ ASR 安装失败：${redactSecrets(result.error) ?? "未知错误"}`);
+      console.log("   已保留部分下载文件，重新运行 setup 可从断点续传。");
+      console.log("   当前 MCP 服务不受影响，字幕回退为 SUBTITLE_UNAVAILABLE。");
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   if (!process.stdin.isTTY) {
     console.error(
       "Error: setup requires an interactive terminal (TTY).",
@@ -391,12 +447,36 @@ export function createCli() {
 
   cli
     .command("setup")
-    .description("交互式配置 Bilibili 凭证和可选 ASR（需要终端）")
-    .action(async () =>
-      setupCredentials(configureCredentials, async (modelKey: AsrModelKey) =>
-        runAsrInstallation({ modelKey, onStage: (s) => console.log(`  ${s}`) }),
-      ),
-    );
+    .description("配置 Bilibili 凭证和可选 ASR（交互式需要终端，--non-interactive 供自动化使用）")
+    .option("--non-interactive", "非交互模式：使用已有的 env/global config 凭据，绝不提示")
+    .option("--asr-model <tiny|base|small>", "非交互模式下的 ASR 模型（需与 --non-interactive 同用）")
+    .action(async (cmdOptions: { nonInteractive?: boolean; asrModel?: string }) => {
+      const options: SetupCredentialsOptions = {
+        nonInteractive: Boolean(cmdOptions.nonInteractive),
+      };
+      if (cmdOptions.asrModel !== undefined) {
+        const key = cmdOptions.asrModel.trim().toLowerCase() as AsrModelKey;
+        let resolvedKey: AsrModelKey | undefined;
+        try {
+          resolvedKey = resolveModelSpec(key).key;
+        } catch {
+          resolvedKey = undefined;
+        }
+        if (resolvedKey === undefined) {
+          console.error("Error: --asr-model must be one of: tiny, base, small");
+          process.exitCode = 1;
+          return;
+        }
+        options.asrModel = resolvedKey;
+      }
+      await setupCredentials(
+        configureCredentials,
+        async (modelKey: AsrModelKey) =>
+          runAsrInstallation({ modelKey, onStage: (s) => console.log(`  ${s}`) }),
+        askHidden,
+        options,
+      );
+    });
 
   cli
     .command("version")
