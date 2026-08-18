@@ -195,7 +195,7 @@ Runtime 固定为 `faster-whisper==1.2.1`，模型存放在用户目录 `~/.bili
 - **收藏夹遍历是调用方驱动的**："全部收藏夹"指当前登录账号创建、且 Bilibili API 当前可见的收藏夹；每次调用最多读取一个 20 条上游页面，Agent 必须持续跟随 `next_cursor`。遍历是实时 best-effort，不是快照。
 - **不跨收藏夹去重**：同一 BVID 出现在多个收藏夹时保留各自的收藏夹上下文。
 - **跳过的条目不补漏**：无法安全规范化的视频条目会计入 `skipped_count`，不会为该页拉取替代条目。
-- **ASR 是显式回退，不是自动行为**：不开启 `fallback_to_asr` 或 `force_asr` 时行为与过去完全一致；开启后也只在确认无字幕（或显式 `force_asr`）时运行一次转录，且需要本机已有 ready 模型。
+- **ASR 是显式回退，不是自动行为**：每个选中的 `ai-*` 默认都会双读，完整性不通过时即使未开启 ASR 也会降级为简介或 `SUBTITLE_UNAVAILABLE`；本地转录只会在确认无字幕并显式开启 `fallback_to_asr`，或设置 `force_asr` 时运行一次，且需要本机已有 ready 模型。
 - **AI 字幕与人工字幕可区分**：选中 Bilibili AI 识别字幕（`ai-zh` 等任意 `ai-*` 语言）时 `data_source` 为 `ai_subtitle`；它是 Bilibili 的 AI 转录，可能不准确，不能当作人工校验过的引用。需要纯人工字幕时使用 `exclude_ai_subtitles: true`。
 - **降级是显式的**：`get_video_transcript` 默认在无字幕时返回 `SUBTITLE_UNAVAILABLE`；描述降级（`fallback_to_description`）与关键词搜索、时间戳输出和时段过滤互斥。
 - **无访问绕过**：不会绕过付费、会员、地区、私密、下架或其他 Bilibili 访问限制。
