@@ -1627,3 +1627,25 @@
 - Command: `npm run build`
 - Result: passed after all four slices.
 - Area: TypeScript compilation.
+
+## 2026-08-18 — v1.12.0 Publication And Public Artifact Verification
+
+- Release commit: `a31fafb1f27ddb52cbca0abb0111dc4a73664da3` on
+  `master`; annotated `v1.12.0` peels to the same commit.
+- Local candidate: Node `22.14.0` / npm `11.18.0` build passed; 41 files / 906
+  tests passed; 189-file package dry run passed; 97 production dependencies
+  audited with zero vulnerabilities; scoped secret and Smithery checks passed.
+- Independent release-verifier: PASS after correcting one stale Chinese README
+  limitation sentence; no remaining candidate blocker.
+- Trusted publication: GitHub Actions run `32107346010` completed successfully;
+  npm `latest=1.12.0` exposes integrity, shasum, and SLSA provenance.
+- Exact public artifact: isolated install verified 97 registry signatures and
+  10 attestations; under Node `22.14.0`, CLI reported `1.12.0`, MCP initialize
+  reported server `bilibili-mcp-server` `1.12.0` / protocol `2025-06-18`, and
+  tools/list returned exactly ten tools.
+- GitHub Release: bilingual `v1.12.0 - AI 字幕完整性 / AI Subtitle Integrity`
+  is public, latest, non-draft, and non-prerelease at
+  `https://github.com/XZXZZX-Ai/bilibili-mcp/releases/tag/v1.12.0`.
+- Boundary: Official MCP Registry publication was not authorized and remains at
+  `1.11.4`; the dirty primary worktree and future CI/CD roadmap note stayed out
+  of the immutable release tag.
