@@ -1572,6 +1572,711 @@
   this post-publication section belongs in a separate docs-only master update
   and does not move the tag.
 
+## 2026-08-11 Harness v2 Issue #29
+
+- Scope: isolated branch `codex/harness-v2-session-spine-29` at base
+  `44ac1e717001aed59c4a3b475cf82f074d11e567`; shared rules, thin adapters,
+  typed contract, portable Hook translators, shared CLI, bounded runtime
+  ledger, capability diagnostics, replay fixtures, and project-memory updates.
+  Product `src/`, package metadata, dependencies, workflows, and `dist/` are
+  outside the diff.
+- Commands: Harness unittest discovery; legacy Hook-safety and Stop-summary
+  suites; Python compileall; `npm run build`; full Vitest; contract validation;
+  `harness doctor`; `npm pack --dry-run --json`; scoped high-confidence secret
+  scan; `git diff --check`; clean Codex/Claude rule-discovery smokes; Codex Hook
+  process-boundary tests; real Claude failure lifecycle; two final read-only
+  reviews.
+- Result: Harness 26/26, legacy 6/6 and 8/8, build, 41 files / 862 Vitest tests,
+  and typed contract validation passed. Package dry run contains 185 files,
+  required `dist` entrypoints, and zero Harness/rules/project-memory paths.
+  Thirty-seven changed files have zero high-confidence secret findings. Both
+  final reviewers returned PASS with no P0-P3.
+- Manual-Skill evidence: the user explicitly invoked `$implement` for #29.
+  Host-bound reminder tests pass; the concurrency regression produces exactly
+  one `reminder-emitted`, 23 `already-reminded`, and one ledger row.
+- Worktree evidence: the dirty primary checkout remains at HEAD `ab4dd028…`
+  with status 68 / `a4bbfb6d…`, tracked diff `78271fe3…`, untracked 44 / manifest
+  `cf938aa3…`, and no `.harness`; all six values match the resume baseline.
+- Caveat: a trusted normal-config Codex smoke proved live lifecycle dispatch but
+  also triggered the primary worktree's legacy Hook in the linked worktree. Its
+  date-only queue mutation was restored from the captured baseline and all
+  primary-checkout fingerprints then matched exactly. `harness doctor` now
+  reports this overlap as `action-required` and never rewrites it.
+- Boundary: Issue #29 deliberately does not implement adapter execution loops,
+  accepted-evidence memory projection, Harness evolution, remote Issue changes,
+  push, PR, release, or publication. Full three-adapter pilot/release
+  conformance belongs to #36.
+
+## 2026-08-11 Harness v2 Issue #30
+
+- Scope: isolated branch `codex/harness-v2-codex-direct-30` at exact parent
+  `0ed8968bf94ea5b468e97665baac99e00c3b979e`; executable Codex Direct contract,
+  state machine, canonical writer lease, action guards, typed evidence,
+  fingerprint-bounded repair, Recovery Bundle, current-diff acceptance, and
+  protected automatic local commit. Product `src/`, package/dependency/workflow,
+  tracked Hooks, external configuration, and remote GitHub state are excluded.
+- TDD/result: disposable repositories cover mode/base freeze, missing native
+  `$implement`, concurrent transactions, linked-worktree rejection, guards,
+  typed results/skips/risks/criteria, stale-diff review, repair fingerprint/
+  limit, automatic adapter-failure recovery, malformed/symlink state, declared
+  maximum state, bounded reminders, lock identity/hardlinks, task-source aliases,
+  malformed sibling state, external/late Git filters, concurrent caller-index
+  injection, Hook/signing suppression, CRLF/symlink conversion, exact index/
+  snapshot and post-ref crash recovery, and one-commit/no-remote postconditions.
+  Red races for two writers, executed late filters, and an injected staged path
+  are green at the shared boundary. Harness discovery ran 92 tests in
+  388.397s with `OK (skipped=1)` for one platform-permission symlink case;
+  legacy Hook safety passes
+  6/6; legacy Stop summary passes 8/8; compileall and example contract
+  validation pass. Final controller/test SHA-256 values are
+  `d2c21c9d9fbc301d5531f0038b21ffdf2e88f8659fbee30da98f6467b031e2f0` /
+  `cf07d4bb4368ed58b9435413ee7506adc73ca370eb3295372a7e2bed36a52f59`.
+- Product/package: `npm run build` passes; full Vitest passes 41 files / 862
+  tests. `npm pack --dry-run --json` reports 185 files, 1,088,657 packed bytes,
+  1,718,671 unpacked bytes, all three required `dist` entrypoints, zero
+  forbidden Harness/rules/project-memory paths, and no emitted tarball.
+- Real pilot: ignored disposable repository `github-30-real-v6` advanced from
+  base `3b93fe44379bd827e9c687ec59a219268648984b` to the single accepted commit
+  `1a326b9760ca9b23bb2ba25f6c0704941713b5b5`, changing only
+  `harness-only.txt`. It has zero remotes and a clean tree; repeated acceptance
+  is `already-committed`. The accepted snapshot digest is
+  `e8837d20c4ee3cbb6a196e44e4883bcc877ef7a7af923c4183af106a7d48db0c`,
+  accepted index digest is
+  `4763b2413f680cf415e1cba34e59f0c31fc30cfe44cb43ad10221f352630bd34`;
+  all required evidence binds to diff digest
+  `df61b7d467d241cd08dae76212cee52b6d81c454c1929a09752268f10e3e99ee`.
+  Runtime contains no canonical path/raw command and the common Git directory
+  contains no Harness lease marker.
+- Security/text: 21 candidate files have zero high-confidence token/private-key
+  matches, UTF-8 decode errors, or BOMs; added diff lines contain zero U+FFFD.
+  Historical verification commands intentionally retain U+FFFD as a search
+  sentinel, so the whole-file count is not used as a corruption claim.
+  `git diff --check` passes. Automatic commit tests prove configured Hooks/
+  signing and late filters have no execution path, caller-staged content cannot
+  enter the accepted tree, and post-ref index installation failure recovers
+  without a second commit.
+- Diagnostics: `python -m harness doctor --json` remains the expected
+  `action-required`, with tracked/primary/user Codex Hook command counts 4/5/0.
+  No external configuration was rewritten and the normal-config smoke stayed
+  skipped with reason `doctor-action-required`.
+- Dirty-primary isolation: `C:\Users\ZX\bilibili-mcp` remains at HEAD
+  `ab4dd02854f0483fc7668c713523b4be77de6cc7`, status count 68 / hash
+  `34ef9dee55da26ef977b54e795477f493e18dded`, tracked-diff hash
+  `c9a4daa32c34115d3d443a52afa81301416b6082`, untracked count 44 / hash
+  `2ec8b5fa42ed2cf4d684a5c7b9156998756abecb`, and staged count 0. All match
+  the #30 pre-write baseline.
+- Acceptance/review boundary: Spec review passed its final code axis; the final
+  Standards and adversarial security axes independently returned PASS with no
+  P0-P2 at the frozen controller/test hashes. A separate final risk-weighted
+  acceptance review also returned PASS with no executable P0-P2. The focused
+  commit containing this record exists only after the exact staged scope passes
+  reinspection. Before that commit, these results describe the accepted
+  candidate. No push, PR,
+  Issue close, tag, release, publish, credential/SSH action, history rewrite,
+  or broad deletion is authorized or performed.
+
+## 2026-08-12 Harness v2 Issue #31
+
+- Scope: isolated branch `codex/harness-v2-claude-direct-31` at exact parent
+  `cbd31b952aa9f820005e60852bcd2d4db886a31c`; shared Claude Direct entrypoint,
+  adapter-specific typed schemas/ownership, cross-adapter mode fencing,
+  source-bound writer collision checks, native manual-Skill gate, shared guards,
+  finite repair/Recovery Bundle, exact automatic local commit, executable
+  conformance fixture, and synchronized project memory. Product `src/`, package
+  metadata/dependencies/workflows, external configuration, and remote GitHub
+  state are excluded.
+- TDD/result: initial failures proved the missing public Claude command, a
+  cross-adapter control seam, malformed `/$implement` reminder, mismatched
+  reminder rollback identity, and static-only conformance. Review then added a
+  credential-free child-process environment regression. Final Harness discovery
+  ran 105 tests in 339.095 seconds with `OK (skipped=1)`; focused Claude module
+  passed 11/11 after the repair. Legacy Hook safety passes 6/6, Stop summary
+  passes 8/8, compileall and example contract validation pass.
+- Product/package: exact-lockfile install enabled the initially dependency-empty
+  worktree; build passes and full Vitest passes 41 files / 862 tests. Production
+  audit reports zero vulnerabilities. Package dry run reports 185 files,
+  1,088,657 packed bytes, 1,718,671 unpacked bytes, required dist entrypoints,
+  zero forbidden Harness/rules/adapter/project-memory paths, and no tarball.
+- Real Claude pilot: real Claude Code 2.1.212 attempt 2 completed the public
+  Claude Direct loop in ignored zero-remote repository
+  `github-31-claude-direct-real-v1`, advancing seed `c4844708…` to the single
+  accepted commit `d4875bfe…`. It changed only `harness-only.txt`, finished
+  clean with a released Claude lease, recorded two passing evidence records and
+  one passing criterion, used zero repairs, and emitted no Recovery Bundle.
+  Attempt 1 failed before Harness start on malformed strict MCP configuration
+  and created no run or diff.
+- Security/text: all 19 candidate files pass strict UTF-8/BOM and added-U+FFFD
+  checks, the scoped high-confidence added-content scan has zero findings, and
+  `git diff --check` passes. New subprocess tests allowlist only platform/process
+  location keys, disable global/system Git config and credential prompts, and
+  prove synthetic Bilibili/npm/GitHub credential keys cannot enter children.
+- Diagnostics/isolation: `harness doctor` remains the expected
+  `action-required`, with tracked/primary/user Codex Hook counts 4/5/0 and
+  tracked/local Claude counts 5/0. App-created untracked `.codex/config.toml`
+  remains unchanged and outside the commit. Dirty primary checkout
+  `C:\Users\ZX\bilibili-mcp` still matches #30 exactly: HEAD `ab4dd028…`,
+  status 68 / `34ef9dee…`, tracked diff `c9a4daa3…`, untracked 44 /
+  `2ec8b5fa…`, and staged 0.
+- Review/acceptance: fixed-base Standards and Spec follow-ups and the final
+  independent risk reconciliation return PASS with no remaining P0-P3. Frozen
+  controller/test SHA-256 values are `a40b65da…` / `595bd286…`. The single
+  focused commit containing this record exists only after exact staged-scope
+  reinspection; before then these results describe the accepted candidate. No
+  push, PR, Issue close, tag, release, publish, credential/SSH action, history
+  rewrite, or broad deletion is authorized or performed.
+
+## 2026-08-12 Issue #32 Paseo Collaboration Verification
+
+- Command: `PATH="/d/Git/cmd:$PATH" python -m pytest harness/tests/test_paseo_collaboration.py -v`
+- Result: 36/36 passed in 115.11s (29 function tests + 7 CLI tracer tests).
+- Area: Paseo collaboration adapter focused suite.
+
+- Command: `python -m compileall -q harness .codex/scripts`
+- Result: Passed.
+- Area: Python byte-compilation of harness and hook scripts.
+
+- Command: `git diff --check`
+- Result: Passed (CRLF warnings only, expected on Windows).
+- Area: Whitespace/conflict validation.
+
+- Command: `git diff --stat`
+- Result: 3 tracked files, +289/-14. New untracked: `harness/paseo_collaboration.py` (1479 lines), `harness/tests/test_paseo_collaboration.py` (1705 lines).
+- Area: Diff scope.
+
+- Command: combined `test_paseo_collaboration.py + test_codex_direct.py + test_contracts.py + test_cli_and_adapters.py`
+- Result: **Blocked/hung**. The combined pytest process (PID 45224) hung in a Git child process and was terminated by Codex without touching the Paseo daemon or agent. Recorded as `blocked/hung`, pending Codex verification. The 36/36 focused collaboration suite, compileall, and diff-check remain valid writer evidence.
+- Area: Combined shared-controller acceptance gates.
+
+- Dead-code removal: `_validate_collaboration_contract` (~66 lines) removed from `paseo_collaboration.py`. This function duplicated shared `validate_task_contract()` checks. 36/36 tests continued to pass after removal.
+- Area: Slice 8 deduplication.
+
+- Remaining risks:
+  - Combined suite hang requires independent Codex investigation and rerun.
+  - Real Paseo-managed Claude pilot is Codex-owned and has not been launched.
+  - Full TypeScript/Vitest/pack suite not run (no product changes; Codex-owned).
+  - All changes remain uncommitted for Codex acceptance review.
+
+## 2026-08-12 Round 4 same-agent repair (scope-compressed closure)
+
+- Command: `python -m py_compile harness/codex_direct.py harness/paseo_collaboration.py harness/cli.py`
+- Result: Passed.
+- Area: Round 4 production changes (unlocked-core extraction, acceptance lock,
+  recovery bundle collaboration section, bounded subprocess/file reads).
+
+- Command: `PATH=/d/Git/cmd:$PATH python -m pytest harness/tests/test_paseo_collaboration.py -v`
+- Result: 52/52 passed in 251.37s (function tests + CLI tracer tests).
+- Area: Full focused Paseo collaboration suite after Round 4 changes.
+
+- Command: focused tracer selection (`-k "slice8_accept or slice35_repair or slice4_at_most"`)
+- Result: 3/3 passed in 18.57s (acceptance pending-dispatch block, repair
+  prepared-intent block, at-most-once dispatch).
+- Area: Strongest new dispatch/repair/acceptance regression proofs.
+
+- Round 4 production changes: extracted `_accept_codex_direct_unlocked` shared
+  seam (acceptance now holds `run.lock` in `collaboration_accept` and calls the
+  unlocked core — no TOCTOU precheck); `_enter_recovery_unlocked` emits a
+  bounded secret-free collaboration evidence section (last-persisted agent
+  identity/state, frozen bridge handoff digest, bridge + sidecar digests) for
+  `codex-paseo-claude` runs only; all four bootstrap failure sites route
+  through the shared recovery path so `recovery-required` always has a
+  durable bundle; raw failure text is never persisted in the run record
+  (hashed category/fingerprint only); `_run_paseo_cli` replaced
+  post-allocation capture with concurrent bounded drain + kill on overflow/
+  timeout and metadata-only errors; handoff/review/preferences reads use
+  `read_bounded_bytes`.
+- Area: Round 4 controller scope compression (Slices 3+5, 4+8, recovery).
+
+- Second controller audit fixes: removed `run["error"]` persistence in
+  `_bootstrap_recovery` (run shape has no error key; the reload in
+  `_enter_recovery_unlocked` rejected it, so inspect-failure bootstrap
+  exited 2 instead of 6); collaboration evidence now binds the frozen
+  `bridge_handoff_digest` and validates its strict 64-hex shape; evidence
+  identity is documented as last-persisted run-record state, not live.
+
+- Command: `PATH=/d/Git/cmd:$PATH python -m pytest harness/tests/test_paseo_collaboration.py -v -k "test_slice3_inspect_fail_closed_on_missing_field or test_recovery_bundle_roundtrip_status"`
+- Result: 2/2 passed in 15.72s (exit 6 without raw error persistence; full
+  collaboration evidence round-trip through the public status path).
+- Area: Second-audit targeted regression proof.
+
+- Command: `python -m py_compile harness/codex_direct.py harness/paseo_collaboration.py harness/tests/test_paseo_collaboration.py`
+- Result: Passed (re-run after second-audit fixes).
+
+- Remaining risks:
+  - Combined shared-controller suite not rerun; pending Codex verification.
+  - The 52/52 focused run predates the second-audit fixes; only the two
+    targeted tests were rerun after them (per controller instruction).
+  - Real Paseo pilot and full release gates are Codex-owned and not started.
+- All Round 4 changes remain uncommitted for Codex acceptance review.
+
+## 2026-08-13 Issue #32 final controller acceptance
+
+- Repair attempt 6: same original Paseo writer closed six independently
+  reviewed root findings. Six new focused proofs passed 6/6, `py_compile`
+  passed, and the then-full collaboration module passed 71/71 in 274.79s.
+- Repair attempt 7: the user explicitly changed the model freeze. The idle
+  original writer released its logical lease before replacement agent
+  `0bdef442-14db-4f35-9e0d-c1516bb38166` became the sole writer. Live inspect
+  proved `claude/deepseek-v4-pro[1m]`, thinking `max`,
+  `bypassPermissions`, and canonical cwd. The public-CLI malformed-contract
+  proof passed 1/1 in 2.27s, 1/1 in 2.00s on the max-thinking verification turn,
+  and 1/1 in 2.31s under independent Codex rerun. Both agents ended idle; the
+  replacement lease was released to Codex acceptance.
+- Independent acceptance and Standards re-reviews: PASS with no remaining
+  P0–P2 finding. The analogous Direct-start expression is unchanged from the
+  accepted #31 base and is recorded as a nonblocking follow-up, not expanded
+  into Issue #32.
+- Final staged review then found one actor-authority gap: an accepted Claude
+  caller could pass `local-commit` through the actor-agnostic shared guard. The
+  user authorized repair attempt 8 on the same DeepSeek V4 Pro writer at
+  thinking `max`. RED reproduced `AssertionError: 0 == 0` because Claude was
+  allowed. The minimum early denial made the new accepted-lifecycle proof PASS
+  1/1 in 17.19s and all seven guard tests PASS in 31.84s; `py_compile` passed.
+  Codex independently reran the proof 1/1 in 15.377s. The two reviewers that
+  found the gap independently reran/reviewed the repair and both returned PASS
+  with no P0–P2 blocker. The writer ended idle and released its lease.
+- Command: `python -m unittest discover -s harness/tests -p "test_*.py"`
+- Result: 177 tests ran in 845.622s; OK (skipped=1). This full-suite snapshot
+  includes the first 72 collaboration tests. The subsequent attempt-8 delta is
+  the isolated actor guard plus one focused regression described above; it was
+  intentionally not followed by another broad suite.
+- Command: `python -m compileall -q harness .codex/scripts`
+- Result: PASS.
+- Command: `python .codex/scripts/test_hook_safety.py`
+- Result: 6/6 PASS.
+- Command: `python .codex/scripts/test_stop_summary.py`
+- Result: 8/8 PASS.
+- Node/package evidence reuse: `git diff --quiet -- package.json
+  package-lock.json tsconfig.json src tests .github` returned zero, so the
+  already-passing build, 41 files / 862 Vitest tests, and 185-file pack remain
+  current. No product/package input changed.
+- Real pilot reconciliation: the zero-remote pilot predates attempts 6–7 and
+  is retained as real integration evidence for Paseo/provider resolution,
+  native `/implement`, bounded write/report, one accepted commit, and zero
+  remotes. Later changes are negative-path/input/metadata/guard hardening proven
+  by current public-process tests and the final suite; no hash-identical pilot
+  claim is made.
+- Diagnostics/isolation: `doctor` remains the expected `action-required`
+  legacy Hook-overlap state with no config rewrite. Base/parent/branch remain
+  `5e9de4b…` / `cbd31b9…` /
+  `codex/harness-v2-paseo-claude-32`. The dirty primary remains HEAD
+  `ab4dd028…`, status count 68, joined-line digest `a4bbfb6d…f8423`, staged
+  0. No daemon restart, push, PR, Issue close, tag, release, publish, SSH,
+  credential action, or history rewrite occurred.
+
+## 2026-08-13 Final review closure (repair attempt 4)
+
+Six release blockers fixed; one regression proof per root cause (new tests
+`test_fix1`–`test_fix5`):
+
+1. Preflight accepts Paseo 0.2.5 `connectedDaemon: reachable`; unreachable
+   still rejected (`test_fix1_preflight_accepts_reachable_daemon`).
+2. Dispatch/repair prompt files are ephemeral (removed in `finally` after
+   send); report nested objects (commands/skips/risks/evidence) allow exact
+   key sets only and persist normalized projections, never the caller's raw
+   object (`test_fix2_report_rejects_risk_extra_keys`). The fake Paseo now
+   captures the prompt at send time; `test_slice2_prompt_file_format` proves
+   format from the send event and that no prompt file survives.
+3. Repair delivery evidence is attempt-keyed (`repair-pending-{n}` /
+   `repair-dispatch-{n}`); a completed attempt never blocks the next,
+   a prepared current-attempt intent blocks replay, and acceptance blocks any
+   pending-N lacking dispatch-N (`test_fix3_two_sequential_repairs_attempt_keyed`).
+   Recovery folds the attempts into two logical sidecar digests
+   (`repair-pending-attempts` / `repair-dispatch-attempts`) over a canonical
+   sorted name→digest map.
+4. Acceptance binds launch/report/task/agent IDs and launch/bridge/handoff
+   digests to the frozen run record under the task lock; the expected agent
+   never comes from mutable launch.json alone
+   (`test_fix4_accept_rejects_tampered_launch_agent_id`). The launch digest
+   uses one shared serialization seam (`_launch_digest`).
+5. Post-launch malformed (list) inspect output routes to the shared Recovery
+   Bundle path with the candidate agent ID preserved; no AttributeError, no
+   raw error persisted (`test_fix5_bootstrap_inspect_list_enters_recovery`).
+   The two inspect CLI tracers now assert the no-raw-error contract.
+
+- Command: `python -m py_compile harness/paseo_collaboration.py harness/codex_direct.py harness/tests/test_paseo_collaboration.py`
+- Result: Passed.
+- Command: five fix proofs + three updated tracers (targeted): 8/8 passed.
+- Command: `PATH=/d/Git/cmd:$PATH python -m pytest harness/tests/test_paseo_collaboration.py -v`
+- Result: 58/58 passed in 186.35s (function tests + CLI tracer tests).
+- Command: `git diff --check`
+- Result: Passed after removing the stray blank line at EOF in
+  `docs/agent-memory/verification-log.md`.
+- Docs: codemap.md, active-work.md, project-facts.md, harness-eval.md, and
+  harness-security.md test/line counts updated to the final-review truth.
+
+- Remaining risks:
+  - Combined shared-controller suite not rerun; pending Codex verification.
+  - npm gates, `npm pack --dry-run`, and the real Paseo pilot remain
+    Codex-owned and were not run.
+  - All changes remain uncommitted for Codex acceptance review.
+
+## 2026-08-13 Issue #33 Typed Memory Verification
+
+- Baseline: clean independent worktree at exact accepted #32 commit
+  `9cbb8de64ffedefd682517e203841dd137b75662`; its direct parent is accepted #31
+  commit `5e9de4bace35a2ca4b9c83b5a0d81ebb627df6fb`. Branch is
+  `codex/harness-v2-typed-memory-33`.
+- Live scope: GitHub #33 is open with title `[Harness v2] Automatic typed
+  memory from accepted evidence`; live dependency metadata still names open
+  #30, while the accepted implementation chain through #32 satisfies the
+  ticket's specified commit baseline. No live Issue or remote state changed.
+- Doctor: `action-required` only for the known primary legacy Codex Hook
+  overlap. No primary/user Hook, Skill, Agent, MCP, or configuration rewrite
+  was performed.
+- TDD: focused typed-memory tests progressed from missing-module/schema failures
+  to 33/33 pass in 69.134s. Coverage includes record shape, replay/no-change,
+  semantic digest binding, supersession and equal-time conflict, correction and
+  independent-task lesson thresholds, weak evidence, secret/raw payload
+  rejection, six record types, invalid dates/writers, tamper checks, bounded
+  startup, deterministic capability builds, and the real memory-only pilot.
+- Shared Harness modules: Codex Direct 61/61 in 427.367s (one platform-
+  permission skip), Claude Direct 12/12 in 84.850s, Paseo collaboration 73/73 in
+  263.526s, and CLI/contracts/events core 32/32. Final unified discovery passed
+  211 tests in 873.324s with one skip.
+- Legacy compatibility: Hook safety 6/6 and Stop-summary 8/8 passed. Python
+  compileall passed.
+- Product isolation: exact-lockfile `npm ci` was required because this fresh
+  worktree had no dependencies; it changed no package metadata. TypeScript
+  build passed and full Vitest passed 41 files / 862 tests in 11.61s.
+- Package/security: production audit reports zero vulnerabilities across 97
+  production dependencies. Dry-run pack is version 1.11.4 with 185 files,
+  1,088,657 packed bytes, and zero Harness, `.harness`, agent-memory, RULES,
+  AGENTS, or CLAUDE entries. `package.json` and `package-lock.json` are
+  unchanged.
+- Real process-boundary pilot: disposable zero-remote source task commit
+  `62caea4d73e0f88d81803ecd6abc70aae9faed54`, followed by exactly one
+  memory-only commit `a3e6fcabdd36849f46a738592a24d815b64d337b`. Its two paths were exactly the
+  typed store and current projection; replay was no-change, audit line count was
+  two, final status was clean, and no remote existed.
+- Independent risk review: PASS with no remaining P0-P2. Review-driven red/green
+  repairs cover A→B→A facts, different-time lesson support, secret/raw key and
+  command variants, exact Direct memory-only writer locking, source/target
+  identity, projection/store/HEAD binding, node bounds, future validity, and
+  isolated pilot environment.
+- Frozen candidate gates: 23 paths, all under `harness/` or
+  `docs/agent-memory/`; strict UTF-8 passed; the index and product/package diffs
+  are empty; `git diff --check` and tracked/untracked secret scans pass.
+- Final Doctor remains the known `action-required` Hook-overlap result with
+  tracked/primary/user Codex command counts 4/5/0. Primary HEAD, tracked diff,
+  empty staged diff, untracked manifest, status digest, and count 44 exactly
+  match the recorded baseline.
+
+## 2026-08-13 — Harness v2 Issue #34 governed Skill and Agent evolution
+
+- Baseline: clean independent worktree, branch
+  `codex/harness-v2-skill-agent-evolution-34`, exact #33 HEAD
+  `1cd12c8a6edab272bd16ad5ecb8ba2ae4bd90cf8`, direct parent #32
+  `9cbb8de64ffedefd682517e203841dd137b75662`, and pushed #33 remote ref exact.
+- Live scope: GitHub #34 remains open, parent #28, blocked by #33, and titled
+  `[Harness v2] Governed Skill and Agent evolution`. No remote state changed.
+- Mode: the user explicitly selected `codex-direct`; the typed contract froze
+  the base/branch/owned paths and Codex acquired the only writer lease. No
+  Paseo/Claude adapter was launched or used as a writer.
+- Doctor: isolated-home exact command returned expected `action-required` with
+  tracked/primary/user Codex Hook counts 4/5/0. The isolated capability lists
+  were intentionally empty and were not used as catalog evidence; no external
+  configuration was rewritten.
+- TDD: focused evolution suite progressed from missing CLI/module behavior to
+  final 10/10 pass in 481.432s. Coverage includes accepted-gap provenance, independent
+  worktree/writer, exact ignored-state validation, protected paths, pinned
+  candidate contract, Search/Adapt/Build ordering, idempotent authorization,
+  canonical host packages, manual/model invocation, bounded read-only agents,
+  drift/self-approval denial, rollback, reports, zero remotes, and exact-one
+  local commits. Typed-memory regressions pass 33/33 in 62.953s.
+- Search evidence: installed `find-skills` route was inspected without running
+  its unpinned `npx` command; installed `vitest` SHA-256 is `3dcdc45f…6375`.
+  Live `antfu/skills` is MIT at verified commit
+  `a74f281a27dadc02397bc1a174b0f2c97531b6ae`; pinned Skill SHA-256 is
+  `2da9b15c…8968`, LICENSE SHA-256 `2a596f69…1cb2`. Mismatch/unknown installed
+  provenance caused deferred/no-install.
+- Current-diff focused evidence: Evolution 10/10 in 481.432s; typed memory
+  33/33 in 71.401s; legacy Hook 6/6; legacy Stop 8/8; Python compileall,
+  `py_compile`, Ruff, and `git diff --check` pass.
+- Product/package: TypeScript build passes in 2.619s; Vitest passes 41 files /
+  862 tests in 9.986s; `npm pack --dry-run --json --ignore-scripts` reports
+  185 files and zero forbidden Harness/internal paths. The production audit
+  attempt reached no advisory result because TLS failed before the npm registry
+  request; package/dependency inputs are unchanged from accepted #33.
+- Boundary checks: all 16 intended paths are strict UTF-8; added diff lines have
+  zero high-confidence secret-pattern hits. Product/package inputs, shared
+  controllers, constitutional files, and staged index have zero diff. Primary
+  HEAD/status/tracked/staged/untracked fingerprints match the #33 frozen values.
+- Independent risk review passes the accepted-gap receipt, forged Adapt state,
+  and terminal writer-lease audit under the existing repository-process trust
+  model. One monolithic Harness discovery process exceeded its 30-minute ceiling
+  without failure output; it was not rerun. Current-diff shards all pass:
+  Direct/Claude 73 (one skip), Paseo 73, CLI/contracts/events 32, typed memory
+  33, and Evolution 10, for 221 executed tests / one skip with no failure.
+- Final release review found one actionable terminal seam: promotion-ready
+  revalidation failure previously stopped without restoring known candidate
+  output. The shared acceptance gate now rolls that state back to a rejected
+  report while unknown/drifted files still enter Recovery. Its focused
+  public-CLI rollback/commit proof passes 1/1 in 146.898s; the reviewer closed
+  the finding after the rejected-reason invariant was added.
+
+## 2026-08-13 — Harness v2 Issue #35 MCP/CLI/Hook/Loop evolution
+
+- Baseline: independent clean worktree on branch
+  `codex/harness-v2-mcp-cli-hook-loop-evolution-35`, exact accepted #34 HEAD
+  `493393c9ef4941e5ff8dc7b66acaa6cd9d06d7ce`. The dirty primary checkout stays
+  isolated. The user selected `codex-direct`; one Codex writer lease is active
+  and no Paseo/Claude writer was launched.
+- Live source audit: Issue #35 remains open with parent #28 and blocker #34.
+  Official npm reports `@modelcontextprotocol/inspector@2.2.0` MIT metadata,
+  integrity `sha512-IUyZ…RxA==`, GitHub release/tag commit
+  `672f9f41c548487a468b9e7007d2f9de14da5a69`, Node `>=22.19.0`, and a
+  `postinstall` plus browser/listener surface, so it is not eligible for silent
+  auto-adoption. Official `@modelcontextprotocol/conformance@0.1.16` is MIT and
+  executable but has runtime dependencies/network behavior, so it is Search
+  evidence rather than a repository-local no-effect candidate.
+- TDD: safe byte-canonical CLI Adapt, dangerous MCP authorization, four surface
+  Build/promotion/three-adapter/commit, Hook/Loop policy, public Loop decisions,
+  and authorization canonical-order tests progressed red to green. The legacy
+  executable candidate remains authorization-required.
+- Focused current evidence: Evolution 13/13 pass in 853.936s; Hook events 9/9
+  pass in 2.422s; CLI/adapters 16/16 pass in 10.655s; the four-kind surface
+  zero-remote pilot passes in 289.367s. Python `py_compile`, Black, and
+  `git diff --check` pass at this checkpoint.
+- Final shared Harness shards, Hook/Stop regressions, product build/Vitest,
+  package-content checks, secret/diff checks, independent review, Direct
+  evidence binding, acceptance, and exact local commit are recorded below in
+  the final convergence update.
+
+### 2026-08-14 — Issue #35 independent-review repair checkpoint
+
+- Review closure: v1 surface Search fails closed; four candidate-bound channel
+  results are derived from bounded fetched responses; CLI/MCP use actual shared
+  Harness operations; Loop decisions call the public step seam; Hook runtime
+  points to the public event handler and smoke replays/reads/restores its actual
+  deployment/config/canary/ledger state.
+- Focused evidence: forged channel-result and response-digest regressions pass
+  2/2 in 50.570s; the complete MCP/CLI/Hook/Loop disposable lifecycle across
+  all three adapter mappings, including local acceptance commits, passes 1/1 in
+  189.195s. Black, Ruff, `py_compile`, and strict diff checks pass after repair.
+- Evidence boundary: no external Claude/Paseo process was launched under the
+  frozen `codex-direct` mode; no candidate code, installer, daemon, port,
+  credential, product source, tracked Hook registration, or remote state was
+  used or changed.
+- Final reviewer edge: package-manager evidence now separates capability ID from
+  scoped npm name/version and handles an exact bound urllib HTTPError 404 as
+  `no-match`; the scoped safe auto-Adapt regression passes in 36.959s. Other npm
+  status classes remain fail-closed.
+
+### 2026-08-14 — Issue #35 final current-diff verification
+
+- Harness shards: Evolution 17/17 in 677.525s; Direct/Claude Direct 73 in
+  448.405s (one platform-permission skip); Paseo 73/73 in 240.077s; typed
+  memory/contracts/events/CLI core 67/67 in 94.093s. Hook safety 6/6 and Stop
+  summary 8/8 pass.
+- Product/package: exact-lock isolated dependencies install 466 packages with
+  `@modelcontextprotocol/sdk@1.30.0`; build passes; Vitest passes 41 files/862
+  tests in 7.54s; dry-run npm pack contains 185 files and zero Harness paths.
+  Junction, temporary dependencies, and `dist` cleanup all verify absent.
+- Static/boundary: Black, Ruff, `py_compile`, `git diff --check`, and strict
+  UTF-8 over all 16 intended paths pass. Independent risk re-review closes all
+  findings and reports no remaining live #35 blocker.
+
+## 2026-08-14 — Harness v2 Issue #36 checkpoint
+
+- Baseline/mode: clean independent worktree froze exact #35 HEAD
+  `8de058e772e97a6ab8d16d65386081db76953320` on branch
+  `codex/harness-v2-three-adapter-conformance-36`; `codex-direct` is frozen and
+  a repeated start is rejected while its writer lease is active.
+- TDD: missing three-adapter fixture, missing per-pilot/migration matrix,
+  missing explicit event provenance/sensitivity/digest/terminal state, and an
+  incorrect Paseo public-command label each failed before the shared fix.
+- Focused current-diff checks: contract/events/Direct fixture 21/21 in 22.343s;
+  writer/authority/recovery/exact-commit 7/7 in 33.230s; typed memory 3/3 in
+  21.834s; three-adapter Evolution surface 1/1 in 170.520s;
+  promotion/rejection/rollback 1/1 in 98.519s; evaluator/projection-drift
+  rollback 1/1 in 41.808s.
+- Real Direct pilots: Codex accepted commit `0cadc18c...`; Claude safe-mode
+  implementation and acceptance produced `a81fef21...`. Each pilot is one
+  commit above its seed, changes only `pilot.txt`, is clean after acceptance,
+  has no remote, rejects a second start, emits one deduplicated missing-manual-
+  Skill reminder with zero writes, and records attributed redacted active/stop
+  events. Intentional Claude adapter failure entered `recovery-required` with
+  `adapter_switch_policy=stop-and-report` and no changed paths.
+- Paseo pilot: after explicit user authority, one `paseo start` launched 0.3.1.
+  Provider initialization moved from `loading` to a green preflight for frozen
+  `claude/deepseek-v4-flash`, with no restart or fallback. Agent
+  `f4a4fec4-fb93-4a84-8c8c-556aeb08488c` received the digest-bound handoff,
+  changed only `pilot.txt`, stopped idle, and returned a validated report.
+  Codex review accepted commit `27fba0dce64fb591a30f0651979940089c667fb0`:
+  exactly one commit above base, clean, released lease, and no remote.
+- Inconclusive evidence: an initial parallel parent batch timed out at 304s and
+  returned no child results, so it is not counted as green. Its required short
+  shards were rerun independently; long Evolution cases were run separately.
+- Independent risk review: the shared fixture now drives the public Paseo
+  lifecycle, and pilot evidence is no longer a self-certified summary. Native
+  controller/Recovery state passes production validation, Git objects and
+  event digests are recomputed, package contents are compared with a live dry
+  run, durable files are rehashed, and clean-room bytes are compared directly
+  with exact #35 Git objects. The same reviewer closed both High findings;
+  the three pilot artifacts now carry that production/Git/ledger evidence.
+  Migration/index verification passes against the independent artifacts,
+  current durable-file hashes, live package dry run, and exact clean-room Git
+  objects.
+- Product/package checkpoint: after worktree-local `npm ci --ignore-scripts`,
+  build passed, Vitest passed 41 files / 862 tests in 6.82s, and `npm pack
+  --dry-run --json --ignore-scripts` returned 185 files with zero forbidden
+  Harness/runtime/Recovery/memory paths. A production-only audit was
+  inconclusive on a registry TLS disconnect and was not retried or reported as
+  green; the product and lockfile remain unchanged from accepted #35.
+- Final risk-weighted Harness shard passed 26/26 in 75.307s across the shared
+  contracts/events, Direct conformance/authority/exact-commit/Recovery, and
+  Paseo shared lifecycle/duplicate-dispatch/Recovery cases. Valid earlier typed
+  memory and governed-Evolution receipts were reused rather than rerunning the
+  long cases without an implementation change.
+- Final byte/scope gates: formatting-only churn in the two historical lifecycle
+  test files was removed, leaving only the shared-matrix deltas. The two
+  affected lifecycle tests and migration evidence test pass 3/3. Strict UTF-8
+  covers 22 paths; focused Black, Python compilation, git diff --check, and the
+  high-confidence secret-value scan pass. The dirty primary fingerprint remains
+  exact: 68 status rows, SHA-256
+  a4bbfb6dc821d203291ec664843d23f818db293aad8af1975f1190f33e5f8423,
+  zero staged paths, and 44 untracked paths.
+- Independent final risk review: PASS after correcting this durable-state
+  wording. Both earlier High findings remain closed; no reproducible
+  acceptance, security, or data-integrity defect remains.
+- Acceptance contract recovery: the first main run failed closed before
+  verifying because broad owned path `harness/` overlapped immutable
+  governed-Evolution roots. It produced a typed Recovery Bundle with
+  fingerprint
+  `ea11fa7123898b0e3e8d5a231daa408abc55529fa2814126dd810349f046b940`.
+  The same Codex writer used a reversible local stash to freeze a recovery
+  continuation on the exact #35 base with the same mode/worktree and 23 exact
+  Issue-owned paths, then restored all 23 changes. No kernel/evaluator/holdout
+  edit, adapter switch, second implementation actor, commit, or remote effect
+  occurred.
+
+## 2026-08-14 — PR #39 automated-review repair pre-acceptance
+
+- Baseline: branch `codex/harness-v2-three-adapter-conformance-36` was clean at
+  pushed PR HEAD `2fd2b9b0141d536534c7e565aad9172bac72d9b5`; the task-local mode was newly
+  frozen as `codex-direct` before implementation writes.
+- TDD red evidence: canonical LF hashing produced four expected digest failures
+  for the three pilot artifacts and migration artifact; WSL contract discovery
+  produced three assertion failures and six errors because the Windows literal
+  was not POSIX-absolute; zero-candidate Build was rejected as an invalid
+  selection; and an empty candidate list paired with a `candidate` source result
+  was initially accepted before the all-`no-match` guard was added.
+- Focused green evidence: pilot migration digest test 1/1; Windows contract tests
+  9/9; WSL contract tests 9/9; zero-candidate Search→Build→Evaluate→Accept 1/1
+  in 58.951s; five candidate Search/Adapt/authorization/version-gate tests 5/5
+  in 118.430s; and legacy Build reject/rollback/promote/accept 1/1 in 130.859s.
+- A 27-test contract/CLI batch intentionally stopped at the old migration
+  clean-room assertion after `harness/evolution.py` changed. It is not counted
+  green; the migration model now separates exact #35 paths from the reviewed
+  PR repair and normalizes durable-memory bytes before hashing.
+- Governance recovery: the first exact-path contract omitted
+  `harness/fixtures/pilot-artifacts/migration.json`. It entered a typed Recovery
+  Bundle with five changed paths and no staged files; a reversible stash carried
+  the identical diff into the same-mode, same-base recovery continuation with
+  the migration artifact explicitly owned.
+
+## 2026-08-14 — PR #39 automated-review round-2 pre-acceptance
+
+- Baseline/mode: the isolated worktree was clean at pushed PR HEAD
+  `58c23136d808e4be81a3c63ebffdcf36af8ee715`; `codex-direct` was frozen and
+  acquired the only writer lease before the first test edit.
+- Red evidence: empty-HOME Paseo preflight failed 1/1; clean-checkout migration
+  package comparison failed 1/1; WSL CRLF preservation failed 1/1; canonical
+  source identity and a 35-message MCP session failed 2/2.
+- Focused green evidence: source/MCP plus five empty-HOME Paseo cases passed
+  7/7 in 10.188s; WSL CRLF passed 1/1 in 1.743s; package migration acceptance
+  with `dist/` moved aside passed 1/1 in 2.457s; MCP lifetime plus per-message
+  bound passed 2/2 in 0.477s.
+- Final risk-weighted verification: contracts, CLI/adapters, writer aliases,
+  malformed sibling state, and Windows CRLF passed 34/34 in 34.121s. The
+  Paseo function class passed 51/51 with empty HOME in 129.414s.
+- Static boundary: `py_compile`, `git diff --check`, and focused Black for
+  `harness/cli.py` pass. Installed Black 24.10.0 would reformat historical test
+  style, so that churn was removed and no full-file Black result is claimed.
+- Independent risk review: PASS with no reproducible P0-P3. Reviewer reruns
+  passed source/MCP/CRLF 4/4, clean-checkout migration/package 1/1, empty-HOME
+  Paseo 51/51 in 130.825s, `git diff --check`, and migration/repair/durable-
+  memory digest recomputation.
+
+## 2026-08-15 — PR #39 automated-review round-3 pre-acceptance
+
+- Baseline/mode: the isolated worktree was clean at pushed PR HEAD
+  `80e893b1d0e0a8078cb3c7a0dd8f91f2e11e9fb6`; the existing `codex-direct`
+  mode was retained and the round-3 contract acquired the only writer lease.
+  The dirty primary checkout remained isolated with 58 status rows.
+- Red evidence: concurrent growth bypassed the stale JSONL size check; a
+  synthetic second-file failure left the new store beside the old projection;
+  and a synthetic process stop left no recoverable transaction marker. The
+  focused loop failed 3/4 with the symlink case skipped only because Windows
+  denied symlink creation.
+- Focused green evidence: the same four tests pass on Windows with one symlink
+  permission skip; the two JSONL race tests pass 2/2 under WSL/POSIX; and the
+  complete events plus typed-memory modules pass 47 tests with the same single
+  Windows symlink skip in 42.156s.
+- Independent review reproduced two successive recovery defects: self-reported
+  after digests admitted an unrelated shape-valid record, and a fully forged
+  before/after marker remained self-consistent while duplicate candidates could
+  break reverse replay. Automatic recovery no longer trusts marker-derived
+  state: it requires the exact internally consistent prior pair committed at
+  Git `HEAD`, restores it, and runs the same accepted envelope normally. The
+  three focused transaction regressions pass 3/3; unanchored state fails closed
+  for explicit recovery.
+- Final risk-weighted matrix passed 49 tests in 47.689s with one Windows-only
+  symlink-permission skip. Independent re-review then reproduced a short-append
+  P2 because partial-tail discard and payload read each received a byte budget.
+  The shared reader now performs one bounded descriptor read and revalidates
+  descriptor/path identity and size afterward. The exact red regression now
+  passes; the complete event module passes 12 tests in 1.155s with the same
+  Windows skip, and both descriptor races pass 2/2 under WSL in 0.003s.
+- Static boundary: Python compile, JSON parsing, strict UTF-8 decode,
+  `git diff --check`, high-confidence secret scan, and debug-marker scan pass;
+  the latter two report zero matches. Ruff is unavailable and was not installed.
+- Independent final review: PASS with no reproducible P0-P3. Short and long
+  append probes each read exactly 64 configured bytes and failed closed;
+  post-read replacement/growth, forged-marker, duplicate-candidate, rollback,
+  migration, durable-memory, repair-hash, and diff checks all passed. Full
+  Harness and npm suites were intentionally not repeated because this bounded
+  repair did not touch product or package code.
+
+## 2026-08-15 — PR #39 automated-review round-4 pre-acceptance
+
+- Baseline/mode: the isolated worktree was clean at pushed PR HEAD
+  `1f638b5085568e1c87e46057df915f2ba53c348a`; `codex-direct` acquired the
+  only writer lease. The dirty primary checkout remained isolated with 58
+  status rows.
+- Red evidence: a V2 zero-candidate Search with a forged channel digest entered
+  `build-ready`; the POSIX Paseo process-boundary test returned preflight exit
+  1 because no executable native launcher existed; and the forged-receipt test
+  failed only on POSIX because checkout line endings changed its failure path.
+- Focused green: the V1 and V2 zero-candidate paths plus forged-receipt
+  rejection passed 3/3 on Windows in 89.680s. WSL passed the POSIX launcher,
+  V2 zero-result verification, and forged-receipt rejection 3/3 in 13.364s.
+- Risk-weighted final verification: six Evolution checks covering authentic
+  and forged channel results, V1 and V2 zero-candidate Build, all three adapter
+  projections, and receipt rejection passed 6/6 in 323.104s. Four POSIX Paseo
+  process-boundary checks passed 4/4 in 3.224s.
+- Independent review reproduced two P1 end-to-end gaps: allowed-host but
+  unrelated no-match URLs could still reach an accepted zero-candidate Build,
+  and WSL selected a later Windows `paseo.cmd` before the native disposable
+  launcher. A red URL/query/path regression reproduced the first 1/1.
+- The initial round-4 contract omitted the shared Paseo resolver. It entered a
+  Recovery Bundle with fingerprint
+  `cedc3edc5b54bf15ad3eb3b04133fc11186487dfe3ec255c52ebe5beb24b7f83`;
+  a reversible local stash transferred the identical ten-file diff to the
+  same-base, same-mode continuation with the resolver explicitly owned.
+- Recovery green: the full forged-coordinate Search→Build→Evaluate→Accept
+  regression passed 1/1 in 57.435s. WSL with its ordinary inherited PATH now
+  resolves the native stub and passes 1/1 in 1.563s; candidate and zero-result
+  channel checks passed 3/3 on Windows in 84.995s and 2/2 on WSL in 9.876s.
+- Re-review found that a version-scoped npm 404 proved only a missing version,
+  not a missing package. The isolated red regression reached `build-ready`;
+  zero-candidate npm evidence now requires the exact unversioned query path.
+  The end-to-end zero-result test plus both candidate channel tests pass 3/3 in
+  97.449s, and ordinary-path WSL Paseo remains green 1/1 in 0.838s.
+- Independent final re-review: PASS with no remaining P0-P3. It confirmed the
+  exact unversioned npm path, unchanged candidate name/version binding, legal
+  end-to-end acceptance, migration hashes, package exclusion, diff cleanliness,
+  product isolation, and zero remote effects.
 ## 2026-08-18 — Issue #40 AI Subtitle Integrity Candidate
 
 - Command: `npx vitest run tests/bilibili-transcript.test.ts tests/server-tools.test.ts tests/server-handler-sanitization.test.ts tests/server-error-next-steps.test.ts`
@@ -1656,3 +2361,30 @@
 - Boundary: the dirty primary worktree and future CI/CD roadmap note stayed out
   of the immutable release tag; Registry publication did not move the tag,
   republish npm, or change the workflow.
+
+## 2026-08-18 — PR #39 post-CI Codex review repair
+
+- Red evidence: WSL reproduced zero parent-directory fsyncs after two
+  descriptor-relative `mkdir` calls and after one descriptor-relative unlink;
+  Windows and WSL both proved Paseo passed a symlinked/junction home path to the
+  bounded reader instead of the resolved home.
+- Green evidence: the three focused regressions pass on their applicable
+  platforms. The complete affected events, Paseo preferences, and Paseo
+  function matrix passes 85 tests on Windows with 13 platform skips and 85 on
+  WSL with 2 platform skips.
+- Boundary: only shared Harness persistence, Paseo preference discovery, tests,
+  and durable receipts changed. Product runtime, dependencies, package output,
+  credentials, daemon state, adapter selection, and release state are unchanged.
+
+## 2026-08-19 — PR #39 Hook rollback review repair
+
+- Red evidence: a focused Hook smoke test trapped the remaining pathname
+  `rmdir`, while a second test replaced an originally absent canary file with a
+  directory and reproduced a false successful rollback.
+- Green evidence: Hook smoke now uses the shared descriptor-anchored directory
+  remover, fsyncs its verified POSIX parent, and uses a verified no-follow
+  existence check. The three focused regressions pass, unexpected
+  file/link/directory residue fails the smoke, and the final safe-I/O matrices
+  pass 26 tests on both Windows and WSL with platform-appropriate skips.
+- Boundary: no product runtime, package output, credentials, adapter selection,
+  external publication, evaluator, or holdout changed.

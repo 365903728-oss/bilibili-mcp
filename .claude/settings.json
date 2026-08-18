@@ -1,0 +1,115 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/harness/cli.py",
+              "hook",
+              "ingest",
+              "--adapter",
+              "claude",
+              "--event",
+              "session-start",
+              "--cwd",
+              "${CLAUDE_PROJECT_DIR}"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/harness/cli.py",
+              "hook",
+              "ingest",
+              "--adapter",
+              "claude",
+              "--event",
+              "post-tool-use",
+              "--cwd",
+              "${CLAUDE_PROJECT_DIR}"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/harness/cli.py",
+              "hook",
+              "ingest",
+              "--adapter",
+              "claude",
+              "--event",
+              "post-tool-use-failure",
+              "--cwd",
+              "${CLAUDE_PROJECT_DIR}"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/harness/cli.py",
+              "hook",
+              "ingest",
+              "--adapter",
+              "claude",
+              "--event",
+              "pre-compact",
+              "--cwd",
+              "${CLAUDE_PROJECT_DIR}"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/harness/cli.py",
+              "hook",
+              "ingest",
+              "--adapter",
+              "claude",
+              "--event",
+              "stop",
+              "--cwd",
+              "${CLAUDE_PROJECT_DIR}"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

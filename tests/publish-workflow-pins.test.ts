@@ -1,16 +1,18 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("publish workflow action integrity", () => {
+describe("workflow action integrity", () => {
   it("pins every third-party action to a full immutable commit SHA", () => {
-    const workflow = fs.readFileSync(
-      new URL("../.github/workflows/publish.yml", import.meta.url),
-      "utf8",
-    );
-    const actionUses = [
-      ...workflow.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+).*$/gm),
-    ]
-      .map((match) => match[1])
+    const workflowDirectory = new URL("../.github/workflows/", import.meta.url);
+    const actionUses = fs
+      .readdirSync(workflowDirectory)
+      .filter((name) => /\.ya?ml$/.test(name))
+      .flatMap((name) => {
+        const workflow = fs.readFileSync(new URL(name, workflowDirectory), "utf8");
+        return [
+          ...workflow.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+).*$/gm),
+        ].map((match) => match[1]);
+      })
       .filter((value) => !value.startsWith("./"));
 
     expect(actionUses.length).toBeGreaterThan(0);

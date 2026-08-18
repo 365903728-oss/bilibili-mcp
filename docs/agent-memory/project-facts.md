@@ -457,6 +457,253 @@
   masquerade as no matches. Explicit empty arrays and non-empty arrays whose
   rows all normalize away retain their previous successful-empty semantics.
 
+## 2026-08-11
+
+- Fact: Harness v2 Issue #29 supersedes the earlier path-bound Hook/runtime
+  layout with one shared `RULES.md`, thin Codex/Claude adapters, tracked
+  portable Hook registrations, and a worktree-scoped `.harness/runtime/`
+  ledger using opaque worktree and session IDs.
+- Evidence: `RULES.md`, `AGENTS.md`, `CLAUDE.md`, `.codex/hooks.json`,
+  `.claude/settings.json`, `harness/`, replay/conformance tests, clean Codex and
+  Claude rule-discovery smokes, all four Codex translator process-boundary
+  tests, a trusted Codex lifecycle observation, and a real Claude failure
+  lifecycle in the isolated #29 worktree.
+- Impact: Earlier facts naming `C:\Users\ZX\.codex\memories\bilibili-mcp\`,
+  `.claude\memory\`, or `.claude\runtime\` describe the legacy v1 collectors,
+  not the v2 canonical event ledger. Existing primary/user Codex Hooks and
+  ignored `.claude/settings.local.json` Hooks are not rewritten automatically;
+  when they conflict with tracked Hooks, `harness doctor` reports
+  `action-required` so the legacy registration can be migrated before rollout.
+
+- Fact: Harness v2 Issue #30 adds the complete executable `codex-direct`
+  accepted-ticket loop on top of #29's shared session spine.
+- Evidence: 92 Harness tests (one platform-permission skip), 14 legacy Hook
+  tests, 862 product tests, a
+  185-file package with zero Harness paths, two-axis code review, independent
+  risk review, and the accepted real Harness-only pilot recorded in
+  `executions/2026-08-11-github-30-codex-direct-report.md`.
+- Impact: Codex Direct now freezes one typed canonical worktree/mode/base/branch
+  and Codex writer, atomically excludes same-source/task aliases in sibling
+  worktrees without common-Git state or config changes, serializes worktree-
+  local state, guards protected effects, binds an append-only evidence log and
+  current review to the current diff, bounds repair, produces Recovery Bundles,
+  and automatically creates one exact local accepted commit through an isolated
+  index plus `commit-tree`/CAS `update-ref`. Hooks, signing, external filters,
+  and caller-staged entries cannot enter that commit. Push, PR, tag, release,
+  publish, credentials/SSH, history rewrite, and broad delete remain outside
+  normal authority.
+
+- Fact: Codex Direct runtime persistence is metadata-only even though the
+  input task contract contains an absolute canonical worktree and verification
+  commands.
+- Evidence: runtime regressions reject malformed/symlink state, omit raw paths
+  and commands, retain only opaque worktree/repository IDs plus semantic
+  metadata/digests, preflight the declared maximum state before replacement,
+  and verify every state write by bounded read-back.
+- Impact: Recovery and acceptance remain auditable without copying private
+  checkout paths, command text, prompts, output, or credential-bearing values
+  into `.harness/runtime/`.
+
+- Fact: Harness v2 Issue #31 adds the executable `claude-direct` accepted-ticket
+  loop as a mode-fenced entrypoint to the same controller used by Codex Direct.
+- Evidence: the shared two-adapter lifecycle conformance fixture, Claude process
+  tests for mode/owner/manual-host tampering, cross-adapter status and mutation
+  rejection, mixed-writer collision, authority guards, repeated-failure and
+  adapter-failure recovery, and exact one-commit/no-remote acceptance.
+- Impact: Claude Code can now plan, hold the sole Claude writer lease, write,
+  verify, review, judge criteria, accept, and create the exact local ticket
+  commit without Paseo or Codex fallback. Public commands must match the frozen
+  mode; the constitutional remote/credential/delete/history gates are unchanged.
+
+- Fact: A real Claude Code 2.1.212 session completed the bounded Claude Direct
+  path in a disposable Harness-only repository.
+- Evidence: ignored pilot base `c4844708eebdaf4339feb26c0f91877a66321367`,
+  accepted commit `d4875bfe6b21e2e460d7fad2ebb59e3165a32c1e`,
+  only path `harness-only.txt`, exact released Claude lease, two passing evidence
+  records, one passing criterion, clean tree, and zero remotes. The first CLI
+  attempt failed before start because its empty MCP JSON lacked the required
+  `mcpServers` object; the corrected strict-empty configuration succeeded.
+- Impact: The actual host path is proven without modifying product source, the
+  implementation worktree, global settings, external Hooks, or remote state.
+  The pilot required no manual Skill and therefore is not evidence of native
+  `/implement`; that one-reminder/zero-write behavior is independently tested.
+
+## 2026-08-12
+
+- Fact: Harness v2 Issue #32 implements the `codex-paseo-claude` collaboration
+  adapter as a thin seam on the shared #30/#31 Direct controller.
+- Evidence: `harness/paseo_collaboration.py` (~2072 lines) reuses
+  `validate_task_contract()`, `start_direct`, `_commit_unlocked`,
+  `accept_codex_direct`, and shared safe-I/O/locking/recovery machinery. The
+  collaboration module has 73 tests. Its final proofs bind dispatch to the
+  frozen handoff digest, reports to the frozen writer, acceptance to the
+  current diff, every repair to delivery evidence, and runtime state to
+  metadata-only projections; both send paths remove ephemeral prompts on every
+  exit. A real public-path pilot used the live resolved
+  `claude/deepseek-v4-flash` writer, recorded native `/implement`, accepted one
+  exact `harness-only.txt` commit (`291ad721…`), released the lease, finished
+  clean, and retained zero remotes. The focused local Issue #32 commit is made
+  only after the full acceptance gates pass on branch
+  `codex/harness-v2-paseo-claude-32`.
+- Impact: Codex can now plan, freeze a collaboration contract, launch one
+  Paseo-managed Claude writer, receive a validated report, review diff/evidence,
+  accept, and create one exact local commit — all through the public CLI seam.
+  The adapter does not duplicate the Direct controller and does not persist
+  provider/model in tracked contracts, rules, or config. Push, PR, tag,
+  release, publish, and other
+  remote operations remain separate user authority gates.
+- Evidence: Repair attempt 7 used an explicit user-authorized sequential lease
+  transfer from the idle original writer to one live-inspected
+  `claude/deepseek-v4-pro[1m]` writer at thinking `max`. It added the final
+  public-CLI malformed-contract proof, changed only the authorized three-file
+  repair scope, returned idle, and released the lease to Codex acceptance.
+  This runtime route is not persisted in tracked contracts, rules, or config.
+- Evidence: Repair attempt 8 reused that same live-inspected writer at thinking
+  `max`. It added an accepted-lifecycle regression and the minimum adapter guard
+  that rejects Claude `local-commit` before shared delegation while preserving
+  Codex's accepted-state behavior. The focused proof, all seven guard tests,
+  Codex rerun, and both independent re-reviews passed; the writer returned idle.
+
+- Fact: The collaboration adapter uses vertical-slice CLI tracer tests with
+  disposable Git repositories and command-scoped `PATH` for Git resolution.
+- Evidence: All 7 CLI tracer tests (`test_slice1` through `test_slice5` plus
+  `test_cli_contract_validation` and `test_cli_subcommand_is_registered`) use
+  `PATH="/d/Git/cmd:$PATH"` prefixed on test commands only. No tracked file
+  hard-codes a machine-specific Git path. The fake Paseo CLI executable records
+  events and returns bounded JSON for daemon/provider/model/run/inspect.
+- Impact: Tests are portable across machines with different Git installations.
+  The command-scoped PATH pattern isolates Git resolution to the test command
+  without mutating global process state.
+
+## 2026-08-13
+
+- Fact: Harness v2 Issue #33 adds a typed-memory projector at
+  `harness/memory.py` without changing the accepted #30/#31/#32 execution
+  controllers.
+- Evidence: The projector reads the shared strict Direct status seam, requires
+  an accepted-and-committed source task plus a passing current evidence entry
+  whose digest equals the canonical semantic envelope digest, and owns only
+  the typed store, bounded current projection, and ignored audit ledger.
+- Impact: Hooks, free-form reports, model inference, and old append-only lines
+  cannot silently become authoritative project memory.
+
+- Fact: Every durable typed record has a stable content identity, source and
+  provenance, validation state, sensitivity class, validity fields and/or a
+  supersession link, and an evidence digest.
+- Evidence: Replay, content-binding, tamper, semantic-date, supersession,
+  same-time-conflict, promotion-threshold, weak-evidence, secret/raw-payload,
+  and bounded-startup tests pass. Current startup loads only accepted current
+  records from `current-memory.json`.
+- Impact: Replaying accepted evidence creates neither duplicate records nor a
+  duplicate projection; conflicting current facts are deterministically
+  superseded or rejected when ordering is ambiguous.
+
+- Fact: The repository now has one canonical `bilibili-mcp-memory` capability
+  source and deterministic thin Codex/Claude packages at version `1.0.0`.
+- Evidence: The capability test recompiles both host packages byte-for-byte and
+  verifies their interface, evaluation metadata, and manifest hashes. No
+  externally installed capability copy is a projector output or was rewritten.
+- Impact: Both hosts route through the same shared CLI and memory contract
+  without duplicating projection policy in Skill prose.
+
+- Fact: The real Issue #33 pilot used two accepted Codex Direct tasks in a
+  disposable repository with no remote: a source commit
+  `62caea4d73e0f88d81803ecd6abc70aae9faed54`, followed by memory-only commit
+  `a3e6fcabdd36849f46a738592a24d815b64d337b`.
+- Evidence: The second commit changed exactly
+  `docs/agent-memory/current-memory.json` and
+  `docs/agent-memory/typed-memory.json`; replay returned no change, two audit
+  outcomes were retained, final Git status was clean, and remote output was
+  empty.
+- Impact: Automatic projection is proven through the accepted-ticket process
+  boundary without product credentials, SSH, remote writes, or controller
+  changes.
+
+- Fact: Harness v2 Issue #34 adds governed Skill and Agent evolution at
+  `harness/evolution.py` without changing the accepted-ticket controllers or
+  product runtime.
+- Evidence: Evolution consumes only a current accepted `capability-gap`, binds
+  its accepted-and-committed origins, and requires an independent linked
+  worktree plus an active Direct writer whose exact derived owned paths exclude
+  the fixed evaluator, holdout, product, kernel, and engine.
+- Impact: Typed memory may authorize a bounded Evolution Run but still cannot
+  itself modify capabilities, evaluate a candidate, or approve promotion.
+
+- Fact: One canonical evolution capability compiles deterministic Codex and
+  Claude Skill/Agent projections with explicit invocation, triggers,
+  interface, governance, trust, packaging, and read-only zero-child authority.
+- Evidence: Host compiler, native discovery-path/schema parser, and exact projection tests
+  cover manual/model semantics, shared interface and canonical digests, bounded
+  manifests, and extra-file/byte drift rejection.
+- Impact: Host packages cannot silently diverge or grant subagents autonomous
+  delegation or a second writer.
+
+- Fact: Controlled #34 fixtures exercise Search, Build, Reject,
+  rollback, promotion-ready, and exact-one local commit in disposable linked
+  worktrees with no remotes.
+- Evidence: The real Search candidate is pinned `antfu/skills` commit
+  `a74f281a27dadc02397bc1a174b0f2c97531b6ae`; the installed `vitest` content
+  differs and has unknown immutable provenance, so the zero-install pilot is
+  deferred. Candidate-provided machine claims cannot authorize Adapt; the safe
+  repository-local Build fixture runs without executing or installing external
+  code.
+- Impact: Search evidence can reject or defer a candidate without turning
+  external Skill prose into execution authority; the Adapt seam remains
+  fail-closed pending trusted machine evidence, and Build remains a
+  repository-local fixture.
+
+## 2026-08-13 — Harness v2 Issue #35
+
+- Fact: Governed Evolution now supports exact MCP, CLI, Hook, and Loop surface
+  contracts without a second controller or any product-runtime change.
+- Evidence: v2 canonical sources compile through the existing deterministic
+  Codex/Claude package seam; public Harness discovery and smoke validate
+  `codex-direct`, `claude-direct`, and `codex-paseo-claude` projections.
+- Impact: Surface capabilities remain repository-local Harness artifacts and
+  stay outside `src/`, `src/cli.ts`, `package.json` files, and the npm package.
+
+- Fact: A safe v2 Adapt decision trusts only governor-created evidence from
+  immutable canonical JSON, not candidate-supplied compatibility, smoke, or
+  installed-provenance fields.
+- Evidence: Search re-fetches the exact pinned artifact/license bytes, parses a
+  byte-canonical v2 source, derives all four candidate-bound channel results
+  from the fetched response formats, and compiles all adapter projections
+  without executing candidate code. Dangerous effects produce one stable
+  authorization request and zero capability files.
+- Impact: Safe repository-local adoption is possible without weakening the #34
+  fail-closed boundary for executable or legacy candidates.
+
+- Fact: Hook and Loop surfaces have executable Harness-only safety seams.
+- Evidence: The public Hook handler validates the installed capability and host,
+  persists an attributed redacted event, replays it, and reads the ledger.
+  Smoke proves shadow/no-diff, secret removal, linked-worktree identity, and
+  exact deployment/config/canary/ledger restoration. `capability loop-step` stops at attempt/no-progress
+  limits, yields to new user input, and prohibits adapter switches.
+- Impact: Declaring a policy is insufficient; promotion evidence is generated
+  by the shared CLI and remains subordinate to Direct acceptance.
+
+## 2026-08-14 — Harness v2 Issue #36 checkpoint
+
+- Fact: All three execution adapters now share one versioned conformance
+  matrix in addition to the existing typed task contract and constitutional
+  kernel.
+- Evidence: `three-adapter-conformance.json` enumerates the three public mode
+  commands, lifecycle kind, writer, acceptance owner, native invocation,
+  run/control schemas, eleven pilot checks, and four migration checks. Direct
+  contract/lifecycle tests consume the same fixture; no controller was copied.
+- Impact: Adapter comparison is an explicit project-owned acceptance surface,
+  while mode-specific transport remains in the accepted Direct/Paseo seams.
+
+- Fact: Real Codex Direct, Claude Direct, and Paseo-managed Claude #36 pilots
+  are accepted with one scoped local commit each and no remote.
+- Evidence: Disposable clean repositories accepted only `pilot.txt` as commits
+  `0cadc18c9cd85733875929e49130b847a204e1be` and
+  `a81fef21b17330613729b5a67f13386c4ad651ec`, and
+  `27fba0dce64fb591a30f0651979940089c667fb0`. Claude Direct ran in safe mode;
+  the Paseo agent used the frozen provider, handoff digest, worktree, writer
+  lease, and acceptance owner after one user-authorized daemon start.
+- Impact: Mocked adapter tests are not used as substitutes for any of the three
+  required real runtime pilots.
 ## 2026-08-18
 
 - Fact: An isolated, uncommitted Issue #40 + Roadmap candidate classifies

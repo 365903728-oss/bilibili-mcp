@@ -1,0 +1,474 @@
+{
+  "authority": {
+    "ordinary": "allowed",
+    "publish": "user-authorization-required",
+    "second_writer": "rejected",
+    "ssh": "blocked"
+  },
+  "capability": {
+    "command_id": "harness-tests",
+    "status": "pass"
+  },
+  "controller_run": {
+    "accepted_diff": {
+      "diff_digest": "08f669b6b71f9cab28d162095e5901c21a44d51916a4150eb6cb7515617f1838",
+      "digest": "64f6b173a796bdbed4755023e22d78991a2f4ae36d2f0199589c540db82ed10f",
+      "index_digest": "d2cc767f20e7015b1b2374717f22536efa8a01db4cc882197ff0508723439c57",
+      "index_snapshot": [
+        {
+          "digest": "0cddd01c41b97af7e6e07353426ad8c0a757fea895560ad661c3900cf2c4eedb",
+          "executable": false,
+          "kind": "file",
+          "path": "pilot.txt"
+        }
+      ],
+      "paths": [
+        "pilot.txt"
+      ],
+      "snapshot": [
+        {
+          "digest": "9e97ed31072572f001c67b862740111d945844f0a4430a7f524b1c6af4c24c25",
+          "executable": false,
+          "kind": "file",
+          "path": "pilot.txt"
+        }
+      ]
+    },
+    "agent_id": "f4a4fec4-fb93-4a84-8c8c-556aeb08488c",
+    "agent_provider": "claude/deepseek-v4-flash",
+    "agent_state": "active",
+    "baseline": {
+      "branch": "main",
+      "head_sha": "041ee7eff85ff57893c5dd2a39fac11974e5493d",
+      "status_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "bridge_handoff_digest": "0f9c364f7ddffdc9cf39d548fbcd3e193bad95e557635a745d28c49058f9ee3f",
+    "bridge_recorded_at": "2026-08-14T08:55:00Z",
+    "checks": {
+      "owned-file-check": {
+        "diff_digest": "08f669b6b71f9cab28d162095e5901c21a44d51916a4150eb6cb7515617f1838",
+        "digest": "9e97ed31072572f001c67b862740111d945844f0a4430a7f524b1c6af4c24c25",
+        "exit_code": 0,
+        "reason_code": null,
+        "sensitivity": "secret-free",
+        "source": "command",
+        "status": "pass"
+      },
+      "review-check": {
+        "diff_digest": "08f669b6b71f9cab28d162095e5901c21a44d51916a4150eb6cb7515617f1838",
+        "digest": "236b25421736498035bb3496271638e0bbe09805ed2dc59e78b1e098cb1c5f7e",
+        "exit_code": null,
+        "reason_code": null,
+        "sensitivity": "secret-free",
+        "source": "review",
+        "status": "pass"
+      }
+    },
+    "commit_sha": "27fba0dce64fb591a30f0651979940089c667fb0",
+    "contract": {
+      "acceptance_owner": "codex",
+      "authority": {
+        "credentials_ssh_broad_delete_history_rewrite": "blocked",
+        "local_commit": "after-acceptance",
+        "local_read_write_test": "allowed",
+        "push_pr_tag_release_publish": "user-approval-required"
+      },
+      "execution": {
+        "adapter_switch_policy": "stop-and-report",
+        "base_sha": "041ee7eff85ff57893c5dd2a39fac11974e5493d",
+        "branch": "main",
+        "isolated_worktree": false,
+        "mode": "codex-paseo-claude",
+        "repository_id": "repo-3e21191ccfe7b568",
+        "worktree_id": "wt-96fdfb25d39f273e"
+      },
+      "plan": {
+        "acceptance_criteria": [
+          {
+            "description_digest": "59bc4f4924fa95c3d03bd9a36de6c840c91878016ee6e4c2030c3f9e951edf31",
+            "id": "writes-owned-file"
+          }
+        ],
+        "objective_digest": "be3ae21ea97f59a88c7a3328b0308cd4832fb24b2593dd5aaf5c2e089bdc05a7",
+        "owned_paths": [
+          "pilot.txt"
+        ],
+        "repair_policy": {
+          "max_attempts": 1
+        },
+        "stop_condition_digests": [
+          "b7f0e7a9273f82623999d43ef947cf059d8f5f1f3ae3340aff04ceb463ca38a5",
+          "74fb9ea0be950448fc6d519b8db3a872289ec3a9bfc75ed8aa6ccdf1da00334b",
+          "687a9bc167682c8ac9ea4226cc1235312c30e16652cf081a53f1e9a636ee87d0"
+        ],
+        "verification_plan": [
+          {
+            "command_digest": "1e063c752dfe2bdd4facb90aa72aee910386c1913d17655b5a38561f850bbe36",
+            "id": "owned-file-check",
+            "required": true
+          },
+          {
+            "command_digest": "995c04837e655114fca020c87739094c11bc3b6f53e97f9e8011d77a22507d29",
+            "id": "review-check",
+            "required": false
+          }
+        ]
+      },
+      "schema": "harness.task-contract/v1",
+      "source_contract_digest": "ce7d52bb8ff4043c9162f059681297022ad5db6172c67a7e00e5fd388318cb23",
+      "state": "accepted",
+      "task": {
+        "id": "pilot-36-paseo",
+        "source_digest": "8979340ca9ce33a096cbdd27f60cdb336f9105eada6a8e303c341816f8e2b803"
+      },
+      "writer_lease": {
+        "holder": "claude",
+        "state": "released"
+      }
+    },
+    "criteria": {
+      "writes-owned-file": {
+        "evidence_digest": "9e97ed31072572f001c67b862740111d945844f0a4430a7f524b1c6af4c24c25",
+        "status": "pass"
+      }
+    },
+    "evidence_log": [
+      {
+        "diff_digest": "08f669b6b71f9cab28d162095e5901c21a44d51916a4150eb6cb7515617f1838",
+        "digest": "9e97ed31072572f001c67b862740111d945844f0a4430a7f524b1c6af4c24c25",
+        "exit_code": 0,
+        "id": "owned-file-check",
+        "reason_code": null,
+        "sensitivity": "secret-free",
+        "source": "command",
+        "status": "pass"
+      },
+      {
+        "diff_digest": "08f669b6b71f9cab28d162095e5901c21a44d51916a4150eb6cb7515617f1838",
+        "digest": "236b25421736498035bb3496271638e0bbe09805ed2dc59e78b1e098cb1c5f7e",
+        "exit_code": null,
+        "id": "review-check",
+        "reason_code": null,
+        "sensitivity": "secret-free",
+        "source": "review",
+        "status": "pass"
+      }
+    ],
+    "history": [
+      {
+        "event": "mode-frozen",
+        "sequence": 1,
+        "state": "mode-frozen"
+      },
+      {
+        "event": "baseline-verified",
+        "sequence": 2,
+        "state": "baselined"
+      },
+      {
+        "event": "writer-acquired",
+        "sequence": 3,
+        "state": "executing"
+      },
+      {
+        "event": "entered-verifying",
+        "sequence": 4,
+        "state": "verifying"
+      },
+      {
+        "event": "verification-recorded",
+        "sequence": 5,
+        "state": "verifying"
+      },
+      {
+        "event": "entered-reviewing",
+        "sequence": 6,
+        "state": "reviewing"
+      },
+      {
+        "event": "verification-recorded",
+        "sequence": 7,
+        "state": "reviewing"
+      },
+      {
+        "event": "criterion-judged",
+        "sequence": 8,
+        "state": "reviewing"
+      },
+      {
+        "event": "accepted",
+        "sequence": 9,
+        "state": "accepted"
+      },
+      {
+        "event": "local-commit-created",
+        "sequence": 10,
+        "state": "accepted"
+      }
+    ],
+    "repairs": [],
+    "risks": {},
+    "schema": "harness.codex-paseo-claude-run/v1",
+    "sequence": 10,
+    "state": "accepted"
+  },
+  "events": [
+    {
+      "digest": "300f121d5f3dde9ec2d5b730c47dea01d547d0117d489213bda3f51348fe5d1d",
+      "event_id": "300f121d5f3dde9ec2d5",
+      "head_sha": "27fba0dce64fb591a30f0651979940089c667fb0",
+      "provenance": {
+        "adapter": "claude",
+        "host_event": "post-tool-use"
+      },
+      "repository_id": "repo-3e21191ccfe7b568",
+      "schema": "harness.hook-event/v1",
+      "semantic": {
+        "category": "shell",
+        "event": "post-tool-use",
+        "exit_code": null,
+        "has_error": false,
+        "outcome": "succeeded",
+        "tool_class": "edit"
+      },
+      "sensitivity": "metadata",
+      "session_id": "session-e1c6c596ae13ff242327",
+      "source_adapter": "claude",
+      "terminal_state": "active",
+      "timestamp": "2026-08-14T08:56:40Z",
+      "worktree_id": "wt-96fdfb25d39f273e"
+    },
+    {
+      "digest": "ea5a0d558f91c91dd4bec69929ed74054d42475a36b1e12dc570d7d530f56356",
+      "event_id": "ea5a0d558f91c91dd4be",
+      "head_sha": "27fba0dce64fb591a30f0651979940089c667fb0",
+      "provenance": {
+        "adapter": "claude",
+        "host_event": "stop"
+      },
+      "repository_id": "repo-3e21191ccfe7b568",
+      "schema": "harness.hook-event/v1",
+      "semantic": {
+        "category": "shell",
+        "event": "stop",
+        "exit_code": null,
+        "has_error": false,
+        "outcome": "succeeded",
+        "tool_class": "other"
+      },
+      "sensitivity": "metadata",
+      "session_id": "session-e1c6c596ae13ff242327",
+      "source_adapter": "claude",
+      "terminal_state": "stopped",
+      "timestamp": "2026-08-14T08:56:44Z",
+      "worktree_id": "wt-96fdfb25d39f273e"
+    }
+  ],
+  "git": {
+    "accepted": {
+      "oid": "27fba0dce64fb591a30f0651979940089c667fb0",
+      "raw": "tree 96b1526c5a2b56d87fed5a6437f92e8a368e27fd\nparent 041ee7eff85ff57893c5dd2a39fac11974e5493d\nauthor Harness Pilot <harness@example.invalid> 1786698008 +0800\ncommitter Harness Pilot <harness@example.invalid> 1786698008 +0800\n\ntest(harness): accept Paseo-managed Claude pilot\n\nHarness-Task: a5a227e02a3ed57411b4336c\n"
+    },
+    "base": {
+      "oid": "041ee7eff85ff57893c5dd2a39fac11974e5493d",
+      "raw": "tree e2507bdd4f9f3f64f3554e77c711f3cb063206da\nauthor Harness Pilot <harness@example.invalid> 1786693033 +0800\ncommitter Harness Pilot <harness@example.invalid> 1786693033 +0800\n\nseed pilot\n"
+    },
+    "changed_paths": [
+      "pilot.txt"
+    ],
+    "commit_count": 1,
+    "files": {
+      ".gitignore": ".harness/\n",
+      "README.md": "# Paseo-managed Claude pilot\n",
+      "pilot.txt": "codex-paseo-claude accepted pilot\n"
+    },
+    "remote_effects": [],
+    "trees": {
+      "accepted": [
+        {
+          "mode": "100644",
+          "name": ".gitignore",
+          "oid": "bf311f63a323c46a07dcc293e55b78f934a8b4f1"
+        },
+        {
+          "mode": "100644",
+          "name": "README.md",
+          "oid": "fda4c980e95f0916997c67e14801d10e5956657a"
+        },
+        {
+          "mode": "100644",
+          "name": "pilot.txt",
+          "oid": "4f02dfe12c239c3a68047b22c24498e7ca41f071"
+        }
+      ],
+      "base": [
+        {
+          "mode": "100644",
+          "name": ".gitignore",
+          "oid": "bf311f63a323c46a07dcc293e55b78f934a8b4f1"
+        },
+        {
+          "mode": "100644",
+          "name": "README.md",
+          "oid": "fda4c980e95f0916997c67e14801d10e5956657a"
+        }
+      ]
+    }
+  },
+  "manual_gate": {
+    "first": "reminder-emitted",
+    "implementation_write_count": 0,
+    "second": "already-reminded"
+  },
+  "memory_evolution": {
+    "command_id": "typed-memory-evolution-tests",
+    "status": "pass"
+  },
+  "mode": "codex-paseo-claude",
+  "recovery": {
+    "bundle": {
+      "adapter_switch_policy": "stop-and-report",
+      "base_sha": "a81fef21b17330613729b5a67f13386c4ad651ec",
+      "branch": "main",
+      "changed_path_count": 0,
+      "changed_paths": [],
+      "changed_paths_digest": "75924a2ed682acddb24d11db285f5b91cab452e2067cbb7417c39550f7fe3c97",
+      "changed_paths_embedded": true,
+      "commit_sha": null,
+      "diff_digest": "b1a09df078c556e1794eb480841424b4f165cced6e9259eb7d00d2524225905a",
+      "failure": {
+        "category": "adapter-failure",
+        "fingerprint": "31d34b87760c3b2d821fb1c86ca10e5c95e853bfd4917712039cddac322ab4b7"
+      },
+      "head_sha": "a81fef21b17330613729b5a67f13386c4ad651ec",
+      "incomplete_criteria": [
+        "recovery"
+      ],
+      "mode": "claude-direct",
+      "owned_path_count": 1,
+      "owned_paths": [
+        "never-written.txt"
+      ],
+      "owned_paths_digest": "3500e112256a62374131ea25ff02f23937fe013df5d5374c4ce4dd9d9bb27969",
+      "owned_paths_embedded": true,
+      "repair_attempts": 0,
+      "repository_id": "repo-01bee8bd7835b885",
+      "repository_inspection": "current",
+      "risks": [],
+      "schema": "harness.recovery-bundle/v1",
+      "staged_path_count": 0,
+      "staged_paths": [],
+      "staged_paths_digest": "75924a2ed682acddb24d11db285f5b91cab452e2067cbb7417c39550f7fe3c97",
+      "staged_paths_embedded": true,
+      "task_id": "pilot-36-claude-failure",
+      "validations": [],
+      "worktree_id": "wt-3d9d0d16eabd6136",
+      "writer_lease": {
+        "holder": "claude",
+        "state": "active"
+      }
+    },
+    "run": {
+      "baseline": {
+        "branch": "main",
+        "head_sha": "a81fef21b17330613729b5a67f13386c4ad651ec",
+        "status_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "checks": {},
+      "commit_sha": null,
+      "contract": {
+        "acceptance_owner": "claude",
+        "authority": {
+          "credentials_ssh_broad_delete_history_rewrite": "blocked",
+          "local_commit": "after-acceptance",
+          "local_read_write_test": "allowed",
+          "push_pr_tag_release_publish": "user-approval-required"
+        },
+        "execution": {
+          "adapter_switch_policy": "stop-and-report",
+          "base_sha": "a81fef21b17330613729b5a67f13386c4ad651ec",
+          "branch": "main",
+          "isolated_worktree": false,
+          "mode": "claude-direct",
+          "repository_id": "repo-01bee8bd7835b885",
+          "worktree_id": "wt-3d9d0d16eabd6136"
+        },
+        "plan": {
+          "acceptance_criteria": [
+            {
+              "description_digest": "444a788babb64431829dd7c92a7276200ab93a9c47352d146a2c0b61c5cc67ee",
+              "id": "recovery"
+            }
+          ],
+          "objective_digest": "97ca0d19b23eeab182a48bc707f3d3512f7752b3956d313b4ef31312ca287ea2",
+          "owned_paths": [
+            "never-written.txt"
+          ],
+          "repair_policy": {
+            "max_attempts": 1
+          },
+          "stop_condition_digests": [
+            "b7f0e7a9273f82623999d43ef947cf059d8f5f1f3ae3340aff04ceb463ca38a5"
+          ],
+          "verification_plan": [
+            {
+              "command_digest": "a1409ba9a6914135a567d481d27919d666ccd44db9bcd4a5e1b35f71703ace88",
+              "id": "recovery",
+              "required": true
+            }
+          ]
+        },
+        "schema": "harness.task-contract/v1",
+        "source_contract_digest": "ab49bf52e3ff1b96af97d51dd71ab0011f1714979c450d8f684dad4613976e52",
+        "state": "recovery-required",
+        "task": {
+          "id": "pilot-36-claude-failure",
+          "source_digest": "99187245cd9d1bd8ae6f6fb5bf14dd3472ec9f2493beaebf45c5321c5a671b46"
+        },
+        "writer_lease": {
+          "holder": "claude",
+          "state": "active"
+        }
+      },
+      "criteria": {},
+      "evidence_log": [],
+      "history": [
+        {
+          "event": "mode-frozen",
+          "sequence": 1,
+          "state": "mode-frozen"
+        },
+        {
+          "event": "baseline-verified",
+          "sequence": 2,
+          "state": "baselined"
+        },
+        {
+          "event": "writer-acquired",
+          "sequence": 3,
+          "state": "executing"
+        },
+        {
+          "event": "recovery-required",
+          "sequence": 4,
+          "state": "recovery-required"
+        }
+      ],
+      "recovery_bundle": {
+        "digest": "1e4dc6014a53930ea5a80c70d37b74b4657ed9adaffd28ca231260601aa4d129",
+        "failure": {
+          "category": "adapter-failure",
+          "fingerprint": "31d34b87760c3b2d821fb1c86ca10e5c95e853bfd4917712039cddac322ab4b7"
+        },
+        "file": "recovery-bundle.json",
+        "schema": "harness.recovery-bundle-ref/v1"
+      },
+      "repairs": [],
+      "risks": {},
+      "schema": "harness.claude-direct-run/v1",
+      "sequence": 4,
+      "state": "recovery-required"
+    }
+  },
+  "schema": "harness.pilot-artifact/v1"
+}

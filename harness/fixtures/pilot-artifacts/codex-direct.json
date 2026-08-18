@@ -1,0 +1,469 @@
+{
+  "authority": {
+    "ordinary": "allowed",
+    "publish": "user-authorization-required",
+    "second_writer": "rejected",
+    "ssh": "blocked"
+  },
+  "capability": {
+    "command_id": "harness-tests",
+    "status": "pass"
+  },
+  "controller_run": {
+    "accepted_diff": {
+      "diff_digest": "49c13af187bb9c2168f2f0f2f0c88f05e637ed62b17cddd810d5947633d68cba",
+      "digest": "eb5d7ef1a854aee09313d41cc29105ace64016c261bb464acf85890f7b0cae33",
+      "index_digest": "9eaab4cfb5945d45be031a2076ca237148047d50a73f1170171fc842332500f4",
+      "index_snapshot": [
+        {
+          "digest": "5c1d99c5658cc495d94054c23067e98f0deadaf844c24432b778bb983d31c94e",
+          "executable": false,
+          "kind": "file",
+          "path": "pilot.txt"
+        }
+      ],
+      "paths": [
+        "pilot.txt"
+      ],
+      "snapshot": [
+        {
+          "digest": "cf68ae94e18ea54d33dc59f24b7fc50a8a51c5fd58f946a3349d397932926fee",
+          "executable": false,
+          "kind": "file",
+          "path": "pilot.txt"
+        }
+      ]
+    },
+    "baseline": {
+      "branch": "main",
+      "head_sha": "a7b0aba49c59e807cdd5a63b28d238c8e041d668",
+      "status_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "checks": {
+      "owned-file-check": {
+        "diff_digest": "49c13af187bb9c2168f2f0f2f0c88f05e637ed62b17cddd810d5947633d68cba",
+        "digest": "cf68ae94e18ea54d33dc59f24b7fc50a8a51c5fd58f946a3349d397932926fee",
+        "exit_code": 0,
+        "reason_code": null,
+        "sensitivity": "metadata",
+        "source": "command",
+        "status": "pass"
+      },
+      "review-check": {
+        "diff_digest": "49c13af187bb9c2168f2f0f2f0c88f05e637ed62b17cddd810d5947633d68cba",
+        "digest": "c0b82a408646ed43876b27d9ba32a8e429d071412c5951fc42c1cd562f6db96a",
+        "exit_code": null,
+        "reason_code": null,
+        "sensitivity": "metadata",
+        "source": "review",
+        "status": "pass"
+      }
+    },
+    "commit_sha": "0cadc18c9cd85733875929e49130b847a204e1be",
+    "contract": {
+      "acceptance_owner": "codex",
+      "authority": {
+        "credentials_ssh_broad_delete_history_rewrite": "blocked",
+        "local_commit": "after-acceptance",
+        "local_read_write_test": "allowed",
+        "push_pr_tag_release_publish": "user-approval-required"
+      },
+      "execution": {
+        "adapter_switch_policy": "stop-and-report",
+        "base_sha": "a7b0aba49c59e807cdd5a63b28d238c8e041d668",
+        "branch": "main",
+        "isolated_worktree": false,
+        "mode": "codex-direct",
+        "repository_id": "repo-c1d7367892cb4fc0",
+        "worktree_id": "wt-4684bb5255c08311"
+      },
+      "plan": {
+        "acceptance_criteria": [
+          {
+            "description_digest": "5a7585d8fafd132ab2b864b927cd72006c1b1d2036428a6473b8d23002ebdeeb",
+            "id": "writes-owned-file"
+          }
+        ],
+        "objective_digest": "2c66dd1f92712dcfab36c52b61d34d93376d7db4e88b3fce419e424b236b54d5",
+        "owned_paths": [
+          "pilot.txt"
+        ],
+        "repair_policy": {
+          "max_attempts": 1
+        },
+        "stop_condition_digests": [
+          "b7f0e7a9273f82623999d43ef947cf059d8f5f1f3ae3340aff04ceb463ca38a5",
+          "74fb9ea0be950448fc6d519b8db3a872289ec3a9bfc75ed8aa6ccdf1da00334b",
+          "687a9bc167682c8ac9ea4226cc1235312c30e16652cf081a53f1e9a636ee87d0"
+        ],
+        "verification_plan": [
+          {
+            "command_digest": "bdb58e72c35d890cf1511b8222fab997511585c6c7fdf73167d550d375614c7d",
+            "id": "owned-file-check",
+            "required": true
+          },
+          {
+            "command_digest": "aeff6c1aa43459f11a801789d55396b87bd02ce7ba1bf17cbb824ce13e5e15eb",
+            "id": "review-check",
+            "required": true
+          }
+        ]
+      },
+      "schema": "harness.task-contract/v1",
+      "source_contract_digest": "9be6a1a561d7d6766ca46203f8bf526342ecafc484ec0bdb29a8caedde2f29cc",
+      "state": "accepted",
+      "task": {
+        "id": "pilot-36-codex",
+        "source_digest": "47c5b89b657da91b5bca16cab49604976d8d331be7f30d41de5de54c215e58f2"
+      },
+      "writer_lease": {
+        "holder": "codex",
+        "state": "released"
+      }
+    },
+    "criteria": {
+      "writes-owned-file": {
+        "evidence_digest": "cf68ae94e18ea54d33dc59f24b7fc50a8a51c5fd58f946a3349d397932926fee",
+        "status": "pass"
+      }
+    },
+    "evidence_log": [
+      {
+        "diff_digest": "49c13af187bb9c2168f2f0f2f0c88f05e637ed62b17cddd810d5947633d68cba",
+        "digest": "cf68ae94e18ea54d33dc59f24b7fc50a8a51c5fd58f946a3349d397932926fee",
+        "exit_code": 0,
+        "id": "owned-file-check",
+        "reason_code": null,
+        "sensitivity": "metadata",
+        "source": "command",
+        "status": "pass"
+      },
+      {
+        "diff_digest": "49c13af187bb9c2168f2f0f2f0c88f05e637ed62b17cddd810d5947633d68cba",
+        "digest": "c0b82a408646ed43876b27d9ba32a8e429d071412c5951fc42c1cd562f6db96a",
+        "exit_code": null,
+        "id": "review-check",
+        "reason_code": null,
+        "sensitivity": "metadata",
+        "source": "review",
+        "status": "pass"
+      }
+    ],
+    "history": [
+      {
+        "event": "mode-frozen",
+        "sequence": 1,
+        "state": "mode-frozen"
+      },
+      {
+        "event": "baseline-verified",
+        "sequence": 2,
+        "state": "baselined"
+      },
+      {
+        "event": "writer-acquired",
+        "sequence": 3,
+        "state": "executing"
+      },
+      {
+        "event": "entered-verifying",
+        "sequence": 4,
+        "state": "verifying"
+      },
+      {
+        "event": "verification-recorded",
+        "sequence": 5,
+        "state": "verifying"
+      },
+      {
+        "event": "verification-recorded",
+        "sequence": 6,
+        "state": "verifying"
+      },
+      {
+        "event": "entered-reviewing",
+        "sequence": 7,
+        "state": "reviewing"
+      },
+      {
+        "event": "criterion-judged",
+        "sequence": 8,
+        "state": "reviewing"
+      },
+      {
+        "event": "accepted",
+        "sequence": 9,
+        "state": "accepted"
+      },
+      {
+        "event": "local-commit-created",
+        "sequence": 10,
+        "state": "accepted"
+      }
+    ],
+    "repairs": [],
+    "risks": {},
+    "schema": "harness.codex-direct-run/v1",
+    "sequence": 10,
+    "state": "accepted"
+  },
+  "events": [
+    {
+      "digest": "de21aebb2159671fe6184a4ac8e3252463bb777559c0811b37dda17cc431b435",
+      "event_id": "de21aebb2159671fe618",
+      "head_sha": "a7b0aba49c59e807cdd5a63b28d238c8e041d668",
+      "provenance": {
+        "adapter": "codex",
+        "host_event": "post-tool-use"
+      },
+      "repository_id": "repo-c1d7367892cb4fc0",
+      "schema": "harness.hook-event/v1",
+      "semantic": {
+        "category": "shell",
+        "event": "post-tool-use",
+        "exit_code": null,
+        "has_error": false,
+        "outcome": "succeeded",
+        "tool_class": "edit"
+      },
+      "sensitivity": "metadata",
+      "session_id": "session-96c1f0dbd7227a8c412b",
+      "source_adapter": "codex",
+      "terminal_state": "active",
+      "timestamp": "2026-08-14T06:41:26Z",
+      "worktree_id": "wt-4684bb5255c08311"
+    },
+    {
+      "digest": "978c5c52d2806024bdb9fa66b323d5cf2b346a9b2c6da5e8d81ec6f34d238d41",
+      "event_id": "978c5c52d2806024bdb9",
+      "head_sha": "a7b0aba49c59e807cdd5a63b28d238c8e041d668",
+      "provenance": {
+        "adapter": "codex",
+        "host_event": "stop"
+      },
+      "repository_id": "repo-c1d7367892cb4fc0",
+      "schema": "harness.hook-event/v1",
+      "semantic": {
+        "category": "shell",
+        "event": "stop",
+        "exit_code": null,
+        "has_error": false,
+        "outcome": "succeeded",
+        "tool_class": "other"
+      },
+      "sensitivity": "metadata",
+      "session_id": "session-96c1f0dbd7227a8c412b",
+      "source_adapter": "codex",
+      "terminal_state": "stopped",
+      "timestamp": "2026-08-14T06:41:26Z",
+      "worktree_id": "wt-4684bb5255c08311"
+    }
+  ],
+  "git": {
+    "accepted": {
+      "oid": "0cadc18c9cd85733875929e49130b847a204e1be",
+      "raw": "tree 08426857da2f94c1df92045b27db92bdb65cd3a6\nparent a7b0aba49c59e807cdd5a63b28d238c8e041d668\nauthor Harness Pilot <harness@example.invalid> 1786689759 +0800\ncommitter Harness Pilot <harness@example.invalid> 1786689759 +0800\n\ntest(harness): accept Codex Direct pilot\n\nHarness-Task: 41f01b277edc67a785445ffc\n"
+    },
+    "base": {
+      "oid": "a7b0aba49c59e807cdd5a63b28d238c8e041d668",
+      "raw": "tree d6effcdf28a5bf80d4a431960d64707fce4593fe\nauthor Harness Pilot <harness@example.invalid> 1786689520 +0800\ncommitter Harness Pilot <harness@example.invalid> 1786689520 +0800\n\nseed pilot\n"
+    },
+    "changed_paths": [
+      "pilot.txt"
+    ],
+    "commit_count": 1,
+    "files": {
+      ".gitignore": ".harness/\n",
+      "README.md": "# Codex Direct pilot\n",
+      "pilot.txt": "codex-direct accepted pilot\n"
+    },
+    "remote_effects": [],
+    "trees": {
+      "accepted": [
+        {
+          "mode": "100644",
+          "name": ".gitignore",
+          "oid": "bf311f63a323c46a07dcc293e55b78f934a8b4f1"
+        },
+        {
+          "mode": "100644",
+          "name": "README.md",
+          "oid": "862463c711a23318ea2a9e5cc0645967042d2e7e"
+        },
+        {
+          "mode": "100644",
+          "name": "pilot.txt",
+          "oid": "de5da81c5bd5ab83e84bc011477663bfa6f079a3"
+        }
+      ],
+      "base": [
+        {
+          "mode": "100644",
+          "name": ".gitignore",
+          "oid": "bf311f63a323c46a07dcc293e55b78f934a8b4f1"
+        },
+        {
+          "mode": "100644",
+          "name": "README.md",
+          "oid": "862463c711a23318ea2a9e5cc0645967042d2e7e"
+        }
+      ]
+    }
+  },
+  "manual_gate": {
+    "first": "reminder-emitted",
+    "implementation_write_count": 0,
+    "second": "already-reminded"
+  },
+  "memory_evolution": {
+    "command_id": "typed-memory-evolution-tests",
+    "status": "pass"
+  },
+  "mode": "codex-direct",
+  "recovery": {
+    "bundle": {
+      "adapter_switch_policy": "stop-and-report",
+      "base_sha": "a81fef21b17330613729b5a67f13386c4ad651ec",
+      "branch": "main",
+      "changed_path_count": 0,
+      "changed_paths": [],
+      "changed_paths_digest": "75924a2ed682acddb24d11db285f5b91cab452e2067cbb7417c39550f7fe3c97",
+      "changed_paths_embedded": true,
+      "commit_sha": null,
+      "diff_digest": "b1a09df078c556e1794eb480841424b4f165cced6e9259eb7d00d2524225905a",
+      "failure": {
+        "category": "adapter-failure",
+        "fingerprint": "31d34b87760c3b2d821fb1c86ca10e5c95e853bfd4917712039cddac322ab4b7"
+      },
+      "head_sha": "a81fef21b17330613729b5a67f13386c4ad651ec",
+      "incomplete_criteria": [
+        "recovery"
+      ],
+      "mode": "claude-direct",
+      "owned_path_count": 1,
+      "owned_paths": [
+        "never-written.txt"
+      ],
+      "owned_paths_digest": "3500e112256a62374131ea25ff02f23937fe013df5d5374c4ce4dd9d9bb27969",
+      "owned_paths_embedded": true,
+      "repair_attempts": 0,
+      "repository_id": "repo-01bee8bd7835b885",
+      "repository_inspection": "current",
+      "risks": [],
+      "schema": "harness.recovery-bundle/v1",
+      "staged_path_count": 0,
+      "staged_paths": [],
+      "staged_paths_digest": "75924a2ed682acddb24d11db285f5b91cab452e2067cbb7417c39550f7fe3c97",
+      "staged_paths_embedded": true,
+      "task_id": "pilot-36-claude-failure",
+      "validations": [],
+      "worktree_id": "wt-3d9d0d16eabd6136",
+      "writer_lease": {
+        "holder": "claude",
+        "state": "active"
+      }
+    },
+    "run": {
+      "baseline": {
+        "branch": "main",
+        "head_sha": "a81fef21b17330613729b5a67f13386c4ad651ec",
+        "status_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "checks": {},
+      "commit_sha": null,
+      "contract": {
+        "acceptance_owner": "claude",
+        "authority": {
+          "credentials_ssh_broad_delete_history_rewrite": "blocked",
+          "local_commit": "after-acceptance",
+          "local_read_write_test": "allowed",
+          "push_pr_tag_release_publish": "user-approval-required"
+        },
+        "execution": {
+          "adapter_switch_policy": "stop-and-report",
+          "base_sha": "a81fef21b17330613729b5a67f13386c4ad651ec",
+          "branch": "main",
+          "isolated_worktree": false,
+          "mode": "claude-direct",
+          "repository_id": "repo-01bee8bd7835b885",
+          "worktree_id": "wt-3d9d0d16eabd6136"
+        },
+        "plan": {
+          "acceptance_criteria": [
+            {
+              "description_digest": "444a788babb64431829dd7c92a7276200ab93a9c47352d146a2c0b61c5cc67ee",
+              "id": "recovery"
+            }
+          ],
+          "objective_digest": "97ca0d19b23eeab182a48bc707f3d3512f7752b3956d313b4ef31312ca287ea2",
+          "owned_paths": [
+            "never-written.txt"
+          ],
+          "repair_policy": {
+            "max_attempts": 1
+          },
+          "stop_condition_digests": [
+            "b7f0e7a9273f82623999d43ef947cf059d8f5f1f3ae3340aff04ceb463ca38a5"
+          ],
+          "verification_plan": [
+            {
+              "command_digest": "a1409ba9a6914135a567d481d27919d666ccd44db9bcd4a5e1b35f71703ace88",
+              "id": "recovery",
+              "required": true
+            }
+          ]
+        },
+        "schema": "harness.task-contract/v1",
+        "source_contract_digest": "ab49bf52e3ff1b96af97d51dd71ab0011f1714979c450d8f684dad4613976e52",
+        "state": "recovery-required",
+        "task": {
+          "id": "pilot-36-claude-failure",
+          "source_digest": "99187245cd9d1bd8ae6f6fb5bf14dd3472ec9f2493beaebf45c5321c5a671b46"
+        },
+        "writer_lease": {
+          "holder": "claude",
+          "state": "active"
+        }
+      },
+      "criteria": {},
+      "evidence_log": [],
+      "history": [
+        {
+          "event": "mode-frozen",
+          "sequence": 1,
+          "state": "mode-frozen"
+        },
+        {
+          "event": "baseline-verified",
+          "sequence": 2,
+          "state": "baselined"
+        },
+        {
+          "event": "writer-acquired",
+          "sequence": 3,
+          "state": "executing"
+        },
+        {
+          "event": "recovery-required",
+          "sequence": 4,
+          "state": "recovery-required"
+        }
+      ],
+      "recovery_bundle": {
+        "digest": "1e4dc6014a53930ea5a80c70d37b74b4657ed9adaffd28ca231260601aa4d129",
+        "failure": {
+          "category": "adapter-failure",
+          "fingerprint": "31d34b87760c3b2d821fb1c86ca10e5c95e853bfd4917712039cddac322ab4b7"
+        },
+        "file": "recovery-bundle.json",
+        "schema": "harness.recovery-bundle-ref/v1"
+      },
+      "repairs": [],
+      "risks": {},
+      "schema": "harness.claude-direct-run/v1",
+      "sequence": 4,
+      "state": "recovery-required"
+    }
+  },
+  "schema": "harness.pilot-artifact/v1"
+}

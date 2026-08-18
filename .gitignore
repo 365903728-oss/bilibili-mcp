@@ -18,10 +18,14 @@ Thumbs.db
 *.swp
 *.swo
 .claude/*
+!.claude/skills/
+!.claude/skills/**
 !.claude/agents/
 !.claude/agents/*.md
+!.claude/settings.json
 .codex/memory/
 .codex/runtime/
+.harness/
 
 # 临时文件
 *.tmp

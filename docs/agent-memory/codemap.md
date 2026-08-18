@@ -142,7 +142,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `tests/pinned-https.test.ts`: DNS/public-address rejection, connection
   pinning, TLS hostname retention, header stripping, and host enforcement.
 - `tests/publish-workflow-pins.test.ts`: full immutable SHA enforcement for
-  every third-party publish Action.
+  every third-party Action across all repository workflows.
 - `tests/subtitle-fallback-security.test.ts`: malformed subtitle fail-closed
   behavior and exact ASR eligibility.
 - `tests/helpers/mcp.ts`: centralized test access to MCP request handlers.
@@ -177,6 +177,8 @@ Default verification:
 
 - `package.json`: npm metadata, binary mapping, scripts, dependencies, and publish file allowlist.
 - `package-lock.json`: npm lockfile; update through npm tooling, not manual edits.
+- `.github/workflows/verify.yml`: read-only pull-request/default-branch CI for
+  product build/test/package checks and sharded Windows/Linux Harness tests.
 - `.github/workflows/publish.yml`: trusted-publishing npm release workflow for version tags.
 - `README.md`, `README_EN.md`: concise bilingual landing pages with project value, verified evidence workflow, installation and verification flow, task-oriented tool selection, CLI status gates, product limits, privacy and safety boundaries, plus prominent links to the canonical setup and tool references; they do not duplicate exhaustive installation or configuration methods.
 - `docs/client-setup.md`, `docs/client-setup.en.md`: canonical bilingual source for the Agent installation prompt, npm/global/source installation, all supported MCP client configurations, credential setup and login validation, and optional runtime configuration.
@@ -188,9 +190,90 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
 
 ## Agent Harness
 
-- `AGENTS.md`: Codex/project-wide operating rules, fixed skill/MCP/CLI/subagent triggers, and Codex-to-Claude collaboration model.
-- `CLAUDE.md`: Claude Code execution rules, fixed skill/subagent triggers, and report expectations.
-- `docs/agent-memory/agent-communication.md`: file-backed Codex handoff and Claude report protocol, including the required `Harness Artifacts` report section.
+- `RULES.md`: single shared constitutional/workflow core for all three execution adapters.
+- `AGENTS.md`: thin Codex adapter for `codex-direct` and Codex's controller/acceptance role in `codex-paseo-claude`.
+- `CLAUDE.md`: thin Claude adapter; imports `RULES.md` and defines `claude-direct` plus Paseo-managed writer behavior.
+- `harness/cli.py`: shared diagnostics, typed-contract validation, hook
+  ingestion/replay, manual-Skill gate, and mode-fenced `codex-direct` /
+  `claude-direct` control commands.
+- `harness/contracts.py`: three-mode owners, writer lease, authority, state,
+  terminal, no-switch, executable plan, owned-path, verification, and repair
+  invariants.
+- `harness/codex_direct.py`: shared persistent controller for both Direct
+  adapters, retaining the #30 compatibility module name. It freezes a clean
+  canonical worktree/branch/base and the mode-specific sole writer, rejects
+  cross-adapter control, uses a repository-scoped Windows mutex or POSIX
+  existing-config advisory lock to scan source-bound sibling worktree leases
+  atomically, guards fixed action classes, records an append-only bounded
+  evidence log plus current checks/criteria/risks, bounds repairs by fingerprint
+  and progress, writes Recovery Bundles, accepts the exact owned snapshot, and
+  creates one hermetic, idempotent `commit-tree`/`update-ref` post-acceptance
+  local commit.
+- `harness/memory.py`: host-neutral Issue #33 typed-memory boundary. It validates
+  bounded evidence envelopes, binds their semantic digest to a passing current
+  check on an accepted-and-committed Direct run, applies promotion and current-
+  fact supersession rules, rejects unsafe payloads and tampered state, writes
+  the deterministic typed store/current projection atomically, and records
+  metadata-only no-change/change audit outcomes. Startup reads only the bounded
+  current projection.
+- `harness/context.py`: dynamic Git repository/worktree attribution and opaque IDs.
+- `harness/events.py`: Codex/Claude payload projection into `harness.hook-event/v1`.
+- `harness/safe_io.py`: bounded JSON/JSONL, rotation, atomic replacement, and
+  descriptor-identity/link/hardlink-safe file-lock primitives.
+- `harness/paseo_collaboration.py`: Codex–Paseo–Claude collaboration seam for
+  `codex-paseo-claude` mode (Issue #32). Two-phase preflight/bootstrap gate
+  (Paseo daemon probe → bridge-trigger verification → frozen run state) with
+  accepted `start_direct` lock protocol (repository_lock identity →
+  bounded_file_lock → _repository_mutex → recheck). Live Git authority checks
+  (HEAD, branch, porcelain status) before agent creation. PascalCase Paseo
+  inspect field handling, blocking model-list failures, frozen bridge/handoff
+  digest validation. Single-agent serialized dispatch, writer-scoped
+  metadata-only report validation, attempt-keyed same-agent repair delivery,
+  unconditional ephemeral-prompt cleanup, and recovery delegation.
+  Acceptance binds launch/report/live identity to the frozen run and the
+  current diff. Collaboration guard reuses
+  `guard_codex_direct` with actor-aware passthrough for read-like actions and
+  rejects Claude `local-commit` before actor-agnostic shared delegation.
+  Thin lifecycle wrappers delegate to shared codex_direct machinery. CLI
+  routes `PaseoCollaborationError` through recovery.
+- `harness/tests/test_paseo_collaboration.py`: ~4474 lines, 73 tests (function
+  + CLI) for the collaboration seam. Git resolution via command-scoped PATH
+  (`shutil.which("git")`). Mock Paseo CLI with real PascalCase shapes. Covers
+  preflight (including Paseo 0.2.5 `connectedDaemon: reachable`), bootstrap
+  (including accepted lock protocol, repository-lock rejection, malformed
+  inspect output routing to recovery), dispatch (at-most-once sidecar,
+  persistence, rejection, oversized rejection, handoff digest validation,
+  ephemeral prompt files removed after send), collaboration guard (actor
+  validation, stage blocking, Claude local-commit denial in accepted state,
+  unknown-action fail-closed, non-zero response normalization), report (strict
+  command-key allowlist/blocklist,
+  duplicate-ID detection, agent state check, summary hashing, schema,
+  owned-path, agent-id, criterion-coverage, missing-key and extra-key
+  validation, normalized projection persistence), repair (same-agent,
+  begin_repair, attempt-keyed pending/dispatch evidence enabling sequential
+  repairs and blocking undelivered attempts), acceptance (identity/digest and
+  current-diff binding to the frozen run record, tampered/stale-sidecar
+  rejection), send-exception prompt cleanup, recovery, and the full lifecycle
+  (bootstrap → dispatch → report → accept → one-commit idempotent). The public
+  CLI boundary also rejects non-object `task` values as bounded JSON before
+  any run record or Paseo call.
+- `harness/capabilities.py`: provider/model-neutral adapter, Skill, and agent
+  discovery plus source-bound, concurrency-safe, count-bounded native-manual-
+  Skill reminder markers.
+- `harness/capability-packages/bilibili-mcp-memory/canonical.json`: canonical
+  versioned capability source. The adjacent `codex/` and `claude/` packages are
+  deterministic thin builds with matching interface/evaluation metadata and
+  host-specific manifest hashes; the runtime projector never rewrites them.
+- `harness/tests/test_memory.py`: typed contract, promotion, replay,
+  redaction/rejection, supersession, tamper, bounded startup, capability build,
+  and real disposable zero-remote Codex Direct memory-only pilot coverage.
+- `harness/fixtures/`, `harness/tests/`: replay/conformance fixtures plus
+  stdlib-only disposable-Git tests for session events, both Direct adapters'
+  state/lease/guard/recovery/acceptance/commit boundary, and the
+  `codex-paseo-claude` collaboration seam. The shared Direct conformance
+  fixture drives the same public lifecycle for Codex and Claude.
+- `docs/agent-memory/agent-communication.md`: three-mode execution/handoff/report protocol.
+- `docs/agent-memory/executions/`: unified execution and acceptance reports.
 - `docs/agent-memory/handoffs/`: durable Codex-to-Claude handoffs, Claude reports, and task-ticket-backed handoff artifacts.
 - `docs/agent-memory/project-facts.md`: durable current facts.
 - `docs/agent-memory/decisions.md`: durable workflow and technical decisions.
@@ -216,11 +299,14 @@ Claude reports must include a `Harness Artifacts` section covering task ticket, 
 
 ## Hooks And Runtime Memory
 
-- `.claude/settings.local.json`: Claude Code project hook registration.
-- `.codex/hooks.json`: Codex app hook registration.
-- `.codex/scripts/`: shared hook scripts and local harness utilities.
-- `.codex/scripts/hook_safety.py`: bounded hook JSON/JSONL readers, locks,
-  atomic writes, state retention, and symlink refusal.
+- `.claude/settings.json`: tracked portable Claude Hook adapter using `${CLAUDE_PROJECT_DIR}`. Machine-local `bypassPermissions` remains in ignored settings.
+- `.codex/hooks.json`: portable Codex Hook adapter that resolves `git rev-parse --show-toplevel` at invocation time.
+- `python -m harness doctor`: inventories both Codex Skill roots and reports
+  overlapping primary/user Codex or machine-local Claude Hook registrations
+  without echoing commands or rewriting external configuration.
+- `.harness/runtime/<worktree-id>/<session-id>/events.jsonl`: ignored, redacted, bounded runtime ledger scoped to the invoking worktree.
+- `.codex/scripts/`: legacy Hook utilities retained for compatibility while registrations use the shared CLI.
+- `.codex/scripts/hook_safety.py`: compatibility re-export of the canonical `harness/safe_io.py` safety implementation.
 - `.codex/scripts/test_hook_safety.py`: deterministic hook input, retention,
   prompt-injection, and fixed-metadata regressions.
 - `.codex/scripts/plan_tracker.py`: active implementation-plan tracking for phase-gated learning reminders.
@@ -231,10 +317,58 @@ Claude reports must include a `Harness Artifacts` section covering task ticket, 
 - `.codex/scripts/pre_compact.py`: pre-compact checkpoint support.
 - `.codex/scripts/post_tool_use.py`: failed shell observation capture and candidate scoring.
 
-Runtime observations are intentionally separate from formal memory:
+Runtime observations are intentionally separate from formal memory and are now
+attributed to the invoking worktree rather than a machine-specific main checkout.
 
-- Codex runtime observations: `C:\Users\ZX\.codex\memories\bilibili-mcp\`.
-- Claude runtime observations: `.claude\memory\` and `.claude\runtime\`.
+Governed capability evolution:
+
+- `harness/evolution.py`: accepted-gap gate, independent Direct-writer binding,
+  Search/Adapt/Build state, bounded and byte-verified candidate schema,
+  canonical Skill/Agent compiler, derived repository-local host deployment,
+  fixed machine-run evaluator/holdout cases, candidate-scoped rollback/Recovery,
+  and rejected/deferred/promotable reports.
+- `harness/fixtures/evolution-build-capability.json`: safe, dependency-free,
+  repository-local Build fixture with read-only zero-child agent policy.
+- `harness/tests/test_evolution.py`: public CLI and compiler coverage including
+  accepted-gap provenance, linked worktree writer, protected paths, pinned
+  Search/Adapt, one authorization stop with no local resolution, Build
+  success/failure, exact host-schema/discovery-path conformance, drift,
+  self-approval denial, scoped
+  rollback, sibling preservation, and exact-one-commit zero-remote pilots.
+- `harness/evolution.py` also owns v2 MCP/CLI/Hook/Loop surface validation,
+  four-channel Search records, immutable canonical-JSON verification, safe
+  auto-Adapt eligibility, three-adapter repository-local discovery/smoke,
+  Hook evidence checks, and bounded Loop step decisions. It extends the #34
+  state machine rather than adding a controller.
+- `harness/cli.py::capability discover|smoke|call|serve|hook-event|loop-step`:
+  public process seam for exact deployment discovery, behavior-derived smoke,
+  bounded CLI calls, stable MCP stdio, capability-bound Hook event persistence,
+  and stateless Loop decisions. These are Harness-only commands and do not
+  change `src/cli.ts` or the npm package.
+- `harness/fixtures/evolution-build-surface.json`: dependency/script/executable-
+  free v2 CLI Build fixture; tests derive MCP, Hook, and Loop variants from the
+  same canonical safe source.
+- `harness/fixtures/three-adapter-conformance.json`: #36 shared matrix for the
+  typed contract, constitutional kernel, per-pilot checks, migration checks,
+  public mode commands, writers, acceptance owners, native manual invocations,
+  and run/control schemas. Direct and collaboration lifecycles reuse their
+  existing controllers; this fixture adds no fourth controller.
+- `harness/fixtures/three-adapter-pilot-evidence.json` and
+  `harness/fixtures/pilot-artifacts/*.json`: thin migration index plus native
+  controller/Recovery snapshots, recomputable Git commit/tree/blob objects,
+  typed event rows, and bounded authority receipts for all three real pilots.
+  The migration artifact binds command receipts, live package output, durable
+  file hashes, dirty-primary isolation, and exact-#35 clean-room bytes.
+- `harness/events.py::normalize_hook_event`: shared #36 redaction seam that
+  binds adapter/host-event provenance, metadata sensitivity, terminal state,
+  and a full digest before persistence under the canonical worktree identity.
+- `harness/tests/test_evolution.py`, `test_events.py`, and
+  `test_cli_and_adapters.py`: v2 Search/Adapt/Build, dangerous-effect authority,
+  all-three-adapter discovery/smoke, Hook policy/evidence, Loop stop/yield/no-
+  switch, rollback, package-boundary, zero-remote, and exact-one-commit coverage.
+- `harness/memory.py::compile_host_package`: shared deterministic host-manifest
+  seam used by typed memory and governed evolution; it does not grant the memory
+  projector capability-write authority.
 
 ## Project Agents And Skills
 
@@ -253,9 +387,15 @@ Codex custom agents:
 - `.codex/agents/risk-reviewer.toml`: focused risk review.
 - `.codex/agents/release-verifier.toml`: release readiness verification.
 
-Fixed skill trigger details live in `AGENTS.md` and `CLAUDE.md`. Do not assume Codex skills, `.agents\skills`, and Claude Code skills are shared unless the skill exists in the target runtime.
+Fixed phase routing and manual-Skill boundaries live in `RULES.md`; adapter
+deltas live in `AGENTS.md` and `CLAUDE.md`. Do not assume Codex skills,
+`.agents\skills`, and Claude Code skills are shared unless the Skill is
+discovered in the target runtime.
 
-Matt Pocock workflow skills are installed in both Codex and Claude Code. GitHub Issues hold Matt specs and tickets, substantial Claude implementation continues through file-backed handoffs, and Codex uses Paseo CLI to launch one bounded implementation agent. Do not invoke Superpowers skills; project Git, security, verification, and no-autonomous-team rules override conflicting skill defaults.
+Matt Pocock workflow Skills remain native manual when their metadata says so.
+The Harness emits one reminder but never imitates them. GitHub Issues hold Matt
+specs/tickets. Do not invoke Superpowers or `ai-coding-harness` Skills unless
+the user explicitly reintroduces them.
 
 ## Common Change Routes
 

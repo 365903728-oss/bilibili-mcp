@@ -37,6 +37,7 @@ def count_json_hooks(path: Path) -> int:
 
 def main() -> int:
     files = [
+        ROOT / "RULES.md",
         ROOT / "AGENTS.md",
         ROOT / "CLAUDE.md",
         ROOT / "docs" / "agent-memory" / "README.md",
@@ -47,7 +48,14 @@ def main() -> int:
         lines, tokens = file_tokens(path)
         rows.append((str(path.relative_to(ROOT)), lines, tokens))
 
-    hook_count = count_json_hooks(ROOT / ".codex" / "hooks.json") + count_json_hooks(ROOT / ".claude" / "settings.local.json")
+    hook_count = sum(
+        count_json_hooks(path)
+        for path in (
+            ROOT / ".codex" / "hooks.json",
+            ROOT / ".claude" / "settings.json",
+            ROOT / ".claude" / "settings.local.json",
+        )
+    )
     total_tokens = sum(row[2] for row in rows)
     status = "OK"
     if total_tokens > 12000 or hook_count > 12:
@@ -74,7 +82,7 @@ def main() -> int:
         "",
         "## Guidance",
         "",
-        "- Keep AGENTS.md and CLAUDE.md focused; avoid duplicating long workflow text.",
+        "- Keep RULES.md canonical and AGENTS.md/CLAUDE.md as thin adapter deltas.",
         "- Keep hooks project-local and avoid loading broad external rules by default.",
         "- Prefer on-demand skills over always-loaded instructions.",
         "- Re-run this script after adding MCP servers, broad rules, or large agent docs.",

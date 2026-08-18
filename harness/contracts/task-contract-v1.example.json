@@ -1,0 +1,68 @@
+{
+  "schema": "harness.task-contract/v1",
+  "task": {
+    "id": "github:#30",
+    "source": "https://github.com/XZXZZX-Ai/bilibili-mcp/issues/30"
+  },
+  "execution": {
+    "mode": "codex-direct",
+    "canonical_worktree": "C:/absolute/path/to/worktree",
+    "base_sha": "0000000000000000000000000000000000000000",
+    "branch": "codex/harness-v2-codex-direct-30",
+    "adapter_switch_policy": "stop-and-report"
+  },
+  "plan": {
+    "objective": "Complete one approved Codex Direct ticket.",
+    "owned_paths": [
+      "harness/",
+      "docs/agent-memory/executions/2026-08-11-github-30-codex-direct-report.md"
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "accepted-ticket-loop",
+        "description": "The bounded ticket reaches acceptance with typed evidence."
+      }
+    ],
+    "verification_plan": [
+      {
+        "id": "harness-tests",
+        "command": "python -m unittest discover -s harness/tests -p test_*.py",
+        "required": true
+      }
+    ],
+    "repair_policy": {
+      "max_attempts": 2
+    },
+    "stop_conditions": [
+      "adapter-failure",
+      "new-authority",
+      "scope-expansion"
+    ]
+  },
+  "writer_lease": {
+    "holder": "codex",
+    "state": "inactive"
+  },
+  "acceptance_owner": "codex",
+  "authority": {
+    "local_read_write_test": "allowed",
+    "local_commit": "after-acceptance",
+    "push_pr_tag_release_publish": "user-approval-required",
+    "credentials_ssh_broad_delete_history_rewrite": "blocked"
+  },
+  "state": "ready",
+  "terminal_states": [
+    "accepted",
+    "blocked",
+    "cancelled",
+    "recovery-required"
+  ],
+  "required_manual_skills": [
+    {
+      "name": "implement",
+      "host": "codex",
+      "status": "invoked",
+      "invocation": "$implement"
+    }
+  ]
+}

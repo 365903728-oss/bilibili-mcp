@@ -415,6 +415,335 @@
 - Evidence: the v1.11.2 403 response and the successful v1.11.3 publication and
   exact-match Official Registry API response.
 
+## 2026-08-12
+
+- Decision: Implement the `codex-paseo-claude` collaboration adapter as a thin
+  seam on the shared #30/#31 Direct controller rather than a parallel controller.
+- Reason: Contract validation, repository mutex, sibling-worktree scan, state
+  persistence, edit guards, recovery bundles, acceptance, and commit are shared
+  semantics. Duplicating them would create drift and increase audit surface.
+- Evidence: `harness/paseo_collaboration.py` reuses `validate_task_contract()`,
+  `start_direct`, `_commit_unlocked`, `accept_codex_direct`, and the shared
+  safe-I/O/locking/recovery machinery. The collaboration-specific seam is ~1479
+  lines vs. a hypothetical ~2500+ line copied controller.
+
+- Decision: Use vertical-slice CLI tracer tests with disposable Git repositories
+  and command-scoped fake Paseo executables instead of patching private functions.
+- Reason: Public-seam tests survive implementation rewrites and catch
+  cross-boundary defects (authority freeze before launch, at-most-once dispatch,
+  fail-closed inspect, stage guards) that private-function mocks miss.
+- Evidence: All 8 Round 3 repair findings resolved to green CLI tracer tests.
+  The original private-function patch approach required a complete rewrite.
+
+- Decision: Freeze authority (mode, base, branch, worktree, Codex acceptance
+  owner, active Claude lease, owned paths, pending agent state) into a durable
+  run record BEFORE the external `paseo run` call.
+- Reason: A Paseo launch failure after partial freeze would leave invisible
+  state; freezing first makes every failure recoverable from the durable run.
+- Evidence: `test_slice1_run_json_frozen_before_paseo_run` — run.json exists
+  with complete frozen authority before the fake Paseo CLI records its `run`.
+
+- Decision: Delete `_validate_collaboration_contract` and keep only
+  collaboration-specific assertions inline in `paseo_bootstrap`.
+- Reason: The function duplicated `validate_task_contract()` checks already
+  performed by the shared `contracts.py` validator. The active inline assertions
+  (branch, plan, state, lease, acceptance owner, manual Skill gate) are the
+  actual collaboration-specific additions.
+- Evidence: 36/36 tests pass after removal of the 66-line dead function.
+
+- Decision: Treat bridge metadata as pre-invocation intent and require the
+  real Paseo/Claude activity log to prove host-native `/implement` before final
+  acceptance.
+- Reason: A JSON bridge can freeze ordering and digests, but it cannot prove
+  that Claude Code actually routed the user message through its manual Skill.
+- Evidence: The disposable Issue #32 pilot log contains `/implement` as the
+  Claude host user message before the guarded write; its frozen agent, provider,
+  model, mode, and cwd match the controller run and launch evidence.
+
+- Decision: Keep transient prompt files only for the duration of `paseo send`
+  and remove them in `finally` on both success and failure.
+- Reason: A failed adapter call must preserve the metadata-only prepared intent
+  without retaining raw handoff or review text in ignored runtime state.
+- Evidence: `test_fix12_send_exception_removes_prompt_files` proves both
+  dispatch and repair retain pending intent, write no success sidecar, send
+  once, remove the prompt, and leave HEAD unchanged.
+
+- Decision: When the user explicitly changes the implementation model after a
+  frozen writer is idle, perform a sequential lease transfer: release the old
+  logical lease, launch exactly one replacement with an explicit runtime
+  override, live-inspect model/mode/cwd, and only then dispatch the next bounded
+  repair.
+- Reason: Paseo 0.2.5 cannot change the model of an existing agent in place.
+  Guessing an alias or leaving both agents writable would violate live routing
+  and single-writer authority.
+- Evidence: Attempt 7 transferred from idle agent `72f2b418…` to
+  `0bdef442…`, inspected `claude/deepseek-v4-pro[1m]`,
+  `bypassPermissions`, canonical cwd, and thinking `max`, then released the
+  replacement lease after its bounded repair. No daemon restart or overlap
+  occurred.
+
+- Decision: Enforce collaboration actor ownership before delegating an action
+  to an actor-agnostic shared guard.
+- Reason: Shared `local-commit` semantics correctly gate accepted state but do
+  not know whether Codex or Claude invoked them. Delegating first allowed an
+  accepted Claude caller to inherit Codex's commit authority.
+- Evidence: Repair attempt 8 added the early Claude `local-commit` denial and
+  an accepted-lifecycle regression proving Claude blocked and Codex allowed.
+  The same DeepSeek V4 Pro writer returned idle and both independent reviewers
+  passed the repair.
+
+## 2026-08-11
+
+- Decision: Use one shared `RULES.md` constitutional/workflow core with thin
+  Codex and Claude adapter documents for `codex-direct`,
+  `codex-paseo-claude`, and `claude-direct`.
+- Reason: Security, authority, Git, acceptance, memory, and capability rules
+  need one source of truth while execution ownership remains adapter-specific.
+- Evidence: GitHub Issues #28/#29, the typed contract, clean host rule-discovery
+  smokes, and both final #29 reviewers.
+
+- Decision: Route both clients' Hook observations through one repository-local
+  Harness CLI and ignored worktree-scoped ledger; diagnose overlapping external
+  Hooks but never rewrite machine or primary-worktree configuration implicitly.
+- Reason: Dynamic Git attribution prevents cross-worktree state pollution, and
+  explicit migration preserves the user's local configuration and authority.
+- Evidence: replay/process-boundary tests, the trusted Codex lifecycle overlap
+  observation, real Claude failure lifecycle, and `harness doctor` reporting
+  tracked/primary/user Codex command counts `4/5/0` as `action-required`.
+
+- Decision: Preserve Matt Skills' native manual metadata. A missing invocation
+  blocks governed writes and receives one host-native reminder whose source-
+  bound marker is atomic under one shared lock and fails closed at 512 retained
+  ticket reminders.
+- Reason: The controller may remind the user, but cannot silently imitate a
+  phase-changing manual workflow or flood duplicate reminders under concurrency.
+- Evidence: `$implement` authorization for #29/#30, host-bound contract tests,
+  24-way concurrent/cross-worktree regressions, collision coverage, and the
+  capacity regression that preserves an old ticket's one-shot marker.
+
+- Decision: Persist a digested Codex Direct runtime projection rather than the
+  complete input task contract, and serialize every state transaction under a
+  bounded per-task lock.
+- Reason: The controller needs typed plan identity, scope, exit/result/diff
+  evidence, and recovery state, but raw commands and an absolute private
+  checkout path are not required after validation. Load-modify-save without a
+  lock can also lose risks or accept against stale evidence.
+- Evidence: Issue #30 Standards review, metadata-only/symlink regressions,
+  24-way concurrent risk regression, read-back-verified persistence, and the
+  real pilot's raw-path/raw-command absence checks.
+
+- Decision: Bind the writer lease to the frozen canonical worktree and branch,
+  task source digest, and task ID; keep every generated record in that
+  worktree's ignored `.harness/runtime/`; serialize sibling-lease discovery
+  with a repository-scoped named OS mutex on Windows or a non-mutating advisory
+  lock on the existing repository config on POSIX; and make acceptance invoke
+  the exact local commit automatically while retaining `commit` only as an
+  idempotent crash-recovery seam.
+- Reason: The canonical-worktree check rejects replay of the frozen contract,
+  but two concurrently altered contracts for the same ticket also need an
+  atomic repository view, including aliases that change only the task ID. A
+  common-Git marker would violate the worktree-local runtime boundary; the OS
+  mutex/POSIX existing-file lock supplies exclusion while every lease/run
+  record stays local. Keeping accepted state separate from an optional ordinary
+  commit would also weaken the one-commit lifecycle.
+- Evidence: concurrent distinct-linked-contract and task-alias regressions,
+  malformed sibling-state fail-closed coverage, unchanged config-byte
+  assertion, same-worktree concurrency regression, and the v6 pilot's absence
+  of common-Git state.
+
+- Decision: Treat the automatic commit as a protected Harness effect: derive
+  the accepted tree in a temporary Git directory/index with frozen-base
+  attributes and allowlisted built-in conversion settings; hold Git's native
+  `index.lock`; create the commit with `commit-tree`; move only the frozen branch
+  with compare-and-swap `update-ref`; and verify branch, single parent, trailer,
+  index, paths, content/mode snapshot, and clean postcondition.
+- Reason: Configured Hooks, signing, filters, or a staged accepted snapshot on
+  the wrong HEAD can create remote/credential effects or make a different
+  commit look accepted without passing the authority gate.
+- Evidence: Hook/signing/filter regressions, late-filter and concurrent-index
+  injection red/green regressions, CRLF/symlink semantics, post-ref index crash
+  recovery, altered-owned-diff rejection, and the one-commit/no-remote v6
+  pilot.
+
+- Decision: Implement Claude Direct as a second, mode-fenced public entrypoint
+  to the #30 Direct controller instead of copying or switching controllers.
+- Reason: Locking, canonical worktree/source identity, evidence, repair,
+  recovery, acceptance, and commit are shared semantics. The invoked command
+  must still match the frozen run mode so a Codex command cannot inspect or
+  mutate a Claude lease, or vice versa. The `codex_direct.py` module and
+  Codex-named Python compatibility functions remain to avoid a churn-only
+  refactor; the public CLI, persisted schemas, and ownership that define
+  authority are mode-specific.
+- Evidence: live Issue #31, the shared process-lifecycle conformance fixture,
+  cross-mode status/mutation rejection, mixed Codex/Claude linked-worktree
+  writer collision, and the real Claude Direct pilot.
+
+- Decision: Run the required real Claude Direct pilot in an ignored,
+  zero-remote Harness-only repository with project settings only, strict empty
+  MCP configuration, bypass permissions, no session persistence, a bounded
+  spend cap, and no model/provider/fallback flag.
+- Reason: This proves the actual Claude Code host path while excluding global
+  Hook/MCP interference and all product, credential, SSH, and remote effects.
+  The pilot contract has no required manual Skill, so it does not falsely claim
+  a user-native `/implement`; that gate is verified independently at the public
+  CLI boundary.
+- Evidence: Claude Code 2.1.212 attempt 2, accepted pilot commit
+  `d4875bfe6b21e2e460d7fad2ebb59e3165a32c1e`, zero remotes, the redacted run
+  ledger, and one-reminder/zero-write Claude manual-Skill regressions.
+
+## 2026-08-13
+
+- Decision: Project typed memory after source-task acceptance through a separate
+  memory-only Codex Direct task, not from Hooks and not inside the acceptance or
+  commit controller.
+- Reason: Acceptance freezes the reviewed diff and immediately creates the
+  exact commit. Writing memory inside that transaction would invalidate its
+  evidence/snapshot semantics, while Hook observations and Markdown reports do
+  not contain a trustworthy typed candidate contract.
+- Evidence: The Issue #33 pilot accepted a source task first, then used the
+  unchanged shared #30 controller to accept exactly one memory-owned commit.
+
+- Decision: Bind an envelope's semantic candidate content to acceptance with a
+  canonical digest that excludes only the not-yet-known source commit SHA and
+  the self-referential evidence-digest fields.
+- Reason: A task must be able to record the digest before its acceptance commit
+  exists, while the later projector must still reject changed type, subject,
+  value, evidence kind, sensitivity, date, or task identity.
+- Evidence: Public `memory digest` and content-binding regressions prove that
+  post-acceptance semantic mutation is rejected even if a caller reuses the
+  previously accepted digest.
+
+- Decision: Treat equal-time conflicting current facts as invalid input rather
+  than selecting a winner by record ID or arrival order.
+- Reason: Neither content hashing nor replay order is evidence of temporal
+  precedence; choosing one would make authoritative context arbitrary.
+- Evidence: The same-validity conflict regression fails closed, while a newer
+  valid-from value supersedes the old record and removes it from startup.
+
+- Decision: Compile both host capability packages from one tracked canonical
+  source and keep the projector's runtime output allowlist separate from those
+  packages.
+- Reason: Host guidance must remain synchronized without granting memory data
+  the authority to change Skills, Agents, CLI, Hooks, Loops, or evaluation.
+- Evidence: Byte-for-byte compiler tests cover Codex and Claude interface,
+  evaluation, Skill, and manifest artifacts; the projection tests allow only
+  the two memory JSON outputs plus ignored audit metadata.
+
+- Decision: Add one thin Evolution seam that consumes accepted typed gaps and
+  delegates task/worktree/writer/evidence/acceptance/commit semantics to the
+  existing Direct controller.
+- Reason: A second controller would duplicate the already-accepted authority
+  and exact-one-commit state machine; memory projection itself cannot safely
+  gain capability-write or evaluation authority.
+- Evidence: Public CLI pilots start a normal Direct task first, then require an
+  independent linked worktree and exact capability/report ownership before an
+  Evolution state record exists.
+
+- Decision: Treat installed catalog discovery and pinned official/live GitHub
+  metadata as evidence, not instructions; never execute an unpinned discovery
+  or installer route automatically.
+- Reason: The installed `find-skills` route names unversioned `npx`, which may
+  fetch and execute external code. Search does not need execution authority to
+  compare immutable source, license, artifact, compatibility, smoke, and local
+  provenance.
+- Evidence: The `vitest` pilot performs bounded no-credential reads of the
+  immutable GitHub artifact and license, records their verified byte/hash
+  evidence with local digests, detects mismatch/unknown installed provenance,
+  and defers with zero capability write.
+
+- Decision: Compile both Skill and Agent projections from one exact canonical
+  source and freeze evaluator/holdout plus a Git capability snapshot outside
+  candidate ownership.
+- Reason: Host prose synchronization alone cannot prove identical interfaces,
+  bounded authority, absence of autonomous agent trees, or reliable rollback.
+- Evidence: Derived-path and exact-file/byte checks, native host parser tests,
+  frozen evaluator/holdout descriptors with Harness-run cases, projection
+  drift, scoped restoration, and sibling-preservation tests all fail closed
+  before Direct acceptance.
+
+- Decision: Persist a deterministic accepted-task receipt with capability-gap
+  provenance instead of depending on disposable ignored runtime state.
+- Reason: Evolution needs durable terminal/commit/diff/tree evidence after the
+  source worktree is gone. This follows the repository-process/Git trust model;
+  it is not a cryptographic claim against a same-account Git rewriter.
+
+- Decision: Extend the #34 Evolution schema and compiler with one v2 surface
+  field instead of introducing MCP-, CLI-, Hook-, or Loop-specific controllers.
+- Reason: Accepted-gap provenance, writer authority, evaluator/holdout,
+  rollback, report, Recovery Bundle, and exact-one-commit semantics are already
+  shared. Only discovery, smoke, and surface-specific policy differ.
+- Evidence: All four surface Build variants and a pinned safe CLI Adapt pass
+  through the existing `evolution start|search|adapt|build|evaluate` and Direct
+  acceptance paths in disposable linked worktrees.
+
+- Decision: Auto-Adapt only immutable, byte-canonical, data-only v2 sources
+  whose exact projections are compiled by the governor itself.
+- Reason: Candidate claims cannot authorize their own installation, while a
+  verified declarative source can be inspected and compiled without executing
+  dependencies, scripts, installers, daemons, or network behavior.
+- Evidence: Unverified candidate compatibility/smoke/install claims are ignored;
+  credentials, elevation, daemons, ports, global mutation, SSH, publishing,
+  runtime writes, and unsafe network/data combinations still block adoption.
+
+- Decision: Keep Loop decisions stateless at the shared CLI seam and Hook
+  evolution observation-only through one deployed, capability-bound event seam.
+- Reason: A stateful autonomous runner or self-mutating Hook would duplicate
+  controller authority and make yield/no-switch guarantees harder to audit.
+- Evidence: The public Loop step consumes bounded fingerprints/evidence and
+  returns only continue/stop/yield. Hook smoke snapshots the deployed manifest,
+  tracked configurations, runtime canary, and ledger; it invokes and replays the
+  public handler, reads attributed redacted events, then restores the same
+  snapshots while leaving the Git diff unchanged.
+
+- Decision: Derive each v2 Search channel result from its fetched response and
+  require the caller record to match that normalized result.
+- Reason: URL, digest, and byte count prove response identity but cannot prove a
+  caller's `candidate`, `no-match`, or `rejected` interpretation.
+- Evidence: Candidate-bound official, MCP Registry, npm version, and immutable
+  GitHub response parsers reject a forged result even when its HTTPS bytes and
+  digest are otherwise valid.
+
+## 2026-08-14 — Harness v2 Issue #36 checkpoint
+
+- Decision: Express migration acceptance as one fixture-backed matrix plus
+  real adapter evidence, not a new orchestration controller.
+- Reason: Contract, authority, lease, evidence, Recovery, memory, Evolution,
+  and exact-commit behavior already live in the accepted shared core. The
+  integration ticket only needs a common comparison surface and current-
+  baseline evidence.
+- Evidence: The Direct lifecycle filters the shared fixture by lifecycle kind;
+  the generic contract test validates all modes and public mode commands.
+
+- Decision: Bind Hook-event provenance and terminal state inside the redacted
+  digest source.
+- Reason: A truncated digest over session plus semantic data could collide
+  across hosts and did not explicitly prove sensitivity or terminal state.
+- Evidence: Equivalent Codex/Claude semantics now retain distinct full digests,
+  metadata sensitivity, adapter/host-event provenance, and active/stopped state
+  without storing the raw payload.
+
+- Decision: Start the Paseo daemon only after explicit task-local user
+  authority, then freeze the resolved provider and forbid restart, switching,
+  or fallback throughout the pilot.
+- Reason: The real third pilot is required by #36, but that requirement does
+  not erase the adapter's external-process authority gate.
+- Evidence: `paseo start` was called once after authorization; preflight bound
+  Paseo 0.3.1 and `claude/deepseek-v4-flash` with
+  `restarted_daemon=false` and `fallback_chosen=false`; the accepted run kept
+  `codex-paseo-claude` through commit and lease release.
+
+## 2026-08-16 — Pull-request verification CI
+
+- Decision: Add one read-only `Verify` workflow for pull requests, `master`
+  pushes, and manual runs; keep npm publication in the existing tag-only
+  workflow.
+- Reason: Automated review and release-time testing do not provide a
+  deterministic clean-runner gate for every proposed commit. Product checks
+  need one Linux job, while Harness filesystem and adapter behavior needs
+  sharded Windows/Linux coverage without a 30-minute monolithic suite.
+- Evidence: The workflow fixes official Actions to full immutable SHAs, grants
+  only `contents: read`, cancels superseded branch runs, and exposes one stable
+  `Required` gate over product plus six Harness matrix jobs.
 ## 2026-08-18
 
 - Decision: Treat Bilibili `lan === "ai-zh"` as the distinct public source

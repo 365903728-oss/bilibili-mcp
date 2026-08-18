@@ -1,0 +1,13 @@
+{
+  "session_id": "fixture-session",
+  "event_timestamp": "2026-08-09T00:00:00Z",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "mcp__fixture__read",
+  "tool_input": {
+    "topic": "fixture"
+  },
+  "tool_response": {
+    "success": true,
+    "message": "A successful response may contain a message field"
+  }
+}

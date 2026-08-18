@@ -255,6 +255,298 @@
   stdout/stderr logs in a sibling path, and never delete or overwrite an
   existing scan merely to retry startup.
 
+## 2026-08-11
+
+- Lesson: A shared state machine still needs the invoked adapter as an explicit
+  transaction invariant.
+- Evidence: The first Claude Direct red test showed `codex-direct status` could
+  read a valid Claude run when validation trusted only the persisted mode.
+- Future behavior: Pass and validate `expected_mode` at the shared load boundary
+  for every read and mutation, including recovery and commit, and test at least
+  one cross-mode mutation as well as status.
+
+- Lesson: One-shot state rollback must derive identity through the same helper
+  as creation.
+- Evidence: Source-scoped manual-Skill markers were created with
+  `source:<digest>` but unstable-start rollback originally recomputed the marker
+  from task ID, consuming a reminder the user never received.
+- Future behavior: Centralize durable identity derivation and leave a red/green
+  rollback test whenever lock or persistence code can fail after a one-shot
+  effect.
+
+## 2026-08-12
+
+- Lesson: Public CLI tracer tests with disposable Git repositories survive
+  implementation rewrites; private-function patches do not.
+- Evidence: The original Issue #32 implementation patched private
+  `_run_paseo_cli` and other internal functions. Round 3 review found 13
+  defects that required a complete rewrite. The replacement vertical-slice
+  CLI tracer tests exercise the public `python -m harness codex-paseo-claude`
+  seam through process-boundary fixtures with fake Paseo executables.
+- Future behavior: For new Harness adapters, start with one public-seam CLI
+  tracer test that is red against the current implementation. Mock only the
+  external system boundary. Private-function mocks couple tests to
+  implementation details that reviews will change.
+
+- Lesson: Freeze authority before any external launch, not after.
+- Evidence: The original bootstrap called `paseo run` before persisting
+  authority. A Paseo failure after launch but before persistence would leave
+  invisible state. Slice 1's red test proved run.json did not exist before
+  the fake Paseo CLI recorded `run`.
+- Future behavior: Persist the complete frozen authority (mode, base, branch,
+  worktree, owners, lease, owned paths, pending state) as a durable run record
+  BEFORE any external side effect. Make every post-freeze failure recoverable
+  from that record.
+
+- Lesson: Dead code that duplicates a shared seam is a review finding, not a
+  style preference.
+- Evidence: `_validate_collaboration_contract` (~66 lines) duplicated
+  `validate_task_contract()` checks already performed by the shared
+  `contracts.py` validator. Removing it reduced audit surface and eliminated
+  the risk of the two validators drifting apart.
+- Future behavior: Before freezing a new adapter, grep for functions that
+  reimplement shared-controller semantics and replace them with thin wrappers
+  plus adapter-specific inline assertions.
+
+- Lesson: A manual-Skill bridge record is not native invocation evidence.
+- Evidence: The Issue #32 bridge froze `/implement`, contract, handoff, owner,
+  lease, worktree, base, and branch before dispatch, while the real Paseo log
+  separately showed `/implement` as the Claude host user message.
+- Future behavior: Keep bridge evidence for ordering and digest binding, then
+  require host activity evidence before claiming a native manual Skill ran.
+
+- Lesson: On Windows, a Git Bash command can find `git` while a child Windows
+  Python process cannot resolve it from the inherited POSIX-style `PATH`.
+- Evidence: The real pilot's first public guard returned
+  `unable to inspect Git worktree`; the same-agent retry with a process-local
+  Git `cmd` PATH prefix passed without changing config, tracked files, or the
+  frozen provider.
+- Future behavior: Use a command-scoped, verified Git PATH for Harness Python
+  processes on Windows; never hard-code it in repository contracts or rules.
+
+- Lesson: A live model switch is a lease transition, not a label edit.
+- Evidence: Paseo 0.2.5 exposed thinking updates on an existing agent but no
+  model-update command. Issue #32 therefore released the idle original writer,
+  created one replacement with the official runtime route, verified its
+  identity, and kept the old agent idle. Paseo also reported that a new thinking
+  level applies on the next turn, so a second bounded verification turn proved
+  `max` was active.
+- Future behavior: Resolve the official model ID live, never encode it in
+  governance contracts, and require inspect evidence plus a non-overlapping
+  lease transfer before the replacement can write.
+
+- Lesson: Actor-specific authority must be decided before an actor-agnostic
+  shared state guard.
+- Evidence: The shared `local-commit` guard correctly allowed accepted runs,
+  but the collaboration wrapper originally applied no Claude-specific denial.
+  Final staged review therefore found that Claude could inherit Codex's commit
+  permission. Attempt 8 moved the denial ahead of shared delegation and proved
+  both actors in one accepted-lifecycle regression.
+- Future behavior: When a shared controller intentionally lacks actor identity,
+  enforce host ownership at the adapter boundary before calling it, then retain
+  the shared state gate for the authorized actor.
+
+- Lesson: Ephemeral prompt cleanup belongs in `finally`, not only after a
+  successful adapter call.
+- Evidence: Independent review found failed `paseo send` paths could retain raw
+  handoff/review text. The final regression proves cleanup on send exceptions
+  while keeping prepared intent and withholding success evidence.
+- Future behavior: For any file-backed external send, persist only bounded
+  metadata, clean the content file unconditionally, and treat ambiguous sends
+  as recovery rather than automatic retry.
+
+## 2026-08-13
+
+- Lesson: Acceptance metadata proves a task passed; it does not supply the
+  semantic memory candidate.
+- Evidence: The shared Direct run stores current digests, statuses, criteria,
+  risks, accepted paths, and commit identity, but deliberately stores no fact
+  text or raw command output. Issue #33 therefore added a bounded typed envelope
+  whose semantic digest must already be present in passing accepted evidence.
+- Future behavior: Never infer durable memory by scraping execution reports,
+  Hook ledgers, stdout/stderr, or adapter sidecars. Require an exact typed
+  candidate and an accepted digest binding.
+
+- Lesson: Repetition inside one task is deduplication evidence, not independent
+  support for a general process lesson.
+- Evidence: Replaying or duplicating a process observation under one task ID
+  leaves the lesson proposed; the same lesson becomes accepted only after a
+  second independently accepted task ID, unless the source is an explicit user
+  correction.
+- Future behavior: Count distinct accepted tasks at promotion boundaries and
+  preserve all bounded provenance without inflating support counts.
+
+- Lesson: Determinism must fail closed when evidence cannot order two current
+  truths.
+- Evidence: A newer `valid_from` supersedes the old current fact; two different
+  values at the same timestamp are rejected instead of being ordered by hash or
+  replay sequence.
+- Future behavior: Require meaningful temporal precedence for supersession;
+  never turn an implementation tie-breaker into factual authority.
+
+- Lesson: An accepted capability gap is authority to start a separate governed
+  run, not authority to install the first plausible candidate.
+- Evidence: The #34 Search pilot found an installed and upstream `vitest`
+  capability but their bytes/provenance did not match; the run deferred and
+  produced only a bounded report.
+- Future behavior: Preserve Search evidence and choose Adapt only after pinned
+  source, immutable license/artifact evidence, compatibility, smoke, effects,
+  and rollback all pass. Never run an unpinned package-manager discovery route
+  merely to satisfy a search checkbox.
+
+- Lesson: Candidate-owned paths are not a sufficient evolution sandbox.
+- Evidence: The generic Direct contract correctly permits arbitrary declared
+  repository-relative paths, but #34 derives one strict capability/report path
+  set, rejects Windows aliases and ignored outputs, keeps evaluator/holdout
+  outside it, and revalidates ignored runtime state against the live Direct
+  contract on every transition.
+- Future behavior: At any privileged subsystem seam, validate both the general
+  writer lease and a narrow derived allowlist plus frozen independent evidence.
+
+- Lesson: Rollback evidence must restore the previous Git object bytes and
+  modes, not merely remove newly generated files.
+- Evidence: #34 freezes bounded `ls-tree` entries for the candidate namespace,
+  rejects links/submodules and oversized output, preserves sibling capabilities,
+  restores exact blobs/modes for known failure, and enters Recovery rather than
+  deleting unknown drift.
+- Future behavior: Bind rollback to an immutable baseline and route restoration
+  failure to the existing Recovery Bundle rather than declaring rejection.
+
+- Lesson: A candidate's `pass` fields are not independent machine evidence.
+- Evidence: The first #35 slice could have treated compatibility, smoke, and
+  installed provenance as trusted input. The final seam derives eligibility
+  from exact fetched canonical bytes plus governor-compiled projections and
+  leaves those candidate fields untrusted.
+- Future behavior: When automation may grant authority, bind the decision to
+  evidence produced inside the trusted boundary, not a claimed result adjacent
+  to the candidate.
+
+- Lesson: Naming Hook phases or Loop limits does not prove their behavior.
+- Evidence: #35 added public smoke/step checks after the initial declarative
+  surface schema. Hook evidence now observes replay, no-secret, no-diff,
+  worktree, canary, and rollback boundaries; Loop behavior is exercised through
+  the CLI for no-progress, user-input, and adapter-switch cases.
+- Future behavior: For each safety label in an acceptance criterion, leave one
+  runnable check whose failure changes promotion outcome.
+
+- Lesson: A fetched channel response is evidence only after the governor derives
+  its meaning; a caller-owned `result` label remains a claim.
+- Evidence: Independent #35 review showed that valid bytes from an allowed host
+  could still be labelled `no-match`. Search now parses candidate-bound official,
+  Registry, npm, and GitHub responses and rejects any label mismatch.
+- Future behavior: Bind both evidence identity and its security-relevant semantic
+  conclusion inside the trusted boundary.
+
+- Lesson: A package-manager `no-match` is a transport status, not a synthetic
+  200 error document, and capability identity is not an npm coordinate.
+- Evidence: Final #35 re-review found real npm 404s were rejected before parsing
+  and scoped MCP packages could not equal the capability ID. Surface candidates
+  now bind a separate scoped-capable name/version and only their exact 404 URL is
+  normalized to `no-match`.
+- Future behavior: Model package coordinates separately and test the real HTTP
+  status path; keep 401, 429, and 5xx fail-closed.
+
+- Lesson: A Hook rollback canary must exercise the deployed Hook and the state it
+  actually mutates.
+- Evidence: Independent #35 review rejected a temporary unrelated file as
+  rollback proof. The final smoke invokes the public deployed handler twice,
+  reads the capability-bound ledger, and restores the deployment, configuration,
+  canary, and ledger snapshots.
+- Future behavior: Test rollback against the same objects used by the real
+  operation, not a structurally similar scratch file.
+
+- Lesson: Authorization payload ordering is part of deterministic idempotence.
+- Evidence: The dangerous-surface red test saw two semantically identical
+  requests serialize effect blocks in different orders because an input object
+  crossed a process boundary. Sorting fixed the shared root.
+- Future behavior: Canonicalize all set-like evidence before hashing,
+  persisting, or presenting an idempotent authorization request.
+
+## 2026-08-14 — Harness v2 Issue #36 checkpoint
+
+- Lesson: Acquire the formal writer lease before preserving TDD edits, even
+  after the user has selected the mode and the branch exists.
+- Evidence: The first red/green draft preceded `codex-direct start`; it was
+  reverted to the exact clean #35 tree, the run froze the baseline and acquired
+  the lease, and the verified patch was then replayed unchanged.
+- Future behavior: Treat branch creation and controller writer acquisition as
+  one pre-write gate, then begin the first red test.
+
+- Lesson: Parallel long verification can erase useful evidence when the parent
+  batch times out even if shorter shards finished.
+- Evidence: One three-shard batch reached its 304-second parent limit without
+  returning child results. Subsequent short shards and each Evolution case were
+  run once independently and returned explicit green results.
+- Future behavior: Parallelize only similarly bounded checks; give long
+  Evolution cases their own process and timeout.
+
+- Lesson: A collaboration contract's canonical worktree is a byte-exact host
+  path, not merely a path that resolves to the same directory.
+- Evidence: The first real Paseo bootstrap rejected a forward-slash Windows
+  path before agent creation. Rewriting only that field to the canonical
+  backslash form and recomputing the bridge contract digest produced a valid
+  launch; no duplicate agent or implementation write existed.
+- Future behavior: Derive collaboration `canonical_worktree` from the same
+  resolved `Path` representation used by worktree discovery before freezing
+  the bridge trigger.
+
+## 2026-08-14 — PR #39 automated-review corrections
+
+- Lesson: Evidence digests must bind repository bytes, not a platform-specific
+  checkout transformation. Normalize CRLF to LF at the verification seam and
+  record the canonical Git-byte digest, including durable migration memory.
+- Lesson: A test fixture's canonical worktree must be native to the executing
+  OS. Building it from a resolved absolute `Path` preserves the intended
+  contract assertion on both Windows and POSIX.
+- Lesson: Search and Build are different trust boundaries. An all-`no-match`
+  Search has no candidate to pin, so Build must represent that absence
+  explicitly while still rejecting candidate/rejected source results and
+  preserving repository-local compiler, evaluator, holdout, rollback, and
+  acceptance gates.
+
+## 2026-08-14 — PR #39 automated-review round 2
+
+- Lesson: Canonical identity must use the normalized value returned by the
+  trust-boundary validator. Validating a trimmed view while hashing the original
+  string can split one ticket into multiple writer identities.
+- Lesson: Conformance tests must inject host preferences and compare the
+  invariant they own. A developer HOME or pre-generated `dist/` directory is
+  not portable test evidence; deterministic provider input and package
+  exclusion properties are.
+- Lesson: A per-message input bound is not a session lifetime bound. MCP stdio
+  should retain byte/shape/lifecycle limits while serving until EOF.
+- Lesson: Inspect formatter diff size before accepting it. A formatter version
+  can expose historical style debt; restore unrelated churn and verify only the
+  scoped change rather than laundering a broad rewrite into a repair.
+
+## 2026-08-15 — PR #39 automated-review round 3
+
+- Lesson: A pathname check is not a bounded read. Open untrusted JSONL once,
+  verify the descriptor against the no-follow path identity before and after
+  one byte-budgeted read, and never grant a fresh budget after discarding a
+  partial tail. Otherwise a short concurrent append can evade the limit.
+- Lesson: Two individually atomic files do not form one transaction. A
+  metadata-only prepared marker plus same-process rollback keeps a typed store
+  and its digest-bound projection recoverable across ordinary write failure.
+- Lesson: A recovery marker is intent, not authority. Its fields and digests are
+  attacker-computable, so interrupted recovery must anchor the prior pair to an
+  independent trusted source. Restore the internally consistent pair committed
+  at Git `HEAD`, then run the same accepted envelope normally; if no exact
+  trusted baseline exists, fail closed for explicit recovery.
+
+## 2026-08-15 — PR #39 automated-review round 4
+
+- Lesson: A zero-candidate Build removes candidate-specific pinning, not Search
+  evidence authentication. Bind repository/revision/artifact, Registry query,
+  and the exact unversioned package coordinate before re-fetching every V2
+  channel; a missing version does not prove a missing package. Replay the same
+  check at acceptance.
+- Lesson: Process-boundary test launchers must be native to the executing OS.
+  Emit a batch launcher on Windows and an executable shell launcher on POSIX,
+  and resolve only the native launcher so WSL cannot select a Windows shim.
+- Lesson: Trust-boundary fixtures must fail for the intended reason on every
+  platform. Write canonical bytes and corrupt only the receipt authority being
+  tested so checkout line endings cannot provide a false green.
 ## 2026-08-18
 
 - Lesson: Subtitle presence is not equivalent to subtitle usability, but

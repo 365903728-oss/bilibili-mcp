@@ -1,0 +1,14 @@
+{
+  "session_id": "fixture-session",
+  "event_timestamp": "2026-08-09T00:00:00Z",
+  "hook_event_name": "PostToolUseFailure",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "npm test -- --run",
+    "environment": {
+      "BILIBILI_SESSDATA": "SYNTHETIC_COOKIE_VALUE"
+    }
+  },
+  "error": "Exit code 1\nSYNTHETIC_STDERR_VALUE",
+  "is_interrupt": false
+}

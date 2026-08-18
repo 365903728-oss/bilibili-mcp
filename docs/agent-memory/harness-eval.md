@@ -418,3 +418,334 @@ Candidate metrics:
 - product-source implementation agents: 0
 - bounded Codex test/review subtasks: 3
 - generated learning proposals promoted: 0
+
+### 2026-08-11 Harness Eval: Harness v2 Issue #29 session spine
+
+- The shared CLI and replay seam exposed host-shape mistakes without duplicating
+  normalization logic. Independent Spec and Standards review caught two real
+  cross-boundary defects that ordinary green tests missed: linked-worktree
+  primary Codex Hook overlap and non-atomic one-shot manual reminders.
+- Keep: one constitutional core, thin adapters, typed contract, worktree-scoped
+  redacted ledger, real process-boundary fixtures, dirty-primary fingerprints,
+  package exclusion, and risk-weighted independent review.
+- Change: run `harness doctor` before any normal-config live client smoke. Use a
+  user-config-disabled session only for clean rule discovery, and require a
+  concurrent regression whenever runtime state promises one-shot behavior.
+- Remove: do not use a normal client smoke as proof of isolation until external
+  Hook layers are inventoried; do not implement read-check-write deduplication
+  outside the existing ledger lock.
+- Residual: the primary checkout's legacy Codex Hooks require an explicit later
+  migration. Issue #29 reports the gate but correctly leaves external
+  configuration untouched; the complete three-adapter pilot remains #36.
+
+Candidate metrics:
+
+- shared Harness tests: 26
+- legacy Hook compatibility tests: 14
+- product tests: 862
+- package entries / forbidden Harness entries: 185 / 0
+- independent final reviewers: 2
+- accepted repair findings: 2
+- product-source files changed: 0
+- remote operations performed: 0
+
+### 2026-08-14 Harness Eval: Issue #36 checkpoint
+
+- Keep: one shared typed contract/kernel, one fixture-backed matrix, public
+  mode commands, source-bound leases, typed redacted evidence, exact local
+  commits, and disposable real pilots.
+- Change: event identity now includes adapter provenance, sensitivity, and
+  terminal state in its full digest; all three adapters are compared against
+  the same pilot and migration check IDs.
+- Remove: the two-Direct-only fixture and any implication that #35 repository-
+  local smoke alone proves an actual runtime pilot.
+- Result: all three real pilots are accepted. The user-authorized Paseo start
+  led to an available frozen Claude provider; bootstrap/dispatch/report/review/
+  accept created exactly one Paseo pilot commit with no restart, fallback, or
+  remote. Final migration/index evidence is verified separately before the
+  #36 controller accepts the repository diff.
+
+Checkpoint metrics:
+
+- focused shared contract/event tests: 21 pass
+- focused writer/authority/recovery/exact-commit tests: 7 pass
+- focused typed-memory tests: 3 pass
+- governed Evolution cases: 3 pass, including three-adapter surface,
+  promotion/rejection/rollback, and evaluator/projection-drift rollback
+- accepted real pilots / required pilots: 3 / 3
+- accepted pilot commits / remotes: 3 / 0
+- final risk-weighted Harness shard: 26 / 26 in 75.307s
+- product-source files changed: 0
+- remote operations performed: 0
+
+### 2026-08-14 Harness Eval: Issue #35 review convergence
+
+- Independent read-only review found four acceptance-impacting gaps before
+  final verification: a v1/v2 Search bypass, label-only CLI/MCP artifacts,
+  claim-derived surface smoke, and evidence that authenticated bytes but not
+  their channel/Hook semantics.
+- Keep: one shared #34 controller and compiler, immutable canonical inputs,
+  exact repository-local projections, three adapter host mappings, stateless
+  Loop decisions, and acceptance-owned exact-one-commit.
+- Change: v2 surface candidates now require v2 Search at every load; external
+  channel results are parsed from candidate-bound responses; CLI/MCP use shared
+  real handlers; Hook smoke invokes the deployed handler, reads its attributed
+  ledger, and restores the same manifest/config/canary/ledger state.
+- Remove: no caller-owned result label, unconditional pass map, scratch-file
+  rollback proof, candidate executable, new controller, dependency, daemon, or
+  port remains.
+- Focused repair evidence: channel semantics/tamper 2/2 in 50.570s; four
+  surfaces across three adapters with disposable acceptance 1/1 in 189.195s.
+  External Claude/Paseo was not launched because the user froze `codex-direct`;
+  host-package projection and public adapter seams are the bounded evidence.
+- Final current-diff metrics: Harness 17 Evolution + 73 Direct + 73 Paseo + 67
+  core = 230 executed tests with one platform-permission skip; Hook/Stop 6/6 and
+  8/8; product 862; package entries/forbidden Harness entries 185/0; reviewer
+  blockers remaining 0; external writer launches, product-source changes, and
+  remote operations 0.
+
+### 2026-08-13 Harness Eval: Harness v2 Issue #35 surfaces
+
+- Public seam: `python -m harness evolution` remains the stateful governor;
+  `capability discover|smoke|loop-step` adds only repository-local conformance
+  and bounded decisions. No product command or second controller was added.
+- Keep: #34 accepted-gap receipts, linked worktree and writer lease, strict
+  source/license bytes, canonical compiler, fixed evaluator/holdout,
+  candidate-scoped rollback, unknown-drift Recovery, and Direct acceptance.
+- Add: exact v2 MCP/CLI/Hook/Loop surface policy, four Search channels,
+  data-only safe Adapt evidence, three-adapter discovery/smoke, real Hook
+  safety checks, and stateless bounded Loop decisions.
+- Remove: do not trust candidate-declared compatibility/smoke/install state; do
+  not execute registry/package-manager installers; do not let Hooks accept or
+  mutate their configuration; do not build an autonomous Loop runner.
+- Risk weighting: immutable canonical bytes and authority/rollback paths receive
+  process-boundary tests; product runtime is unchanged and is verified through
+  build/Vitest/package boundaries. Network/TLS results are recorded honestly
+  rather than retried until green.
+- Current focused evidence before final convergence: Evolution 13/13 in
+  853.936s; Hook events 9/9 in 2.422s; CLI/adapters 16/16 in 10.655s; the four
+  surface Build/three-adapter/commit pilot alone passes in 289.367s. Final
+  shared/product/package/review evidence is recorded in the execution and
+  verification reports.
+
+### 2026-08-13 Harness Eval: Harness v2 Issue #34 governed evolution
+
+- The useful seam is one `evolution` state machine layered on accepted typed
+  memory and the existing Direct controller. It does not need another ticket,
+  lease, evidence, acceptance, or commit implementation.
+- Search proved valuable without installation: immutable upstream artifact and
+  license hashes exposed installed provenance drift, so the honest outcome was
+  deferred instead of silently running unpinned `npx`.
+- The controlled Search pilot verifies immutable upstream bytes, then defers
+  Adapt because no independent trusted machine-evidence provider exists. The
+  safe Build fixture remains declarative: one canonical source produces both
+  native host packages, fixed Harness-run
+  evaluator/holdout cases do not trust caller results, and failure restores the
+  candidate namespace without executing candidate code or clearing siblings.
+- Keep: accepted-gap-only start, exact evolution-owned paths, subsystem
+  derived allowlisted paths, full ignored-state validation, fixed machine-run
+  evaluator/holdout, pinned byte-verified candidate schema, one authorization
+  stop without a self-authorizing resolution route, read-only zero-child agents,
+  exact host-schema and discovery-path conformance, exact drift checks,
+  scoped Git-object rollback, and
+  shared Direct acceptance.
+- Remove: do not add a package manager, daemon, background catalog crawler,
+  separate controller, recursive agent orchestrator, raw install/uninstall
+  command persistence, or product-runtime integration.
+- Residual: a normal-home Doctor still reads every Skill to detect manual
+  metadata, so #34 used an isolated empty-home Doctor and separate safe Search
+  evidence. The known primary Hook overlap remains `action-required`.
+
+Candidate metrics:
+
+- focused evolution tests: 10
+- typed-memory regression tests: 33
+- controlled Search boundary / safe Build paths: 2
+- unsafe external installs / user-global writes: 0 / 0
+- disposable remotes: 0
+- promotion commits per accepted Evolution task: exactly 1
+- product-source files changed: 0
+- remote operations performed: 0
+
+### 2026-08-13 Harness Eval: Harness v2 Issue #33 typed memory
+
+- Intended outcome: turn explicitly typed, accepted evidence into durable
+  idempotent memory and bounded current startup context without granting Hooks,
+  reports, or model inference authority.
+- Keep: one stdlib-only shared projector; exact accepted-source digest binding;
+  stable content IDs; bounded provenance; explicit promotion thresholds;
+  temporal current-fact supersession; fail-closed equal-time conflicts; atomic
+  store/projection writes; metadata-only audit; deterministic capability builds;
+  and a separate memory-only accepted task.
+- Change: future accepted tasks that need memory should produce the typed
+  envelope and record its digest during normal verification. Do not scrape
+  legacy Markdown or append-only runtime logs, and do not add adapter-specific
+  projector logic.
+- Remove: no automatic Hook promotion, free-form model-to-memory path, oldest-
+  line startup loading, duplicate Codex/Claude policy text, or memory-triggered
+  mutation of governance/evaluation surfaces was added.
+- Residual: existing legacy Markdown remains human-maintained history until
+  explicit accepted evidence projects a typed record; the primary legacy Codex
+  Hook overlap remains `doctor=action-required` and outside this ticket.
+
+Candidate metrics:
+
+- focused typed-memory tests: 33
+- exhaustive Harness discovery: 211 in 873.324s (1 platform-permission skip)
+- legacy Hook compatibility tests: 14
+- product tests: 862
+- package entries / forbidden Harness entries: 185 / 0
+- accepted pilot tasks / memory-only commits / remotes: 2 / 1 / 0
+- pilot replay no-change audit outcomes: 1
+- implementation-client handoffs / repairs / user interventions: 0 / 0 / 0
+- product-source files changed: 0
+- remote operations performed: 0
+
+### 2026-08-12 Harness Eval: Harness v2 Issue #32 Paseo Collaboration loop
+
+- The collaboration adapter reuses the shared #30/#31 controller for
+  contracts, locking, state, guards, recovery, acceptance, and commit. The
+  collaboration-specific seam (~2072 lines) is a thin CLI-accessible wrapper;
+  it does not copy the Direct controller.
+- Vertical-slice TDD with portable disposable-Git CLI tracer tests caught
+  real cross-boundary defects before they reached production: authority freeze
+  before agent launch, bridge-trigger sequencing, at-most-once dispatch,
+  fail-closed inspect, stage/unknown-actor guards, secret-free report keys,
+  and idempotent commit semantics.
+- Independent review (Round 3 findings) drove the complete rewrite from
+  patched private functions to public CLI-tracer tests. The 8 numbered repair
+  findings all resolved to green tests with no remaining P0-P3.
+- Keep: one shared Direct controller, thin adapter seam, public CLI tracer
+  tests, Codex-owned acceptance and pilot, dead-code removal before freeze.
+- Change: full final verification must run with a command-scoped Windows Git
+  PATH when Python inherits a Git Bash environment; an earlier combined-suite
+  hang is historical evidence, not the final result.
+- Remove: do not duplicate contract validation, locking, state, or commit
+  machinery per adapter.
+- Residual: the primary legacy Codex Hook overlap remains the deliberate
+  `doctor=action-required` migration gate.
+- Final review (2026-08-13) added six release-blocker fixes with one proof
+  each: Paseo 0.2.5 `connectedDaemon: reachable` preflight acceptance,
+  ephemeral dispatch/repair prompt files with exact-key report projections,
+  attempt-keyed repair delivery evidence (sequential repairs; acceptance
+  blocks pending-N without dispatch-N), acceptance identity/digest binding to
+  the frozen run record (tampered launch rejected), and malformed post-launch
+  inspect output routing to the shared Recovery Bundle path. The focused
+  module reached 72 tests at that snapshot. Repair attempt 8 later added one
+  accepted-state guard proof after staged review found the Claude
+  `local-commit` authority gap. The real zero-remote public-path pilot records
+  native `/implement`, one live `claude/deepseek-v4-flash` writer, one exact
+  accepted local commit, clean final status, and a released lease.
+
+Candidate metrics:
+
+- focused collaboration tests: 73 (function + CLI tracer)
+- shared Harness tests: final full-suite result recorded in verification log
+- legacy Hook compatibility tests: final result recorded in verification log
+- product tests: 41 files / 862 tests
+- package entries / forbidden Harness entries: 185 / 0
+- new collaboration module: ~2072 lines
+- new test module: ~4474 lines
+- tracked modified: 3 files, +289/-14 (Round 3); final review adds the
+  collaboration module/test/docs edits above that base
+- dead code removed: ~66 lines (_validate_collaboration_contract)
+- implementation-client handoffs / real Paseo pilot launches: 1 / 1
+- repair attempts authorized: 8 maximum. Attempts 1–6 stayed on the original
+  writer; attempt 7 used an explicit user-authorized sequential transfer to one
+  DeepSeek V4 Pro replacement at thinking `max`, with no overlapping lease.
+  Attempt 8 reused that same replacement to close the staged-review
+  `local-commit` actor gap; it returned idle and both original reviewers passed
+  the repair.
+- pilot accepted commits / changed paths / remotes: 1 / 1 / 0
+- final independent review axes: focused spec and risk reviews pass; final
+  acceptance review recorded separately
+- product-source files changed: 0
+- remote operations performed: 0
+
+### 2026-08-11 Harness Eval: Harness v2 Issue #31 Claude Direct loop
+
+- Parameterizing the accepted #30 controller was lower risk than copying its
+  state machine. The first failing process test nevertheless exposed a hidden
+  cross-adapter control seam: persisted mode alone is insufficient unless the
+  invoked command is checked on every state transaction. A second red test
+  found that unstable-start rollback used a different identity than the
+  source-scoped manual-Skill marker.
+- Keep: one Direct controller, adapter-specific run/control schemas and owners,
+  command-mode fencing, source-bound writer exclusion, native manual-Skill
+  gates, bounded repair/recovery, exact automatic commit, disposable Git tests,
+  dirty-primary fingerprints, package exclusion, and a real host pilot.
+- Change: a shared conformance fixture must drive both public adapter
+  lifecycles, not merely compare static mappings. Real pilot reports must
+  distinguish user-native Skill evidence from an empty pilot Skill requirement
+  and record preflight failures rather than hiding them.
+- Remove: do not add a copied Claude controller, do not let one adapter inspect
+  another adapter's state, do not pass or persist a model/provider/fallback,
+  and do not promote raw Claude stream output into formal memory.
+- Residual: the primary legacy Codex Hook overlap remains the deliberate
+  `doctor=action-required` migration gate. The real pilot used project settings
+  only; normal-config rollout remains out of scope.
+
+Candidate metrics:
+
+- focused pre-review Harness tests: 34
+- final shared Harness tests: 105 (1 platform-permission skip)
+- legacy Hook compatibility tests: 14
+- product tests: 862
+- package entries / forbidden Harness entries: 185 / 0
+- shared public lifecycle fixture adapters: 2
+- real Claude CLI attempts / accepted runs: 2 / 1
+- pre-start configuration failures / Recovery Bundles: 1 / 0
+- pilot repairs / evidence-command corrections: 0 / 1
+- routine approval prompts / user interventions: 0 / 0
+- accepted pilot commits / changed paths / remotes: 1 / 1 / 0
+- pilot elapsed / reported cost cap usage: 190.481s / USD 1.906883 of 2.00
+- implementation-client handoffs / Paseo launches: 0 / 0
+- final independent review axes: 3, all PASS with no remaining P0-P3
+- accepted review repairs: 4 (report/evidence, executable conformance,
+  subprocess environment, unified report contract)
+- product-source files changed: 0
+- remote operations performed: 0
+
+### 2026-08-11 Harness Eval: Harness v2 Issue #30 Codex Direct loop
+
+- The public process-boundary seam kept adapter behavior testable without
+  launching another writer. Disposable repositories exposed state, Git, and
+  authority effects directly; linked-worktree fixtures forced the writer state
+  back under the frozen canonical worktree while a Windows named mutex/POSIX
+  existing-config advisory lock makes the source-bound sibling-state scan
+  atomic without a common-Git marker.
+- Initial green behavior was insufficient. Two-axis review and focused red
+  regressions found that raw contract persistence, unlocked state updates,
+  caller-asserted command results, stale diff evidence, and trailer-only commit
+  recovery could all produce false auditability or false acceptance.
+- Keep: one frozen typed contract, fixed action classes, diff-bound typed
+  evidence, current review gate, bounded fingerprint repair, metadata-only
+  Recovery Bundle, exact automatic local commit, real Harness-only pilot,
+  dirty-primary fingerprints, package exclusion, and independent final risk
+  review.
+- Change: future adapter loops should reuse the shared lock, metadata projection,
+  frozen canonical/source-bound writer identity, append-only evidence/result
+  fields, hermetic index plus `commit-tree`/CAS `update-ref`, state preflight
+  limit, and accepted snapshot rather than rebuilding host-specific state. Run
+  the cross-worktree alias/malformed-state, concurrent-index, late-filter,
+  Hook/signing, crash-recovery, and maximum-state cases from the first red suite.
+- Remove: do not persist a complete executable contract as runtime history, do
+  not implement load-modify-save without one transaction lock, and do not treat
+  a task trailer or model-reported pass as sufficient evidence.
+- Residual: the primary legacy Codex Hook overlap remains a deliberate
+  `doctor=action-required` migration gate. A normal-config client smoke remains
+  skipped until that external configuration receives separate authority.
+
+Candidate metrics:
+
+- shared Harness tests: 92 (1 platform-permission skip)
+- legacy Hook compatibility tests: 14
+- product tests: 862
+- package entries / forbidden Harness entries: 185 / 0
+- real pilot repairs / user interventions / routine prompts: 0 / 0 / 0
+- accepted pilot commits / remotes: 1 / 0
+- implementation-client handoffs / handoff overhead: 0 / 0
+- context cost: not measured
+- final independent review axes: 2, both PASS with no P0-P2
+- product-source files changed: 0
+- remote operations performed: 0
