@@ -17,8 +17,7 @@
     "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:env": "node -e \"console.log('检查环境变量...'); console.log('BILIBILI_SESSDATA:', process.env.BILIBILI_SESSDATA ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_BILI_JCT:', process.env.BILIBILI_BILI_JCT ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_DEDEUSERID:', process.env.BILIBILI_DEDEUSERID ? '✅ 已配置' : '❌ 未配置');\"",
-    "release": "semantic-release"
+    "test:env": "node -e \"console.log('检查环境变量...'); console.log('BILIBILI_SESSDATA:', process.env.BILIBILI_SESSDATA ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_BILI_JCT:', process.env.BILIBILI_BILI_JCT ? '✅ 已配置' : '❌ 未配置'); console.log('BILIBILI_DEDEUSERID:', process.env.BILIBILI_DEDEUSERID ? '✅ 已配置' : '❌ 未配置');\""
   },
   "files": [
     "dist",
@@ -68,13 +67,8 @@
     "quick-lru": "^7.3.0"
   },
   "devDependencies": {
-    "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^11.0.1",
-    "@semantic-release/npm": "^13.1.5",
     "@types/node": "^22.19.8",
     "esbuild": "^0.28.1",
-    "semantic-release": "^25.0.3",
     "typescript": "^5.7.2",
     "vitest": "^4.1.8"
   }
