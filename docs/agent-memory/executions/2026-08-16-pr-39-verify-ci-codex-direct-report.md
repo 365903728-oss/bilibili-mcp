@@ -162,6 +162,13 @@ the migration clean-room test can inspect its exact accepted #35 base.
   built product checkout. Core shards compare the non-`dist` manifest, while the
   Product job uses full history, runs the same conformance after build, and binds
   both the exact #35 clean-room baseline and all 189 package paths.
+- The post-green Codex review found that descriptor-relative POSIX `mkdir` and
+  unlink operations did not durably commit their parent directory entries, and
+  that Paseo preference discovery rejected legitimate symlinked/junction homes.
+  The shared creator and unlink helper now fsync the already verified parent
+  descriptor after each successful mutation; Paseo resolves the actual home
+  before its existing bounded no-follow read. Focused red tests reproduce all
+  three gaps, and the affected Windows/WSL matrices each pass 85 tests.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

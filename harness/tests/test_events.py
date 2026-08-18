@@ -17,6 +17,8 @@ from harness.events import normalize_hook_event, persist_hook_event
 from harness.evolution import EvolutionError, _surface, _surface_check_names
 from harness.safe_io import (
     MAX_STDIN_BYTES,
+    _ensure_directory_nofollow,
+    _unlink_nofollow,
     append_bounded_jsonl,
     bounded_file_lock,
     ensure_no_link_components,
@@ -480,6 +482,42 @@ class HookEventTests(unittest.TestCase):
                 write_bounded_text(target, "trusted\n", 1024)
 
             self.assertTrue(any(stat.S_ISDIR(mode) for mode in synced_modes))
+
+    @unittest.skipIf(os.name == "nt", "directory fsync is POSIX-only")
+    def test_directory_creation_fsyncs_each_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "runtime" / "task"
+            real_fsync = os.fsync
+            synced_modes: list[int] = []
+
+            def recording_fsync(descriptor: int) -> None:
+                synced_modes.append(os.fstat(descriptor).st_mode)
+                real_fsync(descriptor)
+
+            with patch("harness.safe_io.os.fsync", new=recording_fsync):
+                _ensure_directory_nofollow(target)
+
+            self.assertEqual(len(synced_modes), 2)
+            self.assertTrue(all(stat.S_ISDIR(mode) for mode in synced_modes))
+
+    @unittest.skipIf(os.name == "nt", "directory fsync is POSIX-only")
+    def test_unlink_fsyncs_parent_before_returning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "run.json"
+            target.write_text("executing\n", encoding="utf-8")
+            real_fsync = os.fsync
+            synced_modes: list[int] = []
+
+            def recording_fsync(descriptor: int) -> None:
+                synced_modes.append(os.fstat(descriptor).st_mode)
+                real_fsync(descriptor)
+
+            with patch("harness.safe_io.os.fsync", new=recording_fsync):
+                _unlink_nofollow(target)
+
+            self.assertFalse(target.exists())
+            self.assertEqual(len(synced_modes), 1)
+            self.assertTrue(stat.S_ISDIR(synced_modes[0]))
 
     @unittest.skipIf(os.name == "nt", "directory-relative descriptors are POSIX-only")
     def test_atomic_writer_closes_parent_when_temp_cleanup_fails(self) -> None:

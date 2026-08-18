@@ -246,6 +246,55 @@ class _PaseoTestBase(unittest.TestCase):
 # Function tests — mock _run_paseo_cli
 # ---------------------------------------------------------------------------
 
+class PaseoPreferenceTests(unittest.TestCase):
+    def test_orchestration_preferences_resolve_symlinked_home(self) -> None:
+        from harness.paseo_collaboration import (
+            _read_orchestration_prefs,
+            read_bounded_bytes,
+        )
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            real_home = root / "real-home"
+            linked_home = root / "linked-home"
+            prefs = real_home / ".paseo" / "orchestration-preferences.json"
+            prefs.parent.mkdir(parents=True)
+            prefs.write_text(
+                json.dumps({"providers": {"impl": "claude/deepseek-v4-flash"}}),
+                encoding="utf-8",
+            )
+            if os.name == "nt":
+                result = subprocess.run(
+                    ["cmd", "/c", "mklink", "/J", str(linked_home), str(real_home)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode != 0:
+                    self.skipTest(f"junction unavailable: {result.stderr.strip()}")
+            else:
+                linked_home.symlink_to(real_home, target_is_directory=True)
+
+            try:
+                with patch.object(Path, "home", return_value=linked_home), patch(
+                    "harness.paseo_collaboration.read_bounded_bytes",
+                    wraps=read_bounded_bytes,
+                ) as reader:
+                    self.assertEqual(
+                        _read_orchestration_prefs(),
+                        {"providers": {"impl": "claude/deepseek-v4-flash"}},
+                    )
+                self.assertEqual(
+                    reader.call_args.args[0],
+                    real_home.resolve()
+                    / ".paseo"
+                    / "orchestration-preferences.json",
+                )
+            finally:
+                if linked_home.exists():
+                    linked_home.rmdir() if os.name == "nt" else linked_home.unlink()
+
+
 @unittest.skipIf(GIT_EXE is None, "git not on PATH — inject PATH at command line")
 class PaseoCollaborationFunctionTests(_PaseoTestBase):
     """Tests calling paseo_* functions directly with mocked Paseo CLI."""

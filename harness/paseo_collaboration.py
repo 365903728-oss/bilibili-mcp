@@ -580,7 +580,11 @@ def _read_orchestration_prefs() -> dict[str, Any]:
 
     Returns the parsed dict or an empty dict when unavailable.
     """
-    prefs_path = Path.home() / ".paseo" / "orchestration-preferences.json"
+    try:
+        home = Path.home().resolve(strict=True)
+    except (OSError, RuntimeError):
+        return {}
+    prefs_path = home / ".paseo" / "orchestration-preferences.json"
     raw = read_bounded_bytes(prefs_path, MAX_STATE_BYTES)
     if raw is None:
         return {}

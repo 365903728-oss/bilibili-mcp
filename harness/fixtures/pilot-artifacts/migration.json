@@ -38,11 +38,11 @@
       },
       "harness/paseo_collaboration.py": {
         "finding": "pr-39-private-ephemeral-prompt-files",
-        "sha256": "2c8138b76bf0f57f58c4677a2a9316bf5a2f85f3b821b150cd8ae146cb4a52e6"
+        "sha256": "aff3372235d32679fa9aeba6b091508c5ce95ab549217bc01aab0590998f81de"
       },
       "harness/safe_io.py": {
         "finding": "pr-39-verified-jsonl-descriptor",
-        "sha256": "046d9197f625a773bd59c66a7a9529604e7a6a2c35708262412dfd97f9cde9f6"
+        "sha256": "d66e2b2f7578b14838eec472cc1f0c0c4d1aee9ca0e873b3166a5be33b0895e7"
       }
     }
   },
@@ -94,10 +94,10 @@
     "docs/agent-memory/decisions.md": "44d1383db124476159d0f21bd0fa0dc349cdabc633ff6f03031a54b8799f81a3",
     "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
     "docs/agent-memory/harness-eval.md": "5018e0ac09016fbbbfc024b08208de6808a014f3bb5732f116a393040cb9a5b3",
-    "docs/agent-memory/harness-security.md": "3125c4046123cb10a6c19cbf398d5dfb9e1f9ba202837631a25458cc620d62af",
+    "docs/agent-memory/harness-security.md": "6095dfe40dec98fe93b20c20abc5ddc0d2f6e89e97bcfde20b08aef5e19f2ddc",
     "docs/agent-memory/lessons-learned.md": "6a0e45bc73159237fb3200a3725d12d54dd0d83aa5c8eebcec5ffb9bd2efb7d7",
     "docs/agent-memory/project-facts.md": "f31fbfb9575a170073dadb19398dfb05e3ba504dd883f3af6b9c9d59489b92a5",
-    "docs/agent-memory/verification-log.md": "2a7fe9605b1d4c3ad59ce48a3a635ab030f5884a6d305c7a9a852104b305a285"
+    "docs/agent-memory/verification-log.md": "2c8533f07c2d4e5f70b8bcaf3158ebc7abfa3e8fcd10a5cfdc29a455604e3a7c"
   },
   "package": {
     "output_digest": "5fb82717c9cc28b113da45686671b5d62ca3310b170f2b58b0fe3cd86a83c84c",

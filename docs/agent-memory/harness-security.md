@@ -592,3 +592,8 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
 - Accepted-path parent-chain rejection is normalized at the shared snapshot
   boundary. Windows reparse points and POSIX no-follow failures remain denied,
   but now return the bounded Direct adapter error expected by recovery and CI.
+- POSIX descriptor-relative directory creation fsyncs the containing directory
+  after every successful `mkdir`, and descriptor-relative deletion fsyncs the
+  verified parent before returning success. Paseo resolves the actual user home
+  once before applying the existing bounded no-follow preferences read, so a
+  legitimate home symlink or junction does not weaken descendant link checks.

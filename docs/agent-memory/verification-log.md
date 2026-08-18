@@ -2361,3 +2361,17 @@ Six release blockers fixed; one regression proof per root cause (new tests
 - Boundary: the dirty primary worktree and future CI/CD roadmap note stayed out
   of the immutable release tag; Registry publication did not move the tag,
   republish npm, or change the workflow.
+
+## 2026-08-18 — PR #39 post-CI Codex review repair
+
+- Red evidence: WSL reproduced zero parent-directory fsyncs after two
+  descriptor-relative `mkdir` calls and after one descriptor-relative unlink;
+  Windows and WSL both proved Paseo passed a symlinked/junction home path to the
+  bounded reader instead of the resolved home.
+- Green evidence: the three focused regressions pass on their applicable
+  platforms. The complete affected events, Paseo preferences, and Paseo
+  function matrix passes 85 tests on Windows with 13 platform skips and 85 on
+  WSL with 2 platform skips.
+- Boundary: only shared Harness persistence, Paseo preference discovery, tests,
+  and durable receipts changed. Product runtime, dependencies, package output,
+  credentials, daemon state, adapter selection, and release state are unchanged.

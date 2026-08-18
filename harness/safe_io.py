@@ -703,6 +703,8 @@ def _open_directory_nofollow(
                     os.mkdir(component, 0o700, dir_fd=descriptor)
                 except FileExistsError:
                     pass
+                else:
+                    os.fsync(descriptor)
                 next_descriptor = os.open(component, flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = next_descriptor
@@ -855,6 +857,7 @@ def _unlink_nofollow(path: Path, *, missing_ok: bool = False) -> None:
     try:
         try:
             os.unlink(path.name, dir_fd=parent_descriptor)
+            os.fsync(parent_descriptor)
         except FileNotFoundError:
             if not missing_ok:
                 raise
