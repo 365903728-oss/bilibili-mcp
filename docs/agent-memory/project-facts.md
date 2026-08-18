@@ -509,5 +509,5 @@
   Actions run `32107346010`, npm `latest=1.12.0` with SLSA provenance, and the
   public bilingual GitHub Release.
 - Impact: Issue #40 and the related locally recorded Issue #41 defects are now
-  available from npm. The Official MCP Registry remains at `1.11.4` because
-  that external publication was not part of this release authorization.
+  available from npm and the Official MCP Registry. After follow-up user
+  authorization, Registry `1.12.0` is `active` and `isLatest=true`.

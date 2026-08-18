@@ -27,10 +27,10 @@ Post-publication verification installed exact npm package `1.12.0` under Node
 server version `1.12.0` with protocol `2025-06-18`, and listed the unchanged
 ten-tool surface. No credential value was printed or recorded.
 
-The Official MCP Registry remains at `1.11.4`; publishing a new Registry
-version was not part of the user's tag/changelog/README/npm authorization.
-The dirty primary worktree and its future-only CI/CD roadmap note remain
-outside the release.
+The Official MCP Registry now reports `1.12.0` as `active` and
+`isLatest=true`, with the npm identifier and package version both matching the
+public package. The dirty primary worktree and its future-only CI/CD roadmap
+note remain outside the release.
 
 ## Future Direction — Not Active
 

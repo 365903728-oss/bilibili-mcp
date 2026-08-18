@@ -256,6 +256,11 @@ Remove or stop using:
   highest-signal checks. No implementation agent or workflow change was needed.
 - Keep the current release sequence. Treat GitHub's Node-action deprecation
   annotation as future CI/CD maintenance, not an emergency release change.
+- The follow-up Registry gate reused the already-published npm artifact and
+  versioned `server.json`. Publisher `validate`, digest verification, a bounded
+  auth refresh after the expected expired-JWT failure, and exact public API
+  verification were sufficient; no code, tag, npm, or workflow change was
+  needed.
 
 ### 2026-08-06 Harness Eval: Official MCP Registry publication
 

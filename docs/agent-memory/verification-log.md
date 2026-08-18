@@ -1646,6 +1646,13 @@
 - GitHub Release: bilingual `v1.12.0 - AI 字幕完整性 / AI Subtitle Integrity`
   is public, latest, non-draft, and non-prerelease at
   `https://github.com/XZXZZX-Ai/bilibili-mcp/releases/tag/v1.12.0`.
-- Boundary: Official MCP Registry publication was not authorized and remains at
-  `1.11.4`; the dirty primary worktree and future CI/CD roadmap note stayed out
-  of the immutable release tag.
+- Official Registry follow-up: after explicit user authorization, official
+  `mcp-publisher` v1.8.1 archive SHA-256 matched upstream digest
+  `399ad0d6e00a50812b563a71d8bfbff5160c085e6b13aac6ec083d98d5ff7c45`;
+  live schema and `mcp-publisher validate` checks passed. The saved Registry
+  JWT was expired; GitHub authentication refreshed it without recording token
+  values. Publish succeeded, and the public API reports `1.12.0` active/latest
+  with matching npm identifier and package version.
+- Boundary: the dirty primary worktree and future CI/CD roadmap note stayed out
+  of the immutable release tag; Registry publication did not move the tag,
+  republish npm, or change the workflow.
