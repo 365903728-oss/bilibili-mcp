@@ -148,6 +148,11 @@ the migration clean-room test can inspect its exact accepted #35 base.
   read host `core.autocrlf`, and installed an LF index beside a CRLF worktree.
   Git environment sanitization now preserves only those exact disable sentinels;
   all three failed Direct/Claude lifecycle assertions pass locally.
+- Hosted Windows adapters then exposed one error-shape regression: the verified
+  directory chain correctly rejected a linked parent, but leaked the shared
+  safe-I/O `ValueError`. The accepted-path snapshot entry now converts parent
+  chain failures into one bounded `CodexDirectAdapterError`; the cross-platform
+  regression asserts that public adapter boundary.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

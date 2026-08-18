@@ -1281,6 +1281,10 @@ def _read_ticket_paths(
         except FileNotFoundError:
             snapshot.append({"path": relative, "kind": "deleted", "digest": None})
             continue
+        except (OSError, ValueError) as exc:
+            raise CodexDirectAdapterError(
+                "unable to fingerprint the accepted diff"
+            ) from exc
         try:
             try:
                 visible = os.stat(

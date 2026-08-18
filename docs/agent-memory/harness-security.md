@@ -589,3 +589,6 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   null-device and `GIT_CONFIG_NOSYSTEM=1` disable sentinels. Repository/index/
   object redirections and arbitrary config paths remain excluded, while a
   caller's explicit hermetic configuration cannot be replaced by host settings.
+- Accepted-path parent-chain rejection is normalized at the shared snapshot
+  boundary. Windows reparse points and POSIX no-follow failures remain denied,
+  but now return the bounded Direct adapter error expected by recovery and CI.

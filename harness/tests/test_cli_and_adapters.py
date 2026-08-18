@@ -902,7 +902,7 @@ class CliAndAdapterTests(unittest.TestCase):
         expected_repairs = {
             ".gitattributes": "pr-39-head-bound-memory-eol",
             "harness/cli.py": "pr-39-mcp-session-lifetime",
-            "harness/codex_direct.py": "pr-39-verified-index-installation",
+            "harness/codex_direct.py": "pr-39-bounded-accepted-path-rejection",
             "harness/context.py": "pr-39-safe-git-config-disable",
             "harness/contracts.py": "pr-39-canonical-task-source",
             "harness/evolution.py": "pr-39-verified-zero-candidate-channels",

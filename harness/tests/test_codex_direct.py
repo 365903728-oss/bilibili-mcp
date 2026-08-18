@@ -1191,10 +1191,31 @@ class CodexDirectProcessTests(unittest.TestCase):
         except OSError as exc:
             self.skipTest(f"directory symlinks unavailable: {exc}")
 
-        with self.assertRaises((controller.CodexDirectError, OSError)):
+        with self.assertRaises(controller.CodexDirectError):
             controller._canonical_index_snapshot(
                 discover_worktree(self.repo), ["owned/file.txt"]
             )
+
+    def test_canonical_staging_wraps_directory_chain_rejection(self) -> None:
+        import harness.codex_direct as controller
+
+        helper = (
+            "_hold_windows_directory_chain"
+            if os.name == "nt"
+            else "_open_directory_nofollow"
+        )
+        with patch.object(
+            controller,
+            helper,
+            side_effect=ValueError("atomic path cannot traverse a reparse point"),
+        ):
+            with self.assertRaisesRegex(
+                controller.CodexDirectAdapterError,
+                "unable to fingerprint the accepted diff",
+            ):
+                controller._canonical_index_snapshot(
+                    discover_worktree(self.repo), ["harness-only.txt"]
+                )
 
     def test_snapshot_binds_metadata_change_time(self) -> None:
         import harness.codex_direct as controller
