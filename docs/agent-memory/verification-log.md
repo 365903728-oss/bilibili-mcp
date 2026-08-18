@@ -2375,3 +2375,16 @@ Six release blockers fixed; one regression proof per root cause (new tests
 - Boundary: only shared Harness persistence, Paseo preference discovery, tests,
   and durable receipts changed. Product runtime, dependencies, package output,
   credentials, daemon state, adapter selection, and release state are unchanged.
+
+## 2026-08-19 — PR #39 Hook rollback review repair
+
+- Red evidence: a focused Hook smoke test trapped the remaining pathname
+  `rmdir`, while a second test replaced an originally absent canary file with a
+  directory and reproduced a false successful rollback.
+- Green evidence: Hook smoke now uses the shared descriptor-anchored directory
+  remover, fsyncs its verified POSIX parent, and uses a verified no-follow
+  existence check. The three focused regressions pass, unexpected
+  file/link/directory residue fails the smoke, and the final safe-I/O matrices
+  pass 26 tests on both Windows and WSL with platform-appropriate skips.
+- Boundary: no product runtime, package output, credentials, adapter selection,
+  external publication, evaluator, or holdout changed.

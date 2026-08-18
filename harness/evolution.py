@@ -38,6 +38,7 @@ from harness.memory import (
 )
 from harness.safe_io import (
     _atomic_write_bytes,
+    _path_exists_nofollow,
     _rmdir_nofollow,
     _unlink_nofollow,
     bounded_file_lock,
@@ -2526,19 +2527,25 @@ def smoke_surface_capability(
             for path, snapshot in protected.items():
                 ensure_no_link_components(context.root, path)
                 if snapshot is None:
-                    if path.is_file() and not path.is_symlink():
-                        _unlink_nofollow(path)
+                    try:
+                        _unlink_nofollow(path, missing_ok=True)
+                    except OSError:
+                        pass
                 else:
                     write_bounded_text(
                         path, snapshot.decode("utf-8", errors="strict"), 256 * 1024
                     )
             for directory in (ledger.parent, canary.parent):
                 try:
-                    directory.rmdir()
+                    _rmdir_nofollow(directory)
                 except OSError:
                     pass
         rollback_restored = all(
-            read_bounded_bytes(path, 256 * 1024) == snapshot
+            (
+                not _path_exists_nofollow(path)
+                if snapshot is None
+                else read_bounded_bytes(path, 256 * 1024) == snapshot
+            )
             for path, snapshot in protected.items()
         )
         results = {

@@ -847,6 +847,29 @@ def _directory_exists_nofollow(path: Path) -> bool:
         return False
 
 
+def _path_exists_nofollow(path: Path) -> bool:
+    if os.name == "nt":
+        try:
+            with _hold_windows_directory_chain(path.parent):
+                _verify_active_lock_parent(path.parent)
+                path.lstat()
+        except FileNotFoundError:
+            return False
+        return True
+    try:
+        parent_descriptor = _open_directory_nofollow(path.parent)
+    except FileNotFoundError:
+        return False
+    try:
+        try:
+            os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        return True
+    finally:
+        os.close(parent_descriptor)
+
+
 def _unlink_nofollow(path: Path, *, missing_ok: bool = False) -> None:
     if os.name == "nt":
         with _hold_windows_directory_chain(path.parent):
@@ -874,6 +897,7 @@ def _rmdir_nofollow(path: Path) -> None:
     parent_descriptor = _open_directory_nofollow(path.parent)
     try:
         os.rmdir(path.name, dir_fd=parent_descriptor)
+        os.fsync(parent_descriptor)
     finally:
         os.close(parent_descriptor)
 

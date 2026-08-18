@@ -724,6 +724,110 @@ raise SystemExit(main())
         }
         return source
 
+    def hook_smoke_fixture(self, *, replace_canary_with_directory: bool = False):
+        from harness.context import WorktreeContext
+        from harness.events import normalize_hook_event
+
+        context = WorktreeContext(
+            root=self.repo,
+            git_dir=self.repo / ".git/worktrees/synthetic",
+            common_git_dir=self.repo / ".git",
+            head_sha=git(self.repo, "rev-parse", "HEAD"),
+            worktree_id="wt-hook-smoke",
+            repository_id="repo-hook-smoke",
+        )
+        canonical = self.surface_source("hook")
+        canonical["surface"]["hook"] = {
+            "origin": "accepted-gap",
+            "phases": [
+                "replay",
+                "shadow",
+                "no-secret",
+                "multi-worktree",
+                "canary",
+                "rollback",
+            ],
+            "observation_only": True,
+            "canary_scope": "active-worktree",
+        }
+        projected = normalize_hook_event(
+            "codex",
+            "post-tool-use",
+            {
+                "session_id": "safe-build-fixture-codex-direct-hook-smoke",
+                "tool_name": "shell_command",
+                "tool_input": {"command": "npm test", "token": "secret"},
+                "tool_response": {"exit_code": 1, "stderr": "secret"},
+            },
+        )
+        ledger = context.runtime_root / projected["session_id"] / "events.jsonl"
+        canary = (
+            context.runtime_root
+            / "hook-canary"
+            / "safe-build-fixture-codex-direct.json"
+        )
+        calls = 0
+
+        def hook_event(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            ledger.parent.mkdir(parents=True, exist_ok=True)
+            ledger.write_text(
+                "\n".join(
+                    json.dumps(
+                        {"capability": "safe-build-fixture", "semantic": "same"}
+                    )
+                    for _ in range(calls)
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            if calls == 2 and replace_canary_with_directory:
+                canary.unlink()
+                canary.mkdir()
+            return {"status": "recorded", "evidence_digest": "1" * 64}
+
+        discovery = {
+            "capabilities": [{"name": "safe-build-fixture", "kind": "hook"}],
+            "hosts": ["codex"],
+            "evidence_digest": "2" * 64,
+        }
+        return context, canonical, discovery, hook_event
+
+    def test_hook_smoke_uses_anchored_directory_cleanup(self) -> None:
+        from harness.evolution import smoke_surface_capability
+
+        context, canonical, discovery, hook_event = self.hook_smoke_fixture()
+        with patch(
+            "harness.evolution.discover_surface_capabilities", return_value=discovery
+        ), patch("harness.evolution._surface_canonical", return_value=canonical), patch(
+            "harness.evolution.hook_surface_event", side_effect=hook_event
+        ), patch(
+            "harness.evolution._changed_paths", return_value=[]
+        ), patch.object(Path, "rmdir", side_effect=AssertionError("pathname rmdir")):
+            result = smoke_surface_capability(
+                context, name="safe-build-fixture", adapter="codex-direct"
+            )
+        self.assertEqual(result["status"], "pass")
+
+    def test_hook_smoke_rejects_directory_left_for_absent_snapshot(self) -> None:
+        from harness.evolution import EvolutionError, smoke_surface_capability
+
+        context, canonical, discovery, hook_event = self.hook_smoke_fixture(
+            replace_canary_with_directory=True
+        )
+        with patch(
+            "harness.evolution.discover_surface_capabilities", return_value=discovery
+        ), patch("harness.evolution._surface_canonical", return_value=canonical), patch(
+            "harness.evolution.hook_surface_event", side_effect=hook_event
+        ), patch(
+            "harness.evolution._changed_paths", return_value=[]
+        ):
+            with self.assertRaisesRegex(EvolutionError, "Hook surface smoke failed"):
+                smoke_surface_capability(
+                    context, name="safe-build-fixture", adapter="codex-direct"
+                )
+
     def start_evolution_run(self, repo: Path, task_id: str, gap_id: str) -> None:
         contract = self.write_contract(repo, task_id, self.evolution_owned(task_id))
         self.start_direct(repo, contract)

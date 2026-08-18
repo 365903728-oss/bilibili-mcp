@@ -597,3 +597,8 @@ If a harness change exposes a secret, executes unexpected external code, breaks 
   verified parent before returning success. Paseo resolves the actual user home
   once before applying the existing bounded no-follow preferences read, so a
   legitimate home symlink or junction does not weaken descendant link checks.
+- Hook smoke rollback removes generated directories only through the shared
+  descriptor-anchored no-follow helper, which fsyncs the verified parent after
+  successful POSIX removal. Paths whose accepted snapshot was absent must be
+  genuinely absent after cleanup; a concurrent file, link, or directory
+  replacement cannot be mistaken for a restored empty snapshot.

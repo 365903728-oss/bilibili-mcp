@@ -169,6 +169,16 @@ the migration clean-room test can inspect its exact accepted #35 base.
   descriptor after each successful mutation; Paseo resolves the actual home
   before its existing bounded no-follow read. Focused red tests reproduce all
   three gaps, and the affected Windows/WSL matrices each pass 85 tests.
+- The next cloud review found two Hook smoke rollback gaps in one cleanup block:
+  generated directories still used pathname `rmdir`, and an originally absent
+  protected file could be replaced by a directory that the byte reader also
+  represented as absent. Cleanup now reuses the shared descriptor-anchored
+  directory remover and verifies absent snapshots with a no-follow existence
+  check. Focused red tests reproduce both gaps and pass after the shared repair;
+  independent review added the sibling requirement that successful POSIX
+  directory removal fsync its verified parent. Windows/WSL safe-I/O matrices
+  each pass 26 tests, and the affected real three-adapter/four-surface E2E
+  passes once in 223.624 seconds.
 
 ## Risks, Skipped Checks, Recovery Bundle
 

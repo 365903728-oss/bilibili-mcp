@@ -915,10 +915,10 @@ class CliAndAdapterTests(unittest.TestCase):
             "harness/codex_direct.py": "pr-39-bounded-accepted-path-rejection",
             "harness/context.py": "pr-39-safe-git-config-disable",
             "harness/contracts.py": "pr-39-canonical-task-source",
-            "harness/evolution.py": "pr-39-verified-zero-candidate-channels",
+            "harness/evolution.py": "pr-39-verified-hook-smoke-rollback",
             "harness/memory.py": "pr-39-recoverable-memory-transaction",
             "harness/paseo_collaboration.py": "pr-39-private-ephemeral-prompt-files",
-            "harness/safe_io.py": "pr-39-verified-jsonl-descriptor",
+            "harness/safe_io.py": "pr-39-verified-path-existence",
         }
         exact_keys(review_repairs, set(expected_repairs))
         for relative, finding in expected_repairs.items():

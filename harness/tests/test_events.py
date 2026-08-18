@@ -18,6 +18,7 @@ from harness.evolution import EvolutionError, _surface, _surface_check_names
 from harness.safe_io import (
     MAX_STDIN_BYTES,
     _ensure_directory_nofollow,
+    _rmdir_nofollow,
     _unlink_nofollow,
     append_bounded_jsonl,
     bounded_file_lock,
@@ -514,6 +515,25 @@ class HookEventTests(unittest.TestCase):
 
             with patch("harness.safe_io.os.fsync", new=recording_fsync):
                 _unlink_nofollow(target)
+
+            self.assertFalse(target.exists())
+            self.assertEqual(len(synced_modes), 1)
+            self.assertTrue(stat.S_ISDIR(synced_modes[0]))
+
+    @unittest.skipIf(os.name == "nt", "directory fsync is POSIX-only")
+    def test_rmdir_fsyncs_parent_before_returning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "ephemeral"
+            target.mkdir()
+            real_fsync = os.fsync
+            synced_modes: list[int] = []
+
+            def recording_fsync(descriptor: int) -> None:
+                synced_modes.append(os.fstat(descriptor).st_mode)
+                real_fsync(descriptor)
+
+            with patch("harness.safe_io.os.fsync", new=recording_fsync):
+                _rmdir_nofollow(target)
 
             self.assertFalse(target.exists())
             self.assertEqual(len(synced_modes), 1)
