@@ -179,6 +179,7 @@ describe("MCP stdio entrypoint", () => {
         "search_bilibili_videos",
         "search_bilibili_creators",
         "list_bilibili_favorite_videos",
+        "get_bilibili_creator_content",
       ]);
 
       send({
@@ -230,6 +231,23 @@ describe("MCP stdio entrypoint", () => {
       expect(JSON.parse(creatorSearchResult.content[0].text)).toMatchObject({
         code: "VALIDATION_ERROR",
       });
+
+      send({
+        jsonrpc: "2.0",
+        id: 6,
+        method: "tools/call",
+        params: {
+          name: "get_bilibili_creator_content",
+          arguments: { section: "videos" },
+        },
+      });
+      const creatorContentValidation = await waitForId(6);
+      const creatorContentResult =
+        creatorContentValidation.result as CallToolResponse;
+      expect(creatorContentResult.isError).toBe(true);
+      expect(JSON.parse(creatorContentResult.content[0].text)).toMatchObject({
+        code: "VALIDATION_ERROR",
+      });
     } finally {
       child.stdin.end();
       const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
@@ -267,6 +285,7 @@ describe("MCP stdio entrypoint", () => {
       "search_bilibili_videos",
       "search_bilibili_creators",
       "list_bilibili_favorite_videos",
+      "get_bilibili_creator_content",
     ]);
   });
 

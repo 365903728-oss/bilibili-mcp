@@ -36,6 +36,14 @@ _Avoid_: Unique Video, deduplicated result
 An opaque continuation token that resumes a bounded Favorites Discovery traversal. It is not a Folder selector or account credential.
 _Avoid_: Folder ID, page URL, sync checkpoint
 
+**Creator Content Discovery**:
+A bounded Bilibili-native lookup that turns one selected Creator `mid` into a live `overview` profile reading or a page of that Creator's currently listable Video metadata. It does not crawl the full catalog automatically and never fetches per-Video evidence.
+_Avoid_: Creator crawl, full-catalog sync, per-video evidence fetch
+
+**Creator Content Cursor**:
+An opaque continuation token that resumes a bounded Creator Video catalog traversal. It is not a Creator selector or account credential.
+_Avoid_: mid, page URL, sync checkpoint
+
 **Video**:
 A Bilibili work identified by one BVID. A Video may contain one or more Parts.
 _Avoid_: Archive, post

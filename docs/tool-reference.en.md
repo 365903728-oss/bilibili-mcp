@@ -2,7 +2,7 @@
 
 [Back to English README](../README_EN.md) · [简体中文](./tool-reference.md) · [Client setup](./client-setup.en.md)
 
-This page preserves detailed behavior, parameters, examples, error contracts, and runtime request controls for all eleven MCP tools. Start with the project README for installation and the first successful call.
+This page preserves detailed behavior, parameters, examples, error contracts, and runtime request controls for all twelve MCP tools. Start with the project README for installation and the first successful call.
 
 ## Quick selection
 
@@ -10,6 +10,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 |---|---|---|
 | Start from a topic without a video link | `search_bilibili_videos` | Up to 10 normal Video candidates with reusable BVIDs; no automatic subtitle or comment retrieval |
 | Start from a topic and want Creator candidates | `search_bilibili_creators` | Up to 10 Creator candidates with stable numeric `mid`; display names are fuzzy and never auto-selected |
+| Read a chosen creator's overview or video catalog | `get_bilibili_creator_content` | One live `overview` profile reading or one page of video metadata (at most 20 rows); follow `next_cursor`; no automatic evidence fetching |
 | Start from my Bilibili Favorites | `list_bilibili_favorite_videos` | One bounded page of videos from the current account's created Favorite Folders (at most 20 rows); follow `next_cursor` until absent; no subtitles, comments, or downloads |
 | Summarize a video | `get_video_info` | Subtitles first; falls back to title, description, tags |
 | Get clean transcript text or locate keywords | `get_video_transcript` | Native subtitles first, explicit ASR fallback; supports timestamps, ranges, and keyword search |
@@ -111,13 +112,29 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Optional parameters:
   - `cursor`: Opaque continuation token returned by the previous successful call. Omit on the first call.
 
-### 9. Credential Helper Tools
+### 9. Creator Content Discovery (`get_bilibili_creator_content`)
+
+- Starts from one caller-selected, validated Creator `mid` and reads Bilibili space-page-visible content currently live; `section` is one of:
+  - `overview`: returns one byte-bounded live profile reading (`name`, `bio`, `avatar_url`, `level`, `video_count`, and `live_state`; `follower_count` appears only when the upstream provides a valid `fans` fact — it is never fabricated as 0). `video_count` prefers the upstream `acc/info` value; only when the upstream profile does not provide it is one bounded `arc/search` count probe allowed (`pn=1, ps=1, order=pubdate`) — the tool never invents a count.
+  - `videos`: returns one page of the currently listable video catalog (at most 20 BVID metadata rows); `next_cursor` is an opaque, stateless, versioned base64url token encoding only the mid and the next page number.
+- The cursor is strictly validated before any network request: type, length (1-256), charset (base64url only), JSON structure, version, requested-mid match, requested-section match (`videos` only), and a positive safe-integer page; a mismatch or out-of-range value returns `VALIDATION_ERROR` with no request sent.
+- `continuationProven` decides `next_cursor`: when `videos_total` exists and `page * 20 < videos_total`, the next page is returned; when the total is absent but the raw upstream row count is exactly 20, the next page is also returned, so one malformed row never truncates the traversal; emitting `page + 1` is guarded by a safe-integer check on `(page + 1) * 20`.
+- `skipped_count` reports upstream rows that could not be safely normalized (for example, an invalid BVID or an empty title); no replacement page is fetched. Collaboration rows whose in-row mid differs from the selected Creator remain listable Creator Videos and are kept with their in-row author.
+- Each row carries only metadata that feeds the existing evidence tools: `bvid`, title, description, cover, category, duration, publish time, author, play/danmaku/reply counts, and `source_url`; duration parses the upstream `length` (minutes may exceed 59) with the numeric `duration` as compatibility fallback and publish time prefers `created`; under `arc/search` semantics `comment` is the reply count and `video_review` is the danmaku count; `is_charge_video` is set to `true` only on explicit upstream truthy evidence (`is_pay`/`is_charging_arc`/`elec_arc_type` or the compatibility field `is_charge_video`); `access` is always `"unknown"` (the tool never probes accessibility).
+- No persistence, cache, download, subtitle/comment/chapter/search fetch, or full-catalog crawl; both sections return `live_state: "live"`.
+- Requires configured, logged-in Bilibili Cookies; success returns formatted JSON text plus identical MCP `structuredContent`.
+- Parameters:
+  - `mid` (required): the Creator's numeric `mid` (positive safe integer).
+  - `section` (required): `"overview"` or `"videos"`.
+  - `cursor` (optional): opaque continuation token returned by a previous successful `videos` call. `overview` does not accept a cursor.
+
+### 10. Credential Helper Tools
 
 - `get_credential_setup_instructions`: Returns safe setup commands for Bilibili Cookie configuration. AI agents installing this MCP can call this tool to guide users through setup.
 - `check_bilibili_credentials`: Checks whether credentials are configured and logged in without returning Cookie values. Returns next steps when credentials are missing or invalid.
 - `check_mcp_update`: Checks the local package version against npm latest and returns safe update guidance for `npx @latest` or global installs.
 
-### 10. Behavior and Error Handling
+### 11. Behavior and Error Handling
 
 - **Intelligent Cookie Expiration Detection**: Automatically verifies login status when subtitles are empty, distinguishing between "videos without subtitles" and "invalid credentials," and throwing a clear `COOKIE_EXPIRED` error to prevent silent degradation.
 
@@ -129,6 +146,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Video discovery (`search_bilibili_videos`) requires configured, valid login credentials and never falls back to anonymous search.
 - Creator search (`search_bilibili_creators`) likewise requires configured, valid login credentials and never falls back to anonymous search.
 - Favorites discovery (`list_bilibili_favorite_videos`) must start from the currently logged-in account identity; it never falls back to anonymous access and never reads another user's public Favorites.
+- Creator content discovery (`get_bilibili_creator_content`) requires configured, valid login credentials; it never falls back to anonymous access, `access` is always `"unknown"`, and it never probes whether a resource is accessible.
 - Do not rely on cookie-less mode for reliable subtitle or comment access.
 
 #### Credential Sources
@@ -310,6 +328,53 @@ Continuation:
 ```
 
 > When upstream returns an empty `medias` page, even with `has_more=true`, the tool treats the current Folder as complete and jumps to page 1 of the next Folder, preventing a cursor loop. If the cursor's Folder no longer belongs to the current account (deleted or transferred), the call returns `VALIDATION_ERROR` and instructs the caller to restart without a cursor.
+
+### `get_bilibili_creator_content`
+
+**Best for**: after `search_bilibili_creators` (or any source) yields one selected Creator's stable numeric `mid`, reading that creator's profile overview or paging through their currently listable video catalog. Each call returns at most one upstream page (at most 20 rows); the Agent follows the returned `next_cursor` until it is absent. **Do not assume a single response contains the full catalog, and do not crawl every page automatically.**
+
+Overview request:
+
+```json
+{
+  "name": "get_bilibili_creator_content",
+  "arguments": {
+    "mid": 2088259175,
+    "section": "overview"
+  }
+}
+```
+
+Returns: `mid`, `section: "overview"`, `name`, `bio`, `avatar_url`, `level`, `video_count`, and `live_state`; `follower_count` is optional and appears only when the upstream provides a valid `fans` fact — it is never fabricated as 0. `video_count` prefers the upstream `acc/info` value; only when the upstream profile lacks it is one bounded count probe allowed — the tool never invents a count.
+
+Video catalog request (first call, omit `cursor`):
+
+```json
+{
+  "name": "get_bilibili_creator_content",
+  "arguments": {
+    "mid": 2088259175,
+    "section": "videos"
+  }
+}
+```
+
+Returns: `mid`, `section: "videos"`, `page`, `videos_total` (when bounded), `videos[]` (each with `bvid`, `title`, `description`, `cover_url`, category, `duration_seconds`, `published_at`, `author`, play/danmaku/reply counts, `access: "unknown"`, `source_url`), `skipped_count`, `live_state`, and optional `next_cursor`.
+
+Continuation:
+
+```json
+{
+  "name": "get_bilibili_creator_content",
+  "arguments": {
+    "mid": 2088259175,
+    "section": "videos",
+    "cursor": "<next_cursor from the previous response>"
+  }
+}
+```
+
+> The cursor accepts only a token returned by a previous `videos` call for the same `mid`; a cross-mid or cross-section cursor, a cursor on `overview`, an out-of-range page, or a malformed token returns `VALIDATION_ERROR` before any network request.
 
 ### `get_video_transcript`
 

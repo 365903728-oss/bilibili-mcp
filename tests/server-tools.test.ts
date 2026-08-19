@@ -28,9 +28,9 @@ describe("MCP tool list baseline", () => {
   beforeAll(async () => {
     toolsResult = await getListToolsResult();
   });
-  it("exposes all 11 tools", () => {
+  it("exposes all 12 tools", () => {
     const names = toolsResult.tools.map((t) => t.name);
-    expect(names).toHaveLength(11);
+    expect(names).toHaveLength(12);
     expect(names).toContain("get_credential_setup_instructions");
     expect(names).toContain("check_bilibili_credentials");
     expect(names).toContain("check_mcp_update");
@@ -42,6 +42,7 @@ describe("MCP tool list baseline", () => {
     expect(names).toContain("search_bilibili_videos");
     expect(names).toContain("search_bilibili_creators");
     expect(names).toContain("list_bilibili_favorite_videos");
+    expect(names).toContain("get_bilibili_creator_content");
   });
 
   it("keeps the public tool order stable", () => {
@@ -57,6 +58,7 @@ describe("MCP tool list baseline", () => {
       "search_bilibili_videos",
       "search_bilibili_creators",
       "list_bilibili_favorite_videos",
+      "get_bilibili_creator_content",
     ]);
   });
 
@@ -80,6 +82,7 @@ describe("MCP tool list baseline", () => {
       search_bilibili_videos: ["query"],
       search_bilibili_creators: ["query"],
       list_bilibili_favorite_videos: [],
+      get_bilibili_creator_content: ["mid", "section"],
     });
   });
 
@@ -431,6 +434,7 @@ describe("MCP tool list baseline", () => {
         "search_bilibili_videos",
         "search_bilibili_creators",
         "list_bilibili_favorite_videos",
+        "get_bilibili_creator_content",
       ];
       for (const name of textTools) {
         const schema = toolsResult.tools.find(
@@ -703,6 +707,158 @@ describe("MCP tool list baseline", () => {
     it("is registered as the 11th tool", () => {
       const names = toolsResult.tools.map((t) => t.name);
       expect(names[10]).toBe("list_bilibili_favorite_videos");
+    });
+  });
+
+  describe("get_bilibili_creator_content schema", () => {
+    it("declares the exact bounded mid/section/cursor input", () => {
+      const schema = toolsResult.tools.find(
+        (tool) => tool.name === "get_bilibili_creator_content",
+      )!;
+
+      expect(schema).toBeDefined();
+      expect(schema.inputSchema).toEqual({
+        type: "object",
+        properties: {
+          mid: {
+            type: "integer",
+            minimum: 1,
+            maximum: Number.MAX_SAFE_INTEGER,
+            description:
+              "Bilibili Creator 数字 mid（正整数安全整数），如 2088259175。",
+          },
+          section: {
+            type: "string",
+            enum: ["overview", "videos"],
+            description:
+              "要读取的内容段：overview 返回有界档案与可用计数事实；videos 返回至多一页 20 条当前可列表 BVID 元数据。",
+          },
+          cursor: {
+            type: "string",
+            minLength: 1,
+            maxLength: 256,
+            pattern: "^[A-Za-z0-9_-]+$",
+            description:
+              "Opaque continuation token returned by a previous successful videos call. Omit on the first call; never pass a cursor for overview. The token encodes only a versioned Creator mid, section, and page number; it never contains credentials or Video data.",
+          },
+        },
+        required: ["mid", "section"],
+      });
+    });
+
+    it("declares the section-specific structured output contract", () => {
+      const schema = toolsResult.tools.find(
+        (tool) => tool.name === "get_bilibili_creator_content",
+      )!;
+
+      expect(schema.outputSchema).toEqual({
+        type: "object",
+        properties: {
+          mid: {
+            type: "integer",
+            minimum: 1,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          section: { type: "string", enum: ["overview", "videos"] },
+          name: { type: "string", minLength: 1, maxLength: 128 },
+          bio: { type: "string", maxLength: 512 },
+          avatar_url: { type: "string", maxLength: 512 },
+          follower_count: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          level: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          video_count: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          page: {
+            type: "integer",
+            minimum: 1,
+            maximum: Math.floor(Number.MAX_SAFE_INTEGER / 20),
+          },
+          videos_total: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          videos: {
+            type: "array",
+            maxItems: 20,
+            items: {
+              type: "object",
+              properties: {
+                bvid: { type: "string", minLength: 1, maxLength: 12 },
+                title: { type: "string", minLength: 1, maxLength: 512 },
+                description: { type: "string", maxLength: 512 },
+                cover_url: { type: "string", maxLength: 512 },
+                category_id: {
+                  type: "integer",
+                  minimum: 1,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                category: { type: "string", maxLength: 64 },
+                duration_seconds: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                published_at: { type: "string" },
+                author: { type: "string", maxLength: 128 },
+                view_count: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                danmaku_count: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                reply_count: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                is_charge_video: { type: "boolean" },
+                access: { type: "string", enum: ["unknown"] },
+                source_url: { type: "string" },
+              },
+              required: [
+                "bvid",
+                "title",
+                "description",
+                "cover_url",
+                "duration_seconds",
+                "published_at",
+                "author",
+                "access",
+                "source_url",
+              ],
+            },
+          },
+          skipped_count: { type: "integer", minimum: 0, maximum: 20 },
+          next_cursor: {
+            type: "string",
+            minLength: 1,
+            maxLength: 256,
+            pattern: "^[A-Za-z0-9_-]+$",
+          },
+          live_state: { type: "string", enum: ["live"] },
+        },
+        required: ["mid", "section", "live_state"],
+      });
+    });
+
+    it("is registered as the 12th tool", () => {
+      const names = toolsResult.tools.map((t) => t.name);
+      expect(names[11]).toBe("get_bilibili_creator_content");
     });
   });
 });

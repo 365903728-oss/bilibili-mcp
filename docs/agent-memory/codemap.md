@@ -65,7 +65,7 @@ Current tool families:
 
 - Credential setup, status, and package freshness: `get_credential_setup_instructions`, `check_bilibili_credentials`, `check_mcp_update`.
 - Video content: `get_video_info`, `get_video_transcript` (transcript and keyword search), `get_video_metadata`.
-- Video discovery: `search_bilibili_videos` (authenticated, bounded normal-Video candidates), `search_bilibili_creators` (authenticated, bounded Creator candidates keyed by stable numeric `mid`; display names are never identity and candidates are never auto-selected), and `list_bilibili_favorite_videos` (authenticated current-account Favorites traversal with a stateless opaque cursor; one upstream 20-row resource page per call).
+- Video discovery: `search_bilibili_videos` (authenticated, bounded normal-Video candidates), `search_bilibili_creators` (authenticated, bounded Creator candidates keyed by stable numeric `mid`; display names are never identity and candidates are never auto-selected), `list_bilibili_favorite_videos` (authenticated current-account Favorites traversal with a stateless opaque cursor; one upstream 20-row resource page per call), and `get_bilibili_creator_content` (authenticated, caller-selected Creator `mid`; live bounded `overview` reading with an allowed single count probe, or one 20-row page of the currently listable video catalog with a stateless opaque cursor; no automatic catalog crawl).
 - Comments: `get_video_comments`.
 - Chapters: `get_video_chapters`.
 
@@ -94,6 +94,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `src/bilibili/chapters.ts`: Bilibili-provided Chapter (view_points) retrieval.
 - `src/bilibili/search.ts`: authenticated first-page Video and Creator search, defensive normalization, and candidate shaping; `searchBilibiliCreators` shares the credential precheck, one-shape-retry fetch, resource item limit, and bounded-text helpers with the Video search path.
 - `src/bilibili/favorites.ts`: authenticated current-account Favorites discovery. Stateless opaque base64url cursor encode/decode (versioned Folder ID + page only), strict canonical pre-network decoding and safe-integer emission, nav→created/list-all→at most one resource/list page per call, defensive Folder/Video normalization, and reported-count/skipped-count behavior.
+- `src/bilibili/creator-content.ts`: authenticated Creator Content Discovery for one caller-selected `mid`. Versioned base64url cursor encode/decode (mid + page only) with strict canonical pre-network decoding and mid/section binding, bounded profile normalization (`video_count` from `acc/info` with one allowed `arc/search` count probe when absent), one bounded 20-row catalog page per call, defensive row normalization with BVID/mid acceptance rules and `access: "unknown"`, `continuationProven`-based `next_cursor` emission, and skipped-count behavior.
 - `src/bilibili/comments-api.ts`: raw comments API access.
 - `src/bilibili/comments.ts`: comments retrieval, filtering, and response shaping.
 - `src/bilibili/types.ts`: shared Bilibili-facing types and the runtime
@@ -104,7 +105,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `src/utils/credentials.ts`: global credential storage and credential source detection.
 - `src/utils/credential-guidance.ts`: safe credential setup instructions, status payloads, and next-step generation.
 - `src/utils/error-guidance.ts`: unified structured MCP error payload mapper with bilingual recovery guidance and category/retry metadata.
-- `src/utils/validation.ts`: BV, language, detail-level, comment/search limits, sort, query, max_matches, context_segments, and Favorites cursor (type/length/base64url charset) validation.
+- `src/utils/validation.ts`: BV, language, detail-level, comment/search limits, sort, query, max_matches, context_segments, Favorites cursor (type/length/base64url charset), and Creator Content input (mid/section/cursor shape) validation.
 - `src/utils/sanitization.ts`: BV/URL sanitization and output sanitization helpers.
 - `src/utils/errors.ts`: domain-specific error classes and codes.
 - `src/utils/logger.ts`: prebounded, structurally capped, secret/path/query
@@ -159,6 +160,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `tests/bilibili-chapters.test.ts`: Chapter retrieval, content→title mapping, error propagation, and empty-list fallback.
 - `tests/bilibili-search.test.ts`: authenticated request gating, bounded search parameters, result normalization, and empty-result behavior for Video and Creator search, including `search_type=bili_user` requests, mid/name acceptance rules, malformed-fact normalization, order preservation, resource item limit, and retry/error integrity.
 - `tests/bilibili-favorites.test.ts`: cursor encode/decode round-trip and strict validation, credential/identity gates, exact Favorites endpoints/params/headers/request counts, no-Folder/empty-Folder/same-Folder/next-Folder/final/stale-cursor behavior, raw-empty versus filtered-empty page handling, malformed or mismatched Folder rows, reported-count/visible discrepancy, malformed Video rows and skipped_count, duplicate BVID across two Folder contexts, timestamp/duration fallbacks, and order preservation.
+- `tests/bilibili-creator-content.test.ts`: Creator Content Discovery cursor encode/decode round-trip and strict validation, credential gates, exact `acc/info`/`arc/search` endpoints/params/request counts, overview `video_count` from profile versus bounded count probe, profile mid mismatch/name/bounds, one-page catalog normalization, malformed/mismatched rows and skipped_count, `continuationProven`/`next_cursor` behavior, byte-limit/ResourceLimit enforcement, and error integrity.
 - `tests/bilibili-request-count.test.ts`: verifies exactly 1 view-api request per default flow; cache-hit prevents subtitle requests.
 - `tests/bilibili-comments-tool.test.ts`: comments tool behavior.
 - `tests/cache.test.ts`: cache behavior.

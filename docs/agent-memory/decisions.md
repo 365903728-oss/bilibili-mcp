@@ -10,6 +10,18 @@
 - Reason: Rejecting invalid identity rows and conservatively normalizing the rest keeps the output JSON-serializable and predictable while never guessing identity from a name.
 - Evidence: GitHub Issue #45 acceptance criteria and the bounded-text/normalization precedent in `src/bilibili/search.ts`.
 
+- Decision: Add the `overview` and `videos` sections of `get_bilibili_creator_content` as the twelfth tool, driven by one caller-selected, validated Creator `mid`, reusing `fetchWithWBI`, the operation-context, byte limits, and the Favorites versioned base64url cursor pattern; no automatic catalog crawl and no per-Video evidence fetching.
+- Reason: After `search_bilibili_creators` returns stable numeric `mid` candidates, the user needs a bounded way to read a chosen Creator's profile or currently listable video metadata without turning the server into a broad space API wrapper; page-by-page continuation stays one upstream resource page per call.
+- Evidence: GitHub Issue #46 acceptance criteria, the frozen `codex-paseo-claude` typed contract, `src/bilibili/creator-content.ts`, and the Favorites cursor precedent.
+
+- Decision: Expose an upstream `video_count` in `overview` when available; when `acc/info` does not provide it, allow exactly one bounded `arc/search` count probe (`pn=1, ps=1, order=pubdate`); never invent a count, and keep other profile facts conservative without adding further endpoints or fields beyond ticket needs.
+- Reason: A single count probe is a one-row metadata read, not a catalog crawl, and honest absence of an upstream count must not become a fabricated number in the public contract.
+- Evidence: Controller clarification within the frozen Issue #46 contract and the request-count tests in `tests/bilibili-creator-content.test.ts`.
+
+- Decision: Mark every video row and both sections with `access: "unknown"` and `live_state: "live"`, and bind the continuation cursor to the same mid and `videos` section with strict pre-network validation (cross-mid, cross-section, overview-with-cursor, and unsafe pages return `VALIDATION_ERROR` without any request).
+- Reason: The tool never probes resource accessibility or live status beyond the two endpoints it reads, so any stronger claim would be invented; cursor binding prevents one Creator's token from resuming another Creator's traversal.
+- Evidence: Issue #46 `access`/`live_state` fields, `encodeCreatorContentCursor`/`decodeCreatorContentCursor` in `src/bilibili/creator-content.ts`, and cursor-binding regressions.
+
 ## 2026-07-26
 
 - Decision: Add one bounded `search_bilibili_videos` Video Discovery entry before danmaku, creator navigation, or collection search.

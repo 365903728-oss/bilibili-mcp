@@ -247,3 +247,22 @@ export function validateFavoritesCursor(cursor: unknown): void {
     throw new ValidationError("cursor must contain only base64url characters");
   }
 }
+
+/**
+ * 验证 Creator Content 输入：mid 必填正整数安全整数、section 必填枚举、
+ * cursor 可选字符串 1-256 且仅 base64url 字符。
+ * 不解码 payload；由 creator-content 模块在凭据/网络副作用前完成严格解码与绑定校验。
+ */
+export function validateCreatorContentInput(
+  mid: unknown,
+  section: unknown,
+  cursor?: unknown,
+): void {
+  if (typeof mid !== "number" || !Number.isSafeInteger(mid) || mid < 1) {
+    throw new ValidationError("mid must be a positive safe integer");
+  }
+  if (section !== "overview" && section !== "videos") {
+    throw new ValidationError('section must be "overview" or "videos"');
+  }
+  validateFavoritesCursor(cursor);
+}

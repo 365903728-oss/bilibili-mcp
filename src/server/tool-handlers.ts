@@ -1,5 +1,6 @@
 import { getVideoChaptersData } from "../bilibili/chapters.js";
 import { getVideoCommentsData } from "../bilibili/comments.js";
+import { getBilibiliCreatorContent } from "../bilibili/creator-content.js";
 import { listBilibiliFavoriteVideos } from "../bilibili/favorites.js";
 import { checkLoginStatus } from "../bilibili/http.js";
 import { getVideoMetadataData } from "../bilibili/metadata.js";
@@ -30,6 +31,7 @@ import {
   validateCommentLimit,
   validateCommentSort,
   validateContextSegments,
+  validateCreatorContentInput,
   validateDetailLevel,
   validateFavoritesCursor,
   validateLanguage,
@@ -59,6 +61,7 @@ const KNOWN_TOOL_NAMES = new Set([
   "search_bilibili_videos",
   "search_bilibili_creators",
   "list_bilibili_favorite_videos",
+  "get_bilibili_creator_content",
 ]);
 
 export async function handleToolCall(
@@ -301,6 +304,26 @@ export async function handleToolCall(
 
       const cursor = typeof rawCursor === "string" ? rawCursor : undefined;
       const result = await listBilibiliFavoriteVideos(cursor);
+
+      return toStructuredContent(result as unknown as Record<string, unknown>);
+    }
+
+    case "get_bilibili_creator_content": {
+      const rawMid = args?.mid;
+      const rawSection = args?.section;
+      const rawCursor = args?.cursor;
+
+      try {
+        validateCreatorContentInput(rawMid, rawSection, rawCursor);
+      } catch (error) {
+        return toErrorTextContent(buildValidationErrorPayload(error));
+      }
+
+      const result = await getBilibiliCreatorContent(
+        rawMid as number,
+        rawSection as "overview" | "videos",
+        typeof rawCursor === "string" ? rawCursor : undefined,
+      );
 
       return toStructuredContent(result as unknown as Record<string, unknown>);
     }

@@ -144,6 +144,24 @@ crawling candidate content. Implementation ran in the
 CI status is not claimed green, and no merge, release, or live-smoke claim is
 made here.
 
+Issue #46 (Creator Video Catalog) is the implementation ticket after #45:
+`get_bilibili_creator_content` becomes the twelfth tool with `overview` and
+`videos` sections, driven by one caller-selected numeric Creator `mid`.
+`overview` returns a live bounded profile reading whose `video_count` prefers the
+upstream `acc/info` value and may fall back to exactly one bounded `arc/search`
+count probe (`pn=1, ps=1, order=pubdate`); `videos` returns one 20-row page of
+currently listable BVID metadata with a stateless versioned base64url cursor
+bound to the same mid and section. Both sections return `access: "unknown"`
+and `live_state: "live"`; no automatic evidence crawling, no invented counts,
+and no further endpoints or fields. Implementation ran in the
+`codex-paseo-claude` adapter on worktree
+`C:\Users\ZX\.codex\worktrees\issue-46\bilibili-mcp` at base
+`afb6560c49765b18bbc4710669036cb1c4d3ebbe` on branch
+`codex/issue-46-creator-video-catalog`. The uncommitted writer diff and the
+file-backed Claude report were returned to the Codex acceptance owner; the
+focused contract suite was 207/207 green, and no commit, push, merge, release,
+or live-smoke claim is made here.
+
 The pre-existing learning-proposal queue is legacy v1 state and remains outside
 the clean #29 worktree. Typed accepted-evidence memory automation is scoped to
 #33; #29 hooks only write ignored redacted events. Files under
