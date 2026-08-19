@@ -135,11 +135,14 @@ Issue #45 (Creator Search) is the next implementation ticket after #44:
 `search_bilibili_creators` becomes the eleventh tool, reusing the search module
 (authenticated, bounded, one-shape-retry, `search_type=bili_user`) and
 returning stable numeric `mid` candidates without selecting one Creator or
-crawling candidate content. Implementation runs in the
+crawling candidate content. Implementation ran in the
 `codex-paseo-claude` adapter on worktree
 `C:\Users\ZX\.codex\worktrees\issue-45\bilibili-mcp` at base
-`8f994f5a3f8763eff668299af461aceeb4257d0e`; the diff is returned uncommitted
-for Codex acceptance and no push/PR/release occurs.
+`8f994f5a3f8763eff668299af461aceeb4257d0e` and was accepted locally as commit
+`53e244f7f14c5cf576b4ab784990b2512a4c0b9f`, pushed on branch
+`codex/issue-45-creator-search`; draft PR #49 is the current integration gate.
+CI status is not claimed green, and no merge, release, or live-smoke claim is
+made here.
 
 The pre-existing learning-proposal queue is legacy v1 state and remains outside
 the clean #29 worktree. Typed accepted-evidence memory automation is scoped to
