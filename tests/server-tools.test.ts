@@ -28,9 +28,9 @@ describe("MCP tool list baseline", () => {
   beforeAll(async () => {
     toolsResult = await getListToolsResult();
   });
-  it("exposes all 10 tools", () => {
+  it("exposes all 11 tools", () => {
     const names = toolsResult.tools.map((t) => t.name);
-    expect(names).toHaveLength(10);
+    expect(names).toHaveLength(11);
     expect(names).toContain("get_credential_setup_instructions");
     expect(names).toContain("check_bilibili_credentials");
     expect(names).toContain("check_mcp_update");
@@ -40,6 +40,7 @@ describe("MCP tool list baseline", () => {
     expect(names).toContain("get_video_metadata");
     expect(names).toContain("get_video_chapters");
     expect(names).toContain("search_bilibili_videos");
+    expect(names).toContain("search_bilibili_creators");
     expect(names).toContain("list_bilibili_favorite_videos");
   });
 
@@ -54,6 +55,7 @@ describe("MCP tool list baseline", () => {
       "get_video_metadata",
       "get_video_chapters",
       "search_bilibili_videos",
+      "search_bilibili_creators",
       "list_bilibili_favorite_videos",
     ]);
   });
@@ -76,6 +78,7 @@ describe("MCP tool list baseline", () => {
       get_video_metadata: ["bvid_or_url"],
       get_video_chapters: ["bvid_or_url"],
       search_bilibili_videos: ["query"],
+      search_bilibili_creators: ["query"],
       list_bilibili_favorite_videos: [],
     });
   });
@@ -426,6 +429,7 @@ describe("MCP tool list baseline", () => {
         "get_video_metadata",
         "get_video_chapters",
         "search_bilibili_videos",
+        "search_bilibili_creators",
         "list_bilibili_favorite_videos",
       ];
       for (const name of textTools) {
@@ -545,6 +549,90 @@ describe("MCP tool list baseline", () => {
     });
   });
 
+  describe("search_bilibili_creators schema", () => {
+    it("declares the exact bounded input and structured creator candidate output", () => {
+      const schema = toolsResult.tools.find(
+        (tool) => tool.name === "search_bilibili_creators",
+      )!;
+
+      expect(schema).toBeDefined();
+      expect(schema.inputSchema).toEqual({
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            minLength: 1,
+            maxLength: 100,
+            description:
+              "Bilibili 创作者搜索关键词。trim 后必须非空，最多 100 字符。",
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10,
+            description: "可选，候选 Creator 数量。默认 5，最大 10。",
+          },
+        },
+        required: ["query"],
+      });
+      expect(schema.outputSchema).toEqual({
+        type: "object",
+        properties: {
+          query: { type: "string", maxLength: 100 },
+          results: {
+            type: "array",
+            maxItems: 10,
+            items: {
+              type: "object",
+              properties: {
+                mid: {
+                  type: "integer",
+                  minimum: 1,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                name: { type: "string", minLength: 1, maxLength: 128 },
+                bio: { type: "string", maxLength: 512 },
+                avatar_url: { type: "string", maxLength: 512 },
+                follower_count: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                video_count: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                level: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: Number.MAX_SAFE_INTEGER,
+                },
+                source_url: { type: "string", maxLength: 64 },
+              },
+              required: [
+                "mid",
+                "name",
+                "bio",
+                "avatar_url",
+                "follower_count",
+                "video_count",
+                "level",
+                "source_url",
+              ],
+            },
+          },
+        },
+        required: ["query", "results"],
+      });
+    });
+
+    it("is registered as the 10th tool", () => {
+      const names = toolsResult.tools.map((t) => t.name);
+      expect(names[9]).toBe("search_bilibili_creators");
+    });
+  });
+
   describe("list_bilibili_favorite_videos schema", () => {
     it("declares the bounded cursor input and structured favorites output", () => {
       const schema = toolsResult.tools.find(
@@ -612,9 +700,9 @@ describe("MCP tool list baseline", () => {
       });
     });
 
-    it("is registered as the 10th tool", () => {
+    it("is registered as the 11th tool", () => {
       const names = toolsResult.tools.map((t) => t.name);
-      expect(names[9]).toBe("list_bilibili_favorite_videos");
+      expect(names[10]).toBe("list_bilibili_favorite_videos");
     });
   });
 });

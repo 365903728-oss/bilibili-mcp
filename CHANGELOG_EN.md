@@ -6,6 +6,10 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ## [Unreleased]
 
+### Added
+- Added the 11th tool `search_bilibili_creators`, returning Creator candidates in Bilibili's platform order. `limit` defaults to 5 and is capped at 10; each candidate includes the stable numeric `mid` (the only identity), name, bio, avatar URL, follower count, video count, level, and a locally derived source URL. Display names are fuzzy and non-unique; candidates are returned as candidates only — the tool never selects one Creator and never crawls candidate content. (Issue #45)
+- Creator Search success returns formatted JSON text plus identical MCP `structuredContent`; it requires configured, logged-in Bilibili Cookies and never falls back to anonymous search.
+
 ---
 
 ## [1.12.0] - 2026-08-18

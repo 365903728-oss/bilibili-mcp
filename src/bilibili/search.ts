@@ -10,7 +10,12 @@ import {
   throwIfAborted,
 } from "../security/operation-context.js";
 import { isValidBVId } from "../utils/bvid.js";
-import type { VideoSearchCandidate, VideoSearchData } from "./types.js";
+import type {
+  CreatorSearchCandidate,
+  CreatorSearchData,
+  VideoSearchCandidate,
+  VideoSearchData,
+} from "./types.js";
 import { checkLoginStatus, fetchWithoutWBI } from "./http.js";
 import {
   boundedRemoteText,
@@ -18,10 +23,15 @@ import {
 } from "../utils/bounded-text.js";
 
 const VIDEO_SEARCH_PATH = "/x/web-interface/wbi/search/type";
+const VIDEO_SEARCH_TYPE = "video";
+const CREATOR_SEARCH_TYPE = "bili_user";
 const MAX_SEARCH_ROWS = 100;
 const MAX_SEARCH_TITLE_BYTES = 512;
 const MAX_SEARCH_AUTHOR_BYTES = 128;
 const MAX_SEARCH_DESCRIPTION_BYTES = 512;
+const MAX_CREATOR_NAME_BYTES = 128;
+const MAX_CREATOR_BIO_BYTES = 512;
+const MAX_CREATOR_AVATAR_BYTES = 512;
 const SEARCH_SHAPE_RETRY_DELAY_MS = 500;
 
 type UnknownRecord = Record<string, unknown>;
@@ -89,6 +99,15 @@ function toViewCount(value: unknown): number {
   return Math.trunc(value);
 }
 
+// Creator profile facts are identity-adjacent and must never truncate or
+// widen: only non-negative safe integers are accepted, everything else is 0.
+function toNonNegativeSafeInteger(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    return 0;
+  }
+  return value;
+}
+
 function truncateDescription(value: unknown): string {
   return cleanSearchText(value, MAX_SEARCH_DESCRIPTION_BYTES);
 }
@@ -118,10 +137,12 @@ async function fetchSearchRows(
   query: string,
   limit: number,
   authHeaders: Record<string, string>,
+  searchType: string,
+  invalidResponseMessage: string,
 ): Promise<unknown[]> {
   const signal = getOperationSignal();
   const params = {
-    search_type: "video",
+    search_type: searchType,
     keyword: query,
     page: 1,
     page_size: limit,
@@ -142,9 +163,7 @@ async function fetchSearchRows(
     }
   }
 
-  throw new UpstreamResponseError(
-    "Bilibili returned an invalid video search response",
-  );
+  throw new UpstreamResponseError(invalidResponseMessage);
 }
 
 export async function searchBilibiliVideos(
@@ -166,7 +185,13 @@ export async function searchBilibiliVideos(
     throw createCredentialError();
   }
 
-  const rows = await fetchSearchRows(normalizedQuery, limit, authHeaders);
+  const rows = await fetchSearchRows(
+    normalizedQuery,
+    limit,
+    authHeaders,
+    VIDEO_SEARCH_TYPE,
+    "Bilibili returned an invalid video search response",
+  );
 
   if (rows.length > MAX_SEARCH_ROWS) {
     throw new ResourceLimitError(
@@ -179,6 +204,81 @@ export async function searchBilibiliVideos(
 
   for (const row of rows) {
     const candidate = normalizeCandidate(row);
+    if (candidate) results.push(candidate);
+    if (results.length === limit) break;
+  }
+
+  return {
+    query: normalizedQuery,
+    results,
+  };
+}
+
+function toPositiveMid(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+    return undefined;
+  }
+  return value;
+}
+
+function normalizeCreatorCandidate(
+  value: unknown,
+): CreatorSearchCandidate | undefined {
+  if (!isRecord(value)) return undefined;
+  const mid = toPositiveMid(value.mid);
+  const name = cleanSearchText(value.uname, MAX_CREATOR_NAME_BYTES);
+  if (mid === undefined || !name) return undefined;
+
+  return {
+    mid,
+    name,
+    bio: cleanSearchText(value.usign, MAX_CREATOR_BIO_BYTES),
+    avatar_url: cleanSearchText(value.upic, MAX_CREATOR_AVATAR_BYTES),
+    follower_count: toNonNegativeSafeInteger(value.fans),
+    video_count: toNonNegativeSafeInteger(value.videos),
+    level: toNonNegativeSafeInteger(value.level),
+    source_url: `https://space.bilibili.com/${mid}/`,
+  };
+}
+
+export async function searchBilibiliCreators(
+  query: string,
+  limit = 5,
+): Promise<CreatorSearchData> {
+  const normalizedQuery = query.trim();
+  const authHeaders = credentialManager.getAuthHeaders();
+
+  if (
+    typeof authHeaders.Cookie !== "string" ||
+    authHeaders.Cookie.trim().length === 0
+  ) {
+    throw createCredentialError();
+  }
+
+  const loginStatus = await checkLoginStatus();
+  if (!loginStatus.isLogin) {
+    throw createCredentialError();
+  }
+
+  const rows = await fetchSearchRows(
+    normalizedQuery,
+    limit,
+    authHeaders,
+    CREATOR_SEARCH_TYPE,
+    "Bilibili returned an invalid creator search response",
+  );
+
+  if (rows.length > MAX_SEARCH_ROWS) {
+    throw new ResourceLimitError(
+      "Creator search response exceeded its item limit",
+      "creator_search_items",
+      MAX_SEARCH_ROWS,
+    );
+  }
+  const results: CreatorSearchCandidate[] = [];
+
+  for (const row of rows) {
+    const candidate = normalizeCreatorCandidate(row);
     if (candidate) results.push(candidate);
     if (results.length === limit) break;
   }

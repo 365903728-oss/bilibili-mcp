@@ -2,13 +2,14 @@
 
 [返回中文 README](../README.md) · [English](./tool-reference.en.md) · [客户端接入](./client-setup.md)
 
-本页保存 10 个 MCP 工具的详细行为、参数、示例、错误结构和运行时请求控制。安装与首次调用请先看项目 README。
+本页保存 11 个 MCP 工具的详细行为、参数、示例、错误结构和运行时请求控制。安装与首次调用请先看项目 README。
 
 ## 快速选择
 
 | 目标 | 推荐工具 | 返回重点 |
 |---|---|---|
 | 只有主题，还没有视频链接 | `search_bilibili_videos` | 最多 10 个普通视频候选及可继续调用的 BVID；不自动抓取字幕或评论 |
+| 只有主题，想找 UP 主候选 | `search_bilibili_creators` | 最多 10 个 Creator 候选及其稳定数字 `mid`；显示名称模糊且不唯一，不做自动选择 |
 | 从我的 Bilibili 收藏夹开始读取 | `list_bilibili_favorite_videos` | 当前账号所有创建的收藏夹的一页视频（最多 20 条），按 `next_cursor` 翻页直到结束；不读取字幕、评论或下载 |
 | 想让 AI 总结一个视频 | `get_video_info` | 字幕优先；无字幕时返回标题、简介、标签 |
 | 只想拿完整转录文本或关键词定位 | `get_video_transcript` | 原生字幕优先，可显式 ASR 回退；支持时间戳、区间过滤和关键词搜索 |
@@ -89,7 +90,14 @@
 - 候选只包含可选择和传给现有工具的元数据，不自动获取字幕、评论，也不进行 AI 重排。
 - 必须先配置且登录 Bilibili Cookie；成功结果同时提供格式化 JSON 文本和内容相同的 MCP `structuredContent`。
 
-### 7. 收藏夹发现 (`list_bilibili_favorite_videos`)
+### 7. 创作者搜索 (`search_bilibili_creators`)
+
+- 按关键词返回 Bilibili 平台排序的 Creator 候选；默认 5 条，最多 10 条。
+- 每个候选携带稳定数字 `mid`（唯一身份）、显示名称、简介、头像 URL、粉丝数、视频数、等级和本地推导的 `source_url`；`mid` 是正安全整数且名称非空时才接受该候选，畸形字段规范化为空字符串或 0。
+- 显示名称模糊且不唯一：重名/近似名保持为独立候选，按 Bilibili 原始顺序返回；本工具不自动选择某个 Creator，也不抓取候选内容。
+- 必须先配置且登录 Bilibili Cookie；成功结果同时提供格式化 JSON 文本和内容相同的 MCP `structuredContent`。
+
+### 8. 收藏夹发现 (`list_bilibili_favorite_videos`)
 
 - 从当前已登录账号自动发现所有创建的收藏夹，逐 Folder 逐页返回其中的视频成员。
 - 每次调用最多返回上游一页（固定 20 条）；`next_cursor` 是不透明、无状态、版本化的 base64url 令牌，仅包含下一个 Folder 与页码。
@@ -104,13 +112,13 @@
 - 可选参数：
   - `cursor`: 上一次成功调用返回的不透明续读令牌。首次调用请省略。
 
-### 8. 凭证助手工具
+### 9. 凭证助手工具
 
 - `get_credential_setup_instructions`: 返回安全的 Bilibili Cookie 配置命令和说明。AI agent 安装此 MCP 后可调用此工具引导用户完成配置。
 - `check_bilibili_credentials`: 检查凭证是否已配置并处于登录状态，不返回任何 Cookie 值。配置缺失或失效时返回下一步操作指引。
 - `check_mcp_update`: 检查本地包版本与 npm latest 是否一致，并返回 `npx @latest` 或全局安装的安全更新指引。
 
-### 9. 行为说明与错误处理
+### 10. 行为说明与错误处理
 
 - **Cookie 过期智能检测**：当字幕获取为空时自动验证登录状态，区分“无字幕视频”与“凭证失效”，并抛出明确的 `COOKIE_EXPIRED` 错误，避免静默降级。
 
@@ -120,6 +128,7 @@
 - 字幕（`get_video_info`、`get_video_transcript`）在未登录时可能无法获取、不完整或返回空结果。
 - 评论（`get_video_comments`）在未登录时可能不完整、被限流或返回空列表。
 - 视频发现（`search_bilibili_videos`）强制检查已配置且有效的登录凭证；不提供匿名降级。
+- 创作者搜索（`search_bilibili_creators`）同样强制检查已配置且有效的登录凭证；不提供匿名降级。
 - 收藏夹发现（`list_bilibili_favorite_videos`）必须从已登录的当前账号身份开始；不提供匿名降级，也不读取其他账号的公开收藏。
 - 不建议依赖无 Cookie 模式获取字幕或评论。
 
@@ -254,6 +263,29 @@
 ```
 
 返回内容：综合排序的普通视频候选及其 `bvid`、标题、作者、时长、发布时间、播放量、简介片段和源链接。搜索需要有效登录凭证，且不会自动读取候选视频的字幕或评论。
+
+### `search_bilibili_creators`
+
+**适合**：让 Agent 从主题/关键词出发，获得 Bilibili UP 主候选及其稳定数字 `mid`，用于需要"按创作者身份继续"的场景。显示名称模糊且不唯一，每个候选都只是候选而非已解析身份；本工具不自动选择某个 Creator，也不抓取候选内容。
+
+请求示例：
+
+```json
+{
+  "name": "search_bilibili_creators",
+  "arguments": {
+    "query": "UP主",
+    "limit": 5
+  }
+}
+```
+
+参数：
+
+- `query`（必填）：搜索关键词。trim 后必须非空，最多 100 字符。
+- `limit`（可选）：候选 Creator 数量，整数 1-10，默认 5。
+
+返回内容：`query` 和按 Bilibili 原始顺序排列的 `results[]`。每项含稳定数字 `mid`（正安全整数，唯一身份）、`name`、`bio`、`avatar_url`、`follower_count`、`video_count`、`level` 和本地推导的 `source_url`。只有 `mid` 为正安全整数且名称非空时才接受该候选；畸形字段规范化为空字符串或 0。重名/近似名保持为独立候选。搜索需要有效登录凭证，不会自动读取候选的视频、动态、字幕、评论或其他详情。
 
 ### `list_bilibili_favorite_videos`
 

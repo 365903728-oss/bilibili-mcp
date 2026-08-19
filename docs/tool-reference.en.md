@@ -2,13 +2,14 @@
 
 [Back to English README](../README_EN.md) · [简体中文](./tool-reference.md) · [Client setup](./client-setup.en.md)
 
-This page preserves detailed behavior, parameters, examples, error contracts, and runtime request controls for all ten MCP tools. Start with the project README for installation and the first successful call.
+This page preserves detailed behavior, parameters, examples, error contracts, and runtime request controls for all eleven MCP tools. Start with the project README for installation and the first successful call.
 
 ## Quick selection
 
 | Goal | Recommended tool | What you get |
 |---|---|---|
 | Start from a topic without a video link | `search_bilibili_videos` | Up to 10 normal Video candidates with reusable BVIDs; no automatic subtitle or comment retrieval |
+| Start from a topic and want Creator candidates | `search_bilibili_creators` | Up to 10 Creator candidates with stable numeric `mid`; display names are fuzzy and never auto-selected |
 | Start from my Bilibili Favorites | `list_bilibili_favorite_videos` | One bounded page of videos from the current account's created Favorite Folders (at most 20 rows); follow `next_cursor` until absent; no subtitles, comments, or downloads |
 | Summarize a video | `get_video_info` | Subtitles first; falls back to title, description, tags |
 | Get clean transcript text or locate keywords | `get_video_transcript` | Native subtitles first, explicit ASR fallback; supports timestamps, ranges, and keyword search |
@@ -88,7 +89,14 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Candidate metadata is for selection and follow-up calls only; the tool does not fetch subtitles/comments or apply AI re-ranking.
 - Requires configured, logged-in Bilibili Cookies; success returns formatted JSON text plus identical MCP `structuredContent`.
 
-### 7. Favorites Discovery (`list_bilibili_favorite_videos`)
+### 7. Creator Search (`search_bilibili_creators`)
+
+- Returns Creator candidates in Bilibili's platform order; 5 by default and at most 10.
+- Each candidate carries the stable numeric `mid` (the only identity), display name, bio, avatar URL, follower count, video count, level, and a locally derived `source_url`. A candidate is accepted only when `mid` is a positive safe integer and the bounded name is non-empty; malformed profile facts normalize to empty strings or non-negative integer zero.
+- Display names are fuzzy and non-unique: duplicate or near-duplicate names remain separate candidates in Bilibili's original order. The tool never selects one Creator and never crawls candidate content.
+- Requires configured, logged-in Bilibili Cookies; success returns formatted JSON text plus identical MCP `structuredContent`.
+
+### 8. Favorites Discovery (`list_bilibili_favorite_videos`)
 
 - Automatically discovers every created Favorite Folder of the currently logged-in account and walks Folder-by-Folder, page-by-page.
 - Each call returns at most one upstream resource page (fixed at 20 rows). `next_cursor` is an opaque, stateless, versioned base64url token that encodes only the next Folder ID and page number.
@@ -103,13 +111,13 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Optional parameters:
   - `cursor`: Opaque continuation token returned by the previous successful call. Omit on the first call.
 
-### 8. Credential Helper Tools
+### 9. Credential Helper Tools
 
 - `get_credential_setup_instructions`: Returns safe setup commands for Bilibili Cookie configuration. AI agents installing this MCP can call this tool to guide users through setup.
 - `check_bilibili_credentials`: Checks whether credentials are configured and logged in without returning Cookie values. Returns next steps when credentials are missing or invalid.
 - `check_mcp_update`: Checks the local package version against npm latest and returns safe update guidance for `npx @latest` or global installs.
 
-### 9. Behavior and Error Handling
+### 10. Behavior and Error Handling
 
 - **Intelligent Cookie Expiration Detection**: Automatically verifies login status when subtitles are empty, distinguishing between "videos without subtitles" and "invalid credentials," and throwing a clear `COOKIE_EXPIRED` error to prevent silent degradation.
 
@@ -119,6 +127,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 - Subtitles (`get_video_info`, `get_video_transcript`) may be unavailable, incomplete, or fail without authentication.
 - Comments (`get_video_comments`) may be incomplete, empty, or rate-limited without authentication.
 - Video discovery (`search_bilibili_videos`) requires configured, valid login credentials and never falls back to anonymous search.
+- Creator search (`search_bilibili_creators`) likewise requires configured, valid login credentials and never falls back to anonymous search.
 - Favorites discovery (`list_bilibili_favorite_videos`) must start from the currently logged-in account identity; it never falls back to anonymous access and never reads another user's public Favorites.
 - Do not rely on cookie-less mode for reliable subtitle or comment access.
 
@@ -250,6 +259,29 @@ Request:
 ```
 
 Returns: normal Video candidates in comprehensive order with `bvid`, title, author, duration, publish time, view count, bounded description, and source URL. Search requires valid logged-in credentials and never fetches candidate subtitles or comments automatically.
+
+### `search_bilibili_creators`
+
+**Best for**: letting an Agent start from a topic and get Bilibili UP 主 candidates with stable numeric `mid` values for later Creator-identity steps. Display names are fuzzy and non-unique; every candidate is a candidate, not a resolved identity. This tool never selects one Creator and never crawls candidate content.
+
+Request:
+
+```json
+{
+  "name": "search_bilibili_creators",
+  "arguments": {
+    "query": "MCP",
+    "limit": 5
+  }
+}
+```
+
+Parameters:
+
+- `query` (required): search keyword. Must be non-empty after trimming, at most 100 characters.
+- `limit` (optional): candidate Creator count, integer 1-10, default 5.
+
+Returns: `query` and `results[]` in Bilibili's original order. Each entry carries the stable numeric `mid` (positive safe integer, the only identity), `name`, `bio`, `avatar_url`, `follower_count`, `video_count`, `level`, and a locally derived `source_url`. A candidate is accepted only when `mid` is a positive safe integer and the bounded name is non-empty; malformed profile facts normalize to empty strings or non-negative integer zero. Duplicate or near-duplicate names remain separate candidates. Search requires valid logged-in credentials and never fetches candidate Videos, Dynamics, subtitles, comments, or other per-candidate details.
 
 ### `list_bilibili_favorite_videos`
 

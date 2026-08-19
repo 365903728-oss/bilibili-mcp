@@ -3,7 +3,10 @@ import { getVideoCommentsData } from "../bilibili/comments.js";
 import { listBilibiliFavoriteVideos } from "../bilibili/favorites.js";
 import { checkLoginStatus } from "../bilibili/http.js";
 import { getVideoMetadataData } from "../bilibili/metadata.js";
-import { searchBilibiliVideos } from "../bilibili/search.js";
+import {
+  searchBilibiliCreators,
+  searchBilibiliVideos,
+} from "../bilibili/search.js";
 import {
   getVideoInfoWithSubtitle,
   getVideoTranscriptData,
@@ -54,6 +57,7 @@ const KNOWN_TOOL_NAMES = new Set([
   "get_video_metadata",
   "get_video_chapters",
   "search_bilibili_videos",
+  "search_bilibili_creators",
   "list_bilibili_favorite_videos",
 ]);
 
@@ -261,6 +265,27 @@ export async function handleToolCall(
       const query = (rawQuery as string).trim();
       const limit = rawLimit === undefined ? 5 : (rawLimit as number);
       const result = await searchBilibiliVideos(query, limit);
+
+      return toStructuredContent(result as unknown as Record<string, unknown>);
+    }
+
+    case "search_bilibili_creators": {
+      const rawQuery = args?.query;
+      const rawLimit = args?.limit;
+
+      try {
+        if (rawQuery === undefined) {
+          throw new ValidationError("query is required");
+        }
+        validateQuery(rawQuery);
+        validateSearchLimit(rawLimit);
+      } catch (error) {
+        return toErrorTextContent(buildValidationErrorPayload(error));
+      }
+
+      const query = (rawQuery as string).trim();
+      const limit = rawLimit === undefined ? 5 : (rawLimit as number);
+      const result = await searchBilibiliCreators(query, limit);
 
       return toStructuredContent(result as unknown as Record<string, unknown>);
     }

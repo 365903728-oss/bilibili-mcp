@@ -178,6 +178,7 @@ Runtime 固定为 `faster-whisper==1.2.1`，模型存放在用户目录 `~/.bili
 | 目标 | 工具 |
 |---|---|
 | 只有主题，还没有视频链接 | `search_bilibili_videos` |
+| 只有主题，想找 UP 主候选（稳定 mid） | `search_bilibili_creators` |
 | 从我的收藏夹开始读取 | `list_bilibili_favorite_videos` |
 | 快速获取字幕优先的视频上下文 | `get_video_info` |
 | 完整转录、关键词定位，或无字幕时本地 ASR | `get_video_transcript` |

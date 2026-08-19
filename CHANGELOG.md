@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+### 新增
+- 新增第 11 个工具 `search_bilibili_creators`，按关键词返回 Bilibili 平台排序的 Creator 候选。`limit` 默认 5、最大 10；每个候选包含稳定数字 `mid`（唯一身份）、名称、简介、头像 URL、粉丝数、视频数、等级和本地推导的来源链接。显示名称模糊且不唯一，候选仅作为候选返回，不自动选择某个 Creator，也不抓取候选内容。（Issue #45）
+- 创作者搜索成功结果同时返回格式化 JSON 文本与内容相同的 MCP `structuredContent`；要求有效且已登录的 Bilibili Cookie，不提供匿名降级。
+
 ---
 
 ## [1.12.0] - 2026-08-18

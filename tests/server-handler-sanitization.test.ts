@@ -9,6 +9,7 @@ const mockGetVideoChaptersData = vi.fn();
 const mockGetVideoTranscriptData = vi.fn();
 const mockGetVideoCommentsData = vi.fn();
 const mockSearchBilibiliVideos = vi.fn();
+const mockSearchBilibiliCreators = vi.fn();
 const mockListBilibiliFavoriteVideos = vi.fn();
 
 vi.mock("../src/bilibili/subtitle.js", () => ({
@@ -29,6 +30,8 @@ vi.mock("../src/bilibili/chapters.js", () => ({
 vi.mock("../src/bilibili/search.js", () => ({
   searchBilibiliVideos: (...args: unknown[]) =>
     mockSearchBilibiliVideos(...args),
+  searchBilibiliCreators: (...args: unknown[]) =>
+    mockSearchBilibiliCreators(...args),
 }));
 
 vi.mock("../src/bilibili/favorites.js", () => ({
@@ -659,6 +662,93 @@ describe("search handler validation and output", () => {
       params: {
         name: "search_bilibili_videos",
         arguments: { query: "MCP", limit: 3 },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("UNKNOWN_ERROR");
+  });
+});
+
+describe("creator search handler validation and output", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ["missing query", {}],
+    ["empty query", { query: "   " }],
+    ["long query", { query: "a".repeat(101) }],
+    ["limit below range", { query: "UP主", limit: 0 }],
+    ["limit above range", { query: "UP主", limit: 11 }],
+    ["fractional limit", { query: "UP主", limit: 1.5 }],
+    ["string limit", { query: "UP主", limit: "5" }],
+  ])("search_bilibili_creators with %s returns VALIDATION_ERROR", async (_case, args) => {
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 15,
+      params: {
+        name: "search_bilibili_creators",
+        arguments: args,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("VALIDATION_ERROR");
+    expect(mockSearchBilibiliCreators).not.toHaveBeenCalled();
+  });
+
+  it("trims the query, applies the default limit, and returns identical dual output", async () => {
+    const fixture = {
+      query: "UP主",
+      results: [
+        {
+          mid: 2_468_136,
+          name: "UP主一号",
+          bio: "分享生活",
+          avatar_url: "https://i0.hdslb.com/bfs/face/a.jpg",
+          follower_count: 1_234_567,
+          video_count: 42,
+          level: 6,
+          source_url: "https://space.bilibili.com/2468136/",
+        },
+      ],
+    };
+    mockSearchBilibiliCreators.mockResolvedValueOnce(fixture);
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 16,
+      params: {
+        name: "search_bilibili_creators",
+        arguments: { query: "  UP主  " },
+      },
+    });
+
+    expect(mockSearchBilibiliCreators).toHaveBeenCalledWith("UP主", 5);
+    expect(result.structuredContent).toEqual(fixture);
+    expect(result.content[0].text).toBe(JSON.stringify(fixture, null, 2));
+  });
+
+  it("keeps creator search failures text-only", async () => {
+    mockSearchBilibiliCreators.mockRejectedValueOnce(
+      new Error("Unexpected creator search failure"),
+    );
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 17,
+      params: {
+        name: "search_bilibili_creators",
+        arguments: { query: "UP主", limit: 3 },
       },
     });
 

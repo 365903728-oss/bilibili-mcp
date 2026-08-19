@@ -89,9 +89,9 @@
     }
   ],
   "durable_memory": {
-    "docs/agent-memory/active-work.md": "9a9898a73b7677100765e381e1ca09067e3932e8b0e60a5b6766234d73e14c85",
-    "docs/agent-memory/codemap.md": "af7c4e2900ed9fc9d02c764fd43293810b8b53f518b4686b26743d64e55549e9",
-    "docs/agent-memory/decisions.md": "44d1383db124476159d0f21bd0fa0dc349cdabc633ff6f03031a54b8799f81a3",
+    "docs/agent-memory/active-work.md": "7c177ef3fb9c42defdfe0adff6d0515b8161c7fc29a300608c83a44117bc5f72",
+    "docs/agent-memory/codemap.md": "d1455eb7ced7dadc1a7ce848f55f14578fa72a6b3868ae8bf950f77bae745660",
+    "docs/agent-memory/decisions.md": "b122063215a17efd8e2999ad16d009bf1223facb4414b21b06169010af7f7ff4",
     "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
     "docs/agent-memory/harness-eval.md": "5018e0ac09016fbbbfc024b08208de6808a014f3bb5732f116a393040cb9a5b3",
     "docs/agent-memory/harness-security.md": "b907339f85c0ba13c2a8642b475aa682ae1b313cb51cebec9977aca798df3430",

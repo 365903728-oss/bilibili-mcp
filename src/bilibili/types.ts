@@ -214,6 +214,24 @@ export interface VideoSearchData {
   results: VideoSearchCandidate[];
 }
 
+// Bilibili 创作者搜索候选
+export interface CreatorSearchCandidate {
+  mid: number;
+  name: string;
+  bio: string;
+  avatar_url: string;
+  follower_count: number;
+  video_count: number;
+  level: number;
+  source_url: string;
+}
+
+// 有界创作者搜索结果
+export interface CreatorSearchData {
+  query: string;
+  results: CreatorSearchCandidate[];
+}
+
 // 内部搜索选项（仅供 getVideoTranscriptData 使用）
 export interface TranscriptSearchOptions {
   query: string;

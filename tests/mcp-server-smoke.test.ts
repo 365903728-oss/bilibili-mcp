@@ -177,6 +177,7 @@ describe("MCP stdio entrypoint", () => {
         "get_video_metadata",
         "get_video_chapters",
         "search_bilibili_videos",
+        "search_bilibili_creators",
         "list_bilibili_favorite_videos",
       ]);
 
@@ -210,6 +211,23 @@ describe("MCP stdio entrypoint", () => {
       const rejectedLanguageResult = rejectedLanguage.result as CallToolResponse;
       expect(rejectedLanguageResult.isError).toBe(true);
       expect(JSON.parse(rejectedLanguageResult.content[0].text)).toMatchObject({
+        code: "VALIDATION_ERROR",
+      });
+
+      send({
+        jsonrpc: "2.0",
+        id: 5,
+        method: "tools/call",
+        params: {
+          name: "search_bilibili_creators",
+          arguments: { limit: 11 },
+        },
+      });
+      const creatorSearchValidation = await waitForId(5);
+      const creatorSearchResult =
+        creatorSearchValidation.result as CallToolResponse;
+      expect(creatorSearchResult.isError).toBe(true);
+      expect(JSON.parse(creatorSearchResult.content[0].text)).toMatchObject({
         code: "VALIDATION_ERROR",
       });
     } finally {
@@ -247,6 +265,7 @@ describe("MCP stdio entrypoint", () => {
       "get_video_metadata",
       "get_video_chapters",
       "search_bilibili_videos",
+      "search_bilibili_creators",
       "list_bilibili_favorite_videos",
     ]);
   });

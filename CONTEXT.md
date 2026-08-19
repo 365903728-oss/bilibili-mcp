@@ -12,6 +12,14 @@ _Avoid_: Universal video MCP, cross-platform media gateway
 A bounded Bilibili-native lookup that turns one topic query into a small ordered set of candidate Videos. It does not automatically retrieve evidence from those Videos or search creators, series, and collections.
 _Avoid_: Recommendation engine, cross-video research, global search
 
+**Creator**:
+A Bilibili account identified by one stable numeric `mid`. A display name is fuzzy and not unique; only the `mid` is identity.
+_Avoid_: UP 主 display name, handle, author string
+
+**Creator Search**:
+A bounded Bilibili-native lookup that turns one query into a small ordered set of Creator candidates identified by `mid`. It never selects one candidate as the Creator and never crawls candidate Videos, Dynamics, transcripts, comments, or other per-candidate evidence.
+_Avoid_: Creator resolution, auto-follow, per-candidate crawl
+
 **Favorites Discovery**:
 A read-only, bounded traversal of Favorite Memberships belonging to the currently authenticated Bilibili account. It discovers saved Videos but does not retrieve their evidence, synchronize a database, or generate knowledge notes.
 _Avoid_: Favorites sync, knowledge base, batch transcript job
