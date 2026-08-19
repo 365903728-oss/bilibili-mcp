@@ -6,6 +6,7 @@ const mockGetVideoInfoWithSubtitle = vi.fn();
 const mockGetVideoTranscriptData = vi.fn();
 const mockGetVideoCommentsData = vi.fn();
 const mockSearchBilibiliVideos = vi.fn();
+const mockSearchBilibiliCreators = vi.fn();
 const mockListBilibiliFavoriteVideos = vi.fn();
 
 vi.mock("../src/bilibili/subtitle.js", () => ({
@@ -27,6 +28,8 @@ vi.mock("../src/bilibili/comments.js", () => ({
 vi.mock("../src/bilibili/search.js", () => ({
   searchBilibiliVideos: (...args: unknown[]) =>
     mockSearchBilibiliVideos(...args),
+  searchBilibiliCreators: (...args: unknown[]) =>
+    mockSearchBilibiliCreators(...args),
 }));
 
 vi.mock("../src/bilibili/favorites.js", () => ({
@@ -135,6 +138,35 @@ describe("generic MCP error credential next_steps", () => {
       params: {
         name: "search_bilibili_videos",
         arguments: { query: "MCP" },
+      },
+    });
+    const payload = JSON.parse(response.content[0].text);
+
+    expect(response.isError).toBe(true);
+    expect(response).not.toHaveProperty("structuredContent");
+    expectStructuredError(payload, "COOKIE_EXPIRED", {
+      retryable: false,
+      userActionRequired: true,
+    });
+    expect(payload.next_steps_en.join(" ")).toContain(
+      "npx -y @xzxzzx/bilibili-mcp@latest config",
+    );
+    expect(JSON.stringify(payload)).not.toContain("configured");
+  });
+
+  it("returns safe credential recovery guidance for authenticated creator search", async () => {
+    mockSearchBilibiliCreators.mockRejectedValueOnce(
+      new BilibiliAPIError("Cookie expired", "COOKIE_EXPIRED"),
+    );
+
+    const handler = getCallToolHandler();
+    const response = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 5,
+      params: {
+        name: "search_bilibili_creators",
+        arguments: { query: "UP主" },
       },
     });
     const payload = JSON.parse(response.content[0].text);

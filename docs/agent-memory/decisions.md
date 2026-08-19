@@ -1,5 +1,15 @@
 # Decisions
 
+## 2026-08-19
+
+- Decision: Add one bounded `search_bilibili_creators` Creator Search tool (`search_type=bili_user`) reusing the existing search module, credential precheck, `fetchWithoutWBI`, operation cancellation, bounded text, response item limit, and one-shape-retry behavior; no generic search factory/adapter/router/dependency.
+- Reason: A display name is fuzzy and non-unique; only the stable numeric `mid` is identity. The tool returns candidates as candidates — it never selects one Creator and never crawls candidate Videos, Dynamics, transcripts, comments, or other per-candidate evidence. Keeping the search module deep with one small public extension preserves the existing Video Search contract and the ten existing tools unchanged.
+- Evidence: GitHub Issue #45, `docs/research/2026-08-19-bilibili-creator-search-contract.md`, and the Issue #21 video search precedent (2026-07-26 decisions below).
+
+- Decision: Require `mid` to be a positive safe integer and the bounded display name non-empty for a candidate to be accepted; malformed profile facts normalize to empty strings or non-negative integer zero, preserving Bilibili order and duplicate/fuzzy display-name candidates.
+- Reason: Rejecting invalid identity rows and conservatively normalizing the rest keeps the output JSON-serializable and predictable while never guessing identity from a name.
+- Evidence: GitHub Issue #45 acceptance criteria and the bounded-text/normalization precedent in `src/bilibili/search.ts`.
+
 ## 2026-07-26
 
 - Decision: Add one bounded `search_bilibili_videos` Video Discovery entry before danmaku, creator navigation, or collection search.

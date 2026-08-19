@@ -131,6 +131,16 @@ doctor reports no ready model, so no model was downloaded or switched and no
 live ASR end-to-end smoke was run. This is a documented validation boundary,
 not unfinished Phase 3 implementation.
 
+Issue #45 (Creator Search) is the next implementation ticket after #44:
+`search_bilibili_creators` becomes the eleventh tool, reusing the search module
+(authenticated, bounded, one-shape-retry, `search_type=bili_user`) and
+returning stable numeric `mid` candidates without selecting one Creator or
+crawling candidate content. Implementation runs in the
+`codex-paseo-claude` adapter on worktree
+`C:\Users\ZX\.codex\worktrees\issue-45\bilibili-mcp` at base
+`8f994f5a3f8763eff668299af461aceeb4257d0e`; the diff is returned uncommitted
+for Codex acceptance and no push/PR/release occurs.
+
 The pre-existing learning-proposal queue is legacy v1 state and remains outside
 the clean #29 worktree. Typed accepted-evidence memory automation is scoped to
 #33; #29 hooks only write ignored redacted events. Files under
