@@ -28,7 +28,7 @@ Bilibili MCP is a local MCP server that lets AI agents read Bilibili: transcript
 - **Read transcripts and comments** — pull the full transcript or search it for keywords, every match carrying context, a timestamp, and a direct Bilibili link to that moment; read hot- (default) or time-sorted comments and replies, with timestamped comments kept with priority.
 - **Read a single video** — fetch metadata such as title, creator, and play counts, plus the multi-part structure and chapters.
 - **Find videos** — search Bilibili by topic and get candidates in Bilibili's platform order, each with title, creator, duration, and BVID.
-- **Read creator content** — pick a numeric `mid` and read that creator's profile overview, or page through their currently listable video catalog (at most 20 rows per page, following `next_cursor`); no automatic evidence fetching.
+- **Read creator content** — pick a numeric `mid` and page through that creator's overview, video catalog, Collections, Series, or Dynamics (at most 20 rows per page, following `next_cursor`). Dynamics expose only bounded text, image URL/dimensions, referenced BVIDs, and repost relationships; images are not downloaded and Video evidence is not fetched automatically.
 - **Browse favorites** — traverse every Favorite Folder your logged-in account created and Bilibili currently shows, page by page.
 - **Transcribe subtitle-less videos locally** — for videos confirmed to have no subtitles, opt in to a local faster-whisper transcription that returns the same transcript shape as subtitles. Off by default; you can choose to download an ASR model during `setup`. See [Local ASR (optional)](#local-asr-optional).
 
@@ -186,7 +186,7 @@ For the full semantics of error codes such as `ASR_NOT_READY`, `ASR_BUSY`, and `
 |---|---|
 | Have a topic but no video link yet | `search_bilibili_videos` |
 | Have a topic and want Creator candidates (stable mids) | `search_bilibili_creators` |
-| Read a chosen creator's overview, video catalog, Collections, or Series | `get_bilibili_creator_content` |
+| Read a chosen creator's overview, video catalog, Collections, Series, or Dynamics | `get_bilibili_creator_content` |
 | Start from my Favorites | `list_bilibili_favorite_videos` |
 | Get subtitle-first video context | `get_video_info` |
 | Full transcript, keyword search, or local ASR when no subtitles | `get_video_transcript` |

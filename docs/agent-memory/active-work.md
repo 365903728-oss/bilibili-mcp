@@ -131,48 +131,20 @@ doctor reports no ready model, so no model was downloaded or switched and no
 live ASR end-to-end smoke was run. This is a documented validation boundary,
 not unfinished Phase 3 implementation.
 
-Issue #45 (Creator Search) is the next implementation ticket after #44:
-`search_bilibili_creators` becomes the eleventh tool, reusing the search module
-(authenticated, bounded, one-shape-retry, `search_type=bili_user`) and
-returning stable numeric `mid` candidates without selecting one Creator or
-crawling candidate content. Implementation ran in the
-`codex-paseo-claude` adapter on worktree
-`C:\Users\ZX\.codex\worktrees\issue-45\bilibili-mcp` at base
-`8f994f5a3f8763eff668299af461aceeb4257d0e` and was accepted locally as commit
-`53e244f7f14c5cf576b4ab784990b2512a4c0b9f`, pushed on branch
-`codex/issue-45-creator-search`; draft PR #49 is the current integration gate.
-CI status is not claimed green, and no merge, release, or live-smoke claim is
-made here.
+Issues #45, #46, and #47 are merged and closed on the published-product branch
+line. Together they provide Creator Search plus the `overview`, `videos`,
+`collections`, and `series` sections of `get_bilibili_creator_content`.
 
-Issue #46 (Creator Video Catalog) is the implementation ticket after #45:
-`get_bilibili_creator_content` becomes the twelfth tool with `overview` and
-`videos` sections, driven by one caller-selected numeric Creator `mid`.
-`overview` returns a live bounded profile reading whose `video_count` prefers the
-upstream `acc/info` value and may fall back to exactly one bounded `arc/search`
-count probe (`pn=1, ps=1, order=pubdate`); `videos` returns one 20-row page of
-currently listable BVID metadata with a stateless versioned base64url cursor
-bound to the same mid and section. Both sections return `access: "unknown"`
-and `live_state: "live"`; no automatic evidence crawling, no invented counts,
-and no further endpoints or fields. Implementation ran in the
-`codex-paseo-claude` adapter on worktree
-`C:\Users\ZX\.codex\worktrees\issue-46\bilibili-mcp` at base
-`afb6560c49765b18bbc4710669036cb1c4d3ebbe` on branch
-`codex/issue-46-creator-video-catalog`. The uncommitted writer diff and the
-file-backed Claude report were returned to the Codex acceptance owner; the
-focused contract suite was 207/207 green, and no commit, push, merge, release,
-or live-smoke claim is made here.
-
-Issue #47 (Creator Collections and Series) is active in the Codex Direct
-adapter on isolated worktree
-`C:\Users\ZX\.codex\worktrees\issue-47\bilibili-mcp`, branch
-`codex/issue-47-creator-collections-series`, based on merged master
-`9e583a8da1fa69e384845cd0b6b99c49b0421095`. The existing
-`get_bilibili_creator_content` tool gains separate `collections` and `series`
-sections: omitting `container_id` lists that container family, while providing
-one reads a single bounded Video Membership page. Cursors bind mid, section,
-page, and optional container ID; no evidence fetching, global deduplication,
-push, PR, merge, or release is authorized. The credential-safe shape probe
-recorded no Cookie values or private content.
+Issue #48 (Creator Dynamics) is the current Codex Direct task in isolated
+worktree `C:\Users\ZX\.codex\worktrees\issue-48\bilibili-mcp`, branch
+`codex/issue-48-creator-dynamics`, frozen at merged master
+`bfbd66d6edca6ddfdb88596423fd60c657e4176f`. It adds one bounded `dynamics`
+section using a Creator- and section-bound opaque offset cursor. Rows expose
+bounded text, image URL/dimensions, referenced BVID relationships, explicit
+repost originals, skipped counts, and live non-snapshot state. The MCP does
+not download or interpret images and does not fetch referenced Video evidence.
+Authenticated live endpoint smoke remains outside current credential authority.
+No push, PR, merge, release, or publish is authorized.
 
 The pre-existing learning-proposal queue is legacy v1 state and remains outside
 the clean #29 worktree. Typed accepted-evidence memory automation is scoped to

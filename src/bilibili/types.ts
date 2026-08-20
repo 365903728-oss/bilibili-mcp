@@ -272,7 +272,8 @@ export type CreatorContentSection =
   | "overview"
   | "videos"
   | "collections"
-  | "series";
+  | "series"
+  | "dynamics";
 
 // 创作者内容概览（overview 段）：
 // 有界实时上游档案事实与可用计数事实；不包含语义总结或目录爬取。
@@ -399,6 +400,45 @@ export interface CreatorSeriesMemberPage {
   page: number;
   selected_series: CreatorSeriesContainer;
   members: CreatorContainerVideoRow[];
+  skipped_count: number;
+  next_cursor?: string;
+  live_state: "live";
+}
+
+export type CreatorDynamicType =
+  | "text"
+  | "image"
+  | "video"
+  | "repost"
+  | "unknown";
+
+export interface CreatorDynamicImage {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
+export interface CreatorDynamicEvidence {
+  dynamic_id: string;
+  type: Exclude<CreatorDynamicType, "repost">;
+  upstream_type: string;
+  text: string;
+  images: CreatorDynamicImage[];
+  referenced_bvids: string[];
+}
+
+export interface CreatorDynamicRow
+  extends Omit<CreatorDynamicEvidence, "type"> {
+  type: CreatorDynamicType;
+  published_at: string;
+  original?: CreatorDynamicEvidence;
+  source_url: string;
+}
+
+export interface CreatorDynamicPage {
+  mid: number;
+  section: "dynamics";
+  dynamics: CreatorDynamicRow[];
   skipped_count: number;
   next_cursor?: string;
   live_state: "live";

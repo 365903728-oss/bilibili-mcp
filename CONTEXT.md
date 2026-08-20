@@ -37,8 +37,16 @@ An opaque continuation token that resumes a bounded Favorites Discovery traversa
 _Avoid_: Folder ID, page URL, sync checkpoint
 
 **Creator Content Discovery**:
-A bounded Bilibili-native lookup that turns one selected Creator `mid` into a live profile reading, a page of currently listable Video metadata, a Collection/Series container list, or one selected container's Video Membership page. It does not crawl the full catalog automatically and never fetches per-Video evidence.
+A bounded Bilibili-native lookup that turns one selected Creator `mid` into a live profile reading, a page of currently listable Video metadata, a Collection/Series container list, one selected container's Video Membership page, or one page of Creator Dynamics. It does not crawl the full catalog automatically and never fetches per-Video evidence.
 _Avoid_: Creator crawl, full-catalog sync, per-video evidence fetch
+
+**Creator Dynamic**:
+A Bilibili Dynamic published or reposted by the selected Creator, identified by a decimal `dynamic_id`. Its bounded evidence may include text, image URLs and dimensions, referenced BVIDs, and an explicit original Dynamic relationship for reposts.
+_Avoid_: Article extraction, downloaded image, OCR result, owned Video
+
+**Dynamic Repost Relationship**:
+The relationship between a reposting Creator Dynamic and its original Dynamic evidence. A referenced BVID records only a relationship visible in the Dynamic and does not prove Video ownership.
+_Avoid_: Creator-owned Video, duplicate Dynamic, flattened repost text
 
 **Collection**:
 A Creator-organized Bilibili container identified by a `collection_id`. It is distinct from a Series, a multi-Part Video, and a Favorite Folder.
@@ -53,7 +61,7 @@ The relationship between one Video and one Collection or Series. The same BVID i
 _Avoid_: Part, unique Video result, Favorite Membership
 
 **Creator Content Cursor**:
-An opaque continuation token that resumes a bounded Creator Video, container-list, or selected-container Membership traversal. A member cursor binds the Creator, section, and container identity; it is not a selector or account credential.
+An opaque continuation token that resumes a bounded Creator Video, container-list, selected-container Membership, or Dynamic traversal. A member cursor binds the Creator, section, and container identity; a Dynamic cursor binds the Creator and opaque upstream offset. It is not a selector or account credential.
 _Avoid_: mid, container selector, page URL, sync checkpoint
 
 **Video**:

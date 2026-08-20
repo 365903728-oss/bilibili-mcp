@@ -2,6 +2,14 @@
 
 ## 2026-08-20
 
+- Decision: Add a bounded `dynamics` section to `get_bilibili_creator_content` using one authenticated detailed Dynamic-feed request and a versioned cursor that binds the selected Creator and opaque upstream offset. Normalize text, image URL/dimensions, referenced BVID relationships, explicit repost originals, and unknown types without per-item requests.
+- Reason: The Creator-understanding journey needs Dynamic evidence, but the MCP remains an evidence retriever rather than an image interpreter or automatic cross-content crawler. The currently visible flattened Opus endpoint cannot preserve all Issue #48 relationships in one response, so the detailed endpoint is retained behind the existing login gate.
+- Evidence: GitHub Issue #48, `docs/research/2026-08-20-bilibili-creator-dynamics-contract.md`, and focused cursor/normalization/MCP-output tests.
+
+- Decision: Treat Dynamic images as bounded Bilibili/CDN HTTPS URL plus optional dimensions only, and treat every referenced BVID as a relationship rather than Creator ownership. Do not download, proxy, persist, OCR, caption, or run vision, and do not auto-fetch referenced Video evidence.
+- Reason: This preserves the agreed product boundary and prevents one discovery call from amplifying network, context, privacy, and interpretation cost.
+- Evidence: Issue #48 acceptance criteria and the Dynamic output schema.
+
 - Decision: Extend `get_bilibili_creator_content` with separate `collections` and `series` sections. Omitting `container_id` lists only that container family; providing a positive safe-integer ID reads one selected container's bounded `members` page. Member cursors bind mid, section, page, and container ID, and repeated BVID Memberships are never globally deduplicated.
 - Reason: Bilibili exposes Collection and Series as distinct Creator organization, while the discovery journey needs bounded navigation without confusing either family with a multi-Part Video or the current account's Favorite Folders.
 - Evidence: GitHub Issue #47, `docs/research/2026-08-20-bilibili-creator-collections-series-contract.md`, and focused cursor/overlap/MCP output tests.

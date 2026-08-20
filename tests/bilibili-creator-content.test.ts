@@ -24,6 +24,7 @@ vi.mock("../src/utils/credentials.js", () => ({
 
 const {
   BilibiliAPIError,
+  NetworkError,
   ResourceLimitError,
   UpstreamResponseError,
   ValidationError,
@@ -31,6 +32,7 @@ const {
 const {
   decodeCreatorContentCursor,
   encodeCreatorContentCursor,
+  encodeCreatorDynamicsCursor,
   getBilibiliCreatorContent,
 } = await import("../src/bilibili/creator-content.js");
 const { handleToolCall } = await import("../src/server/tool-handlers.js");
@@ -68,6 +70,32 @@ describe("creator content cursor encode/decode", () => {
       page: 2,
       container_id: 1903592,
     });
+  });
+
+  it("round-trips a dynamics cursor with its opaque upstream offset", () => {
+    const cursor = encodeCreatorDynamicsCursor(MID, "1234567890");
+
+    expect(decodeCreatorContentCursor(cursor)).toEqual({
+      mid: MID,
+      section: "dynamics",
+      offset: "1234567890",
+    });
+    expect(encodeCreatorDynamicsCursor(MID, "1234567890")).toBe(cursor);
+  });
+
+  it("keeps dynamics cursors within the public bound and rejects unsafe offsets", () => {
+    const cursor = encodeCreatorDynamicsCursor(
+      Number.MAX_SAFE_INTEGER,
+      "A".repeat(96),
+    );
+
+    expect(cursor.length).toBeLessThanOrEqual(256);
+    expect(() => encodeCreatorDynamicsCursor(MID, "A".repeat(97))).toThrow(
+      ValidationError,
+    );
+    expect(() => encodeCreatorDynamicsCursor(MID, "bad offset")).toThrow(
+      ValidationError,
+    );
   });
 
   it("rejects invalid mid/section/page at encode time", () => {
@@ -1426,6 +1454,509 @@ describe("getBilibiliCreatorContent videos", () => {
     await getBilibiliCreatorContent(MID, "videos", validCursor());
 
     expect(httpMocks.fetchWithWBI).toHaveBeenCalledTimes(1);
+  });
+});
+
+function dynamicItem(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id_str: "1234567890123456789",
+    type: "DYNAMIC_TYPE_DRAW",
+    modules: {
+      module_author: { mid: MID, pub_ts: 1_720_000_000 },
+      module_dynamic: {
+        desc: {
+          text: "A bounded image post",
+          rich_text_nodes: [
+            {
+              type: "RICH_TEXT_NODE_TYPE_BV",
+              text: "BV1T6PQzQEUf",
+              jump_url: "https://www.bilibili.com/video/BV1T6PQzQEUf",
+            },
+          ],
+        },
+        major: {
+          type: "MAJOR_TYPE_DRAW",
+          draw: {
+            items: [
+              {
+                src: "https://i0.hdslb.com/bfs/new_dyn/image.jpg",
+                width: 1920,
+                height: 1080,
+              },
+            ],
+          },
+        },
+      },
+    },
+    ...overrides,
+  };
+}
+
+function dynamicPage(
+  items: unknown[],
+  hasMore = false,
+  offset = "",
+): Record<string, unknown> {
+  return { has_more: hasMore, offset, items };
+}
+
+describe("getBilibiliCreatorContent dynamics", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    credentialMocks.getAuthHeaders.mockReturnValue({ Cookie: "configured" });
+    httpMocks.checkLoginStatus.mockResolvedValue({ isLogin: true });
+  });
+
+  it("normalizes one image Dynamic with bounded image and referenced Video evidence", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([dynamicItem()]),
+    );
+
+    const result = await getBilibiliCreatorContent(MID, "dynamics");
+
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledWith(
+      "/x/polymer/web-dynamic/v1/feed/space",
+      { host_mid: MID },
+      { Cookie: "configured" },
+    );
+    expect(result).toEqual({
+      mid: MID,
+      section: "dynamics",
+      dynamics: [
+        {
+          dynamic_id: "1234567890123456789",
+          type: "image",
+          upstream_type: "DYNAMIC_TYPE_DRAW",
+          published_at: "2024-07-03T09:46:40.000Z",
+          text: "A bounded image post",
+          images: [
+            {
+              url: "https://i0.hdslb.com/bfs/new_dyn/image.jpg",
+              width: 1920,
+              height: 1080,
+            },
+          ],
+          referenced_bvids: ["BV1T6PQzQEUf"],
+          source_url:
+            "https://www.bilibili.com/opus/1234567890123456789",
+        },
+      ],
+      skipped_count: 0,
+      live_state: "live",
+    });
+  });
+
+  it("keeps a repost relationship and the original Dynamic's Video reference", async () => {
+    const original = dynamicItem({
+      id_str: "987654321098765432",
+      type: "DYNAMIC_TYPE_AV",
+      modules: {
+        module_author: { mid: 1_234, pub_ts: 1_719_000_000 },
+        module_dynamic: {
+          desc: { text: "Original Video", rich_text_nodes: [] },
+          major: {
+            type: "MAJOR_TYPE_ARCHIVE",
+            archive: {
+              bvid: "BV1T6PQzQEUf",
+              jump_url: "https://www.bilibili.com/video/BV1T6PQzQEUf",
+            },
+          },
+        },
+      },
+    });
+    const repost = dynamicItem({
+      id_str: "1234567890123456790",
+      type: "DYNAMIC_TYPE_FORWARD",
+      modules: {
+        module_author: { mid: MID, pub_ts: 1_720_000_001 },
+        module_dynamic: { desc: { text: "Worth sharing", rich_text_nodes: [] } },
+      },
+      orig: original,
+    });
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(dynamicPage([repost]));
+
+    const result = await getBilibiliCreatorContent(MID, "dynamics");
+
+    expect(result).toMatchObject({
+      dynamics: [
+        {
+          dynamic_id: "1234567890123456790",
+          type: "repost",
+          text: "Worth sharing",
+          original: {
+            dynamic_id: "987654321098765432",
+            type: "video",
+            upstream_type: "DYNAMIC_TYPE_AV",
+            text: "Original Video",
+            images: [],
+            referenced_bvids: ["BV1T6PQzQEUf"],
+          },
+        },
+      ],
+    });
+  });
+
+  it("reads itemOpusStyle summary text and image metadata without downloading images", async () => {
+    const opus = dynamicItem({
+      modules: {
+        module_author: { mid: MID, pub_ts: 1_720_000_000 },
+        module_dynamic: {
+          desc: null,
+          major: {
+            type: "MAJOR_TYPE_OPUS",
+            opus: {
+              summary: {
+                text: "Opus-style image summary",
+                rich_text_nodes: [
+                  {
+                    type: "RICH_TEXT_NODE_TYPE_BV",
+                    text: "BV1T6PQzQEUf",
+                  },
+                ],
+              },
+              pics: [
+                {
+                  url: "//i0.hdslb.com/bfs/new_dyn/opus.jpg",
+                  width: 1080,
+                  height: 1440,
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(dynamicPage([opus]));
+
+    const result = await getBilibiliCreatorContent(MID, "dynamics");
+
+    expect(result).toMatchObject({
+      dynamics: [
+        {
+          type: "image",
+          text: "Opus-style image summary",
+          referenced_bvids: ["BV1T6PQzQEUf"],
+          images: [
+            {
+              url: "https://i0.hdslb.com/bfs/new_dyn/opus.jpg",
+              width: 1080,
+              height: 1440,
+            },
+          ],
+        },
+      ],
+    });
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+    expect(httpMocks.fetchWithWBI).not.toHaveBeenCalled();
+  });
+
+  it("types plain text, Video-share, and unknown well-formed Dynamics explicitly", async () => {
+    const text = dynamicItem({
+      id_str: "1234567890123456791",
+      type: "DYNAMIC_TYPE_WORD",
+      modules: {
+        module_author: { mid: MID, pub_ts: 1_720_000_002 },
+        module_dynamic: {
+          desc: { text: "Plain text", rich_text_nodes: [] },
+          major: null,
+        },
+      },
+    });
+    const video = dynamicItem({
+      id_str: "1234567890123456792",
+      type: "DYNAMIC_TYPE_AV",
+      modules: {
+        module_author: { mid: MID, pub_ts: 1_720_000_003 },
+        module_dynamic: {
+          desc: { text: "Shared Video", rich_text_nodes: [] },
+          major: {
+            type: "MAJOR_TYPE_ARCHIVE",
+            archive: { bvid: "BV1T6PQzQEUf" },
+          },
+        },
+      },
+    });
+    const unknown = dynamicItem({
+      id_str: "1234567890123456793",
+      type: "DYNAMIC_TYPE_FUTURE",
+      modules: {
+        module_author: { mid: MID, pub_ts: 1_720_000_004 },
+        module_dynamic: {
+          desc: { text: "Future bounded evidence", rich_text_nodes: [] },
+          major: null,
+        },
+      },
+    });
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([text, video, unknown]),
+    );
+
+    const result = await getBilibiliCreatorContent(MID, "dynamics");
+
+    expect(result).toMatchObject({
+      dynamics: [
+        { type: "text", referenced_bvids: [] },
+        { type: "video", referenced_bvids: ["BV1T6PQzQEUf"] },
+        {
+          type: "unknown",
+          upstream_type: "DYNAMIC_TYPE_FUTURE",
+          text: "Future bounded evidence",
+        },
+      ],
+      skipped_count: 0,
+    });
+  });
+
+  it("binds continuation to the Creator and forwards only the opaque upstream offset", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([dynamicItem()], true, "next_offset.2"),
+    );
+    const first = await getBilibiliCreatorContent(MID, "dynamics");
+    if (first.section !== "dynamics") throw new Error("unexpected section");
+
+    expect(first.next_cursor).toBeDefined();
+    expect(decodeCreatorContentCursor(first.next_cursor!)).toEqual({
+      mid: MID,
+      section: "dynamics",
+      offset: "next_offset.2",
+    });
+
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(dynamicPage([]));
+    await getBilibiliCreatorContent(MID, "dynamics", first.next_cursor);
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenLastCalledWith(
+      "/x/polymer/web-dynamic/v1/feed/space",
+      { host_mid: MID, offset: "next_offset.2" },
+      { Cookie: "configured" },
+    );
+
+    vi.clearAllMocks();
+    await expect(
+      getBilibiliCreatorContent(
+        MID,
+        "dynamics",
+        encodeCreatorDynamicsCursor(MID + 1, "next_offset.2"),
+      ),
+    ).rejects.toThrow(ValidationError);
+    expect(credentialMocks.getAuthHeaders).not.toHaveBeenCalled();
+    expect(httpMocks.fetchWithoutWBI).not.toHaveBeenCalled();
+
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([dynamicItem()], true, "same-offset"),
+    );
+    await expect(
+      getBilibiliCreatorContent(
+        MID,
+        "dynamics",
+        encodeCreatorDynamicsCursor(MID, "same-offset"),
+      ),
+    ).rejects.toThrow(UpstreamResponseError);
+  });
+
+  it("keeps text and images bounded and rejects an oversized image list", async () => {
+    const longText = "🙂".repeat(1_000);
+    const bounded = dynamicItem({
+      modules: {
+        module_author: { mid: MID, pub_ts: 1_720_000_000 },
+        module_dynamic: {
+          desc: { text: longText, rich_text_nodes: [] },
+          major: {
+            type: "MAJOR_TYPE_DRAW",
+            draw: {
+              items: [
+                { src: "javascript:alert(1)", width: 1, height: 1 },
+                {
+                  src: "https://i0.hdslb.com/bfs/new_dyn/safe.jpg",
+                  width: 640,
+                  height: 480,
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(dynamicPage([bounded]));
+
+    const result = await getBilibiliCreatorContent(MID, "dynamics");
+    if (result.section !== "dynamics") throw new Error("unexpected section");
+
+    expect(Buffer.byteLength(result.dynamics[0]!.text, "utf8")).toBeLessThanOrEqual(
+      2_048,
+    );
+    expect(result.dynamics[0]!.images).toEqual([
+      {
+        url: "https://i0.hdslb.com/bfs/new_dyn/safe.jpg",
+        width: 640,
+        height: 480,
+      },
+    ]);
+
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([
+        dynamicItem({
+          modules: {
+            module_author: { mid: MID, pub_ts: 1_720_000_000 },
+            module_dynamic: {
+              desc: { text: "draw with filtered image", rich_text_nodes: [] },
+              major: {
+                type: "MAJOR_TYPE_DRAW",
+                draw: {
+                  items: [{ src: `https://i0.hdslb.com/${"界".repeat(150)}` }],
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    );
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).resolves.toMatchObject({
+      dynamics: [{ type: "image", images: [] }],
+    });
+
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([
+        dynamicItem({
+          modules: {
+            module_author: { mid: MID, pub_ts: 1_720_000_000 },
+            module_dynamic: {
+              desc: { text: "too many", rich_text_nodes: [] },
+              major: {
+                type: "MAJOR_TYPE_DRAW",
+                draw: {
+                  items: Array.from({ length: 10 }, (_, index) => ({
+                    src: `https://i0.hdslb.com/bfs/new_dyn/${index}.jpg`,
+                  })),
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    );
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).rejects.toThrow(ResourceLimitError);
+  });
+
+  it("reports malformed rows, pages, and continuation offsets without empty-success masking", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([
+        dynamicItem({ id_str: "not-an-id" }),
+        dynamicItem({
+          modules: {
+            module_author: { mid: MID + 1, pub_ts: 1_720_000_000 },
+            module_dynamic: { desc: { text: "wrong creator" } },
+          },
+        }),
+      ]),
+    );
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).resolves.toMatchObject({ dynamics: [], skipped_count: 2 });
+
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce({
+      has_more: "false",
+      items: [],
+    });
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).rejects.toThrow(UpstreamResponseError);
+
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([dynamicItem()], true, ""),
+    );
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).rejects.toThrow(UpstreamResponseError);
+
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage(Array.from({ length: 21 }, () => dynamicItem())),
+    );
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).rejects.toThrow(ResourceLimitError);
+  });
+
+  it("caps referenced BVIDs and reads rich-node rid/orig_text fields", async () => {
+    const richTextNodes: Array<Record<string, string>> = Array.from(
+      { length: 19 },
+      (_, index) => ({
+      text: `BV${String(index).padStart(10, "0")}`,
+      }),
+    );
+    richTextNodes.push({
+      rid: "BV0000000019",
+      orig_text: "BV0000000020",
+    });
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([
+        dynamicItem({
+          modules: {
+            module_author: { mid: MID, pub_ts: 1_720_000_000 },
+            module_dynamic: {
+              desc: { text: "bounded references", rich_text_nodes: richTextNodes },
+              major: null,
+            },
+          },
+        }),
+      ]),
+    );
+
+    const result = await getBilibiliCreatorContent(MID, "dynamics");
+    if (result.section !== "dynamics") throw new Error("unexpected section");
+
+    expect(result.dynamics[0]!.referenced_bvids).toHaveLength(20);
+    expect(result.dynamics[0]!.referenced_bvids).toContain("BV0000000019");
+    expect(result.dynamics[0]!.referenced_bvids).not.toContain("BV0000000020");
+  });
+
+  it("propagates Dynamic authentication, HTTP 412, and API failures", async () => {
+    credentialMocks.getAuthHeaders.mockReturnValueOnce({});
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).rejects.toMatchObject({ code: "COOKIE_EXPIRED" });
+    expect(httpMocks.fetchWithoutWBI).not.toHaveBeenCalled();
+
+    const riskControl = new NetworkError(
+      "HTTP 412: Precondition Failed",
+      undefined,
+      "https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/space",
+      412,
+    );
+    httpMocks.fetchWithoutWBI.mockRejectedValueOnce(riskControl);
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).rejects.toBe(riskControl);
+
+    const apiError = new BilibiliAPIError("risk control", "API_ERROR");
+    httpMocks.fetchWithoutWBI.mockRejectedValueOnce(apiError);
+    await expect(
+      getBilibiliCreatorContent(MID, "dynamics"),
+    ).rejects.toBe(apiError);
+  });
+
+  it("returns identical structured and JSON text output without per-item requests", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      dynamicPage([dynamicItem()]),
+    );
+
+    const result = await handleToolCall("get_bilibili_creator_content", {
+      mid: MID,
+      section: "dynamics",
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      mid: MID,
+      section: "dynamics",
+      dynamics: [{ type: "image" }],
+    });
+    expect(JSON.parse(result.content[0]!.text)).toEqual(
+      result.structuredContent,
+    );
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+    expect(httpMocks.fetchWithWBI).not.toHaveBeenCalled();
   });
 });
 

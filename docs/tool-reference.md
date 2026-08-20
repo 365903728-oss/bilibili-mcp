@@ -10,7 +10,7 @@
 |---|---|---|
 | 只有主题，还没有视频链接 | `search_bilibili_videos` | 最多 10 个普通视频候选及可继续调用的 BVID；不自动抓取字幕或评论 |
 | 只有主题，想找 UP 主候选 | `search_bilibili_creators` | 最多 10 个 Creator 候选及其稳定数字 `mid`；显示名称模糊且不唯一，不做自动选择 |
-| 从选定 UP 主（mid）读取概览、视频目录、合集或系列 | `get_bilibili_creator_content` | 一个实时概览、一个有界目录页或所选容器成员页（最多 20 条），按 `next_cursor` 翻页；不自动抓取视频证据 |
+| 从选定 UP 主（mid）读取概览、视频目录、合集、系列或动态 | `get_bilibili_creator_content` | 一个实时概览或有界内容页（最多 20 条），按 `next_cursor` 翻页；不下载图片或自动抓取视频证据 |
 | 从我的 Bilibili 收藏夹开始读取 | `list_bilibili_favorite_videos` | 当前账号所有创建的收藏夹的一页视频（最多 20 条），按 `next_cursor` 翻页直到结束；不读取字幕、评论或下载 |
 | 想让 AI 总结一个视频 | `get_video_info` | 字幕优先；无字幕时返回标题、简介、标签 |
 | 只想拿完整转录文本或关键词定位 | `get_video_transcript` | 原生字幕优先，可显式 ASR 回退；支持时间戳、区间过滤和关键词搜索 |
@@ -115,20 +115,22 @@
 
 ### 9. 创作者内容发现 (`get_bilibili_creator_content`)
 
-- 从调用方选定且已验证的一个 Creator `mid` 出发，读取 Bilibili 空间页面当前可见的实时内容，`section` 四选一：
+- 从调用方选定且已验证的一个 Creator `mid` 出发，读取 Bilibili 空间页面当前可见的实时内容，`section` 五选一：
   - `overview`：返回一个受字节限制的实时主页概览（名称、简介、头像、等级、`video_count` 和 `live_state`；`follower_count` 仅在上游提供有效 `fans` 事实时出现，绝不编造为 0）。`video_count` 优先取 `acc/info` 上游值；上游不提供时才允许一次有界的 `arc/search` 计数探测（`pn=1, ps=1, order=pubdate`），绝不自行编造计数。
   - `videos`：返回当前可列出的视频目录的一页（最多 20 条 BVID 元数据行）；`next_cursor` 是不透明、无状态、版本化的 base64url 令牌，仅编码 mid 与下一页号。
   - `collections` / `series`：不传 `container_id` 时分别列出 Collection 或 Series 容器；传入该段返回的容器 ID 时，只遍历所选容器的一页 `members`。两类容器保持独立，不与多 Part Video 或 Favorite Folder 混用。
-- 游标在任何网络请求前严格校验，并绑定请求 mid、section、正安全整数页码与可选容器 ID；不匹配或越界时返回 `VALIDATION_ERROR`，不会发出任何请求。
+  - `dynamics`：返回一页 Creator Dynamic（最多 20 条），包括有界文字、图片 URL 与可用尺寸、关联 BVID、发布时间和转发时的原动态关系。普通动态即使浏览器 URL 使用 `/opus/` 仍是 Dynamic；不提取专门的长文/Opus 正文。
+- 游标在任何网络请求前严格校验，并绑定请求 mid、section，以及正安全整数页码与可选容器 ID，或 `dynamics` 的不透明上游 offset；不匹配或越界时返回 `VALIDATION_ERROR`，不会发出任何请求。
 - `continuationProven` 决定 `next_cursor`：有 `videos_total` 且 `page * 20 < videos_total` 时返回下一页；无总数但当前页的原始上游行数恰好 20 行时也返回下一页，避免单条畸形行截断遍历；发出 `page + 1` 前会证明其 `page * 20` 算术仍为安全整数。
 - `skipped_count` 报告上游返回但无法安全规范化的行数（如无效 BVID、空标题），不会触发额外的替换请求；联合投稿行的行内 mid 可能与所选创作者不同，保留该行并使用行内作者。
 - 每行只含可继续传给现有证据工具的元数据：`bvid`、标题、简介、封面、分类、时长、发布时间、作者、播放/弹幕/评论计数和 `source_url`；时长解析上游 `length`（分钟可大于 59）并兼容数值 `duration`，发布时间以 `created` 为准；`arc/search` 语义下 `comment` 是评论数、`video_review` 是弹幕数；`is_charge_video` 仅在上游显式真值证据（`is_pay`/`is_charging_arc`/`elec_arc_type` 或兼容字段 `is_charge_video`）存在时为 `true`；`access` 恒为 `"unknown"`（本工具不做访问探测）。
 - Collection/Series 列表和成员页保留 Bilibili 顺序、最多 20 条，并用 `skipped_count` 报告无法安全规范化的目标类型行；同一 BVID 在不同容器中保留不同 Membership，不做全局去重。结果都是实时非快照状态。
-- 不持久化、不缓存、不下载、不自动抓取字幕/评论/章节/搜索结果，也不自动读取其他容器成员或爬取完整目录。
+- Dynamic 保留上游顺序，并把原发、转发、纯文字、图片、视频分享或未知类型明确标为 `text`、`image`、`video`、`repost` 或 `unknown`；每行含 `dynamic_id`、`upstream_type`、`published_at`、有界 `text`、最多 9 个 `images[]`、最多 20 个 `referenced_bvids[]`、`source_url`，转发另含有界 `original`。关联 BVID 只表示动态中的关系，不证明该视频归动态作者所有。
+- 不持久化、不缓存、不下载/代理图片、不做 OCR、图片描述或视觉模型推理；不自动抓取字幕/评论/章节/搜索结果、关联视频详情，也不自动读取其他容器成员或爬取完整目录。
 - 必须先配置且登录 Bilibili Cookie；成功结果同时提供格式化 JSON 文本和内容相同的 MCP `structuredContent`。
 - 参数：
   - `mid`（必填）：要读取的 Creator 数字 `mid`（正安全整数）。
-  - `section`（必填）：`"overview"`、`"videos"`、`"collections"` 或 `"series"`。
+  - `section`（必填）：`"overview"`、`"videos"`、`"collections"`、`"series"` 或 `"dynamics"`。
   - `container_id`（可选）：仅用于 `collections` 或 `series`；省略时列容器，提供时读取所选容器成员。
   - `cursor`（可选）：上一次同 mid、同 section、同容器模式成功调用返回的不透明令牌。`overview` 不接受游标。
 
@@ -338,7 +340,7 @@
 
 ### `get_bilibili_creator_content`
 
-**适合**：从 `search_bilibili_creators`（或任何来源）得到一个选定 Creator 的稳定数字 `mid` 后，读取主页概览、视频目录，或分别浏览 Collection 与 Series。每次调用最多返回上游一页（最多 20 条），Agent 按返回的 `next_cursor` 继续调用直到没有该字段为止。**不要假设一次响应包含完整目录，也不要自动爬取全部页。**
+**适合**：从 `search_bilibili_creators`（或任何来源）得到一个选定 Creator 的稳定数字 `mid` 后，读取主页概览、视频目录、Collection、Series 或动态。每次调用最多返回上游一页（最多 20 条），Agent 按返回的 `next_cursor` 继续调用直到没有该字段为止。**不要假设一次响应包含完整目录，也不要自动爬取全部页。**
 
 概览请求示例：
 
@@ -394,6 +396,14 @@
 ```
 
 Series 使用相同模式但 `section` 为 `"series"`，且必须使用 Series 列表返回的 `series_id`。容器列表返回 `collections[]` 或 `series[]`；成员页返回 `selected_collection` 或 `selected_series` 以及 `members[]`。成员游标绑定 mid、section 和 `container_id`，不得跨容器复用。
+
+动态请求示例：
+
+```json
+{"name":"get_bilibili_creator_content","arguments":{"mid":2088259175,"section":"dynamics"}}
+```
+
+返回 `dynamics[]`、`skipped_count`、`live_state: "live"` 和可选 `next_cursor`。每项只提供有界文字、图片 URL/尺寸、关联 BVID 与转发关系；MCP 不下载或识别图片，也不自动读取关联视频。续读时把上次的 `next_cursor` 原样传回同一 mid 的 `dynamics` 请求；游标绑定 Creator 与 section，遍历期间上游内容变化可能影响顺序或可见结果。
 
 ### `get_video_transcript`
 

@@ -1,5 +1,29 @@
 # Verification Log
 
+## 2026-08-20 Issue #48 Codex Direct
+
+- Command: `npx vitest run tests/server-tools.test.ts tests/bilibili-creator-content.test.ts tests/server-handler-sanitization.test.ts tests/validation.test.ts`
+- Result: Passed, 4 files and 341 tests after code-review repairs.
+- Area: Creator Dynamic schema, handler, cursor, authentication, normalization, bounds, pagination, structured/text parity, and explicit failure behavior.
+
+- Command: `npm test`; `npm run build`
+- Result: Passed, 42 files / 1058 tests and TypeScript build.
+- Area: Full product regression and compiled package surface.
+
+- Command: Ajv Creator Content Dynamic schema smoke; `npm pack --dry-run --json --ignore-scripts`; `npm audit --omit=dev --json`; `git diff --check`; gitleaks ticket-diff scan
+- Result: Passed. Seven schema cases; 193 package files with zero forbidden paths; zero production vulnerabilities; clean diff; zero secret findings.
+- Area: MCP output discrimination, package contents, production dependency risk, formatting, and credential safety.
+
+- Command: Matt `code-review` Standards/Spec and project `risk-reviewer`
+- Result: Product source passed after one repair cycle. Repairs fixed upstream-offset error classification and progress, BVID extraction/cap, pre/post-normalization image URL bounds, unknown/image type preservation, and Dynamic-specific authentication/HTTP 412/API propagation tests.
+- Area: Issue #48 acceptance, repository standards, and Bilibili/MCP boundary risk.
+
+- Command: `python -B -m unittest harness.tests.test_contracts harness.tests.test_events harness.tests.test_cli_and_adapters harness.tests.test_memory`
+- Result: Ran 102 tests with 1 failure and 15 skips. The only failure is the expected immutable migration receipt mismatch after legitimate durable-memory edits.
+- Area: Harness core suite; not a product-source failure. A separate local receipt-sync task is required after the product commit and before any push or PR.
+
+- Skipped: authenticated live Dynamic feed smoke. No user credential values or private content were accessed. The detailed endpoint's current authenticated shape and risk-control behavior remain unverified.
+
 ## 2026-08-20 Issue #47 Codex Direct
 
 - Command: `npx vitest run tests/server-tools.test.ts tests/bilibili-creator-content.test.ts tests/server-handler-sanitization.test.ts tests/validation.test.ts`
