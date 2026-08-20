@@ -330,7 +330,8 @@ export async function handleToolCall(
         | "overview"
         | "videos"
         | "collections"
-        | "series";
+        | "series"
+        | "dynamics";
       const cursor = typeof rawCursor === "string" ? rawCursor : undefined;
       const result =
         typeof rawContainerId === "number"

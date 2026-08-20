@@ -10,7 +10,7 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
 |---|---|---|
 | Start from a topic without a video link | `search_bilibili_videos` | Up to 10 normal Video candidates with reusable BVIDs; no automatic subtitle or comment retrieval |
 | Start from a topic and want Creator candidates | `search_bilibili_creators` | Up to 10 Creator candidates with stable numeric `mid`; display names are fuzzy and never auto-selected |
-| Read a chosen creator's overview, video catalog, Collections, or Series | `get_bilibili_creator_content` | One live overview, bounded catalog page, or selected-container member page (at most 20 rows); follow `next_cursor`; no automatic evidence fetching |
+| Read a chosen creator's overview, video catalog, Collections, Series, or Dynamics | `get_bilibili_creator_content` | One live overview or bounded content page (at most 20 rows); follow `next_cursor`; no image download or automatic Video evidence fetch |
 | Start from my Bilibili Favorites | `list_bilibili_favorite_videos` | One bounded page of videos from the current account's created Favorite Folders (at most 20 rows); follow `next_cursor` until absent; no subtitles, comments, or downloads |
 | Summarize a video | `get_video_info` | Subtitles first; falls back to title, description, tags |
 | Get clean transcript text or locate keywords | `get_video_transcript` | Native subtitles first, explicit ASR fallback; supports timestamps, ranges, and keyword search |
@@ -118,16 +118,18 @@ This page preserves detailed behavior, parameters, examples, error contracts, an
   - `overview`: returns one byte-bounded live profile reading (`name`, `bio`, `avatar_url`, `level`, `video_count`, and `live_state`; `follower_count` appears only when the upstream provides a valid `fans` fact — it is never fabricated as 0). `video_count` prefers the upstream `acc/info` value; only when the upstream profile does not provide it is one bounded `arc/search` count probe allowed (`pn=1, ps=1, order=pubdate`) — the tool never invents a count.
   - `videos`: returns one page of the currently listable video catalog (at most 20 BVID metadata rows); `next_cursor` is an opaque, stateless, versioned base64url token encoding only the mid and the next page number.
   - `collections` / `series`: without `container_id`, separately lists Collection or Series containers; with the container ID returned by that section, reads one bounded `members` page from only the selected container. The families remain distinct and never reuse multi-Part Video or Favorite Folder semantics.
-- The cursor is strictly validated before any network request and binds the requested mid, section, positive safe-integer page, and optional container ID; a mismatch or out-of-range value returns `VALIDATION_ERROR` with no request sent.
+  - `dynamics`: returns one Creator Dynamic page (at most 20 rows) with bounded text, image URL and available dimensions, referenced BVIDs, publication time, and an explicit original relationship for reposts. An ordinary feed entry remains a Dynamic when its browser URL uses `/opus/`; dedicated long-form article/Opus-body extraction is not provided.
+- The cursor is strictly validated before any network request and binds the requested mid and section plus either a positive safe-integer page/optional container ID or the opaque upstream Dynamic offset; a mismatch or out-of-range value returns `VALIDATION_ERROR` with no request sent.
 - `continuationProven` decides `next_cursor`: when `videos_total` exists and `page * 20 < videos_total`, the next page is returned; when the total is absent but the raw upstream row count is exactly 20, the next page is also returned, so one malformed row never truncates the traversal; emitting `page + 1` is guarded by a safe-integer check on `(page + 1) * 20`.
 - `skipped_count` reports upstream rows that could not be safely normalized (for example, an invalid BVID or an empty title); no replacement page is fetched. Collaboration rows whose in-row mid differs from the selected Creator remain listable Creator Videos and are kept with their in-row author.
 - Each row carries only metadata that feeds the existing evidence tools: `bvid`, title, description, cover, category, duration, publish time, author, play/danmaku/reply counts, and `source_url`; duration parses the upstream `length` (minutes may exceed 59) with the numeric `duration` as compatibility fallback and publish time prefers `created`; under `arc/search` semantics `comment` is the reply count and `video_review` is the danmaku count; `is_charge_video` is set to `true` only on explicit upstream truthy evidence (`is_pay`/`is_charging_arc`/`elec_arc_type` or the compatibility field `is_charge_video`); `access` is always `"unknown"` (the tool never probes accessibility).
 - Collection/Series lists and member pages preserve Bilibili order, contain at most 20 rows, and report target-family rows that cannot be normalized through `skipped_count`. The same BVID in different containers remains a separate Membership; no global deduplication occurs. Results are live, non-snapshot state.
-- No persistence, cache, download, subtitle/comment/chapter/search fetch, automatic traversal of other containers, or full-catalog crawl.
+- Dynamics preserve upstream order and explicitly type original, repost, text, image, Video-share, and unknown entries as `text`, `image`, `video`, `repost`, or `unknown`. Each row contains `dynamic_id`, `upstream_type`, `published_at`, bounded `text`, at most 9 `images[]`, at most 20 `referenced_bvids[]`, and `source_url`; a repost also contains bounded `original`. A referenced BVID records only a relationship and never proves that the Dynamic author owns the Video.
+- No persistence, cache, image download/proxy, OCR, image captioning, vision inference, subtitle/comment/chapter/search fetch, referenced-Video detail fetch, automatic traversal of other containers, or full-catalog crawl.
 - Requires configured, logged-in Bilibili Cookies; success returns formatted JSON text plus identical MCP `structuredContent`.
 - Parameters:
   - `mid` (required): the Creator's numeric `mid` (positive safe integer).
-  - `section` (required): `"overview"`, `"videos"`, `"collections"`, or `"series"`.
+  - `section` (required): `"overview"`, `"videos"`, `"collections"`, `"series"`, or `"dynamics"`.
   - `container_id` (optional): only for `collections` or `series`; omit to list containers, provide it to read the selected container's members.
   - `cursor` (optional): opaque token returned by a previous successful call with the same mid, section, and container mode. `overview` does not accept a cursor.
 
@@ -334,7 +336,7 @@ Continuation:
 
 ### `get_bilibili_creator_content`
 
-**Best for**: after `search_bilibili_creators` (or any source) yields one selected Creator's stable numeric `mid`, reading that creator's profile, video catalog, or separate Collection and Series organization. Each call returns at most one upstream page (at most 20 rows); the Agent follows the returned `next_cursor` until it is absent. **Do not assume a single response contains the full catalog, and do not crawl every page automatically.**
+**Best for**: after `search_bilibili_creators` (or any source) yields one selected Creator's stable numeric `mid`, reading that creator's profile, video catalog, Collections, Series, or Dynamics. Each call returns at most one upstream page (at most 20 rows); the Agent follows the returned `next_cursor` until it is absent. **Do not assume a single response contains the full catalog, and do not crawl every page automatically.**
 
 Overview request:
 
@@ -390,6 +392,14 @@ Collection list and member examples:
 ```
 
 Series uses the same pattern with `section: "series"` and a `series_id` returned by the Series list. Container lists return `collections[]` or `series[]`; member pages return `selected_collection` or `selected_series` plus `members[]`. Member cursors bind mid, section, and `container_id` and cannot be reused across containers.
+
+Dynamic request:
+
+```json
+{"name":"get_bilibili_creator_content","arguments":{"mid":2088259175,"section":"dynamics"}}
+```
+
+Returns `dynamics[]`, `skipped_count`, `live_state: "live"`, and optional `next_cursor`. Rows contain only bounded text, image URL/dimensions, referenced BVIDs, and repost relationships; the MCP neither downloads/interprets images nor fetches referenced Video evidence. Continue by passing the previous `next_cursor` unchanged to `dynamics` for the same mid. The cursor binds Creator and section; upstream changes during traversal can affect order and visibility.
 
 ### `get_video_transcript`
 

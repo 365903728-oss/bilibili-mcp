@@ -267,7 +267,8 @@ export function validateCreatorContentInput(
     section !== "overview" &&
     section !== "videos" &&
     section !== "collections" &&
-    section !== "series"
+    section !== "series" &&
+    section !== "dynamics"
   ) {
     throw new ValidationError("section is not supported");
   }

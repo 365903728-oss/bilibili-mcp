@@ -19,13 +19,19 @@ import {
 import { ValidationError } from "../src/utils/errors.js";
 
 describe("validateCreatorContentInput", () => {
+  it("accepts the dynamics section with an opaque cursor", () => {
+    expect(() =>
+      validateCreatorContentInput(2_088_259_175, "dynamics", "YWJj"),
+    ).not.toThrow();
+  });
+
   it("accepts a positive container_id for Collection member traversal", () => {
     expect(() =>
       validateCreatorContentInput(2_088_259_175, "collections", undefined, 1_903_592),
     ).not.toThrow();
   });
 
-  it.each(["overview", "videos"])(
+  it.each(["overview", "videos", "dynamics"])(
     "rejects container_id for %s",
     (section) => {
       expect(() =>

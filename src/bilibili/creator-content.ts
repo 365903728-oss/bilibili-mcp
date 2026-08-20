@@ -11,6 +11,10 @@ import type {
   CreatorCollectionListPage,
   CreatorCollectionMemberPage,
   CreatorContainerVideoRow,
+  CreatorDynamicEvidence,
+  CreatorDynamicImage,
+  CreatorDynamicPage,
+  CreatorDynamicRow,
   CreatorContentOverview,
   CreatorContentSection,
   CreatorSeriesContainer,
@@ -28,9 +32,12 @@ const CONTAINER_LIST_PATH = "/x/polymer/web-space/seasons_series_list";
 const COLLECTION_MEMBERS_PATH = "/x/polymer/web-space/seasons_archives_list";
 const SERIES_METADATA_PATH = "/x/series/series";
 const SERIES_MEMBERS_PATH = "/x/series/archives";
+const DYNAMIC_FEED_PATH = "/x/polymer/web-dynamic/v1/feed/space";
 const PAGE_SIZE = 20;
 const CURSOR_VERSION = 1;
 const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+const DYNAMIC_OFFSET_RE = /^[\x21-\x7e]+$/;
+const MAX_DYNAMIC_OFFSET_BYTES = 96;
 export const MAX_CREATOR_NAME_BYTES = 128;
 export const MAX_CREATOR_BIO_BYTES = 512;
 export const MAX_CREATOR_AVATAR_BYTES = 512;
@@ -41,6 +48,12 @@ export const MAX_CATALOG_CATEGORY_BYTES = 64;
 export const MAX_CATALOG_AUTHOR_BYTES = 128;
 export const MAX_CONTAINER_NAME_BYTES = 128;
 export const MAX_CONTAINER_DESCRIPTION_BYTES = 512;
+export const MAX_DYNAMIC_TEXT_BYTES = 2_048;
+export const MAX_DYNAMIC_IMAGE_URL_BYTES = 512;
+export const MAX_DYNAMIC_TYPE_BYTES = 64;
+const MAX_DYNAMIC_IMAGES = 9;
+const MAX_DYNAMIC_BVIDS = 20;
+const MAX_DYNAMIC_RICH_TEXT_NODES = 100;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -68,8 +81,24 @@ function isCreatorContentSection(value: unknown): value is CreatorContentSection
     value === "overview" ||
     value === "videos" ||
     value === "collections" ||
-    value === "series"
+    value === "series" ||
+    value === "dynamics"
   );
+}
+
+function isDynamicOffset(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    Buffer.byteLength(value, "utf8") <= MAX_DYNAMIC_OFFSET_BYTES &&
+    DYNAMIC_OFFSET_RE.test(value)
+  );
+}
+
+function assertDynamicOffset(value: unknown): asserts value is string {
+  if (!isDynamicOffset(value)) {
+    throw new ValidationError("dynamic offset is invalid");
+  }
 }
 
 function toNonNegativeSafeInteger(value: unknown): number {
@@ -159,16 +188,22 @@ function base64urlDecode(value: string): string {
   return decoded.toString("utf-8");
 }
 
-export interface ResolvedCreatorContentCursor {
-  mid: number;
-  section: CreatorContentSection;
-  page: number;
-  container_id?: number;
-}
+export type ResolvedCreatorContentCursor =
+  | {
+      mid: number;
+      section: Exclude<CreatorContentSection, "dynamics">;
+      page: number;
+      container_id?: number;
+    }
+  | {
+      mid: number;
+      section: "dynamics";
+      offset: string;
+    };
 
 export function encodeCreatorContentCursor(
   mid: number,
-  section: CreatorContentSection,
+  section: Exclude<CreatorContentSection, "dynamics">,
   page: number,
   containerId?: number,
 ): string {
@@ -201,6 +236,19 @@ export function encodeCreatorContentCursor(
     ...(containerId === undefined ? {} : { container_id: containerId }),
   };
   return base64urlEncode(JSON.stringify(payload));
+}
+
+export function encodeCreatorDynamicsCursor(
+  mid: number,
+  offset: string,
+): string {
+  if (!isPositiveSafeInteger(mid)) {
+    throw new ValidationError("cursor mid must be a positive safe integer");
+  }
+  assertDynamicOffset(offset);
+  return base64urlEncode(
+    JSON.stringify({ version: CURSOR_VERSION, mid, section: "dynamics", offset }),
+  );
 }
 
 export function decodeCreatorContentCursor(
@@ -248,6 +296,17 @@ export function decodeCreatorContentCursor(
   if (!isCreatorContentSection(parsed.section)) {
     throw new ValidationError("cursor section is not supported");
   }
+  if (parsed.section === "dynamics") {
+    if (parsed.page !== undefined || parsed.container_id !== undefined) {
+      throw new ValidationError("dynamic cursor contains paged fields");
+    }
+    assertDynamicOffset(parsed.offset);
+    return {
+      mid: parsed.mid,
+      section: "dynamics",
+      offset: parsed.offset,
+    };
+  }
   if (!isPositiveSafeInteger(parsed.page)) {
     throw new ValidationError("cursor page must be a positive safe integer");
   }
@@ -290,6 +349,7 @@ export async function getBilibiliCreatorContent(
   | CreatorCollectionMemberPage
   | CreatorSeriesListPage
   | CreatorSeriesMemberPage
+  | CreatorDynamicPage
 > {
   if (!isPositiveSafeInteger(mid)) {
     throw new ValidationError("mid must be a positive safe integer");
@@ -310,6 +370,7 @@ export async function getBilibiliCreatorContent(
     }
   }
   let page = 1;
+  let dynamicOffset: string | undefined;
   if (section === "overview") {
     if (cursor !== undefined) {
       throw new ValidationError(
@@ -324,10 +385,14 @@ export async function getBilibiliCreatorContent(
     if (resolved.section !== section) {
       throw new ValidationError("cursor belongs to a different section");
     }
-    if (resolved.container_id !== containerId) {
-      throw new ValidationError("cursor belongs to a different container");
+    if (resolved.section === "dynamics") {
+      dynamicOffset = resolved.offset;
+    } else {
+      if (resolved.container_id !== containerId) {
+        throw new ValidationError("cursor belongs to a different container");
+      }
+      page = resolved.page;
     }
-    page = resolved.page;
   }
 
   const authHeaders = credentialManager.getAuthHeaders();
@@ -345,6 +410,9 @@ export async function getBilibiliCreatorContent(
 
   if (section === "overview") {
     return fetchCreatorOverview(mid, authHeaders);
+  }
+  if (section === "dynamics") {
+    return fetchCreatorDynamicPage(mid, dynamicOffset, authHeaders);
   }
   if (
     (section === "collections" || section === "series") &&
@@ -364,6 +432,232 @@ export async function getBilibiliCreatorContent(
     return fetchCreatorSeriesMemberPage(mid, containerId, page, authHeaders);
   }
   return fetchCreatorVideoPage(mid, page, authHeaders);
+}
+
+function normalizeDynamicId(value: unknown): string | undefined {
+  return typeof value === "string" && /^\d{1,32}$/.test(value)
+    ? value
+    : undefined;
+}
+
+function normalizeDynamicType(value: unknown): string | undefined {
+  if (typeof value !== "string" || Buffer.byteLength(value, "utf8") > MAX_DYNAMIC_TYPE_BYTES) {
+    return undefined;
+  }
+  const type = boundedRemoteText(value, MAX_DYNAMIC_TYPE_BYTES);
+  return type || undefined;
+}
+
+function normalizeDynamicImageUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const raw = value.trim();
+  if (!raw || Buffer.byteLength(raw, "utf8") > MAX_DYNAMIC_IMAGE_URL_BYTES) {
+    return undefined;
+  }
+  try {
+    const url = new URL(raw.startsWith("//") ? `https:${raw}` : raw);
+    const hostname = url.hostname.toLowerCase();
+    if (
+      url.protocol !== "https:" ||
+      !(
+        hostname === "bilibili.com" ||
+        hostname.endsWith(".bilibili.com") ||
+        hostname === "hdslb.com" ||
+        hostname.endsWith(".hdslb.com") ||
+        hostname === "biliimg.com" ||
+        hostname.endsWith(".biliimg.com")
+      )
+    ) {
+      return undefined;
+    }
+    const normalized = url.toString();
+    return normalized.length <= MAX_DYNAMIC_IMAGE_URL_BYTES &&
+      Buffer.byteLength(normalized, "utf8") <= MAX_DYNAMIC_IMAGE_URL_BYTES
+      ? normalized
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function collectDynamicImages(moduleDynamic: UnknownRecord): CreatorDynamicImage[] {
+  const major = isRecord(moduleDynamic.major) ? moduleDynamic.major : undefined;
+  const draw = major && isRecord(major.draw) ? major.draw : undefined;
+  const opus = major && isRecord(major.opus) ? major.opus : undefined;
+  const values = draw && Array.isArray(draw.items)
+    ? draw.items
+    : opus && Array.isArray(opus.pics)
+      ? opus.pics
+      : [];
+  if (values.length > MAX_DYNAMIC_IMAGES) {
+    throw new ResourceLimitError(
+      "Creator Dynamic image list exceeded its item limit",
+      "creator_dynamic_images",
+      MAX_DYNAMIC_IMAGES,
+    );
+  }
+  const images: CreatorDynamicImage[] = [];
+  for (const value of values) {
+    if (!isRecord(value)) continue;
+    const url = normalizeDynamicImageUrl(value.src ?? value.url);
+    if (!url) continue;
+    const image: CreatorDynamicImage = { url };
+    const width = toOptionalPositiveInteger(value.width);
+    const height = toOptionalPositiveInteger(value.height);
+    if (width !== undefined) image.width = width;
+    if (height !== undefined) image.height = height;
+    images.push(image);
+  }
+  return images;
+}
+
+function collectDynamicBvids(moduleDynamic: UnknownRecord): string[] {
+  const bvids: string[] = [];
+  const add = (value: unknown): void => {
+    if (typeof value !== "string" || bvids.length >= MAX_DYNAMIC_BVIDS) return;
+    const direct = isValidBVId(value) ? value : undefined;
+    const match = direct ? undefined : value.match(/BV[0-9A-Za-z]{10}/);
+    const bvid = direct ?? match?.[0];
+    if (bvid && isValidBVId(bvid) && !bvids.includes(bvid)) bvids.push(bvid);
+  };
+  const major = isRecord(moduleDynamic.major) ? moduleDynamic.major : undefined;
+  const archive = major && isRecord(major.archive) ? major.archive : undefined;
+  add(archive?.bvid);
+  add(archive?.jump_url);
+  const desc = isRecord(moduleDynamic.desc) ? moduleDynamic.desc : undefined;
+  const opus = major && isRecord(major.opus) ? major.opus : undefined;
+  const summary = opus && isRecord(opus.summary) ? opus.summary : undefined;
+  const nodeLists = [desc?.rich_text_nodes, summary?.rich_text_nodes];
+  for (const value of nodeLists) {
+    const nodes = Array.isArray(value) ? value : [];
+    if (nodes.length > MAX_DYNAMIC_RICH_TEXT_NODES) {
+      throw new ResourceLimitError(
+        "Creator Dynamic rich-text nodes exceeded their item limit",
+        "creator_dynamic_rich_text_nodes",
+        MAX_DYNAMIC_RICH_TEXT_NODES,
+      );
+    }
+    for (const node of nodes) {
+      if (!isRecord(node)) continue;
+      add(node.text);
+      add(node.jump_url);
+      add(node.rid);
+      add(node.orig_text);
+      if (bvids.length >= MAX_DYNAMIC_BVIDS) break;
+    }
+    if (bvids.length >= MAX_DYNAMIC_BVIDS) break;
+  }
+  return bvids;
+}
+
+function normalizeDynamicEvidence(
+  value: unknown,
+  expectedMid?: number,
+): CreatorDynamicEvidence | undefined {
+  if (!isRecord(value) || !isRecord(value.modules)) return undefined;
+  const author = value.modules.module_author;
+  if (expectedMid !== undefined && (!isRecord(author) || author.mid !== expectedMid)) {
+    return undefined;
+  }
+  const dynamicId = normalizeDynamicId(value.id_str);
+  const upstreamType = normalizeDynamicType(value.type);
+  const moduleDynamic = value.modules.module_dynamic;
+  if (!dynamicId || !upstreamType || !isRecord(moduleDynamic)) return undefined;
+  const desc = isRecord(moduleDynamic.desc) ? moduleDynamic.desc : undefined;
+  const major = isRecord(moduleDynamic.major) ? moduleDynamic.major : undefined;
+  const majorType = normalizeDynamicType(major?.type);
+  const opus = major && isRecord(major.opus) ? major.opus : undefined;
+  const summary = opus && isRecord(opus.summary) ? opus.summary : undefined;
+  const images = collectDynamicImages(moduleDynamic);
+  const referencedBvids = collectDynamicBvids(moduleDynamic);
+  const type: CreatorDynamicEvidence["type"] =
+    majorType === "MAJOR_TYPE_ARCHIVE"
+      ? "video"
+      : upstreamType === "DYNAMIC_TYPE_DRAW" ||
+          majorType === "MAJOR_TYPE_DRAW" ||
+          images.length > 0
+        ? "image"
+        : upstreamType === "DYNAMIC_TYPE_WORD"
+          ? "text"
+          : "unknown";
+  return {
+    dynamic_id: dynamicId,
+    type,
+    upstream_type: upstreamType,
+    text:
+      boundedRemoteText(desc?.text, MAX_DYNAMIC_TEXT_BYTES) ||
+      boundedRemoteText(summary?.text, MAX_DYNAMIC_TEXT_BYTES),
+    images,
+    referenced_bvids: referencedBvids,
+  };
+}
+
+function normalizeDynamicRow(value: unknown, mid: number): CreatorDynamicRow | undefined {
+  const evidence = normalizeDynamicEvidence(value, mid);
+  if (!evidence || !isRecord(value) || !isRecord(value.modules)) return undefined;
+  const author = value.modules.module_author;
+  if (!isRecord(author)) return undefined;
+  const publishedAt = toIsoFromUnixSeconds(author.pub_ts);
+  if (!publishedAt) return undefined;
+  const result: CreatorDynamicRow = {
+    ...evidence,
+    published_at: publishedAt,
+    source_url: `https://www.bilibili.com/opus/${evidence.dynamic_id}`,
+  };
+  if (evidence.upstream_type === "DYNAMIC_TYPE_FORWARD") {
+    const original = normalizeDynamicEvidence(value.orig);
+    if (!original) return undefined;
+    result.type = "repost";
+    result.original = original;
+  }
+  return result;
+}
+
+async function fetchCreatorDynamicPage(
+  mid: number,
+  offset: string | undefined,
+  authHeaders: Record<string, string>,
+): Promise<CreatorDynamicPage> {
+  const data = await fetchWithoutWBI(
+    DYNAMIC_FEED_PATH,
+    { host_mid: mid, ...(offset === undefined ? {} : { offset }) },
+    authHeaders,
+  );
+  if (!isRecord(data) || typeof data.has_more !== "boolean" || !Array.isArray(data.items)) {
+    throw new UpstreamResponseError(
+      "Bilibili returned an invalid Creator Dynamic feed response",
+    );
+  }
+  if (data.items.length > PAGE_SIZE) {
+    throw new ResourceLimitError(
+      "Creator Dynamic page exceeded its item limit",
+      "creator_dynamic_items",
+      PAGE_SIZE,
+    );
+  }
+  const dynamics: CreatorDynamicRow[] = [];
+  let skippedCount = 0;
+  for (const item of data.items) {
+    const dynamic = normalizeDynamicRow(item, mid);
+    if (dynamic) dynamics.push(dynamic);
+    else skippedCount += 1;
+  }
+  const result: CreatorDynamicPage = {
+    mid,
+    section: "dynamics",
+    dynamics,
+    skipped_count: skippedCount,
+    live_state: "live",
+  };
+  if (data.has_more) {
+    if (!isDynamicOffset(data.offset) || data.offset === offset) {
+      throw new UpstreamResponseError(
+        "Bilibili returned an invalid Creator Dynamic continuation offset",
+      );
+    }
+    result.next_cursor = encodeCreatorDynamicsCursor(mid, data.offset);
+  }
+  return result;
 }
 
 function normalizeContainerVideoRow(

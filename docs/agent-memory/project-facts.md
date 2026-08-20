@@ -1,5 +1,15 @@
 # Project Facts
 
+## 2026-08-20
+
+- Fact: Issue #48 extends the existing Creator Content Discovery tool with one authenticated, bounded `dynamics` page at a time. The output preserves stable Dynamic identity, publication time, bounded text, image URL/dimensions, referenced BVID relationships, repost originals, skipped rows, and live non-snapshot continuation.
+- Evidence: `src/bilibili/creator-content.ts`, public MCP schema, focused tests, and `docs/research/2026-08-20-bilibili-creator-dynamics-contract.md`.
+- Impact: Agents can inspect Creator Dynamics without the MCP downloading or interpreting images, extracting dedicated article/Opus bodies, or automatically fetching referenced Video evidence.
+
+- Fact: The current first-party space UI uses a flattened Opus feed, while the detailed Dynamic endpoint needed for full repost/image/BVID evidence returned API code `-352` to anonymous probes on 2026-08-20.
+- Evidence: `docs/research/2026-08-20-bilibili-creator-dynamics-contract.md`.
+- Impact: The implementation keeps the detailed endpoint behind the existing credential/login gate; authenticated live behavior remains a named verification gap rather than an empty-success fallback.
+
 ## 2026-05-27
 
 - Fact: This repository is `@xzxzzx/bilibili-mcp`, a TypeScript MCP server for extracting Bilibili video subtitles, metadata, and popular comments.
