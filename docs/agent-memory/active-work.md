@@ -135,16 +135,21 @@ Issues #45, #46, and #47 are merged and closed on the published-product branch
 line. Together they provide Creator Search plus the `overview`, `videos`,
 `collections`, and `series` sections of `get_bilibili_creator_content`.
 
-Issue #48 (Creator Dynamics) is the current Codex Direct task in isolated
-worktree `C:\Users\ZX\.codex\worktrees\issue-48\bilibili-mcp`, branch
-`codex/issue-48-creator-dynamics`, frozen at merged master
-`bfbd66d6edca6ddfdb88596423fd60c657e4176f`. It adds one bounded `dynamics`
-section using a Creator- and section-bound opaque offset cursor. Rows expose
-bounded text, image URL/dimensions, referenced BVID relationships, explicit
-repost originals, skipped counts, and live non-snapshot state. The MCP does
-not download or interpret images and does not fetch referenced Video evidence.
-Authenticated live endpoint smoke remains outside current credential authority.
-No push, PR, merge, release, or publish is authorized.
+Issue #48 (Creator Dynamics) is accepted locally as product commit
+`959eae07213f99752884421750aba8673b533826` on branch
+`codex/issue-48-creator-dynamics` in isolated worktree
+`C:\Users\ZX\.codex\worktrees\issue-48\bilibili-mcp`. It adds one bounded
+`dynamics` section using a Creator- and section-bound opaque offset cursor.
+Rows expose bounded text, image URL/dimensions, referenced BVID relationships,
+explicit repost originals, skipped counts, and live non-snapshot state. The MCP
+does not download or interpret images and does not fetch referenced Video
+evidence. Authenticated live endpoint smoke remains outside current credential
+authority.
+
+The mechanical `github-48-receipt` follow-up based on `959eae0` has synchronized
+the final durable-memory hashes in the Harness migration receipt and verified
+the exact conformance check plus core Harness suite locally. It changes no
+product source and has no push, PR, merge, release, or publish authority.
 
 The pre-existing learning-proposal queue is legacy v1 state and remains outside
 the clean #29 worktree. Typed accepted-evidence memory automation is scoped to
