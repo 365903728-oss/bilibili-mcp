@@ -2,7 +2,7 @@
 
 [返回中文 README](../README.md) · [English](./tool-reference.en.md) · [客户端接入](./client-setup.md)
 
-本页保存 11 个 MCP 工具的详细行为、参数、示例、错误结构和运行时请求控制。安装与首次调用请先看项目 README。
+本页保存 12 个 MCP 工具的详细行为、参数、示例、错误结构和运行时请求控制。安装与首次调用请先看项目 README。
 
 ## 快速选择
 
@@ -10,6 +10,7 @@
 |---|---|---|
 | 只有主题，还没有视频链接 | `search_bilibili_videos` | 最多 10 个普通视频候选及可继续调用的 BVID；不自动抓取字幕或评论 |
 | 只有主题，想找 UP 主候选 | `search_bilibili_creators` | 最多 10 个 Creator 候选及其稳定数字 `mid`；显示名称模糊且不唯一，不做自动选择 |
+| 从选定 UP 主（mid）读取主页概览或视频目录 | `get_bilibili_creator_content` | 一个 `overview` 实时概览或一页视频元数据（最多 20 条），按 `next_cursor` 翻页；不自动抓取视频证据 |
 | 从我的 Bilibili 收藏夹开始读取 | `list_bilibili_favorite_videos` | 当前账号所有创建的收藏夹的一页视频（最多 20 条），按 `next_cursor` 翻页直到结束；不读取字幕、评论或下载 |
 | 想让 AI 总结一个视频 | `get_video_info` | 字幕优先；无字幕时返回标题、简介、标签 |
 | 只想拿完整转录文本或关键词定位 | `get_video_transcript` | 原生字幕优先，可显式 ASR 回退；支持时间戳、区间过滤和关键词搜索 |
@@ -112,13 +113,29 @@
 - 可选参数：
   - `cursor`: 上一次成功调用返回的不透明续读令牌。首次调用请省略。
 
-### 9. 凭证助手工具
+### 9. 创作者内容发现 (`get_bilibili_creator_content`)
+
+- 从调用方选定且已验证的一个 Creator `mid` 出发，读取 Bilibili 空间页面当前可见的实时内容，`section` 二选一：
+  - `overview`：返回一个受字节限制的实时主页概览（名称、简介、头像、等级、`video_count` 和 `live_state`；`follower_count` 仅在上游提供有效 `fans` 事实时出现，绝不编造为 0）。`video_count` 优先取 `acc/info` 上游值；上游不提供时才允许一次有界的 `arc/search` 计数探测（`pn=1, ps=1, order=pubdate`），绝不自行编造计数。
+  - `videos`：返回当前可列出的视频目录的一页（最多 20 条 BVID 元数据行）；`next_cursor` 是不透明、无状态、版本化的 base64url 令牌，仅编码 mid 与下一页号。
+- 游标在任何网络请求前严格校验：类型、长度（1-256）、字符集（仅 base64url）、JSON 结构、版本、请求 mid 匹配、请求 section 匹配（仅 `videos`）、正安全整数页码；不匹配或越界时返回 `VALIDATION_ERROR`，不会发出任何请求。
+- `continuationProven` 决定 `next_cursor`：有 `videos_total` 且 `page * 20 < videos_total` 时返回下一页；无总数但当前页的原始上游行数恰好 20 行时也返回下一页，避免单条畸形行截断遍历；发出 `page + 1` 前会证明其 `page * 20` 算术仍为安全整数。
+- `skipped_count` 报告上游返回但无法安全规范化的行数（如无效 BVID、空标题），不会触发额外的替换请求；联合投稿行的行内 mid 可能与所选创作者不同，保留该行并使用行内作者。
+- 每行只含可继续传给现有证据工具的元数据：`bvid`、标题、简介、封面、分类、时长、发布时间、作者、播放/弹幕/评论计数和 `source_url`；时长解析上游 `length`（分钟可大于 59）并兼容数值 `duration`，发布时间以 `created` 为准；`arc/search` 语义下 `comment` 是评论数、`video_review` 是弹幕数；`is_charge_video` 仅在上游显式真值证据（`is_pay`/`is_charging_arc`/`elec_arc_type` 或兼容字段 `is_charge_video`）存在时为 `true`；`access` 恒为 `"unknown"`（本工具不做访问探测）。
+- 不持久化、不缓存、不下载、不自动抓取字幕/评论/章节/搜索结果，不爬取完整目录；`overview` 与 `videos` 都返回 `live_state: "live"`。
+- 必须先配置且登录 Bilibili Cookie；成功结果同时提供格式化 JSON 文本和内容相同的 MCP `structuredContent`。
+- 参数：
+  - `mid`（必填）：要读取的 Creator 数字 `mid`（正安全整数）。
+  - `section`（必填）：`"overview"` 或 `"videos"`。
+  - `cursor`（可选）：上一次 `videos` 成功调用返回的不透明续读令牌。`overview` 不接受游标。
+
+### 10. 凭证助手工具
 
 - `get_credential_setup_instructions`: 返回安全的 Bilibili Cookie 配置命令和说明。AI agent 安装此 MCP 后可调用此工具引导用户完成配置。
 - `check_bilibili_credentials`: 检查凭证是否已配置并处于登录状态，不返回任何 Cookie 值。配置缺失或失效时返回下一步操作指引。
 - `check_mcp_update`: 检查本地包版本与 npm latest 是否一致，并返回 `npx @latest` 或全局安装的安全更新指引。
 
-### 10. 行为说明与错误处理
+### 11. 行为说明与错误处理
 
 - **Cookie 过期智能检测**：当字幕获取为空时自动验证登录状态，区分“无字幕视频”与“凭证失效”，并抛出明确的 `COOKIE_EXPIRED` 错误，避免静默降级。
 
@@ -130,6 +147,7 @@
 - 视频发现（`search_bilibili_videos`）强制检查已配置且有效的登录凭证；不提供匿名降级。
 - 创作者搜索（`search_bilibili_creators`）同样强制检查已配置且有效的登录凭证；不提供匿名降级。
 - 收藏夹发现（`list_bilibili_favorite_videos`）必须从已登录的当前账号身份开始；不提供匿名降级，也不读取其他账号的公开收藏。
+- 创作者内容发现（`get_bilibili_creator_content`）需要已配置且有效的登录凭证；不提供匿名降级，`access` 恒为 `"unknown"`，不探测资源是否可访问。
 - 不建议依赖无 Cookie 模式获取字幕或评论。
 
 #### Cookie 凭据来源
@@ -314,6 +332,53 @@
 ```
 
 > 上游返回空 `medias` 时，即使 `has_more=true`，本工具仍会把当前 Folder 视为已结束并跳到下一个 Folder 的第 1 页，避免游标循环。若游标对应的 Folder 已不再属于当前账号（例如被删除或转移），返回 `VALIDATION_ERROR` 并提示“restart without a cursor”。
+
+### `get_bilibili_creator_content`
+
+**适合**：从 `search_bilibili_creators`（或任何来源）得到一个选定 Creator 的稳定数字 `mid` 后，读取该 UP 主的主页概览或分页浏览其当前可列出的视频目录。每次调用最多返回上游一页（最多 20 条），Agent 按返回的 `next_cursor` 继续调用直到没有该字段为止。**不要假设一次响应包含完整目录，也不要自动爬取全部页。**
+
+概览请求示例：
+
+```json
+{
+  "name": "get_bilibili_creator_content",
+  "arguments": {
+    "mid": 2088259175,
+    "section": "overview"
+  }
+}
+```
+
+返回内容：`mid`、`section: "overview"`、`name`、`bio`、`avatar_url`、`level`、`video_count` 和 `live_state`；`follower_count` 为可选字段，仅在上游提供有效 `fans` 事实时出现，绝不编造为 0。`video_count` 优先取上游 `acc/info` 提供的值；上游不提供时才允许一次有界的计数探测，绝不编造计数。
+
+视频目录请求示例（首次调用，不传 `cursor`）：
+
+```json
+{
+  "name": "get_bilibili_creator_content",
+  "arguments": {
+    "mid": 2088259175,
+    "section": "videos"
+  }
+}
+```
+
+返回内容：`mid`、`section: "videos"`、`page`、`videos_total`（有界时提供）、`videos[]`（每项含 `bvid`、`title`、`description`、`cover_url`、分类、`duration_seconds`、`published_at`、`author`、播放/弹幕/评论计数、`access: "unknown"`、`source_url`）、`skipped_count`、`live_state`，以及可选的 `next_cursor`。
+
+续读示例：
+
+```json
+{
+  "name": "get_bilibili_creator_content",
+  "arguments": {
+    "mid": 2088259175,
+    "section": "videos",
+    "cursor": "<上一次响应中的 next_cursor>"
+  }
+}
+```
+
+> 游标只接受上一次同 mid、同 `videos` section 返回的令牌；跨 mid、跨 section、`overview` 携带游标、页码越界或格式非法的游标都会在发出任何网络请求前返回 `VALIDATION_ERROR`。
 
 ### `get_video_transcript`
 

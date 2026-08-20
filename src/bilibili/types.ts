@@ -267,6 +267,64 @@ export interface FavoriteVideoPage {
   next_cursor?: string;
 }
 
+// 创作者内容段（overview / videos）
+export type CreatorContentSection = "overview" | "videos";
+
+// 创作者内容概览（overview 段）：
+// 有界实时上游档案事实与可用计数事实；不包含语义总结或目录爬取。
+// live_state 标识当前实时上游状态，而非持久化存储状态。
+export interface CreatorContentOverview {
+  mid: number;
+  section: "overview";
+  name: string;
+  bio: string;
+  avatar_url: string;
+  // 仅当上游提供有效 fans 事实时才出现，绝不编造为 0。
+  follower_count?: number;
+  level: number;
+  // 上游档案提供，或由一次有界计数探测补充；绝不凭空编造。
+  video_count: number;
+  live_state: "live";
+}
+
+// 创作者视频目录行（videos 段）：
+// 有界 BVID 元数据与可用的参与度事实；联合投稿行的行内 mid 可能与所选
+// 创作者不同，保留并使用行内 author；访问/权益默认 unknown。
+export interface CreatorVideoRow {
+  bvid: string;
+  title: string;
+  description: string;
+  cover_url: string;
+  category_id?: number;
+  category?: string;
+  duration_seconds: number;
+  published_at: string;
+  author: string;
+  // 仅当上游提供有效非负整数时才出现（不编造参与度）。
+  // arc/search 语义：comment 是评论数，video_review 是弹幕数。
+  view_count?: number;
+  danmaku_count?: number;
+  reply_count?: number;
+  // 仅当上游显式真值证据（is_pay / is_charging_arc / elec_arc_type，
+  // 或兼容字段 is_charge_video）存在时才为 true。
+  is_charge_video?: boolean;
+  // 列表可见性、付费标记或可见 BVID 本身永不证明播放权限。
+  access: "unknown";
+  source_url: string;
+}
+
+// 单次 videos 调用返回的有界结果：至多一页 20 行，仅在有上游证明时给出 next_cursor。
+export interface CreatorVideoPage {
+  mid: number;
+  section: "videos";
+  page: number;
+  videos_total?: number;
+  videos: CreatorVideoRow[];
+  skipped_count: number;
+  next_cursor?: string;
+  live_state: "live";
+}
+
 // 视频章节数据类型
 export interface VideoChaptersData {
   bvid: string;

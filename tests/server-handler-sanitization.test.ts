@@ -11,6 +11,7 @@ const mockGetVideoCommentsData = vi.fn();
 const mockSearchBilibiliVideos = vi.fn();
 const mockSearchBilibiliCreators = vi.fn();
 const mockListBilibiliFavoriteVideos = vi.fn();
+const mockGetBilibiliCreatorContent = vi.fn();
 
 vi.mock("../src/bilibili/subtitle.js", () => ({
   getVideoInfoWithSubtitle: (...args: unknown[]) =>
@@ -37,6 +38,11 @@ vi.mock("../src/bilibili/search.js", () => ({
 vi.mock("../src/bilibili/favorites.js", () => ({
   listBilibiliFavoriteVideos: (...args: unknown[]) =>
     mockListBilibiliFavoriteVideos(...args),
+}));
+
+vi.mock("../src/bilibili/creator-content.js", () => ({
+  getBilibiliCreatorContent: (...args: unknown[]) =>
+    mockGetBilibiliCreatorContent(...args),
 }));
 
 vi.mock("../src/bilibili/comments.js", () => ({
@@ -891,6 +897,167 @@ describe("favorites handler validation and output", () => {
     const payload = JSON.parse(result.content[0].text);
     expect(payload.code).toBe("VALIDATION_ERROR");
     expect(payload.message).toContain("restart without a cursor");
+  });
+});
+
+describe("creator content handler validation and output", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ["missing mid", { section: "overview" }],
+    ["non-numeric mid", { mid: "abc", section: "overview" }],
+    ["zero mid", { mid: 0, section: "overview" }],
+    ["fractional mid", { mid: 1.5, section: "overview" }],
+    ["missing section", { mid: 2_088_259_175 }],
+    ["unknown section", { mid: 2_088_259_175, section: "stats" }],
+    ["non-string cursor", { mid: 2_088_259_175, section: "videos", cursor: 42 }],
+    ["empty cursor", { mid: 2_088_259_175, section: "videos", cursor: "" }],
+    [
+      "overlong cursor",
+      { mid: 2_088_259_175, section: "videos", cursor: "A".repeat(257) },
+    ],
+    [
+      "non-base64url cursor",
+      { mid: 2_088_259_175, section: "videos", cursor: "A+B" },
+    ],
+  ])("get_bilibili_creator_content with %s returns VALIDATION_ERROR", async (_case, args) => {
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 20,
+      params: {
+        name: "get_bilibili_creator_content",
+        arguments: args,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("VALIDATION_ERROR");
+    expect(mockGetBilibiliCreatorContent).not.toHaveBeenCalled();
+  });
+
+  it("returns identical structured and text overview output on success", async () => {
+    const fixture = {
+      mid: 2_088_259_175,
+      section: "overview" as const,
+      name: "测试UP主",
+      bio: "分享技术",
+      avatar_url: "https://i0.hdslb.com/bfs/face/a.jpg",
+      follower_count: 123_456,
+      level: 6,
+      video_count: 42,
+      live_state: "live" as const,
+    };
+    mockGetBilibiliCreatorContent.mockResolvedValueOnce(fixture);
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 21,
+      params: {
+        name: "get_bilibili_creator_content",
+        arguments: { mid: 2_088_259_175, section: "overview" },
+      },
+    });
+
+    expect(mockGetBilibiliCreatorContent).toHaveBeenCalledWith(
+      2_088_259_175,
+      "overview",
+      undefined,
+    );
+    expect(result.structuredContent).toEqual(fixture);
+    expect(result.content[0].text).toBe(JSON.stringify(fixture, null, 2));
+  });
+
+  it("passes a valid cursor through to the creator content module", async () => {
+    const cursor =
+      "eyJ2ZXJzaW9uIjoxLCJtaWQiOjIwODgyNTkxNzUsInNlY3Rpb24iOiJ2aWRlb3MiLCJwYWdlIjoyfQ";
+    mockGetBilibiliCreatorContent.mockResolvedValueOnce({
+      mid: 2_088_259_175,
+      section: "videos" as const,
+      page: 2,
+      videos: [],
+      skipped_count: 0,
+      live_state: "live" as const,
+    });
+
+    const handler = getCallToolHandler();
+    await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 22,
+      params: {
+        name: "get_bilibili_creator_content",
+        arguments: {
+          mid: 2_088_259_175,
+          section: "videos",
+          cursor,
+        },
+      },
+    });
+
+    expect(mockGetBilibiliCreatorContent).toHaveBeenCalledWith(
+      2_088_259_175,
+      "videos",
+      cursor,
+    );
+  });
+
+  it("keeps creator content failures text-only", async () => {
+    mockGetBilibiliCreatorContent.mockRejectedValueOnce(
+      new Error("Unexpected creator content failure"),
+    );
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 23,
+      params: {
+        name: "get_bilibili_creator_content",
+        arguments: { mid: 2_088_259_175, section: "videos" },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    expect(JSON.parse(result.content[0].text).code).toBe("UNKNOWN_ERROR");
+  });
+
+  it("routes a section-binding ValidationError from the creator content module as VALIDATION_ERROR", async () => {
+    const { ValidationError } = await import("../src/utils/errors.js");
+    mockGetBilibiliCreatorContent.mockRejectedValueOnce(
+      new ValidationError("cursor is only supported for the videos section"),
+    );
+
+    const handler = getCallToolHandler();
+    const result = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 24,
+      params: {
+        name: "get_bilibili_creator_content",
+        arguments: {
+          mid: 2_088_259_175,
+          section: "overview",
+          cursor:
+            "eyJ2ZXJzaW9uIjoxLCJtaWQiOjIwODgyNTkxNzUsInNlY3Rpb24iOiJ2aWRlb3MiLCJwYWdlIjoyfQ",
+        },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result).not.toHaveProperty("structuredContent");
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.code).toBe("VALIDATION_ERROR");
+    expect(payload.message).toContain(
+      "cursor is only supported for the videos section",
+    );
   });
 });
 
