@@ -37,12 +37,24 @@ An opaque continuation token that resumes a bounded Favorites Discovery traversa
 _Avoid_: Folder ID, page URL, sync checkpoint
 
 **Creator Content Discovery**:
-A bounded Bilibili-native lookup that turns one selected Creator `mid` into a live `overview` profile reading or a page of that Creator's currently listable Video metadata. It does not crawl the full catalog automatically and never fetches per-Video evidence.
+A bounded Bilibili-native lookup that turns one selected Creator `mid` into a live profile reading, a page of currently listable Video metadata, a Collection/Series container list, or one selected container's Video Membership page. It does not crawl the full catalog automatically and never fetches per-Video evidence.
 _Avoid_: Creator crawl, full-catalog sync, per-video evidence fetch
 
+**Collection**:
+A Creator-organized Bilibili container identified by a `collection_id`. It is distinct from a Series, a multi-Part Video, and a Favorite Folder.
+_Avoid_: Season, Favorite Folder, Part list
+
+**Series**:
+A Creator-organized Bilibili container identified by a `series_id`. It remains a separate upstream family from Collection even when both appear on one Bilibili space page.
+_Avoid_: Collection alias, playlist, Favorite Folder
+
+**Container Membership**:
+The relationship between one Video and one Collection or Series. The same BVID in multiple containers represents multiple Memberships and is not globally deduplicated.
+_Avoid_: Part, unique Video result, Favorite Membership
+
 **Creator Content Cursor**:
-An opaque continuation token that resumes a bounded Creator Video catalog traversal. It is not a Creator selector or account credential.
-_Avoid_: mid, page URL, sync checkpoint
+An opaque continuation token that resumes a bounded Creator Video, container-list, or selected-container Membership traversal. A member cursor binds the Creator, section, and container identity; it is not a selector or account credential.
+_Avoid_: mid, container selector, page URL, sync checkpoint
 
 **Video**:
 A Bilibili work identified by one BVID. A Video may contain one or more Parts.

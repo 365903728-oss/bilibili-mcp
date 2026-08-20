@@ -162,6 +162,18 @@ file-backed Claude report were returned to the Codex acceptance owner; the
 focused contract suite was 207/207 green, and no commit, push, merge, release,
 or live-smoke claim is made here.
 
+Issue #47 (Creator Collections and Series) is active in the Codex Direct
+adapter on isolated worktree
+`C:\Users\ZX\.codex\worktrees\issue-47\bilibili-mcp`, branch
+`codex/issue-47-creator-collections-series`, based on merged master
+`9e583a8da1fa69e384845cd0b6b99c49b0421095`. The existing
+`get_bilibili_creator_content` tool gains separate `collections` and `series`
+sections: omitting `container_id` lists that container family, while providing
+one reads a single bounded Video Membership page. Cursors bind mid, section,
+page, and optional container ID; no evidence fetching, global deduplication,
+push, PR, merge, or release is authorized. The credential-safe shape probe
+recorded no Cookie values or private content.
+
 The pre-existing learning-proposal queue is legacy v1 state and remains outside
 the clean #29 worktree. Typed accepted-evidence memory automation is scoped to
 #33; #29 hooks only write ignored redacted events. Files under

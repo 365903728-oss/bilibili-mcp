@@ -186,7 +186,7 @@ For the full semantics of error codes such as `ASR_NOT_READY`, `ASR_BUSY`, and `
 |---|---|
 | Have a topic but no video link yet | `search_bilibili_videos` |
 | Have a topic and want Creator candidates (stable mids) | `search_bilibili_creators` |
-| Read a chosen creator's overview or video catalog | `get_bilibili_creator_content` |
+| Read a chosen creator's overview, video catalog, Collections, or Series | `get_bilibili_creator_content` |
 | Start from my Favorites | `list_bilibili_favorite_videos` |
 | Get subtitle-first video context | `get_video_info` |
 | Full transcript, keyword search, or local ASR when no subtitles | `get_video_transcript` |

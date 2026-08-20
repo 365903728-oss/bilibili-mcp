@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const httpMocks = vi.hoisted(() => ({
   checkLoginStatus: vi.fn(),
+  fetchWithoutWBI: vi.fn(),
   fetchWithWBI: vi.fn(),
 }));
 
@@ -11,6 +12,7 @@ const credentialMocks = vi.hoisted(() => ({
 
 vi.mock("../src/bilibili/http.js", () => ({
   checkLoginStatus: httpMocks.checkLoginStatus,
+  fetchWithoutWBI: httpMocks.fetchWithoutWBI,
   fetchWithWBI: httpMocks.fetchWithWBI,
 }));
 
@@ -31,15 +33,17 @@ const {
   encodeCreatorContentCursor,
   getBilibiliCreatorContent,
 } = await import("../src/bilibili/creator-content.js");
+const { handleToolCall } = await import("../src/server/tool-handlers.js");
 
 const MID = 2_088_259_175;
 
 function validCursor(
   mid = MID,
-  section: "overview" | "videos" = "videos",
+  section: "overview" | "videos" | "collections" | "series" = "videos",
   page = 1,
+  containerId?: number,
 ): string {
-  return encodeCreatorContentCursor(mid, section, page);
+  return encodeCreatorContentCursor(mid, section, page, containerId);
 }
 
 describe("creator content cursor encode/decode", () => {
@@ -53,6 +57,17 @@ describe("creator content cursor encode/decode", () => {
       page: 3,
     });
     expect(encodeCreatorContentCursor(MID, "videos", 3)).toBe(cursor);
+  });
+
+  it("binds a Collection member cursor to its container identity", () => {
+    const cursor = encodeCreatorContentCursor(MID, "collections", 2, 1903592);
+
+    expect(decodeCreatorContentCursor(cursor)).toEqual({
+      mid: MID,
+      section: "collections",
+      page: 2,
+      container_id: 1903592,
+    });
   });
 
   it("rejects invalid mid/section/page at encode time", () => {
@@ -116,6 +131,45 @@ describe("getBilibiliCreatorContent pre-network validation", () => {
     ).rejects.toThrow(ValidationError);
     expect(credentialMocks.getAuthHeaders).not.toHaveBeenCalled();
     expect(httpMocks.fetchWithWBI).not.toHaveBeenCalled();
+  });
+
+  it("rejects a container identity outside Collection/Series before credentials or network", async () => {
+    await expect(
+      getBilibiliCreatorContent(MID, "videos", undefined, 1903592),
+    ).rejects.toThrow(ValidationError);
+    expect(credentialMocks.getAuthHeaders).not.toHaveBeenCalled();
+    expect(httpMocks.checkLoginStatus).not.toHaveBeenCalled();
+    expect(httpMocks.fetchWithWBI).not.toHaveBeenCalled();
+    expect(httpMocks.fetchWithoutWBI).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects invalid container identity %s before credentials or network",
+    async (containerId) => {
+      await expect(
+        getBilibiliCreatorContent(
+          MID,
+          "collections",
+          undefined,
+          containerId,
+        ),
+      ).rejects.toThrow(ValidationError);
+      expect(credentialMocks.getAuthHeaders).not.toHaveBeenCalled();
+      expect(httpMocks.fetchWithoutWBI).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects cross-container cursor reuse before credentials or network", async () => {
+    await expect(
+      getBilibiliCreatorContent(
+        MID,
+        "collections",
+        validCursor(MID, "collections", 2, 1_903_592),
+        1_903_593,
+      ),
+    ).rejects.toThrow(ValidationError);
+    expect(credentialMocks.getAuthHeaders).not.toHaveBeenCalled();
+    expect(httpMocks.fetchWithoutWBI).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -210,6 +264,506 @@ function catalogRow(overrides: Record<string, unknown> = {}): Record<string, unk
     ...overrides,
   };
 }
+
+function containerListPage(
+  seasons: unknown[],
+  series: unknown[],
+  page = 1,
+  total = seasons.length + series.length,
+): Record<string, unknown> {
+  return {
+    items_lists: {
+      page: { page_num: page, page_size: 20, total },
+      seasons_list: seasons,
+      series_list: series,
+    },
+  };
+}
+
+function collectionItem(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    meta: {
+      mid: MID,
+      season_id: 1_903_592,
+      name: "合集·多人实况",
+      description: "一起玩的实况",
+      total: 20,
+      ...overrides,
+    },
+  };
+}
+
+function seriesItem(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    meta: {
+      mid: MID,
+      series_id: 4_684_427,
+      name: "青春旅行团",
+      description: "旅行系列",
+      total: 13,
+      ...overrides,
+    },
+  };
+}
+
+function memberRow(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    bvid: "BV1T6PQzQErF",
+    title: "Container video",
+    desc: "Member description",
+    pic: "https://i0.hdslb.com/bfs/archive/member.jpg",
+    duration: 125,
+    pubdate: 1_700_000_000,
+    stat: { view: 1234, danmaku: 56 },
+    ugc_pay: 1,
+    ...overrides,
+  };
+}
+
+function collectionMemberPage(
+  archives: unknown[],
+  page = 1,
+  total = archives.length,
+  metaOverrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    archives,
+    meta: {
+      mid: MID,
+      season_id: 1_903_592,
+      name: "合集·多人实况",
+      description: "一起玩的实况",
+      total,
+      ...metaOverrides,
+    },
+    page: { page_num: page, page_size: 20, total },
+  };
+}
+
+function seriesMetadata(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    meta: {
+      mid: MID,
+      series_id: 4_684_427,
+      name: "青春旅行团",
+      description: "旅行系列",
+      total: 13,
+      ...overrides,
+    },
+  };
+}
+
+function seriesMemberPage(
+  archives: unknown[],
+  page = 1,
+  total = archives.length,
+): Record<string, unknown> {
+  return {
+    archives,
+    page: { num: page, size: 20, total },
+  };
+}
+
+describe("getBilibiliCreatorContent Collection containers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    credentialMocks.getAuthHeaders.mockReturnValue({ Cookie: "configured" });
+    httpMocks.checkLoginStatus.mockResolvedValue({ isLogin: true });
+  });
+
+  it("lists one bounded Collection container page without fetching members", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      containerListPage([collectionItem()], [], 1, 1),
+    );
+
+    const result = await getBilibiliCreatorContent(MID, "collections");
+
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledWith(
+      "/x/polymer/web-space/seasons_series_list",
+      { mid: MID, page_num: 1, page_size: 20 },
+      { Cookie: "configured" },
+    );
+    expect(httpMocks.fetchWithWBI).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      mid: MID,
+      section: "collections",
+      mode: "containers",
+      page: 1,
+      collections: [
+        {
+          collection_id: 1_903_592,
+          name: "合集·多人实况",
+          description: "一起玩的实况",
+          member_count: 20,
+        },
+      ],
+      skipped_count: 0,
+      live_state: "live",
+    });
+  });
+
+  it("returns equivalent structured and JSON text output through the MCP handler", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      containerListPage([collectionItem()], [], 1, 1),
+    );
+
+    const result = await handleToolCall("get_bilibili_creator_content", {
+      mid: MID,
+      section: "collections",
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      mid: MID,
+      section: "collections",
+      mode: "containers",
+      collections: [{ collection_id: 1_903_592 }],
+    });
+    const text = result.content[0] as { type: "text"; text: string };
+    expect(JSON.parse(text.text)).toEqual(result.structuredContent);
+  });
+
+  it("continues a combined upstream page even when it contains only Series", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      containerListPage([], Array.from({ length: 20 }, () => seriesItem()), 1, 21),
+    );
+
+    const result = await getBilibiliCreatorContent(MID, "collections");
+
+    expect(result).toMatchObject({
+      collections: [],
+      skipped_count: 0,
+      next_cursor: validCursor(MID, "collections", 2),
+    });
+  });
+
+  it("rejects a container page whose upstream page size changed", async () => {
+    const data = containerListPage([collectionItem()], []);
+    (data.items_lists as { page: { page_size: number } }).page.page_size = 50;
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(data);
+
+    await expect(
+      getBilibiliCreatorContent(MID, "collections"),
+    ).rejects.toThrow(UpstreamResponseError);
+  });
+
+  it.each([
+    ["malformed payload", {}, UpstreamResponseError],
+    [
+      "oversized combined page",
+      containerListPage(
+        Array.from({ length: 21 }, () => collectionItem()),
+        [],
+        1,
+        21,
+      ),
+      ResourceLimitError,
+    ],
+  ])("fails explicitly for %s", async (_, payload, expectedError) => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(payload);
+
+    await expect(
+      getBilibiliCreatorContent(MID, "collections"),
+    ).rejects.toThrow(expectedError);
+  });
+
+  it("skips a Collection whose sanitized name is empty", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      containerListPage([collectionItem({ name: "\u0000\u202e" })], []),
+    );
+
+    await expect(
+      getBilibiliCreatorContent(MID, "collections"),
+    ).resolves.toMatchObject({ collections: [], skipped_count: 1 });
+  });
+
+  it("returns one selected Collection's Video memberships with context", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      collectionMemberPage([memberRow()]),
+    );
+
+    const result = await getBilibiliCreatorContent(
+      MID,
+      "collections",
+      undefined,
+      1_903_592,
+    );
+
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledWith(
+      "/x/polymer/web-space/seasons_archives_list",
+      {
+        mid: MID,
+        season_id: 1_903_592,
+        sort_reverse: "false",
+        page_num: 1,
+        page_size: 20,
+      },
+      { Cookie: "configured" },
+    );
+    expect(result).toEqual({
+      mid: MID,
+      section: "collections",
+      mode: "members",
+      page: 1,
+      selected_collection: {
+        collection_id: 1_903_592,
+        name: "合集·多人实况",
+        description: "一起玩的实况",
+        member_count: 1,
+      },
+      members: [
+        {
+          bvid: "BV1T6PQzQErF",
+          title: "Container video",
+          description: "Member description",
+          cover_url: "https://i0.hdslb.com/bfs/archive/member.jpg",
+          duration_seconds: 125,
+          published_at: "2023-11-14T22:13:20.000Z",
+          view_count: 1234,
+          danmaku_count: 56,
+          is_charge_video: true,
+          access: "unknown",
+          source_url: "https://www.bilibili.com/video/BV1T6PQzQErF/",
+        },
+      ],
+      skipped_count: 0,
+      live_state: "live",
+    });
+  });
+
+  it("counts malformed members without suppressing a bound next cursor", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      collectionMemberPage([memberRow(), memberRow({ bvid: "invalid" })], 1, 21),
+    );
+
+    const result = await getBilibiliCreatorContent(
+      MID,
+      "collections",
+      undefined,
+      1_903_592,
+    );
+
+    expect(result).toMatchObject({
+      skipped_count: 1,
+      next_cursor: validCursor(MID, "collections", 2, 1_903_592),
+    });
+    expect(result.mode === "members" && result.members).toHaveLength(1);
+  });
+
+  it.each([
+    ["malformed payload", {}, UpstreamResponseError],
+    [
+      "oversized member page",
+      collectionMemberPage(Array.from({ length: 21 }, () => memberRow())),
+      ResourceLimitError,
+    ],
+    [
+      "mismatched Collection ownership",
+      collectionMemberPage([], 1, 0, { mid: MID + 1 }),
+      UpstreamResponseError,
+    ],
+  ])("fails explicitly for %s", async (_, payload, expectedError) => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(payload);
+
+    await expect(
+      getBilibiliCreatorContent(
+        MID,
+        "collections",
+        undefined,
+        1_903_592,
+      ),
+    ).rejects.toThrow(expectedError);
+  });
+
+  it("propagates upstream Collection API failures", async () => {
+    const upstream = new BilibiliAPIError("risk control", "-352");
+    httpMocks.fetchWithoutWBI.mockRejectedValueOnce(upstream);
+
+    await expect(
+      getBilibiliCreatorContent(MID, "collections"),
+    ).rejects.toBe(upstream);
+  });
+});
+
+describe("getBilibiliCreatorContent Series containers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    credentialMocks.getAuthHeaders.mockReturnValue({ Cookie: "configured" });
+    httpMocks.checkLoginStatus.mockResolvedValue({ isLogin: true });
+  });
+
+  it("keeps Series containers separate from Collections", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      containerListPage([collectionItem()], [seriesItem()], 1, 2),
+    );
+
+    const result = await getBilibiliCreatorContent(MID, "series");
+
+    expect(result).toEqual({
+      mid: MID,
+      section: "series",
+      mode: "containers",
+      page: 1,
+      series: [
+        {
+          series_id: 4_684_427,
+          name: "青春旅行团",
+          description: "旅行系列",
+          member_count: 13,
+        },
+      ],
+      skipped_count: 0,
+      live_state: "live",
+    });
+  });
+
+  it("revalidates Series ownership before returning one member page", async () => {
+    httpMocks.fetchWithoutWBI
+      .mockResolvedValueOnce(seriesMetadata({ total: 1 }))
+      .mockResolvedValueOnce(seriesMemberPage([memberRow()], 1, 1));
+
+    const result = await getBilibiliCreatorContent(
+      MID,
+      "series",
+      undefined,
+      4_684_427,
+    );
+
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(2);
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenNthCalledWith(
+      1,
+      "/x/series/series",
+      { series_id: 4_684_427 },
+      { Cookie: "configured" },
+    );
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenNthCalledWith(
+      2,
+      "/x/series/archives",
+      {
+        mid: MID,
+        series_id: 4_684_427,
+        only_normal: "true",
+        sort: "desc",
+        pn: 1,
+        ps: 20,
+      },
+      { Cookie: "configured" },
+    );
+    expect(result).toEqual({
+      mid: MID,
+      section: "series",
+      mode: "members",
+      page: 1,
+      selected_series: {
+        series_id: 4_684_427,
+        name: "青春旅行团",
+        description: "旅行系列",
+        member_count: 1,
+      },
+      members: [
+        {
+          bvid: "BV1T6PQzQErF",
+          title: "Container video",
+          description: "Member description",
+          cover_url: "https://i0.hdslb.com/bfs/archive/member.jpg",
+          duration_seconds: 125,
+          published_at: "2023-11-14T22:13:20.000Z",
+          view_count: 1234,
+          danmaku_count: 56,
+          is_charge_video: true,
+          access: "unknown",
+          source_url: "https://www.bilibili.com/video/BV1T6PQzQErF/",
+        },
+      ],
+      skipped_count: 0,
+      live_state: "live",
+    });
+  });
+
+  it("stops before member lookup when Series ownership does not match", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      seriesMetadata({ mid: MID + 1 }),
+    );
+
+    await expect(
+      getBilibiliCreatorContent(
+        MID,
+        "series",
+        undefined,
+        4_684_427,
+      ),
+    ).rejects.toThrow(UpstreamResponseError);
+    expect(httpMocks.fetchWithoutWBI).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips a Series whose sanitized name is empty", async () => {
+    httpMocks.fetchWithoutWBI.mockResolvedValueOnce(
+      containerListPage([], [seriesItem({ name: "\u0000\u202e" })]),
+    );
+
+    await expect(
+      getBilibiliCreatorContent(MID, "series"),
+    ).resolves.toMatchObject({ series: [], skipped_count: 1 });
+  });
+
+  it.each([
+    ["malformed", {}, UpstreamResponseError],
+    [
+      "oversized",
+      seriesMemberPage(Array.from({ length: 21 }, () => memberRow())),
+      ResourceLimitError,
+    ],
+  ])("fails explicitly for a %s Series member page", async (_, payload, expectedError) => {
+    httpMocks.fetchWithoutWBI
+      .mockResolvedValueOnce(seriesMetadata())
+      .mockResolvedValueOnce(payload);
+
+    await expect(
+      getBilibiliCreatorContent(
+        MID,
+        "series",
+        undefined,
+        4_684_427,
+      ),
+    ).rejects.toThrow(expectedError);
+  });
+
+  it("preserves the same BVID in separate Collection and Series memberships", async () => {
+    httpMocks.fetchWithoutWBI
+      .mockResolvedValueOnce(collectionMemberPage([memberRow()]))
+      .mockResolvedValueOnce(seriesMetadata({ total: 1 }))
+      .mockResolvedValueOnce(seriesMemberPage([memberRow()]));
+
+    const collection = await getBilibiliCreatorContent(
+      MID,
+      "collections",
+      undefined,
+      1_903_592,
+    );
+    const series = await getBilibiliCreatorContent(
+      MID,
+      "series",
+      undefined,
+      4_684_427,
+    );
+
+    expect(collection.mode === "members" && collection.members[0]?.bvid).toBe(
+      "BV1T6PQzQErF",
+    );
+    expect(series.mode === "members" && series.members[0]?.bvid).toBe(
+      "BV1T6PQzQErF",
+    );
+  });
+});
 
 describe("getBilibiliCreatorContent overview", () => {
   beforeEach(() => {

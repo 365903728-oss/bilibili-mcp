@@ -267,8 +267,12 @@ export interface FavoriteVideoPage {
   next_cursor?: string;
 }
 
-// 创作者内容段（overview / videos）
-export type CreatorContentSection = "overview" | "videos";
+// 创作者内容段。Collection 与 Series 保留为不同的 Bilibili 容器概念。
+export type CreatorContentSection =
+  | "overview"
+  | "videos"
+  | "collections"
+  | "series";
 
 // 创作者内容概览（overview 段）：
 // 有界实时上游档案事实与可用计数事实；不包含语义总结或目录爬取。
@@ -320,6 +324,81 @@ export interface CreatorVideoPage {
   page: number;
   videos_total?: number;
   videos: CreatorVideoRow[];
+  skipped_count: number;
+  next_cursor?: string;
+  live_state: "live";
+}
+
+// Bilibili Collection（上游 season）容器；不与 Series 或 Favorite Folder 合并。
+export interface CreatorCollectionContainer {
+  collection_id: number;
+  name: string;
+  description: string;
+  member_count: number;
+}
+
+export interface CreatorCollectionListPage {
+  mid: number;
+  section: "collections";
+  mode: "containers";
+  page: number;
+  collections: CreatorCollectionContainer[];
+  skipped_count: number;
+  next_cursor?: string;
+  live_state: "live";
+}
+
+export interface CreatorSeriesContainer {
+  series_id: number;
+  name: string;
+  description: string;
+  member_count: number;
+}
+
+export interface CreatorSeriesListPage {
+  mid: number;
+  section: "series";
+  mode: "containers";
+  page: number;
+  series: CreatorSeriesContainer[];
+  skipped_count: number;
+  next_cursor?: string;
+  live_state: "live";
+}
+
+export interface CreatorContainerVideoRow {
+  bvid: string;
+  title: string;
+  description: string;
+  cover_url: string;
+  duration_seconds: number;
+  published_at: string;
+  view_count?: number;
+  danmaku_count?: number;
+  is_charge_video?: boolean;
+  access: "unknown";
+  source_url: string;
+}
+
+export interface CreatorCollectionMemberPage {
+  mid: number;
+  section: "collections";
+  mode: "members";
+  page: number;
+  selected_collection: CreatorCollectionContainer;
+  members: CreatorContainerVideoRow[];
+  skipped_count: number;
+  next_cursor?: string;
+  live_state: "live";
+}
+
+export interface CreatorSeriesMemberPage {
+  mid: number;
+  section: "series";
+  mode: "members";
+  page: number;
+  selected_series: CreatorSeriesContainer;
+  members: CreatorContainerVideoRow[];
   skipped_count: number;
   next_cursor?: string;
   live_state: "live";

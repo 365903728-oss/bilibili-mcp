@@ -311,19 +311,36 @@ export async function handleToolCall(
     case "get_bilibili_creator_content": {
       const rawMid = args?.mid;
       const rawSection = args?.section;
+      const rawContainerId = args?.container_id;
       const rawCursor = args?.cursor;
 
       try {
-        validateCreatorContentInput(rawMid, rawSection, rawCursor);
+        validateCreatorContentInput(
+          rawMid,
+          rawSection,
+          rawCursor,
+          rawContainerId,
+        );
       } catch (error) {
         return toErrorTextContent(buildValidationErrorPayload(error));
       }
 
-      const result = await getBilibiliCreatorContent(
-        rawMid as number,
-        rawSection as "overview" | "videos",
-        typeof rawCursor === "string" ? rawCursor : undefined,
-      );
+      const mid = rawMid as number;
+      const section = rawSection as
+        | "overview"
+        | "videos"
+        | "collections"
+        | "series";
+      const cursor = typeof rawCursor === "string" ? rawCursor : undefined;
+      const result =
+        typeof rawContainerId === "number"
+          ? await getBilibiliCreatorContent(
+              mid,
+              section,
+              cursor,
+              rawContainerId,
+            )
+          : await getBilibiliCreatorContent(mid, section, cursor);
 
       return toStructuredContent(result as unknown as Record<string, unknown>);
     }
