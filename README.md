@@ -6,10 +6,11 @@
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="GPL-3.0 license"></a>
 </p>
 
-Bilibili MCP 是一个本地 MCP server，让 AI Agent 读取 Bilibili 内容：读取字幕与评论，按主题搜索视频，遍历自己账号的收藏夹。即使视频没有字幕，通过 `setup` 安装本地 ASR 模型后也能读到它的文字内容。
+Bilibili MCP 是一个本地 MCP server，让 AI Agent 读取 Bilibili 内容。你可以读取字幕与评论、按主题搜索视频、按名称或关键词查找并了解 UP 主，也可以遍历自己账号的收藏夹。即使视频没有字幕，通过 `setup` 安装本地 ASR 模型后也能读到它的文字内容。
 
 <p align="center">
   <a href="./README_EN.md">English</a> ·
+  <a href="#快速了解一个-up-主">快速了解 UP 主</a> ·
   <a href="./docs/client-setup.md">客户端配置指南</a> ·
   <a href="./docs/tool-reference.md">工具参考</a> ·
   <a href="#本地-asr可选">本地 ASR（可选）</a> ·
@@ -28,7 +29,8 @@ Bilibili MCP 是一个本地 MCP server，让 AI Agent 读取 Bilibili 内容：
 - **读字幕与评论**：读取字幕全文，或用关键词搜索原话——每条命中附带上下文、时间点和可直接跳转的 B 站时刻链接；阅读按热度（默认）或时间排序的评论与回复，含时间戳的评论会被优先保留。
 - **读单个视频**：查看标题、作者、播放量等元数据，以及分 P 结构和章节。
 - **找到视频**：按主题搜索 B 站，得到按平台综合排序、带标题、UP 主、时长和 BVID 的候选列表。
-- **查看创作者内容**：选定一个数字 mid，读取 UP 主主页概览，或分页浏览其视频目录、合集、系列与动态（每页最多 20 条，按 `next_cursor` 翻页）；动态只返回有界文字、图片 URL/尺寸、关联 BVID 与转发关系，不下载图片或自动抓取视频证据。
+- **找到 UP 主**：搜索 UP 主候选，确认你真正想了解的账号。
+- **了解一个 UP 主**：查看他的主页概况、视频、合集、系列与动态，快速了解主要创作方向。
 - **浏览收藏夹**：遍历当前登录账号创建、且 Bilibili 当前可见的全部收藏夹，逐页读取其中的视频。
 - **无字幕时本地转录**：对确认没有字幕的视频，可显式选择用本机 ASR（faster-whisper）转录，得到与字幕相同结构的转录结果。默认关闭，可在 `setup` 时选择下载 ASR 模型，详见[本地 ASR（可选）](#本地-asr可选)。
 
@@ -103,6 +105,17 @@ Agent 返回带时间戳的字幕文本，以及热门评论与回复；含时�
 ```
 
 Agent 返回 5 个候选，各带标题、UP 主、时长和 BVID。选中候选后，把 BVID 直接交给转录、元数据、章节或评论工具。
+
+### 快速了解一个 UP 主
+
+```text
+搜索“毕导THU”，列出 UP 主候选，等我确认正确账号后，
+先查看他的主页概况，再分别查看最新视频、合集、系列和动态。
+根据已经返回的内容概括主要创作方向，并推荐几条适合继续了解的视频；
+先不要翻完所有页面，也不要读取字幕、评论或识别动态图片。
+```
+
+Agent 会先让你确认正确的 UP 主，再分批读取不同类型的内容。需要查看更多时，它会继续翻页；选中的视频还可以交给字幕、元数据、章节或评论工具深入查看。
 
 ### 在转录中定位原话和时刻
 
@@ -179,7 +192,7 @@ Runtime 固定为 `faster-whisper==1.2.1`，模型存放在用户目录 `~/.bili
 | 目标 | 工具 |
 |---|---|
 | 只有主题，还没有视频链接 | `search_bilibili_videos` |
-| 只有主题，想找 UP 主候选（稳定 mid） | `search_bilibili_creators` |
+| 知道名称或关键词，想找 UP 主候选（稳定 mid） | `search_bilibili_creators` |
 | 从选定 UP 主（mid）读取概览、视频目录、合集、系列或动态 | `get_bilibili_creator_content` |
 | 从我的收藏夹开始读取 | `list_bilibili_favorite_videos` |
 | 快速获取字幕优先的视频上下文 | `get_video_info` |

@@ -6,9 +6,24 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ## [Unreleased]
 
+---
+
+## [1.13.0] - 2026-08-20
+
 ### Added
 - Added the 11th tool `search_bilibili_creators`, returning Creator candidates in Bilibili's platform order. `limit` defaults to 5 and is capped at 10; each candidate includes the stable numeric `mid` (the only identity), name, bio, avatar URL, follower count, video count, level, and a locally derived source URL. Display names are fuzzy and non-unique; candidates are returned as candidates only — the tool never selects one Creator and never crawls candidate content. (Issue #45)
 - Creator Search success returns formatted JSON text plus identical MCP `structuredContent`; it requires configured, logged-in Bilibili Cookies and never falls back to anonymous search.
+- Added the 12th tool `get_bilibili_creator_content`, starting from a selected Creator's stable numeric `mid` and reading `overview`, `videos`, `collections`, `series`, or `dynamics`. Every non-overview call returns at most one 20-row page and continues with an opaque `next_cursor` bound to the Creator, section, and container. (Issues #46-#48)
+- The Video catalog keeps ordinary uploads, collaboration rows, and videos with an upstream charge marker when they are listable to the logged-in identity, returning BVIDs and bounded metadata that feed the existing evidence tools. Listing visibility does not prove playback entitlement, so `access` stays `unknown` and no per-row access probe is added.
+- Collections and Series remain distinct container types. Callers can list containers or read one container's members, while the same BVID keeps each membership when it appears in multiple contexts instead of being deduplicated across containers.
+- Creator Dynamics cover original posts, reposts, text, images, Video shares, and unknown types with bounded text, image URL/dimensions, referenced BVIDs, and original-post relationships. The MCP does not download or interpret images, extract dedicated long-form article/Opus bodies, or fetch referenced Videos automatically.
+
+### Security and compatibility
+- Both Creator tools require configured, valid login credentials and reuse the existing timeout, throttling, retry, response-size, and structured-error boundaries. HTTP 412, authentication, API, and malformed-response failures never become empty successes.
+- Discovery stays bounded: it never batch-fetches transcripts, comments, OCR, vision output, or per-row details. Pagination reflects live Bilibili state and is not a snapshot guarantee.
+
+### Verified
+- Passed the TypeScript build and 1058 tests across 42 files; also passed a 193-file npm package check, a zero-vulnerability audit of 97 production dependencies, five-field version parity, and credential scanning of the current release tree and this change.
 
 ---
 
