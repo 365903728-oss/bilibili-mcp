@@ -100,7 +100,8 @@ when required but not invoked.
 
 ## Published Product Baseline
 
-Status: `v1.13.0` is published to npm and GitHub Releases. Release commit
+Status: `v1.13.0` is published to npm, GitHub Releases, and the Official MCP
+Registry. Release commit
 `da6c5f7b5747d8afb6bffae9b063b667d60ebd3a` is on `master`; annotated tag
 `v1.13.0` peels to that exact commit. GitHub Actions run `32347312191` passed
 install, 42 files / 1058 tests, build, and trusted npm publishing. npm `latest`
@@ -127,10 +128,11 @@ package verification are the acceptance authority. The inherited AI subtitle
 semantic-topic limitation and explicit ASR boundaries from `v1.12.0` remain
 unchanged.
 
-The Official MCP Registry remains at `1.12.0`; Registry publication was outside
-the user's named npm/tag/GitHub Release scope. The dirty primary worktree stayed
-outside the release. The pre-existing learning-proposal queue remains legacy v1
-state, and files under `docs/superpowers/` remain historical only.
+After follow-up user authorization, Official MCP Registry version `1.13.0` is
+`active` and `isLatest=true` with matching npm package metadata. The dirty
+primary worktree stayed outside the release. The pre-existing learning-proposal
+queue remains legacy v1 state, and files under `docs/superpowers/` remain
+historical only.
 
 ## Future Direction — Not Active
 

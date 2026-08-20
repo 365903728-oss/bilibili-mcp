@@ -769,3 +769,7 @@ Candidate metrics:
   dependencies / 0 vulnerabilities; 97 verified signatures; 10 attestations;
   twelve public MCP tools; one release-verifier PASS; zero credential-bearing
   live calls.
+- The later Official Registry follow-up reused the existing manifest and
+  Publisher 1.8.1 path. An expired saved JWT and one response EOF were handled
+  with value-free authentication refresh, public-state checks, and one bounded
+  retry; no package, workflow, tag, or product change was needed.

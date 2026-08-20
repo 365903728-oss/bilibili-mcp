@@ -2479,8 +2479,17 @@ Six release blockers fixed; one regression proof per root cause (new tests
 - GitHub Release: bilingual `v1.13.0 - 创作者发现 / Creator Discovery` is public,
   latest, non-draft, and non-prerelease at
   `https://github.com/XZXZZX-Ai/bilibili-mcp/releases/tag/v1.13.0`.
-- Boundaries: no authenticated Bilibili Creator live smoke, Official MCP Registry
-  publication, dependency/workflow change, or dirty-primary inclusion occurred.
+- Official Registry follow-up: after explicit user authorization, official
+  `mcp-publisher` v1.8.1 archive SHA-256 matched upstream digest
+  `399ad0d6e00a50812b563a71d8bfbff5160c085e6b13aac6ec083d98d5ff7c45`.
+  Live validation and current-tree secret scanning passed. The saved Registry
+  JWT was expired; GitHub authentication refreshed it without recording token
+  values. One publish request ended with a transport EOF before acceptance; a
+  public API check still showed `1.12.0`, so one bounded retry published
+  `1.13.0`. The public exact/latest API then reported `active`, `isLatest=true`,
+  and matching `@xzxzzx/bilibili-mcp@1.13.0` metadata.
+- Boundaries: no authenticated Bilibili Creator live smoke,
+  dependency/workflow change, or dirty-primary inclusion occurred.
   Full-history gitleaks retains 13 pre-existing findings; current tree and
   release-changed files scan clean.
 - Post-release Harness receipt synchronization passed the exact migration
