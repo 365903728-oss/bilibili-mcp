@@ -749,3 +749,23 @@ Candidate metrics:
 - final independent review axes: 2, both PASS with no P0-P2
 - product-source files changed: 0
 - remote operations performed: 0
+
+### 2026-08-20 Harness Eval: v1.13.0 Creator Discovery release
+
+- Keep: the existing tag-triggered trusted npm workflow, isolated release
+  worktree, five-field version check, package-boundary check, public exact-
+  version smoke, and independent release-verifier produced direct evidence
+  without a workflow or credential change.
+- README review benefited from the user-invoked `writing-great-readmes` skill:
+  the opening now separates topic-based Video search from name/keyword Creator
+  search and routes to one concrete Creator-understanding scenario.
+- Secret review separated 13 pre-existing Git-history findings from the clean
+  current tree and release diff instead of claiming the historical repository
+  was clean.
+- GitHub Actions emitted a non-blocking annotation that older action runtimes
+  are being forced from Node 20 to Node 24. The release passed; future workflow
+  maintenance should refresh pinned official action revisions separately.
+- Metrics: 42 test files / 1058 tests; 193 package files; 97 production
+  dependencies / 0 vulnerabilities; 97 verified signatures; 10 attestations;
+  twelve public MCP tools; one release-verifier PASS; zero credential-bearing
+  live calls.

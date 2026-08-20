@@ -2,6 +2,10 @@
 
 ## 2026-08-20
 
+- Fact: `v1.13.0` is the current published product baseline on npm and GitHub Releases, with twelve MCP tools.
+- Evidence: release commit `da6c5f7b5747d8afb6bffae9b063b667d60ebd3a`, annotated tag `v1.13.0`, trusted-publish run `32347312191`, npm `latest`, and the public bilingual GitHub Release.
+- Impact: Creator Search plus bounded Creator Videos, Collections, Series, and Dynamics discovery are now public package behavior; the Official MCP Registry remains at `1.12.0` because it was outside this release scope.
+
 - Fact: Issue #48 extends the existing Creator Content Discovery tool with one authenticated, bounded `dynamics` page at a time. The output preserves stable Dynamic identity, publication time, bounded text, image URL/dimensions, referenced BVID relationships, repost originals, skipped rows, and live non-snapshot continuation.
 - Evidence: `src/bilibili/creator-content.ts`, public MCP schema, focused tests, and `docs/research/2026-08-20-bilibili-creator-dynamics-contract.md`.
 - Impact: Agents can inspect Creator Dynamics without the MCP downloading or interpreting images, extracting dedicated article/Opus bodies, or automatically fetching referenced Video evidence.

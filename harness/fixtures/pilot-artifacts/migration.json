@@ -89,28 +89,28 @@
     }
   ],
   "durable_memory": {
-    "docs/agent-memory/active-work.md": "082bac1436bbc169e42850d13a2768bade43e66517d1ce7788bbdfc06246805d",
+    "docs/agent-memory/active-work.md": "ad157064f724871b7f5c56d32d6995ff0ccbaf366e7dcfee1ce754d47605a450",
     "docs/agent-memory/codemap.md": "ac38a1997d647222e05b0ace3c90a85aaab874fbfd8735a09f840cab88f0fc58",
     "docs/agent-memory/decisions.md": "ee99b8c1ea5572de4003143bbe4d513e151b14776defecf879a494436ff2d0fc",
     "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
-    "docs/agent-memory/harness-eval.md": "5018e0ac09016fbbbfc024b08208de6808a014f3bb5732f116a393040cb9a5b3",
+    "docs/agent-memory/harness-eval.md": "ba144a0855d5bf741dff33b137cbdef1b8140b080d446186d412a3c99b1fb67f",
     "docs/agent-memory/harness-security.md": "b907339f85c0ba13c2a8642b475aa682ae1b313cb51cebec9977aca798df3430",
     "docs/agent-memory/lessons-learned.md": "6a0e45bc73159237fb3200a3725d12d54dd0d83aa5c8eebcec5ffb9bd2efb7d7",
-    "docs/agent-memory/project-facts.md": "cf40bf8c9094a9169332575a754267e8af099ef20b31446938325f406ad5295f",
-    "docs/agent-memory/verification-log.md": "d7ccb4a9f793599142e6798c35780c73125879b98ffb97867e9167f284e85681"
+    "docs/agent-memory/project-facts.md": "1f5fd619ceafef9bf3d525acc21deb4761845ca77731bd068e4701cf04c1422c",
+    "docs/agent-memory/verification-log.md": "ab0e30a9fcb1109eaa1a2f38b7e6fcef2656623980d5f5cf6b4a33b653ce112e"
   },
   "package": {
-    "output_digest": "1d71e1a894be71be47be351f85154cc70b59d870fb53654a4ed32247d2db7ea4",
+    "output_digest": "b6de50873e84f83845f1db5add1b6a9a3e8758ef06f38e5e411f10f15c980938",
     "pack_output": [
       {
-        "id": "@xzxzzx/bilibili-mcp@1.12.0",
+        "id": "@xzxzzx/bilibili-mcp@1.13.0",
         "name": "@xzxzzx/bilibili-mcp",
-        "version": "1.12.0",
-        "size": 1120546,
-        "unpackedSize": 1871838,
-        "shasum": "7a2e1da2a6df5ae9de2ece2ef24ad48cb4a3a3cf",
-        "integrity": "sha512-vXKxP7RUrlSvx+F3RtGIiwcHTmO2D+a+WWACdINnkcFuuNTHiejUkuN/otmGt8BDSayryL31KfE8tss4PrutjQ==",
-        "filename": "xzxzzx-bilibili-mcp-1.12.0.tgz",
+        "version": "1.13.0",
+        "size": 1126769,
+        "unpackedSize": 1904520,
+        "shasum": "420770f7136d2a13e8a2dd635aeff83e8449d4b5",
+        "integrity": "sha512-agghDb2+9mZCvzLOzsIIJbuVIRx2tXMg6a3MopAsuv6Y+1k/AEIO6/GkgxXm0WCVF8ONoBv2Kw9hG0ssMOeO4A==",
+        "filename": "xzxzzx-bilibili-mcp-1.13.0.tgz",
         "files": [
           {
             "path": "LICENSE",
@@ -119,12 +119,12 @@
           },
           {
             "path": "README_EN.md",
-            "size": 19107,
+            "size": 19891,
             "mode": 420
           },
           {
             "path": "README.md",
-            "size": 17650,
+            "size": 18390,
             "mode": 420
           },
           {
@@ -294,22 +294,22 @@
           },
           {
             "path": "dist/bilibili/creator-content.d.ts",
-            "size": 1466,
+            "size": 1863,
             "mode": 420
           },
           {
             "path": "dist/bilibili/creator-content.d.ts.map",
-            "size": 1127,
+            "size": 1475,
             "mode": 420
           },
           {
             "path": "dist/bilibili/creator-content.js",
-            "size": 31129,
+            "size": 41092,
             "mode": 420
           },
           {
             "path": "dist/bilibili/creator-content.js.map",
-            "size": 26739,
+            "size": 36589,
             "mode": 420
           },
           {
@@ -494,12 +494,12 @@
           },
           {
             "path": "dist/bilibili/types.d.ts",
-            "size": 8067,
+            "size": 8889,
             "mode": 420
           },
           {
             "path": "dist/bilibili/types.d.ts.map",
-            "size": 8361,
+            "size": 9159,
             "mode": 420
           },
           {
@@ -784,12 +784,12 @@
           },
           {
             "path": "dist/server/tool-schemas.js",
-            "size": 36169,
+            "size": 39548,
             "mode": 420
           },
           {
             "path": "dist/server/tool-schemas.js.map",
-            "size": 16936,
+            "size": 19473,
             "mode": 420
           },
           {
@@ -1044,12 +1044,12 @@
           },
           {
             "path": "dist/utils/validation.js",
-            "size": 7822,
+            "size": 7856,
             "mode": 420
           },
           {
             "path": "dist/utils/validation.js.map",
-            "size": 6130,
+            "size": 6151,
             "mode": 420
           },
           {
@@ -1064,17 +1064,17 @@
           },
           {
             "path": "docs/tool-reference.en.md",
-            "size": 36334,
+            "size": 37910,
             "mode": 420
           },
           {
             "path": "docs/tool-reference.md",
-            "size": 34629,
+            "size": 36063,
             "mode": 420
           },
           {
             "path": "package.json",
-            "size": 2424,
+            "size": 2423,
             "mode": 420
           }
         ],

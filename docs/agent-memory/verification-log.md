@@ -2458,3 +2458,33 @@ Six release blockers fixed; one regression proof per root cause (new tests
   pass 26 tests on both Windows and WSL with platform-appropriate skips.
 - Boundary: no product runtime, package output, credentials, adapter selection,
   external publication, evaluator, or holdout changed.
+
+## 2026-08-20 — v1.13.0 Publication And Public Artifact Verification
+
+- Release commit: `da6c5f7b5747d8afb6bffae9b063b667d60ebd3a`
+  was fast-forwarded to `master`; annotated `v1.13.0` peels to that commit.
+- Local candidate: build passed; 42 files / 1058 tests passed; package dry run
+  returned 193 intended files with required entry points and zero forbidden
+  paths; 97 production dependencies audited with zero vulnerabilities; five
+  version fields, diff checks, current-tree and changed-file secret scans passed.
+- Independent `release-verifier`: PASS with exact twelve-tool MCP compatibility,
+  bilingual parity, package boundary, Smithery absence, and trusted-publishing
+  compatibility confirmed.
+- Trusted publication: GitHub Actions run `32347312191` completed successfully;
+  npm `latest=1.13.0` exposes integrity and shasum with
+  `gitHead=da6c5f7b5747d8afb6bffae9b063b667d60ebd3a`.
+- Exact public package: isolated install audited 97 verified registry signatures
+  and 10 attestations; CLI and MCP initialize reported `1.13.0`; tools/list
+  returned exactly twelve tools.
+- GitHub Release: bilingual `v1.13.0 - 创作者发现 / Creator Discovery` is public,
+  latest, non-draft, and non-prerelease at
+  `https://github.com/XZXZZX-Ai/bilibili-mcp/releases/tag/v1.13.0`.
+- Boundaries: no authenticated Bilibili Creator live smoke, Official MCP Registry
+  publication, dependency/workflow change, or dirty-primary inclusion occurred.
+  Full-history gitleaks retains 13 pre-existing findings; current tree and
+  release-changed files scan clean.
+- Post-release Harness receipt synchronization passed the exact migration
+  conformance test 1/1 and the contracts/events/adapters/memory core suite
+  102/102 with 15 environment-dependent skips. After recording this result,
+  the final durable hashes were regenerated and the exact conformance test was
+  rerun against the fixed receipt.

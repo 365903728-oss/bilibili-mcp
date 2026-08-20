@@ -100,67 +100,37 @@ when required but not invoked.
 
 ## Published Product Baseline
 
-Status: `v1.12.0` is published to npm and GitHub Releases. Release commit
-`a31fafb1f27ddb52cbca0abb0111dc4a73664da3` is on `master`; annotated tag
-`v1.12.0` peels to that exact commit. GitHub Actions run `32107346010` passed
-install, 41 files / 906 tests, build, and trusted npm publishing. npm `latest`
-is `1.12.0` with registry signatures and SLSA provenance. The bilingual public
-GitHub Release is non-draft, non-prerelease, and latest.
+Status: `v1.13.0` is published to npm and GitHub Releases. Release commit
+`da6c5f7b5747d8afb6bffae9b063b667d60ebd3a` is on `master`; annotated tag
+`v1.13.0` peels to that exact commit. GitHub Actions run `32347312191` passed
+install, 42 files / 1058 tests, build, and trusted npm publishing. npm `latest`
+is `1.13.0` with integrity, registry signatures, and provenance. The bilingual
+GitHub Release is public, latest, non-draft, and non-prerelease.
 
-The release ships merged PR #42 / Issue #40 plus the related locally recorded
-Issue #41 defects: every Bilibili `ai-*` track is distinguishable as
-`ai_subtitle`; callers can exclude AI subtitles or force local ASR; selected
-AI subtitle bodies are double-read for deterministic stability with a
-conservative `ai-zh` language guard; and `setup` supports non-interactive,
-credential-safe scripted use. The existing bounded ASR audio candidates and
-actionable `ASR_AUDIO_UNAVAILABLE` guidance remain unchanged.
+The release ships closed specification #44 through merged PRs #49-#52 / closed
+Issues #45-#48. `search_bilibili_creators` returns bounded Creator candidates
+with stable numeric `mid` identity. `get_bilibili_creator_content` reads
+`overview`, `videos`, `collections`, `series`, or `dynamics` with live,
+section-bound continuation. Collections and Series stay distinct, memberships
+are preserved, Video access remains `unknown` without per-row probes, and
+Dynamics expose bounded text, image evidence, repost identity, and referenced
+BVID relationships without image interpretation or automatic evidence crawls.
 
-Known boundary: stable, same-language but semantically unrelated AI subtitle
-bodies may still pass the deterministic integrity guard. This is documented
-and controllable with `force_asr` or `exclude_ai_subtitles`; the release does
-not claim general semantic topic validation.
+Post-publication verification installed exact npm package `1.13.0`, verified
+97 registry signatures and 10 attestations, reported CLI and MCP server version
+`1.13.0`, and listed exactly twelve tools over stdio. No Bilibili content call
+or credential read occurred.
 
-Post-publication verification installed exact npm package `1.12.0` under Node
-`22.14.0`, verified 97 registry signatures and 10 attestations, reported MCP
-server version `1.12.0` with protocol `2025-06-18`, and listed the unchanged
-ten-tool surface. No credential value was printed or recorded.
+Known boundary: authenticated live Creator endpoints were not smoked for this
+release. Deterministic fixtures, MCP protocol tests, merged CI, and public
+package verification are the acceptance authority. The inherited AI subtitle
+semantic-topic limitation and explicit ASR boundaries from `v1.12.0` remain
+unchanged.
 
-The ten-tool product boundary and legacy stdio compatibility remain fixed. ASR
-is explicit, default-off, native-subtitle-first, and ready-state-only. The local
-doctor reports no ready model, so no model was downloaded or switched and no
-live ASR end-to-end smoke was run. This is a documented validation boundary,
-not unfinished Phase 3 implementation.
-
-Issues #45, #46, and #47 are merged and closed on the published-product branch
-line. Together they provide Creator Search plus the `overview`, `videos`,
-`collections`, and `series` sections of `get_bilibili_creator_content`.
-
-Issue #48 (Creator Dynamics) is accepted locally as product commit
-`959eae07213f99752884421750aba8673b533826` on branch
-`codex/issue-48-creator-dynamics` in isolated worktree
-`C:\Users\ZX\.codex\worktrees\issue-48\bilibili-mcp`. It adds one bounded
-`dynamics` section using a Creator- and section-bound opaque offset cursor.
-Rows expose bounded text, image URL/dimensions, referenced BVID relationships,
-explicit repost originals, skipped counts, and live non-snapshot state. The MCP
-does not download or interpret images and does not fetch referenced Video
-evidence. Authenticated live endpoint smoke remains outside current credential
-authority.
-
-The mechanical `github-48-receipt` follow-up based on `959eae0` has synchronized
-the final durable-memory hashes in the Harness migration receipt and verified
-the exact conformance check plus core Harness suite locally. It changes no
-product source and has no push, PR, merge, release, or publish authority.
-
-The pre-existing learning-proposal queue is legacy v1 state and remains outside
-the clean #29 worktree. Typed accepted-evidence memory automation is scoped to
-#33; #29 hooks only write ignored redacted events. Files under
-`docs/superpowers/` are historical records only and must not trigger any
-`superpowers:*` skill.
-
-The Official MCP Registry now reports `1.12.0` as `active` and
-`isLatest=true`, with the npm identifier and package version both matching the
-public package. The dirty primary worktree and its future-only CI/CD roadmap
-note remain outside the release.
+The Official MCP Registry remains at `1.12.0`; Registry publication was outside
+the user's named npm/tag/GitHub Release scope. The dirty primary worktree stayed
+outside the release. The pre-existing learning-proposal queue remains legacy v1
+state, and files under `docs/superpowers/` remain historical only.
 
 ## Future Direction — Not Active
 
