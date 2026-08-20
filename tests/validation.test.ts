@@ -5,6 +5,7 @@ import {
   validateCommentLimit,
   validateCommentSort,
   validateContextSegments,
+  validateCreatorContentInput,
   validateDetailLevel,
   validateFavoritesCursor,
   validateLanguage,
@@ -16,6 +17,42 @@ import {
   validateTimestampRange,
 } from "../src/utils/validation.js";
 import { ValidationError } from "../src/utils/errors.js";
+
+describe("validateCreatorContentInput", () => {
+  it("accepts a positive container_id for Collection member traversal", () => {
+    expect(() =>
+      validateCreatorContentInput(2_088_259_175, "collections", undefined, 1_903_592),
+    ).not.toThrow();
+  });
+
+  it.each(["overview", "videos"])(
+    "rejects container_id for %s",
+    (section) => {
+      expect(() =>
+        validateCreatorContentInput(
+          2_088_259_175,
+          section,
+          undefined,
+          1_903_592,
+        ),
+      ).toThrow(ValidationError);
+    },
+  );
+
+  it.each([0, -1, 1.5, "1903592"])(
+    "rejects invalid container_id %s",
+    (containerId) => {
+      expect(() =>
+        validateCreatorContentInput(
+          2_088_259_175,
+          "collections",
+          undefined,
+          containerId,
+        ),
+      ).toThrow(ValidationError);
+    },
+  );
+});
 
 describe("validateBVInput", () => {
   it("accepts plain BV id", () => {

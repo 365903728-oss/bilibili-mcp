@@ -1,5 +1,15 @@
 # Decisions
 
+## 2026-08-20
+
+- Decision: Extend `get_bilibili_creator_content` with separate `collections` and `series` sections. Omitting `container_id` lists only that container family; providing a positive safe-integer ID reads one selected container's bounded `members` page. Member cursors bind mid, section, page, and container ID, and repeated BVID Memberships are never globally deduplicated.
+- Reason: Bilibili exposes Collection and Series as distinct Creator organization, while the discovery journey needs bounded navigation without confusing either family with a multi-Part Video or the current account's Favorite Folders.
+- Evidence: GitHub Issue #47, `docs/research/2026-08-20-bilibili-creator-collections-series-contract.md`, and focused cursor/overlap/MCP output tests.
+
+- Decision: Use the combined `seasons_series_list` page for container discovery, the selected Collection archive endpoint for Collection members, and a Series metadata ownership read before the selected Series archive page. Preserve upstream order and explicit errors; never fetch transcripts, comments, Video details, or other containers' members.
+- Reason: The combined list has one pagination lifecycle across both families, and the Series archive endpoint alone does not reliably prove ownership. One metadata read is the minimum validation that prevents cross-Creator or missing-Series results from becoming empty success.
+- Evidence: First-party endpoint probes recorded in the 2026-08-20 research note and the ownership/request-count regressions.
+
 ## 2026-08-19
 
 - Decision: Add one bounded `search_bilibili_creators` Creator Search tool (`search_type=bili_user`) reusing the existing search module, credential precheck, `fetchWithoutWBI`, operation cancellation, bounded text, response item limit, and one-shape-retry behavior; no generic search factory/adapter/router/dependency.

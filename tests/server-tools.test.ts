@@ -711,7 +711,7 @@ describe("MCP tool list baseline", () => {
   });
 
   describe("get_bilibili_creator_content schema", () => {
-    it("declares the exact bounded mid/section/cursor input", () => {
+    it("declares the exact bounded Creator section and container input", () => {
       const schema = toolsResult.tools.find(
         (tool) => tool.name === "get_bilibili_creator_content",
       )!;
@@ -729,9 +729,16 @@ describe("MCP tool list baseline", () => {
           },
           section: {
             type: "string",
-            enum: ["overview", "videos"],
+            enum: ["overview", "videos", "collections", "series"],
             description:
-              "要读取的内容段：overview 返回有界档案与可用计数事实；videos 返回至多一页 20 条当前可列表 BVID 元数据。",
+              "要读取的内容段：overview 返回档案；videos 返回视频目录；collections 与 series 分别列出容器，传 container_id 时遍历所选容器的视频成员。",
+          },
+          container_id: {
+            type: "integer",
+            minimum: 1,
+            maximum: Number.MAX_SAFE_INTEGER,
+            description:
+              "可选，仅用于 collections 或 series：选择一个上游容器并读取其视频成员。省略时列出该段的容器。",
           },
           cursor: {
             type: "string",
@@ -739,7 +746,7 @@ describe("MCP tool list baseline", () => {
             maxLength: 256,
             pattern: "^[A-Za-z0-9_-]+$",
             description:
-              "Opaque continuation token returned by a previous successful videos call. Omit on the first call; never pass a cursor for overview. The token encodes only a versioned Creator mid, section, and page number; it never contains credentials or Video data.",
+              "Opaque continuation token returned by a previous successful paged call. Omit on the first call; never pass a cursor for overview. The token binds Creator mid, section, page, and selected container identity when present; it never contains credentials or Video data.",
           },
         },
         required: ["mid", "section"],
@@ -750,6 +757,80 @@ describe("MCP tool list baseline", () => {
       const schema = toolsResult.tools.find(
         (tool) => tool.name === "get_bilibili_creator_content",
       )!;
+      const collectionContainerSchema = {
+        type: "object",
+        properties: {
+          collection_id: {
+            type: "integer",
+            minimum: 1,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          name: { type: "string", minLength: 1, maxLength: 128 },
+          description: { type: "string", maxLength: 512 },
+          member_count: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+        },
+        required: ["collection_id", "name", "description", "member_count"],
+      };
+      const seriesContainerSchema = {
+        type: "object",
+        properties: {
+          series_id: {
+            type: "integer",
+            minimum: 1,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          name: { type: "string", minLength: 1, maxLength: 128 },
+          description: { type: "string", maxLength: 512 },
+          member_count: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+        },
+        required: ["series_id", "name", "description", "member_count"],
+      };
+      const memberSchema = {
+        type: "object",
+        properties: {
+          bvid: { type: "string", minLength: 1, maxLength: 12 },
+          title: { type: "string", minLength: 1, maxLength: 512 },
+          description: { type: "string", maxLength: 512 },
+          cover_url: { type: "string", maxLength: 512 },
+          duration_seconds: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          published_at: { type: "string" },
+          view_count: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          danmaku_count: {
+            type: "integer",
+            minimum: 0,
+            maximum: Number.MAX_SAFE_INTEGER,
+          },
+          is_charge_video: { type: "boolean" },
+          access: { type: "string", enum: ["unknown"] },
+          source_url: { type: "string" },
+        },
+        required: [
+          "bvid",
+          "title",
+          "description",
+          "cover_url",
+          "duration_seconds",
+          "published_at",
+          "access",
+          "source_url",
+        ],
+      };
 
       expect(schema.outputSchema).toEqual({
         type: "object",
@@ -759,7 +840,11 @@ describe("MCP tool list baseline", () => {
             minimum: 1,
             maximum: Number.MAX_SAFE_INTEGER,
           },
-          section: { type: "string", enum: ["overview", "videos"] },
+          section: {
+            type: "string",
+            enum: ["overview", "videos", "collections", "series"],
+          },
+          mode: { type: "string", enum: ["containers", "members"] },
           name: { type: "string", minLength: 1, maxLength: 128 },
           bio: { type: "string", maxLength: 512 },
           avatar_url: { type: "string", maxLength: 512 },
@@ -843,6 +928,23 @@ describe("MCP tool list baseline", () => {
               ],
             },
           },
+          collections: {
+            type: "array",
+            maxItems: 20,
+            items: collectionContainerSchema,
+          },
+          series: {
+            type: "array",
+            maxItems: 20,
+            items: seriesContainerSchema,
+          },
+          selected_collection: collectionContainerSchema,
+          selected_series: seriesContainerSchema,
+          members: {
+            type: "array",
+            maxItems: 20,
+            items: memberSchema,
+          },
           skipped_count: { type: "integer", minimum: 0, maximum: 20 },
           next_cursor: {
             type: "string",
@@ -853,7 +955,186 @@ describe("MCP tool list baseline", () => {
           live_state: { type: "string", enum: ["live"] },
         },
         required: ["mid", "section", "live_state"],
+        oneOf: expect.any(Array),
+        additionalProperties: false,
       });
+
+      const variants = (schema.outputSchema as Record<string, unknown>)
+        .oneOf as Array<{
+        properties: Record<string, { enum: string[] }>;
+        required: string[];
+        not: { anyOf: Array<{ required: string[] }> };
+      }>;
+      expect(
+        variants.map((variant) => ({
+          section: variant.properties.section.enum[0],
+          mode: variant.properties.mode?.enum[0],
+          required: variant.required,
+          forbidden: variant.not.anyOf.map((rule) => rule.required[0]),
+        })),
+      ).toEqual([
+        {
+          section: "overview",
+          mode: undefined,
+          required: [
+            "mid",
+            "section",
+            "name",
+            "bio",
+            "avatar_url",
+            "level",
+            "video_count",
+            "live_state",
+          ],
+          forbidden: [
+            "mode",
+            "page",
+            "videos_total",
+            "videos",
+            "collections",
+            "series",
+            "selected_collection",
+            "selected_series",
+            "members",
+            "skipped_count",
+            "next_cursor",
+          ],
+        },
+        {
+          section: "videos",
+          mode: undefined,
+          required: [
+            "mid",
+            "section",
+            "page",
+            "videos",
+            "skipped_count",
+            "live_state",
+          ],
+          forbidden: [
+            "mode",
+            "name",
+            "bio",
+            "avatar_url",
+            "follower_count",
+            "level",
+            "video_count",
+            "collections",
+            "series",
+            "selected_collection",
+            "selected_series",
+            "members",
+          ],
+        },
+        {
+          section: "collections",
+          mode: "containers",
+          required: [
+            "mid",
+            "section",
+            "mode",
+            "page",
+            "collections",
+            "skipped_count",
+            "live_state",
+          ],
+          forbidden: [
+            "name",
+            "bio",
+            "avatar_url",
+            "follower_count",
+            "level",
+            "video_count",
+            "videos_total",
+            "videos",
+            "series",
+            "selected_collection",
+            "selected_series",
+            "members",
+          ],
+        },
+        {
+          section: "collections",
+          mode: "members",
+          required: [
+            "mid",
+            "section",
+            "mode",
+            "page",
+            "selected_collection",
+            "members",
+            "skipped_count",
+            "live_state",
+          ],
+          forbidden: [
+            "name",
+            "bio",
+            "avatar_url",
+            "follower_count",
+            "level",
+            "video_count",
+            "videos_total",
+            "videos",
+            "collections",
+            "series",
+            "selected_series",
+          ],
+        },
+        {
+          section: "series",
+          mode: "containers",
+          required: [
+            "mid",
+            "section",
+            "mode",
+            "page",
+            "series",
+            "skipped_count",
+            "live_state",
+          ],
+          forbidden: [
+            "name",
+            "bio",
+            "avatar_url",
+            "follower_count",
+            "level",
+            "video_count",
+            "videos_total",
+            "videos",
+            "collections",
+            "selected_collection",
+            "selected_series",
+            "members",
+          ],
+        },
+        {
+          section: "series",
+          mode: "members",
+          required: [
+            "mid",
+            "section",
+            "mode",
+            "page",
+            "selected_series",
+            "members",
+            "skipped_count",
+            "live_state",
+          ],
+          forbidden: [
+            "name",
+            "bio",
+            "avatar_url",
+            "follower_count",
+            "level",
+            "video_count",
+            "videos_total",
+            "videos",
+            "collections",
+            "series",
+            "selected_collection",
+          ],
+        },
+      ]);
     });
 
     it("is registered as the 12th tool", () => {

@@ -1,5 +1,39 @@
 # Verification Log
 
+## 2026-08-20 Issue #47 Codex Direct
+
+- Command: `npx vitest run tests/server-tools.test.ts tests/bilibili-creator-content.test.ts tests/server-handler-sanitization.test.ts tests/validation.test.ts`
+- Result: Passed, 4 files and 327 tests.
+- Area: Creator Collection/Series schema, handler, validation, cursor, normalization, pagination, overlap, and explicit failure behavior.
+
+- Command: `npm test`
+- Result: Passed, 42 files and 1044 tests.
+- Area: Full product Vitest suite after code-review repairs.
+
+- Command: `npm run build`
+- Result: Passed. TypeScript compiled after the guarded `dist/` clean.
+- Area: Product build and package output.
+
+- Command: Ajv validation of `get_bilibili_creator_content.outputSchema`
+- Result: Passed. Six valid section/mode shapes were accepted; missing and cross-family Collection shapes were rejected.
+- Area: MCP structured-output schema discrimination.
+
+- Command: `npm pack --dry-run --json --ignore-scripts`
+- Result: Passed, version 1.12.0 and 193 files; no `src/`, tests, Harness, agent-memory, research, or `.env` paths.
+- Area: npm package contents only; no package was published.
+
+- Command: gitleaks scan of `git diff --unified=0 HEAD`
+- Result: Passed with 0 findings.
+- Area: Current Issue #47 diff; the configured `secret-scanning` skill was unavailable in this runtime, so the installed local scanner was used as the fixed fallback.
+
+- Command: Matt `code-review` Standards/Spec re-review and project `risk-reviewer`
+- Result: Both review axes passed after repairs; independent risk review found only the expected stale Harness package receipt, which remained the final local convergence gate.
+- Area: Issue #47 acceptance and repository standards.
+
+- Command: `python -m unittest harness.tests.test_contracts harness.tests.test_events harness.tests.test_cli_and_adapters harness.tests.test_memory`
+- Result: Passed, 102 tests in 70.847s with 15 environment-dependent skips.
+- Area: Core Harness contracts, events, adapters, package receipt, durable memory, and migration evidence after receipt synchronization.
+
 ## 2026-07-20
 
 - Command: `npm run build`

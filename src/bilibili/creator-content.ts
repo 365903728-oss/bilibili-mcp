@@ -7,16 +7,27 @@ import {
 } from "../utils/errors.js";
 import { isValidBVId } from "../utils/bvid.js";
 import type {
+  CreatorCollectionContainer,
+  CreatorCollectionListPage,
+  CreatorCollectionMemberPage,
+  CreatorContainerVideoRow,
   CreatorContentOverview,
   CreatorContentSection,
+  CreatorSeriesContainer,
+  CreatorSeriesListPage,
+  CreatorSeriesMemberPage,
   CreatorVideoPage,
   CreatorVideoRow,
 } from "./types.js";
-import { checkLoginStatus, fetchWithWBI } from "./http.js";
+import { checkLoginStatus, fetchWithoutWBI, fetchWithWBI } from "./http.js";
 import { boundedRemoteText } from "../utils/bounded-text.js";
 
 const PROFILE_PATH = "/x/space/wbi/acc/info";
 const CATALOG_PATH = "/x/space/wbi/arc/search";
+const CONTAINER_LIST_PATH = "/x/polymer/web-space/seasons_series_list";
+const COLLECTION_MEMBERS_PATH = "/x/polymer/web-space/seasons_archives_list";
+const SERIES_METADATA_PATH = "/x/series/series";
+const SERIES_MEMBERS_PATH = "/x/series/archives";
 const PAGE_SIZE = 20;
 const CURSOR_VERSION = 1;
 const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
@@ -28,6 +39,8 @@ export const MAX_CATALOG_DESCRIPTION_BYTES = 512;
 export const MAX_CATALOG_COVER_BYTES = 512;
 export const MAX_CATALOG_CATEGORY_BYTES = 64;
 export const MAX_CATALOG_AUTHOR_BYTES = 128;
+export const MAX_CONTAINER_NAME_BYTES = 128;
+export const MAX_CONTAINER_DESCRIPTION_BYTES = 512;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -51,7 +64,12 @@ function isPositiveSafeInteger(value: unknown): value is number {
 }
 
 function isCreatorContentSection(value: unknown): value is CreatorContentSection {
-  return value === "overview" || value === "videos";
+  return (
+    value === "overview" ||
+    value === "videos" ||
+    value === "collections" ||
+    value === "series"
+  );
 }
 
 function toNonNegativeSafeInteger(value: unknown): number {
@@ -145,27 +163,42 @@ export interface ResolvedCreatorContentCursor {
   mid: number;
   section: CreatorContentSection;
   page: number;
+  container_id?: number;
 }
 
 export function encodeCreatorContentCursor(
   mid: number,
   section: CreatorContentSection,
   page: number,
+  containerId?: number,
 ): string {
   if (!isPositiveSafeInteger(mid)) {
     throw new ValidationError("cursor mid must be a positive safe integer");
   }
   if (!isCreatorContentSection(section)) {
-    throw new ValidationError("cursor section must be overview or videos");
+    throw new ValidationError("cursor section is not supported");
   }
   if (!isPositiveSafeInteger(page)) {
     throw new ValidationError("cursor page must be a positive safe integer");
+  }
+  if (containerId !== undefined) {
+    if (!isPositiveSafeInteger(containerId)) {
+      throw new ValidationError(
+        "cursor container_id must be a positive safe integer",
+      );
+    }
+    if (section !== "collections" && section !== "series") {
+      throw new ValidationError(
+        "cursor container_id is only supported for collections or series",
+      );
+    }
   }
   const payload = {
     version: CURSOR_VERSION,
     mid,
     section,
     page,
+    ...(containerId === undefined ? {} : { container_id: containerId }),
   };
   return base64urlEncode(JSON.stringify(payload));
 }
@@ -213,7 +246,7 @@ export function decodeCreatorContentCursor(
     );
   }
   if (!isCreatorContentSection(parsed.section)) {
-    throw new ValidationError("cursor section must be overview or videos");
+    throw new ValidationError("cursor section is not supported");
   }
   if (!isPositiveSafeInteger(parsed.page)) {
     throw new ValidationError("cursor page must be a positive safe integer");
@@ -222,25 +255,65 @@ export function decodeCreatorContentCursor(
     throw new ValidationError("cursor page is unsafe");
   }
 
-  return { mid: parsed.mid, section: parsed.section, page: parsed.page };
+  let containerId: number | undefined;
+  if (parsed.container_id !== undefined) {
+    if (!isPositiveSafeInteger(parsed.container_id)) {
+      throw new ValidationError(
+        "cursor container_id must be a positive safe integer",
+      );
+    }
+    if (parsed.section !== "collections" && parsed.section !== "series") {
+      throw new ValidationError(
+        "cursor container_id is only supported for collections or series",
+      );
+    }
+    containerId = parsed.container_id;
+  }
+
+  return {
+    mid: parsed.mid,
+    section: parsed.section,
+    page: parsed.page,
+    ...(containerId === undefined ? {} : { container_id: containerId }),
+  };
 }
 
 export async function getBilibiliCreatorContent(
   mid: number,
   section: CreatorContentSection,
   cursor?: string,
-): Promise<CreatorContentOverview | CreatorVideoPage> {
+  containerId?: number,
+): Promise<
+  | CreatorContentOverview
+  | CreatorVideoPage
+  | CreatorCollectionListPage
+  | CreatorCollectionMemberPage
+  | CreatorSeriesListPage
+  | CreatorSeriesMemberPage
+> {
   if (!isPositiveSafeInteger(mid)) {
     throw new ValidationError("mid must be a positive safe integer");
   }
   if (!isCreatorContentSection(section)) {
-    throw new ValidationError('section must be "overview" or "videos"');
+    throw new ValidationError("section is not supported");
+  }
+  if (containerId !== undefined) {
+    if (!isPositiveSafeInteger(containerId)) {
+      throw new ValidationError(
+        "container_id must be a positive safe integer",
+      );
+    }
+    if (section !== "collections" && section !== "series") {
+      throw new ValidationError(
+        "container_id is only supported for collections or series",
+      );
+    }
   }
   let page = 1;
   if (section === "overview") {
     if (cursor !== undefined) {
       throw new ValidationError(
-        "cursor is only supported for the videos section",
+        "cursor is not supported for the overview section",
       );
     }
   } else if (cursor !== undefined) {
@@ -250,6 +323,9 @@ export async function getBilibiliCreatorContent(
     }
     if (resolved.section !== section) {
       throw new ValidationError("cursor belongs to a different section");
+    }
+    if (resolved.container_id !== containerId) {
+      throw new ValidationError("cursor belongs to a different container");
     }
     page = resolved.page;
   }
@@ -270,7 +346,415 @@ export async function getBilibiliCreatorContent(
   if (section === "overview") {
     return fetchCreatorOverview(mid, authHeaders);
   }
+  if (
+    (section === "collections" || section === "series") &&
+    containerId === undefined
+  ) {
+    return fetchCreatorContainerListPage(mid, section, page, authHeaders);
+  }
+  if (section === "collections" && containerId !== undefined) {
+    return fetchCreatorCollectionMemberPage(
+      mid,
+      containerId,
+      page,
+      authHeaders,
+    );
+  }
+  if (section === "series" && containerId !== undefined) {
+    return fetchCreatorSeriesMemberPage(mid, containerId, page, authHeaders);
+  }
   return fetchCreatorVideoPage(mid, page, authHeaders);
+}
+
+function normalizeContainerVideoRow(
+  value: unknown,
+): CreatorContainerVideoRow | undefined {
+  if (!isRecord(value)) return undefined;
+  const bvid =
+    typeof value.bvid === "string" && isValidBVId(value.bvid)
+      ? value.bvid
+      : undefined;
+  if (!bvid || typeof value.title !== "string") return undefined;
+  if (Buffer.byteLength(value.title, "utf8") > MAX_CATALOG_TITLE_BYTES) {
+    throw new ResourceLimitError(
+      "Creator container Video title exceeded its byte limit",
+      "creator_container_video_title",
+      MAX_CATALOG_TITLE_BYTES,
+    );
+  }
+  const title = boundedRemoteText(value.title, MAX_CATALOG_TITLE_BYTES);
+  if (!title) return undefined;
+  const result: CreatorContainerVideoRow = {
+    bvid,
+    title,
+    description: boundedRemoteText(
+      value.desc ?? value.description,
+      MAX_CATALOG_DESCRIPTION_BYTES,
+    ),
+    cover_url: boundedRemoteText(value.pic, MAX_CATALOG_COVER_BYTES),
+    duration_seconds: toNonNegativeSafeInteger(value.duration),
+    published_at: toIsoFromCreated(value.pubdate, value.ctime),
+    access: "unknown",
+    source_url: `https://www.bilibili.com/video/${bvid}/`,
+  };
+  if (isRecord(value.stat)) {
+    const viewCount = toOptionalNonNegativeCount(value.stat.view);
+    if (viewCount !== undefined) result.view_count = viewCount;
+    const danmakuCount = toOptionalNonNegativeCount(value.stat.danmaku);
+    if (danmakuCount !== undefined) result.danmaku_count = danmakuCount;
+  }
+  if (
+    isExplicitTruthy(value.ugc_pay) ||
+    isExplicitTruthy(value.is_charge_video)
+  ) {
+    result.is_charge_video = true;
+  }
+  return result;
+}
+
+async function fetchCreatorCollectionMemberPage(
+  mid: number,
+  collectionId: number,
+  page: number,
+  authHeaders: Record<string, string>,
+): Promise<CreatorCollectionMemberPage> {
+  const data = await fetchWithoutWBI(
+    COLLECTION_MEMBERS_PATH,
+    {
+      mid,
+      season_id: collectionId,
+      sort_reverse: "false",
+      page_num: page,
+      page_size: PAGE_SIZE,
+    },
+    authHeaders,
+  );
+  if (
+    !isRecord(data) ||
+    !isRecord(data.meta) ||
+    !isRecord(data.page) ||
+    !Array.isArray(data.archives)
+  ) {
+    throw new UpstreamResponseError(
+      "Bilibili returned an invalid Creator Collection member response",
+    );
+  }
+  const selectedCollection = normalizeCollectionContainer(
+    { meta: data.meta },
+    mid,
+  );
+  if (
+    selectedCollection === undefined ||
+    selectedCollection.collection_id !== collectionId
+  ) {
+    throw new UpstreamResponseError(
+      "Bilibili returned a different Creator Collection",
+    );
+  }
+  const pageNumber = toOptionalPositiveInteger(data.page.page_num);
+  const pageSize = toOptionalPositiveInteger(data.page.page_size);
+  const total = toOptionalNonNegativeCount(data.page.total);
+  if (pageNumber !== page || pageSize !== PAGE_SIZE || total === undefined) {
+    throw new UpstreamResponseError(
+      "Bilibili returned invalid Creator Collection page facts",
+    );
+  }
+  if (data.archives.length > PAGE_SIZE) {
+    throw new ResourceLimitError(
+      "Creator Collection member page exceeded its item limit",
+      "creator_collection_member_items",
+      PAGE_SIZE,
+    );
+  }
+
+  const members: CreatorContainerVideoRow[] = [];
+  let skippedCount = 0;
+  for (const value of data.archives) {
+    const video = normalizeContainerVideoRow(value);
+    if (video) members.push(video);
+    else skippedCount += 1;
+  }
+  const result: CreatorCollectionMemberPage = {
+    mid,
+    section: "collections",
+    mode: "members",
+    page,
+    selected_collection: selectedCollection,
+    members,
+    skipped_count: skippedCount,
+    live_state: "live",
+  };
+  const nextPage = page + 1;
+  if (
+    page * PAGE_SIZE < total &&
+    Number.isSafeInteger(nextPage) &&
+    Number.isSafeInteger(nextPage * PAGE_SIZE)
+  ) {
+    result.next_cursor = encodeCreatorContentCursor(
+      mid,
+      "collections",
+      nextPage,
+      collectionId,
+    );
+  }
+  return result;
+}
+
+async function fetchCreatorSeriesMemberPage(
+  mid: number,
+  seriesId: number,
+  page: number,
+  authHeaders: Record<string, string>,
+): Promise<CreatorSeriesMemberPage> {
+  const metadata = await fetchWithoutWBI(
+    SERIES_METADATA_PATH,
+    { series_id: seriesId },
+    authHeaders,
+  );
+  const selectedSeries = normalizeSeriesContainer(metadata, mid);
+  if (selectedSeries === undefined || selectedSeries.series_id !== seriesId) {
+    throw new UpstreamResponseError(
+      "Bilibili returned a different Creator Series",
+    );
+  }
+
+  const data = await fetchWithoutWBI(
+    SERIES_MEMBERS_PATH,
+    {
+      mid,
+      series_id: seriesId,
+      only_normal: "true",
+      sort: "desc",
+      pn: page,
+      ps: PAGE_SIZE,
+    },
+    authHeaders,
+  );
+  if (!isRecord(data) || !isRecord(data.page) || !Array.isArray(data.archives)) {
+    throw new UpstreamResponseError(
+      "Bilibili returned an invalid Creator Series member response",
+    );
+  }
+  const pageNumber = toOptionalPositiveInteger(data.page.num);
+  const pageSize = toOptionalPositiveInteger(data.page.size);
+  const total = toOptionalNonNegativeCount(data.page.total);
+  if (pageNumber !== page || pageSize !== PAGE_SIZE || total === undefined) {
+    throw new UpstreamResponseError(
+      "Bilibili returned invalid Creator Series page facts",
+    );
+  }
+  if (data.archives.length > PAGE_SIZE) {
+    throw new ResourceLimitError(
+      "Creator Series member page exceeded its item limit",
+      "creator_series_member_items",
+      PAGE_SIZE,
+    );
+  }
+
+  const members: CreatorContainerVideoRow[] = [];
+  let skippedCount = 0;
+  for (const value of data.archives) {
+    const video = normalizeContainerVideoRow(value);
+    if (video) members.push(video);
+    else skippedCount += 1;
+  }
+  const result: CreatorSeriesMemberPage = {
+    mid,
+    section: "series",
+    mode: "members",
+    page,
+    selected_series: selectedSeries,
+    members,
+    skipped_count: skippedCount,
+    live_state: "live",
+  };
+  const nextPage = page + 1;
+  if (
+    page * PAGE_SIZE < total &&
+    Number.isSafeInteger(nextPage) &&
+    Number.isSafeInteger(nextPage * PAGE_SIZE)
+  ) {
+    result.next_cursor = encodeCreatorContentCursor(
+      mid,
+      "series",
+      nextPage,
+      seriesId,
+    );
+  }
+  return result;
+}
+
+function normalizeCollectionContainer(
+  value: unknown,
+  mid: number,
+): CreatorCollectionContainer | undefined {
+  if (!isRecord(value) || !isRecord(value.meta)) return undefined;
+  const meta = value.meta;
+  if (meta.mid !== mid || !isPositiveSafeInteger(meta.season_id)) {
+    return undefined;
+  }
+  const name = normalizeContainerName(meta.name, "Collection");
+  if (!name) return undefined;
+  if (
+    typeof meta.description === "string" &&
+    Buffer.byteLength(meta.description, "utf8") > MAX_CONTAINER_DESCRIPTION_BYTES
+  ) {
+    throw new ResourceLimitError(
+      "Creator Collection description exceeded its byte limit",
+      "creator_collection_description",
+      MAX_CONTAINER_DESCRIPTION_BYTES,
+    );
+  }
+  const memberCount = toOptionalNonNegativeCount(meta.total);
+  if (memberCount === undefined) return undefined;
+  return {
+    collection_id: meta.season_id,
+    name,
+    description: boundedRemoteText(
+      meta.description,
+      MAX_CONTAINER_DESCRIPTION_BYTES,
+    ),
+    member_count: memberCount,
+  };
+}
+
+function normalizeSeriesContainer(
+  value: unknown,
+  mid: number,
+): CreatorSeriesContainer | undefined {
+  if (!isRecord(value) || !isRecord(value.meta)) return undefined;
+  const meta = value.meta;
+  if (meta.mid !== mid || !isPositiveSafeInteger(meta.series_id)) {
+    return undefined;
+  }
+  const name = normalizeContainerName(meta.name, "Series");
+  if (!name) return undefined;
+  if (
+    typeof meta.description === "string" &&
+    Buffer.byteLength(meta.description, "utf8") > MAX_CONTAINER_DESCRIPTION_BYTES
+  ) {
+    throw new ResourceLimitError(
+      "Creator Series description exceeded its byte limit",
+      "creator_series_description",
+      MAX_CONTAINER_DESCRIPTION_BYTES,
+    );
+  }
+  const memberCount = toOptionalNonNegativeCount(meta.total);
+  if (memberCount === undefined) return undefined;
+  return {
+    series_id: meta.series_id,
+    name,
+    description: boundedRemoteText(
+      meta.description,
+      MAX_CONTAINER_DESCRIPTION_BYTES,
+    ),
+    member_count: memberCount,
+  };
+}
+
+function normalizeContainerName(
+  value: unknown,
+  kind: "Collection" | "Series",
+): string | undefined {
+  if (typeof value !== "string" || value.trim().length === 0) return undefined;
+  if (Buffer.byteLength(value, "utf8") > MAX_CONTAINER_NAME_BYTES) {
+    throw new ResourceLimitError(
+      `Creator ${kind} name exceeded its byte limit`,
+      `creator_${kind.toLowerCase()}_name`,
+      MAX_CONTAINER_NAME_BYTES,
+    );
+  }
+  return boundedRemoteText(value, MAX_CONTAINER_NAME_BYTES) || undefined;
+}
+
+async function fetchCreatorContainerListPage(
+  mid: number,
+  section: "collections" | "series",
+  page: number,
+  authHeaders: Record<string, string>,
+): Promise<CreatorCollectionListPage | CreatorSeriesListPage> {
+  const data = await fetchWithoutWBI(
+    CONTAINER_LIST_PATH,
+    { mid, page_num: page, page_size: PAGE_SIZE },
+    authHeaders,
+  );
+  if (
+    !isRecord(data) ||
+    !isRecord(data.items_lists) ||
+    !isRecord(data.items_lists.page) ||
+    !Array.isArray(data.items_lists.seasons_list) ||
+    !Array.isArray(data.items_lists.series_list)
+  ) {
+    throw new UpstreamResponseError(
+      "Bilibili returned an invalid Creator container list response",
+    );
+  }
+  const pageFacts = data.items_lists.page;
+  const pageNumber = toOptionalPositiveInteger(pageFacts.page_num);
+  const pageSize = toOptionalPositiveInteger(pageFacts.page_size);
+  const total = toOptionalNonNegativeCount(pageFacts.total);
+  const rawPageLength =
+    data.items_lists.seasons_list.length + data.items_lists.series_list.length;
+  if (pageNumber !== page || pageSize !== PAGE_SIZE || total === undefined) {
+    throw new UpstreamResponseError(
+      "Bilibili returned invalid Creator container page facts",
+    );
+  }
+  if (rawPageLength > PAGE_SIZE) {
+    throw new ResourceLimitError(
+      "Creator container page exceeded its item limit",
+      "creator_container_page_items",
+      PAGE_SIZE,
+    );
+  }
+
+  const collections: CreatorCollectionContainer[] = [];
+  const series: CreatorSeriesContainer[] = [];
+  let skippedCount = 0;
+  const targetItems =
+    section === "collections"
+      ? data.items_lists.seasons_list
+      : data.items_lists.series_list;
+  for (const item of targetItems) {
+    if (section === "collections") {
+      const collection = normalizeCollectionContainer(item, mid);
+      if (collection) collections.push(collection);
+      else skippedCount += 1;
+    } else {
+      const seriesContainer = normalizeSeriesContainer(item, mid);
+      if (seriesContainer) series.push(seriesContainer);
+      else skippedCount += 1;
+    }
+  }
+  const result: CreatorCollectionListPage | CreatorSeriesListPage =
+    section === "collections"
+      ? {
+          mid,
+          section,
+          mode: "containers",
+          page,
+          collections,
+          skipped_count: skippedCount,
+          live_state: "live",
+        }
+      : {
+          mid,
+          section,
+          mode: "containers",
+          page,
+          series,
+          skipped_count: skippedCount,
+          live_state: "live",
+        };
+  const nextPage = page + 1;
+  if (
+    page * PAGE_SIZE < total &&
+    Number.isSafeInteger(nextPage) &&
+    Number.isSafeInteger(nextPage * PAGE_SIZE)
+  ) {
+    result.next_cursor = encodeCreatorContentCursor(mid, section, nextPage);
+  }
+  return result;
 }
 
 interface NormalizedProfile {
