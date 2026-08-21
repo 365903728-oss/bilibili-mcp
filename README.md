@@ -10,7 +10,6 @@ Bilibili MCP 是一个本地 MCP server，让 AI Agent 读取 Bilibili 内容。
 
 <p align="center">
   <a href="./README_EN.md">English</a> ·
-  <a href="#快速了解一个-up-主">快速了解 UP 主</a> ·
   <a href="./docs/client-setup.md">客户端配置指南</a> ·
   <a href="./docs/tool-reference.md">工具参考</a> ·
   <a href="#本地-asr可选">本地 ASR（可选）</a> ·
