@@ -95,18 +95,18 @@ bilibili-mcp --help
 
 **快速跳转**
 
-[Codex](#codex-app--codex-cli) · [Claude Code](#claude-code) · [Claude Desktop](#claude-desktop) · [OpenCode](#opencode) · [OpenClaw](#openclaw) · [Cursor](#cursor) · [Cline](#cline) · [Kilo Code](#kilo-code) · [VS Code](#vs-code) · [Copilot](#github-copilot-vs-code) · [Windsurf](#windsurf) · [Zed](#zed)
+[Codex](#codex-app--codex-cli) · [Claude Code](#claude-code) · [Claude Desktop](#claude-desktop) · [GitHub Copilot](#github-copilot-vs-code) · [VS Code](#vs-code) · [Cursor](#cursor) · [OpenClaw](#openclaw) · [Hermes](#hermes) · [OpenCode](#opencode) · [Pi](#pi) · [Qoder / Qoder CN](#qoder--qoder-cn原通义灵码) · [Trae](#trae-cn) · [WorkBuddy](#workbuddy) · [DeepSeek Harness](#deepseek-harness) · [Antigravity](#antigravity--antigravity-cli) · [Gemini CLI](#gemini-cli) · [Kimi Code](#kimi-code--kimi-code-cli) · [MiniMax Code](#minimax-code--minimax-code-cli) · [CodeBuddy](#codebuddy) · [Qwen Code](#qwen-code) · [Kiro](#kiro-ide--kiro-cli) · [Cline](#cline) · [Kilo Code](#kilo-code) · [Devin Desktop](#devin-desktop--windsurf) · [Grok Build](#grok-build)
 
 <details>
 <summary>查看其他已覆盖客户端</summary>
 
-[Hermes](#hermes) · [WorkBuddy](#workbuddy) · [CodeBuddy](#codebuddy) · [Trae CN](#trae-cn) · [Trae International](#trae-international) · [Trae SOLO CN](#trae-solo-cn) · [Trae SOLO International](#trae-solo-international) · [Qoder](#qoder-ide--qoder-cli--qoderwork) · [Kimi Code](#kimi-code--kimi-code-cli) · [Antigravity](#antigravity--antigravity-cli) · [Pi](#pi) · [Oh My Pi](#oh-my-pi) · [Crush](#crush) · [DeepSeek-TUI](#deepseek-tui) · [Deep Code](#deep-code) · [Reasonix](#reasonix) · [GitHub Copilot CLI](#github-copilot-cli) · [Cherry Studio](#cherry-studio) · [LobeHub](#lobehub--lobechat) · [AstrBot](#astrbot) · [nanobot](#nanobot)
+[GitHub Copilot CLI](#github-copilot-cli) · [文心快码](#文心快码baidu-comate) · [Warp](#warp) · [Factory Droid](#factory-droid) · [JetBrains AI](#jetbrains-ai-assistant) · [Amazon Q Developer](#amazon-q-developer) · [Auggie](#augment-code--auggie-cli) · [Amp](#amp) · [Goose](#goose) · [CodeFlicker](#codeflicker) · [CodeArts Agent](#codearts-agent) · [Mistral Vibe](#mistral-vibe) · [Trae International](#trae-international) · [Trae SOLO CN](#trae-solo-cn) · [Trae SOLO International](#trae-solo-international) · [Oh My Pi](#oh-my-pi) · [Zed](#zed) · [Cherry Studio](#cherry-studio) · [LobeHub](#lobehub--lobechat) · [Crush](#crush) · [DeepSeek-TUI](#deepseek-tui) · [Deep Code](#deep-code) · [Reasonix](#reasonix) · [AstrBot](#astrbot) · [nanobot](#nanobot)
 
 </details>
 
 ### Codex app / Codex CLI
 
-Codex app、Codex CLI 和 Codex IDE extension 共用 MCP 配置。优先使用下面任一方式添加：
+Codex app、ChatGPT desktop app、Codex CLI 和 Codex IDE extension 在同一台主机上共用 MCP 配置。优先使用下面任一方式添加：
 
 #### Codex app
 
@@ -175,69 +175,65 @@ claude mcp add --scope user bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp@latest
 
 保存后重启 Claude Desktop。该配置适合本地 stdio MCP server；不要在 `env`、`args` 或配置文件里写真实 Cookie。
 
-### OpenCode
+### GitHub Copilot (VS Code)
 
-编辑 OpenCode 配置文件 `~/.config/opencode/opencode.json`，在 `mcp` 下添加本地 MCP server：
+GitHub Copilot Chat 在 VS Code 中读取 VS Code MCP 配置。工作区配置可写入：
+
+```text
+.vscode/mcp.json
+```
+
+添加：
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
+  "servers": {
     "bilibili-mcp": {
-      "type": "local",
-      "command": ["npx", "-y", "@xzxzzx/bilibili-mcp@latest"],
-      "enabled": true
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
     }
   }
 }
 ```
 
-OpenCode 会把 MCP tools 加入可用工具上下文。使用时可在提示词中明确要求使用 `bilibili-mcp`。
+也可以用命令面板打开 `MCP: Open User Configuration` 配置全局 MCP。配置后在 Copilot Chat Agent Mode 中使用该 server 的工具。
 
-### OpenClaw
+### VS Code
 
-使用 OpenClaw 的 MCP registry 注册本服务：
+VS Code 原生支持 MCP 配置。工作区配置可通过命令面板打开：
 
-```bash
-openclaw mcp set bilibili-mcp '{"command":"npx","args":["-y","@xzxzzx/bilibili-mcp@latest"]}'
+```text
+MCP: Open Workspace Folder MCP Configuration
 ```
 
-检查配置：
+这会创建或打开：
 
-```bash
-openclaw mcp list
-openclaw mcp show bilibili-mcp
+```text
+.vscode/mcp.json
 ```
 
-也可以在 OpenClaw 配置中加入同等结构：
+添加：
 
 ```json
 {
-  "mcp": {
-    "servers": {
-      "bilibili-mcp": {
-        "command": "npx",
-        "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
-      }
+  "servers": {
+    "bilibili-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
     }
   }
 }
 ```
 
-`openclaw mcp set` 只写入 OpenClaw 的 MCP server 定义；具体运行时是否启用，取决于你的 OpenClaw agent/runtime 配置。
+用户级配置可用命令面板打开：
 
-### Hermes
-
-编辑 `~/.hermes/config.yaml`，在 `mcp_servers` 下添加：
-
-```yaml
-mcp_servers:
-  bilibili-mcp:
-    command: "npx"
-    args: ["-y", "@xzxzzx/bilibili-mcp@latest"]
+```text
+MCP: Open User Configuration
 ```
 
-如果你已经在运行 Hermes 会话，使用 `/reload-mcp` 重新加载 MCP 配置；也可以开启一个新的 Hermes 会话。
+VS Code MCP 还支持 HTTP、SSE、Windows named pipe 和 Unix socket。配置后可在 VS Code 的 MCP server 列表中启动、停止或查看 server 状态。使用本项目时不要把真实 Cookie 写进 `.vscode/mcp.json`。
 
 ### Cursor
 
@@ -288,79 +284,90 @@ cursor-agent mcp list-tools bilibili-mcp
 cursor-agent mcp login bilibili-mcp
 ```
 
-### Cline
+### OpenClaw
 
-Cline 支持本地 STDIO 和远程 MCP。编辑 Cline MCP 配置文件，加入：
+使用 OpenClaw 的 MCP registry 注册本服务：
+
+```bash
+openclaw mcp set bilibili-mcp '{"command":"npx","args":["-y","@xzxzzx/bilibili-mcp@latest"]}'
+```
+
+检查配置并建立一次真实连接：
+
+```bash
+openclaw mcp status --verbose
+openclaw mcp doctor bilibili-mcp --probe
+```
+
+也可以在 OpenClaw 配置中加入同等结构：
 
 ```json
 {
-  "mcpServers": {
-    "bilibili-mcp": {
-      "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"],
-      "disabled": false,
-      "autoApprove": []
+  "mcp": {
+    "servers": {
+      "bilibili-mcp": {
+        "command": "npx",
+        "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+      }
     }
   }
 }
 ```
 
-Cline CLI 用户可用 JSON 方式查看或管理 MCP 设置：
+`openclaw mcp set` 只写入 OpenClaw 的 MCP server 定义；具体运行时是否启用，取决于你的 OpenClaw agent/runtime 配置。
 
-```bash
-cline config mcp --json
+### Hermes
+
+编辑 `~/.hermes/config.yaml`，在 `mcp_servers` 下添加：
+
+```yaml
+mcp_servers:
+  bilibili-mcp:
+    command: "npx"
+    args: ["-y", "@xzxzzx/bilibili-mcp@latest"]
 ```
 
-配置后在 Cline 的 MCP 面板确认 server 已启用。不要把真实 Cookie 写进 Cline 配置。
+如果你已经在运行 Hermes 会话，使用 `/reload-mcp` 重新加载 MCP 配置；也可以开启一个新的 Hermes 会话。
 
-### Kilo Code
+### OpenCode
 
-Kilo Code 的 MCP server 写在主配置文件的 `mcp` 对象下。
+编辑 OpenCode 配置文件 `~/.config/opencode/opencode.json`，在 `mcp` 下添加本地 MCP server：
 
-配置位置：
-
-- 全局：`~/.config/kilo/kilo.jsonc`
-- 项目级：`kilo.jsonc`
-- 项目级：`.kilo/kilo.jsonc`
-
-添加：
-
-```jsonc
+```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "bilibili-mcp": {
       "type": "local",
       "command": ["npx", "-y", "@xzxzzx/bilibili-mcp@latest"],
-      "enabled": true,
-      "timeout": 10000
+      "enabled": true
     }
   }
 }
 ```
 
-也可以在 Kilo Code 设置 UI 中打开 Agent Behaviour → MCP Servers 添加。项目级配置优先于全局配置。
+OpenCode 会把 MCP tools 加入可用工具上下文。使用时可在提示词中明确要求使用 `bilibili-mcp`。
 
-### VS Code
+### Pi
 
-VS Code 原生支持 MCP 配置。工作区配置可通过命令面板打开：
+Pi 通过 `pi-mcp-adapter` 使用 MCP。先安装 adapter：
 
-```text
-MCP: Open Workspace Folder MCP Configuration
+```bash
+pi install npm:pi-mcp-adapter
 ```
 
-这会创建或打开：
+重启 Pi 后，优先使用项目级共享配置：
 
 ```text
-.vscode/mcp.json
+.mcp.json
 ```
 
 添加：
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "bilibili-mcp": {
-      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
     }
@@ -368,47 +375,37 @@ MCP: Open Workspace Folder MCP Configuration
 }
 ```
 
-用户级配置可用命令面板打开：
+也可以使用用户级共享配置：
 
 ```text
-MCP: Open User Configuration
+~/.config/mcp/mcp.json
 ```
 
-VS Code MCP 还支持 HTTP、SSE、Windows named pipe 和 Unix socket。配置后可在 VS Code 的 MCP server 列表中启动、停止或查看 server 状态。使用本项目时不要把真实 Cookie 写进 `.vscode/mcp.json`。
+Pi 还支持 Pi 专属覆盖文件：
 
-### GitHub Copilot (VS Code)
+- 全局：`~/.pi/agent/mcp.json`
+- 项目级：`.pi/mcp.json`
 
-GitHub Copilot Chat 在 VS Code 中读取 VS Code MCP 配置。工作区配置可写入：
+如果你已经在 Cursor、Claude Code、Codex、Windsurf 等客户端里配置过 MCP，可在 Pi 中运行 `/mcp setup` 导入或生成配置；终端也可运行：
 
-```text
-.vscode/mcp.json
+```bash
+pi-mcp-adapter init
 ```
 
-添加：
+Pi 默认 lazy 连接 MCP server，只有实际调用工具时才启动。进入 Pi 后使用 `/mcp` 查看 server 状态和工具列表。不要在 Pi 的 MCP 配置里写真实 Cookie；凭证请用 `bilibili-mcp setup` 或环境变量配置。
 
-```json
-{
-  "servers": {
-    "bilibili-mcp": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
-    }
-  }
-}
-```
+### Qoder / Qoder CN（原通义灵码）
 
-也可以用命令面板打开 `MCP: Open User Configuration` 配置全局 MCP。配置后在 Copilot Chat Agent Mode 中使用该 server 的工具。
+通义灵码已更名为 Qoder CN；它与国际版 Qoder 使用不同账号与额度，但 MCP 配置方式相同。Qoder IDE / Qoder CN Desktop 在设置页配置，Qoder CLI 用 `qodercli mcp` 命令，QoderWork 桌面端在 MCP Servers 页面添加。
 
-### WorkBuddy
+#### Qoder IDE
 
-WorkBuddy 官方文档推荐通过界面配置 MCP。进入侧边栏 插件 → MCP 服务器 → 配置 MCP，然后添加：
+打开右上角用户图标 → Qoder Settings → MCP，在 My Servers 中点击 + Add，然后添加本地 STDIO server：
 
 ```json
 {
   "mcpServers": {
     "bilibili-mcp": {
-      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
     }
@@ -416,46 +413,53 @@ WorkBuddy 官方文档推荐通过界面配置 MCP。进入侧边栏 插件 → 
 }
 ```
 
-也可以按作用域编辑配置文件：
+Qoder 文档说明 Streamable HTTP 可按 SSE endpoint 方式配置并自动检测；本项目是本地 stdio server，因此使用上面的 `command` / `args` 配置。
 
-- 用户级：`~/.workbuddy/mcp.json`
-- 项目级：`<项目目录>/.workbuddy/mcp.json`
+#### Qoder CLI
 
-### CodeBuddy
-
-#### 方式一：CodeBuddy CLI
-
-CodeBuddy CLI 可以直接添加 stdio MCP server：
+Qoder CLI 可直接添加 stdio MCP server：
 
 ```bash
-codebuddy mcp add --scope user bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp@latest
+qodercli mcp add bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp@latest
 ```
 
-检查配置：
+常用检查命令：
 
 ```bash
-codebuddy mcp list
-codebuddy mcp get bilibili-mcp
+qodercli mcp list
 ```
 
-#### 方式二：CodeBuddy IDE
+如果 Qoder CLI 已经在运行，添加或修改 MCP server 后在会话中执行 `/mcp reload` 重新发现工具。默认 scope 是当前项目本地配置；也可以用 `-s user` 保存到用户级配置，或用 `-s project` 写入项目级 `.mcp.json`。
 
-在 CodeBuddy IDE 侧栏对话面板右上角打开 CodeBuddy Settings → MCP → Add MCP，填入：
+常见配置文件位置：
+
+- 用户级：`~/.qoder/settings.json`
+- 当前项目本地：`.qoder/settings.local.json`
+- 项目级共享：`.mcp.json`
+
+#### QoderWork
+
+打开 QoderWork desktop app → Settings → MCP Servers，点击右上角 + Add。
+
+最快方式是选择 Paste JSON Config，并粘贴：
 
 ```json
 {
   "mcpServers": {
     "bilibili-mcp": {
-      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"],
-      "description": "Bilibili MCP server"
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
     }
   }
 }
 ```
 
-如果使用项目级 `.mcp.json`，请确认 CodeBuddy settings 允许启用该项目 MCP server。
+也可以选择 Fill in Config Manually，Server Type 选择 STDIO：
+
+- Server Name: `bilibili-mcp`
+- Command: `npx -y @xzxzzx/bilibili-mcp@latest`
+
+添加后在 Custom Servers 中确认 server 已启用，并展开查看可用 tools。不要在 Qoder / QoderWork 的 MCP 配置中写真实 Cookie；凭证请使用 `bilibili-mcp setup` 或环境变量配置。
 
 ### Trae CN
 
@@ -539,13 +543,55 @@ Trae SOLO International 已存在，官方 FAQ 说明国际版 SOLO 面向 Pro �
 
 如果使用 Trae International 的 UI，打开 AI 对话窗口右上角 Settings → MCP，手动添加同等 `mcpServers` 配置。
 
-### Qoder IDE / Qoder CLI / QoderWork
+### WorkBuddy
 
-Qoder 有多种形态，MCP 入口略有不同：Qoder IDE 在设置页配置，Qoder CLI 用 `qodercli mcp` 命令，QoderWork 桌面端在 MCP Servers 页面添加。
+WorkBuddy 官方文档推荐通过界面配置 MCP。进入侧边栏 插件 → MCP 服务器 → 配置 MCP，然后添加：
 
-#### Qoder IDE
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+    }
+  }
+}
+```
 
-打开右上角用户图标 → Qoder Settings → MCP，在 My Servers 中点击 + Add，然后添加本地 STDIO server：
+也可以按作用域编辑配置文件：
+
+- 用户级：`~/.workbuddy/mcp.json`
+- 项目级：`<项目目录>/.workbuddy/mcp.json`
+
+### DeepSeek Harness
+
+DeepSeek Harness 当前处于 developer preview。它通过 MCP client bridge 插件连接本地 stdio server；在当前组合使用的 `cordis.yml` 中加入：
+
+```yaml
+- id: mcp-bilibili
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: bilibili-mcp
+    transport: stdio
+    command: npx
+    args: ['-y', '@xzxzzx/bilibili-mcp@latest']
+```
+
+修改后会触发断开并重新连接。尚未安装时，可先用 `npx @deepseek-ai/dsh web` 启动本地 Web UI。参见 [DeepSeek Harness 官方仓库](https://github.com/deepseek-ai/deepseek-harness)和 [MCP client 官方文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.zh.md)。
+
+### Antigravity / Antigravity CLI
+
+Antigravity 与 Gemini CLI 是两个独立客户端，配置文件不能混用。Gemini CLI 请使用下方单独的小节。
+
+Antigravity IDE 可通过 MCP Store → Manage MCP Servers → View raw config 打开配置；Antigravity CLI 可通过 `/mcp` 管理 MCP servers。
+
+常见配置路径：
+
+- 全局：`~/.gemini/config/mcp_config.json`
+- 工作区：`.agents/mcp_config.json`
+
+添加：
 
 ```json
 {
@@ -558,35 +604,17 @@ Qoder 有多种形态，MCP 入口略有不同：Qoder IDE 在设置页配置，
 }
 ```
 
-Qoder 文档说明 Streamable HTTP 可按 SSE endpoint 方式配置并自动检测；本项目是本地 stdio server，因此使用上面的 `command` / `args` 配置。
+保存后在 Antigravity 中刷新 MCP 列表，或在 Antigravity CLI 中使用 `/mcp` 检查 server 是否加载。
 
-#### Qoder CLI
+### Gemini CLI
 
-Qoder CLI 可直接添加 stdio MCP server：
-
-```bash
-qodercli mcp add bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp@latest
-```
-
-常用检查命令：
+推荐使用 Gemini CLI 自带命令添加用户级 stdio server：
 
 ```bash
-qodercli mcp list
+gemini mcp add --scope user bilibili-mcp npx -y @xzxzzx/bilibili-mcp@latest
 ```
 
-如果 Qoder CLI 已经在运行，添加或修改 MCP server 后在会话中执行 `/mcp reload` 重新发现工具。默认 scope 是当前项目本地配置；也可以用 `-s user` 保存到用户级配置，或用 `-s project` 写入项目级 `.mcp.json`。
-
-常见配置文件位置：
-
-- 用户级：`~/.qoder/settings.json`
-- 当前项目本地：`.qoder/settings.local.json`
-- 项目级共享：`.mcp.json`
-
-#### QoderWork
-
-打开 QoderWork desktop app → Settings → MCP Servers，点击右上角 + Add。
-
-最快方式是选择 Paste JSON Config，并粘贴：
+也可以在用户级 `~/.gemini/settings.json` 或项目级 `.gemini/settings.json` 的 `mcpServers` 中加入：
 
 ```json
 {
@@ -599,12 +627,7 @@ qodercli mcp list
 }
 ```
 
-也可以选择 Fill in Config Manually，Server Type 选择 STDIO：
-
-- Server Name: `bilibili-mcp`
-- Command: `npx -y @xzxzzx/bilibili-mcp@latest`
-
-添加后在 Custom Servers 中确认 server 已启用，并展开查看可用 tools。不要在 Qoder / QoderWork 的 MCP 配置中写真实 Cookie；凭证请使用 `bilibili-mcp setup` 或环境变量配置。
+配置后运行 `gemini mcp list`，或在 Gemini CLI 中使用 `/mcp` 检查状态。
 
 ### Kimi Code / Kimi Code CLI
 
@@ -645,17 +668,168 @@ kimi mcp test bilibili-mcp
 
 不要在 Kimi Code 的 `mcp.json`、`env` 或命令参数中写真实 Cookie；凭证请用 `bilibili-mcp setup` 或环境变量配置。
 
-### Antigravity / Antigravity CLI
+### MiniMax Code / MiniMax Code CLI
 
-Gemini CLI 已迁移到 Antigravity CLI。新的 MCP 配置不再写在 `~/.gemini/settings.json`，而是使用独立的 `mcp_config.json`。
+MiniMax Code 3.0.66 及以上版本提供独立的 MCP Servers 管理页。打开插件管理入口 → MCP Servers，可以使用表单模式添加，或在 JSON 模式粘贴：
 
-Antigravity IDE 可通过 MCP Store → Manage MCP Servers → View raw config 打开配置；Antigravity CLI 可通过 `/mcp` 管理 MCP servers。
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"],
+      "enabled": true
+    }
+  }
+}
+```
 
-常见配置路径：
+本地配置通常保存在 `~/.minimax/mcp.json`。MiniMax Code CLI 用户可以检查连接和工具：
 
-- Antigravity IDE：`~/.gemini/antigravity/mcp_config.json`
-- Antigravity CLI 全局：`~/.gemini/antigravity-cli/mcp_config.json`
-- Antigravity CLI 工作区：`.agents/mcp_config.json`
+```bash
+mcode mcp list --human
+mcode mcp tools bilibili-mcp
+```
+
+参见 [MiniMax Code MCP 官方文档](https://agent.minimax.io/docs/code/agents/mcp)。
+
+### CodeBuddy
+
+#### 方式一：CodeBuddy CLI
+
+CodeBuddy CLI 可以直接添加 stdio MCP server：
+
+```bash
+codebuddy mcp add --scope user bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp@latest
+```
+
+检查配置：
+
+```bash
+codebuddy mcp list
+codebuddy mcp get bilibili-mcp
+```
+
+#### 方式二：CodeBuddy IDE
+
+在 CodeBuddy IDE 侧栏对话面板右上角打开 CodeBuddy Settings → MCP → Add MCP，填入：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"],
+      "description": "Bilibili MCP server"
+    }
+  }
+}
+```
+
+如果使用项目级 `.mcp.json`，请确认 CodeBuddy settings 允许启用该项目 MCP server。
+
+### Qwen Code
+
+推荐使用 Qwen Code 自带命令添加用户级 stdio server：
+
+```bash
+qwen mcp add --scope user bilibili-mcp npx -y @xzxzzx/bilibili-mcp@latest
+```
+
+对应配置保存在 `~/.qwen/settings.json`；项目级配置可写入 `.qwen/settings.json`，结构与 Gemini CLI 的 `mcpServers` JSON 相同。配置后重启当前 Qwen Code 会话，并使用 `/mcp` 检查连接。
+
+### Kiro IDE / Kiro CLI
+
+Kiro IDE 与 Kiro CLI 共用 MCP 配置。通过命令面板运行 `Kiro: Open user MCP config (JSON)`，或选择 workspace 配置，然后加入：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"],
+      "disabled": false
+    }
+  }
+}
+```
+
+用户级文件是 `~/.kiro/settings/mcp.json`，项目级文件是 `.kiro/settings/mcp.json`。保存后 Kiro 会自动重连；可在 MCP Servers 面板或 CLI 的 `/mcp` 中确认。
+
+### Cline
+
+Cline 支持本地 STDIO 和远程 MCP。编辑 Cline MCP 配置文件，加入：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"],
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+Cline CLI 用户可用 JSON 方式查看或管理 MCP 设置：
+
+```bash
+cline config mcp --json
+```
+
+配置后在 Cline 的 MCP 面板确认 server 已启用。不要把真实 Cookie 写进 Cline 配置。
+
+### Kilo Code
+
+Kilo Code 的 MCP server 写在主配置文件的 `mcp` 对象下。
+
+配置位置：
+
+- 全局：`~/.config/kilo/kilo.jsonc`
+- 项目级：`kilo.jsonc`
+- 项目级：`.kilo/kilo.jsonc`
+
+添加：
+
+```jsonc
+{
+  "mcp": {
+    "bilibili-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "@xzxzzx/bilibili-mcp@latest"],
+      "enabled": true,
+      "timeout": 10000
+    }
+  }
+}
+```
+
+也可以在 Kilo Code 设置 UI 中打开 Agent Behaviour → MCP Servers 添加。项目级配置优先于全局配置。
+
+### Devin Desktop / Windsurf
+
+Windsurf 已更名为 Devin Desktop；现有安装、设置与 Cascade MCP 配置会继续保留。官方入口是 Settings → Tools → Windsurf Settings → Add Server。
+
+#### 方式一：Cascade / MCP Servers UI
+
+打开 MCP Servers 设置后，添加自定义 stdio MCP server：
+
+- Command: `npx`
+- Arguments: `["-y", "@xzxzzx/bilibili-mcp@latest"]`
+
+Windsurf 也支持 MCP deeplink；如果你在文档或网页中提供安装入口，可以使用 `windsurf://windsurf-mcp-registry?serverName=<server-name>` 打开对应 MCP registry 页面。
+
+#### 方式二：Raw config
+
+直接编辑：
+
+```text
+~/.codeium/mcp_config.json
+```
 
 添加：
 
@@ -670,23 +844,54 @@ Antigravity IDE 可通过 MCP Store → Manage MCP Servers → View raw config �
 }
 ```
 
-保存后重启 Antigravity / Antigravity CLI，或在 CLI 中使用 `/mcp` 检查 server 是否加载。
+Devin Desktop 的 Cascade 兼容原 Windsurf MCP 配置，支持 `stdio`、Streamable HTTP 和 SSE。本项目使用本地 stdio server，因此不要把真实 Bilibili Cookie 写进该配置文件；凭证请用 `bilibili-mcp setup` 或环境变量配置。
 
-### Pi
+### Grok Build
 
-Pi 通过 `pi-mcp-adapter` 使用 MCP。先安装 adapter：
+使用 Grok Build CLI 添加本地 stdio server：
 
 ```bash
-pi install npm:pi-mcp-adapter
+grok mcp add bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp@latest
+grok mcp doctor
 ```
 
-重启 Pi 后，优先使用项目级共享配置：
+用户级配置保存在 `~/.grok/config.toml`；如需项目级配置，给 `grok mcp add` 添加 `--scope project`。参见 [Grok Build MCP 官方文档](https://docs.x.ai/build/features/mcp-servers)。
+
+### GitHub Copilot CLI
+
+GitHub Copilot CLI 可在交互模式里使用 `/mcp add` 添加 MCP server。按表单选择 `STDIO` 或 `Local`，然后填入：
+
+- Server Name: `bilibili-mcp`
+- Command: `npx`
+- Args: `-y @xzxzzx/bilibili-mcp`
+
+也可以编辑用户级配置：
 
 ```text
-.mcp.json
+~/.copilot/mcp-config.json
 ```
 
 添加：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"],
+      "env": {},
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+项目级配置可用 `.mcp.json` 或 `.github/mcp.json`，并且会优先于用户级同名 server。进入 Copilot CLI 后可用 `/mcp show` 查看状态。
+
+### 文心快码（Baidu Comate）
+
+在文心快码的 Zulu 页面点击标题栏右侧更多按钮 → MCP → 手动配置。用户级配置位于 `~/.comate/mcp.json`，项目级配置位于 `.comate/mcp.json`。加入：
 
 ```json
 {
@@ -699,24 +904,148 @@ pi install npm:pi-mcp-adapter
 }
 ```
 
-也可以使用用户级共享配置：
+保存后回到 MCP 的已安装列表确认连接，并在需要使用它的 Agent 中启用该 server。参见[文心快码 MCP 官方文档](https://comate.baidu.com/docs/IDE%E5%8A%9F%E8%83%BD/MCP/)。
 
-```text
-~/.config/mcp/mcp.json
+### Warp
+
+在 Warp Settings → AI → MCP Servers 中点击 + Add，粘贴下面的 JSON；也可以写入用户级 `~/.warp/.mcp.json` 或项目级 `.warp/.mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+    }
+  }
+}
 ```
 
-Pi 还支持 Pi 专属覆盖文件：
+项目级 server 首次启动需要确认信任。参见 [Warp MCP 官方文档](https://docs.warp.dev/agent-platform/capabilities/mcp/)。
 
-- 全局：`~/.pi/agent/mcp.json`
-- 项目级：`.pi/mcp.json`
+### Factory Droid
 
-如果你已经在 Cursor、Claude Code、Codex、Windsurf 等客户端里配置过 MCP，可在 Pi 中运行 `/mcp setup` 导入或生成配置；终端也可运行：
+使用 Droid CLI 添加本地 stdio server：
 
 ```bash
-pi-mcp-adapter init
+droid mcp add bilibili-mcp "npx -y @xzxzzx/bilibili-mcp@latest" --type stdio
 ```
 
-Pi 默认 lazy 连接 MCP server，只有实际调用工具时才启动。进入 Pi 后使用 `/mcp` 查看 server 状态和工具列表。不要在 Pi 的 MCP 配置里写真实 Cookie；凭证请用 `bilibili-mcp setup` 或环境变量配置。
+进入 Droid 后运行 `/mcp` 检查状态。用户级配置保存在 `~/.factory/mcp.json`；不要把真实 Cookie 写进项目级 `.factory/mcp.json`。参见 [Factory Droid MCP 官方文档](https://docs.factory.ai/cli/configuration/mcp)。
+
+### JetBrains AI Assistant
+
+在 JetBrains IDE 中打开 Settings → Tools → AI Assistant → Model Context Protocol (MCP)，点击 Add，选择 JSON configuration，并粘贴：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+    }
+  }
+}
+```
+
+按需要选择全局或当前项目级别，保存后点击 Apply，并在 Status 列确认连接成功。
+
+### Amazon Q Developer
+
+在 VS Code 或 JetBrains 中打开 Q Developer → Chat，点击 tools 图标和 `+`，选择 global 或 local scope，再填写：
+
+- Name: `bilibili-mcp`
+- Transport: `stdio`
+- Command: `npx`
+- Arguments: `-y`、`@xzxzzx/bilibili-mcp@latest`
+
+保存后检查 MCP Servers 面板中的连接状态和工具权限。当前 GUI 会分别写入全局 `~/.aws/amazonq/default.json` 或项目级 `.amazonq/default.json`；已有旧版 `mcp.json` 可继续兼容，但新配置优先使用 GUI。
+
+### Augment Code / Auggie CLI
+
+使用 Auggie CLI 添加用户级 stdio server：
+
+```bash
+auggie mcp add bilibili-mcp -- npx -y @xzxzzx/bilibili-mcp@latest
+auggie mcp list
+```
+
+配置保存在 `~/.augment/settings.json`。如需只对当前项目生效，可在 `mcp add` 后添加 `--local` 或 `--project`。参见 [Auggie MCP 官方文档](https://docs.augmentcode.com/cli/integrations)。
+
+### Amp
+
+在用户级 `~/.config/amp/settings.json`，或项目级 `.amp/settings.json` 中加入：
+
+```json
+{
+  "amp.mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+    }
+  }
+}
+```
+
+项目级 MCP server 首次运行需要批准。参见 [Amp MCP 官方手册](https://ampcode.com/manual/mcp.md)。
+
+### Goose
+
+运行 `goose configure`，依次选择 Add Extension → Command-Line Extension，然后填写：
+
+- Name: `Bilibili MCP`
+- Command: `npx -y @xzxzzx/bilibili-mcp@latest`
+- Environment variables: `No`
+
+Goose Desktop 也可以在 Extensions → Add custom extension 中选择 Standard IO 并填写同一命令。保存后确认该 extension 已启用。
+
+### CodeFlicker
+
+打开 CodeFlicker Settings → MCP 管理 → MCP 配置，点击手动配置并加入：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+    }
+  }
+}
+```
+
+保存后确认连接状态，并在 Agent 模式的 MCP 按钮中启用。参见 [CodeFlicker MCP 官方文档](https://www.codeflicker.ai/docs/feats/corefeat/MCP.html)。
+
+### CodeArts Agent
+
+在 CodeArts Agent IDE 中打开 Settings → MCP → Configure MCP，编辑打开的 `mcp_settings.json`：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+    }
+  }
+}
+```
+
+保存并等待 server 启动，然后在聊天面板切换到 Agent 模式使用。参见 [CodeArts Agent MCP 官方文档](https://support.huaweicloud.com/intl/en-us/usermanual-codeartsagent/codeartsagent_ug_0010.html)。
+
+### Mistral Vibe
+
+编辑用户级 `~/.vibe/config.toml`，或受信任项目中的 `.vibe/config.toml`，加入：
+
+```toml
+[[mcp_servers]]
+name = "bilibili-mcp"
+transport = "stdio"
+command = "npx"
+args = ["-y", "@xzxzzx/bilibili-mcp@latest"]
+```
+
+启动 Vibe 后使用 `/mcp` 检查 server；不要把真实 Cookie 写入 `config.toml`。
 
 ### Oh My Pi
 
@@ -760,6 +1089,77 @@ Oh My Pi (`omp`) 原生支持 MCP，优先使用 OMP 专属配置文件：
 ```
 
 OMP 支持 `stdio`、`http` 和 `sse` MCP。不要在 `env`、`args` 或配置文件中写真实 Cookie。
+
+### Zed
+
+Zed 使用 `context_servers` 配置 MCP，不使用 `mcpServers`。可以通过 Settings → AI → MCP Servers 添加自定义 server，也可以直接编辑 `settings.json`。
+
+#### 方式一：MCP Servers UI
+
+打开 Settings → AI → MCP Servers，点击 Add Custom Server，填入本项目的 stdio server 配置。
+
+配置后，在 MCP Servers 列表中查看 server 名称旁边的状态圆点；绿色表示 server active。
+
+#### 方式二：settings.json
+
+用户级设置可通过 Zed 的 `zed: open settings` 打开。项目级设置可写入：
+
+```text
+.zed/settings.json
+```
+
+添加：
+
+```json
+{
+  "context_servers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+    }
+  }
+}
+```
+
+#### 方式三：Zed extension
+
+Zed 也支持以 extension 的方式安装 MCP server。通用自定义 server 用上面的 `context_servers` 更直接；如果未来本项目发布 Zed MCP extension，再改用 extension 安装。
+
+Zed 支持 MCP Tools 和 Prompts，也支持远程 MCP；远程 server 使用 `url` 和可选 `headers`。本项目是本地 stdio server，不要在 Zed 配置里写真实 Bilibili Cookie。
+
+### Cherry Studio
+
+Cherry Studio 在 Settings → MCP Server 中添加 MCP server。添加本项目时选择 `STDIO`：
+
+- Name: `bilibili-mcp`
+- Type: `STDIO`
+- Command: `npx`
+- Parameters: `-y @xzxzzx/bilibili-mcp`
+
+保存后，Cherry Studio 会启动该 MCP server；在聊天窗口中启用对应 MCP server 后即可调用工具。
+
+### LobeHub / LobeChat
+
+LobeChat Desktop 支持导入 MCP server JSON。打开：
+
+```text
+Settings → Default Agent → Plugin Settings → Custom Plugins → Quick JSON Configuration Import
+```
+
+粘贴：
+
+```json
+{
+  "mcpServers": {
+    "bilibili-mcp": {
+      "command": "npx",
+      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
+    }
+  }
+}
+```
+
+安装后，在对应 Agent 的插件设置中启用该 MCP server。不要把真实 Cookie 写进 LobeChat 配置；凭证请通过本项目 CLI 或环境变量配置。
 
 ### Crush
 
@@ -859,145 +1259,6 @@ npx reasonix code --mcp "bilibili=npx -y @xzxzzx/bilibili-mcp@latest"
 ```
 
 Reasonix 的格式是 `name=command arg1 arg2`。如果需要项目级覆盖，可放在项目的 `.reasonix/` 下。
-
-### GitHub Copilot CLI
-
-GitHub Copilot CLI 可在交互模式里使用 `/mcp add` 添加 MCP server。按表单选择 `STDIO` 或 `Local`，然后填入：
-
-- Server Name: `bilibili-mcp`
-- Command: `npx`
-- Args: `-y @xzxzzx/bilibili-mcp`
-
-也可以编辑用户级配置：
-
-```text
-~/.copilot/mcp-config.json
-```
-
-添加：
-
-```json
-{
-  "mcpServers": {
-    "bilibili-mcp": {
-      "type": "local",
-      "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"],
-      "env": {},
-      "tools": ["*"]
-    }
-  }
-}
-```
-
-项目级配置可用 `.mcp.json` 或 `.github/mcp.json`，并且会优先于用户级同名 server。进入 Copilot CLI 后可用 `/mcp show` 查看状态。
-
-### Windsurf
-
-Windsurf 的 MCP 由 Cascade 使用。官方入口是 Cascade 面板右上角的 `MCPs` 图标，或 Windsurf Settings → Cascade → MCP Servers。
-
-#### 方式一：Cascade / MCP Servers UI
-
-打开 MCP Marketplace 或 MCP Servers 设置后，添加自定义 stdio MCP server：
-
-- Command: `npx`
-- Arguments: `["-y", "@xzxzzx/bilibili-mcp@latest"]`
-
-Windsurf 也支持 MCP deeplink；如果你在文档或网页中提供安装入口，可以使用 `windsurf://windsurf-mcp-registry?serverName=<server-name>` 打开对应 MCP registry 页面。
-
-#### 方式二：Raw config
-
-直接编辑：
-
-```text
-~/.codeium/windsurf/mcp_config.json
-```
-
-添加：
-
-```json
-{
-  "mcpServers": {
-    "bilibili-mcp": {
-      "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
-    }
-  }
-}
-```
-
-Windsurf/Cascade 支持 `stdio`、Streamable HTTP 和 SSE MCP。本项目使用本地 stdio server，因此不要把真实 Bilibili Cookie 写进该配置文件；凭证请用 `bilibili-mcp setup` 或环境变量配置。
-
-### Zed
-
-Zed 使用 `context_servers` 配置 MCP，不使用 `mcpServers`。可以通过 Agent Panel 的 settings view 添加自定义 server，也可以直接编辑 `settings.json`。
-
-#### 方式一：Agent Panel UI
-
-打开 Agent Panel 的 Settings view，点击 Add Custom Server，填入本项目的 stdio server 配置。
-
-配置后，在 Agent Panel 的 settings view 中查看 server 名称旁边的状态圆点；绿色表示 server active。
-
-#### 方式二：settings.json
-
-用户级设置可通过 Zed 的 `zed: open settings` 打开。项目级设置可写入：
-
-```text
-.zed/settings.json
-```
-
-添加：
-
-```json
-{
-  "context_servers": {
-    "bilibili-mcp": {
-      "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
-    }
-  }
-}
-```
-
-#### 方式三：Zed extension
-
-Zed 也支持以 extension 的方式安装 MCP server。通用自定义 server 用上面的 `context_servers` 更直接；如果未来本项目发布 Zed MCP extension，再改用 extension 安装。
-
-Zed 支持 MCP Tools 和 Prompts，也支持远程 MCP；远程 server 使用 `url` 和可选 `headers`。本项目是本地 stdio server，不要在 Zed 配置里写真实 Bilibili Cookie。
-
-### Cherry Studio
-
-Cherry Studio 在 Settings → MCP Server 中添加 MCP server。添加本项目时选择 `STDIO`：
-
-- Name: `bilibili-mcp`
-- Type: `STDIO`
-- Command: `npx`
-- Parameters: `-y @xzxzzx/bilibili-mcp`
-
-保存后，Cherry Studio 会启动该 MCP server；在聊天窗口中启用对应 MCP server 后即可调用工具。
-
-### LobeHub / LobeChat
-
-LobeChat Desktop 支持导入 MCP server JSON。打开：
-
-```text
-Settings → Default Agent → Plugin Settings → Custom Plugins → Quick JSON Configuration Import
-```
-
-粘贴：
-
-```json
-{
-  "mcpServers": {
-    "bilibili-mcp": {
-      "command": "npx",
-      "args": ["-y", "@xzxzzx/bilibili-mcp@latest"]
-    }
-  }
-}
-```
-
-安装后，在对应 Agent 的插件设置中启用该 MCP server。不要把真实 Cookie 写进 LobeChat 配置；凭证请通过本项目 CLI 或环境变量配置。
 
 ### AstrBot
 
