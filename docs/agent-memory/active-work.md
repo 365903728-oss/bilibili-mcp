@@ -2,17 +2,16 @@
 
 ## Current Product Ticket
 
-GitHub Issue #58 completes the approved #56 Fake-IP DNS user guidance after
-#57 merged. Work is isolated on `codex/issue-58-fake-ip-guidance` from merged
-#57 base `c95d05d2b2efd355241b3fcc202140a66cda14b3` and is directly executed by
-Codex without Paseo. The bounded scope is the structured MCP remedy choices,
-public response regression coverage, and bilingual tool-reference
-troubleshooting. The implementation is committed and pushed under PR #62. A
-Codex P2 review correctly identified that the migration artifact's package
-receipt had not been refreshed; the scoped review repair regenerates that
-receipt and adds a cross-platform freshness assertion. Merge is authorized
-only after the repaired head passes review and hosted CI; release and
-publication remain separate authority gates.
+GitHub Issue #59 completes the approved #56 Fake-IP DNS acceptance after #57
+and #58 merged and closed. Work is isolated on
+`codex/issue-59-fake-ip-qa` from merged PR #62 base
+`03ccb8bf2e1172a7591b893d79f2af699c2532c3` and is directly executed by Codex
+without Paseo. The bounded scope is a Node 20/22/25 focused CI gate plus
+redacted real FlClash Rule + TUN + Fake-IP evidence. Local focused, build,
+complete-suite, package, production-audit, and real pre/post-filter acceptance
+all pass. The user-controlled override was restored and reloaded after QA;
+push, PR, Issue close, release, and publication remain separate authority
+gates.
 
 ## Harness v2
 
