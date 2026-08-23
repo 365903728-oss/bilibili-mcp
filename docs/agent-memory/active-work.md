@@ -7,8 +7,12 @@ GitHub Issue #58 completes the approved #56 Fake-IP DNS user guidance after
 #57 base `c95d05d2b2efd355241b3fcc202140a66cda14b3` and is directly executed by
 Codex without Paseo. The bounded scope is the structured MCP remedy choices,
 public response regression coverage, and bilingual tool-reference
-troubleshooting. Commit, push, PR, release, and publication remain separate
-authority gates.
+troubleshooting. The implementation is committed and pushed under PR #62. A
+Codex P2 review correctly identified that the migration artifact's package
+receipt had not been refreshed; the scoped review repair regenerates that
+receipt and adds a cross-platform freshness assertion. Merge is authorized
+only after the repaired head passes review and hosted CI; release and
+publication remain separate authority gates.
 
 ## Harness v2
 

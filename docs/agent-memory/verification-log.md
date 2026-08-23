@@ -2576,8 +2576,17 @@ Six release blockers fixed; one regression proof per root cause (new tests
 - Review and boundary: Spec Review found no gap. Standards and risk reviews found
   only the expected stale Harness receipts after memory edits; LF-normalized
   receipt synchronization and the exact conformance gate cleared that finding.
-  No Cookie, token, signed media URL, DNS response, proxy configuration, success
-  `structuredContent`, dependency, commit, push, PR, tag, release, or publication
-  was introduced.
+  At implementation-acceptance time no Cookie, token, signed media URL, DNS
+  response, proxy configuration, success `structuredContent`, dependency,
+  commit, push, PR, tag, release, or publication had been introduced.
 - Harness: the exact real-pilot conformance test and the contracts, events,
   adapters, and memory core suite passed after the two-level receipt refresh.
+- PR #62 review repair: after the scoped commit and push were explicitly
+  authorized, Codex Review found that the migration artifact still carried a
+  parent package dry-run even though packaged docs and compiled guidance had
+  changed. The repair regenerates the 193-entry package receipt from a clean LF
+  Linux build, updates its canonical output digest and outer receipt, and makes
+  conformance verify `unpackedSize` plus LF-normalized packaged text/compiled
+  file sizes. The exact conformance gate and Harness core suite passed after the
+  refreshed three-level receipt chain; no dependency, product behavior, proxy
+  configuration, tag, release, or publication changed.

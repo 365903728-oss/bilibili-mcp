@@ -838,6 +838,25 @@ class CliAndAdapterTests(unittest.TestCase):
         recorded_package_files = [
             item["path"] for item in package["pack_output"][0]["files"]
         ]
+        recorded_package_items = {
+            item["path"]: item for item in package["pack_output"][0]["files"]
+        }
+        self.assertEqual(
+            package["pack_output"][0]["unpackedSize"],
+            sum(item["size"] for item in recorded_package_items.values()),
+        )
+        canonical_text_suffixes = {".js", ".json", ".map", ".md", ".svg", ".ts"}
+        for path, item in recorded_package_items.items():
+            source = ROOT / path
+            if not source.is_file():
+                continue
+            if (
+                path.startswith("dist/")
+                or source.suffix in canonical_text_suffixes
+                or source.name == "LICENSE"
+            ):
+                canonical = source.read_bytes().replace(b"\r\n", b"\n")
+                self.assertEqual(item["size"], len(canonical), path)
         if (ROOT / "dist").is_dir():
             self.assertEqual(recorded_package_files, package_files)
         else:

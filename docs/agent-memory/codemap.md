@@ -363,15 +363,17 @@ Governed capability evolution:
   `harness/fixtures/pilot-artifacts/*.json`: thin migration index plus native
   controller/Recovery snapshots, recomputable Git commit/tree/blob objects,
   typed event rows, and bounded authority receipts for all three real pilots.
-  The migration artifact binds command receipts, live package output, durable
-  file hashes, dirty-primary isolation, and exact-#35 clean-room bytes.
+  The migration artifact binds command receipts, canonical package output and
+  LF-normalized packaged-text sizes, durable file hashes, dirty-primary
+  isolation, and exact-#35 clean-room bytes.
 - `harness/events.py::normalize_hook_event`: shared #36 redaction seam that
   binds adapter/host-event provenance, metadata sensitivity, terminal state,
   and a full digest before persistence under the canonical worktree identity.
 - `harness/tests/test_evolution.py`, `test_events.py`, and
   `test_cli_and_adapters.py`: v2 Search/Adapt/Build, dangerous-effect authority,
   all-three-adapter discovery/smoke, Hook policy/evidence, Loop stop/yield/no-
-  switch, rollback, package-boundary, zero-remote, and exact-one-commit coverage.
+  switch, rollback, package-boundary and package-receipt freshness, zero-remote,
+  and exact-one-commit coverage.
 - `harness/memory.py::compile_host_package`: shared deterministic host-manifest
   seam used by typed memory and governed evolution; it does not grant the memory
   projector capability-write authority.
