@@ -168,9 +168,9 @@ Bilibili 会把部分视频的 AI 识别字幕标为 `ai-zh`、`ai-en`、`ai-ja`
 
 | 模型 | 大小 | 说明 |
 |---|---|---|
-| tiny | ~78 MB | 最小占用 |
-| base | ~148 MB | 折中选择 |
-| small | ~486 MB | 推荐，Enter 默认选中 |
+| tiny | ~78 MB | 速度优先：适合快速提取和长视频初筛；准确率相对较低 |
+| base | ~148 MB | 均衡：兼顾速度、质量和资源占用 |
+| small | ~486 MB | 质量优先：CPU 耗时和内存占用更高；推荐，Enter 默认选中 |
 
 Runtime 固定为 `faster-whisper==1.2.1`，模型存放在用户目录 `~/.bilibili-mcp/asr/`，通过 CPU INT8 加载验证后才算就绪，不需要系统 FFmpeg；同一目录仅保留一个活跃模型。`doctor --json` 的 `asr.status` 和 `asr.model` 报告就绪状态与已选模型（纯信息字段，不影响凭证退出状态）。
 

@@ -22,6 +22,12 @@ import {
 } from "./asr/state.js";
 import { runAsrInstallation } from "./asr/installer.js";
 
+const ASR_MODEL_TIER_DESCRIPTIONS: Record<AsrModelKey, string> = {
+  tiny: "速度优先：适合快速提取和长视频初筛，准确率相对较低",
+  base: "均衡：兼顾速度、质量和资源占用",
+  small: "质量优先：CPU 耗时和内存占用更高",
+};
+
 // Version info
 import fs from "fs";
 const packageJson = JSON.parse(
@@ -381,7 +387,9 @@ export async function setupCredentials(
   for (let i = 0; i < ASR_MODEL_SPECS.length; i++) {
     const spec = ASR_MODEL_SPECS[i];
     const marker = spec.key === "small" ? " [推荐]" : "";
-    console.log(`  ${i + 1}. ${spec.key}（约 ${spec.approximateMB} MB）${marker}`);
+    console.log(
+      `  ${i + 1}. ${spec.key}（约 ${spec.approximateMB} MB）${marker} — ${ASR_MODEL_TIER_DESCRIPTIONS[spec.key]}`,
+    );
   }
 
   let modelKey: AsrModelKey | null = null;
