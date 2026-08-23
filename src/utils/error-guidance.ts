@@ -173,6 +173,20 @@ export function buildStructuredErrorPayload(
         stepsEn: ["Retry later; Bilibili playback URLs are temporary."],
         stepsZh: ["请稍后重试；Bilibili 播放地址是临时的。"],
       },
+      ASR_FAKE_IP_DNS: {
+        en: "The 198.18.0.0/15 addresses are standard Fake-IP placeholders that this server rejects by design.",
+        zh: "198.18.0.0/15 地址是标准 Fake-IP 占位地址，本服务会按安全设计拒绝连接。",
+        stepsEn: [
+          "Your proxy DNS returned placeholder addresses instead of the real Bilibili media addresses; the server keeps rejecting them to prevent unsafe redirected connections.",
+          "Choose how to continue: configure a fake-ip-filter or equivalent real-IP DNS rule for `*.bilivideo.com` and `*.bilivideo.cn`, keep those domains on your intended routing policy, then restart the proxy and reconnect the MCP client; or temporarily disable Fake-IP for this request.",
+          "Do not allowlist 198.18.0.0/15 in the MCP server.",
+        ],
+        stepsZh: [
+          "你的代理 DNS 返回了占位地址，而不是 Bilibili 媒体域名的真实地址；本服务会继续拒绝这些地址，以防止不安全的重定向连接。",
+          "请由你选择后续方案：配置 fake-ip-filter 或等效的真实 IP DNS 规则，使 `*.bilivideo.com` 和 `*.bilivideo.cn` 返回真实地址，保持这些域名使用你预期的路由策略，然后重启代理并重连 MCP 客户端；或者仅为本次请求临时停用 Fake-IP。",
+          "不要在 MCP 服务中放行 198.18.0.0/15。",
+        ],
+      },
       ASR_LIMIT_EXCEEDED: {
         en: "The selected Part exceeds a bounded ASR safety limit.",
         zh: "所选分集超出了 ASR 安全限制。",
@@ -205,15 +219,16 @@ export function buildStructuredErrorPayload(
       },
     };
     const selected = guidance[error.code];
+    const fakeIpDns = error.code === "ASR_FAKE_IP_DNS";
     return withCompatibilityNextSteps({
       error: true,
       message: selected.en,
       message_en: selected.en,
       message_zh: selected.zh,
       code: error.code,
-      category: "runtime",
-      retryable: error.retryable,
-      user_action_required: error.code === "ASR_NOT_READY" || error.code === "ASR_LIMIT_EXCEEDED",
+      category: fakeIpDns ? "network" : "runtime",
+      retryable: fakeIpDns ? false : error.retryable,
+      user_action_required: fakeIpDns || error.code === "ASR_NOT_READY" || error.code === "ASR_LIMIT_EXCEEDED",
       next_steps_en: selected.stepsEn,
       next_steps_zh: selected.stepsZh,
     });

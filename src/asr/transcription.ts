@@ -17,7 +17,10 @@ import {
   linkAbortSignal,
   throwIfAborted,
 } from "../security/operation-context.js";
-import { pinnedHttpsFetch } from "../security/pinned-https.js";
+import {
+  FakeIpDnsError,
+  pinnedHttpsFetch,
+} from "../security/pinned-https.js";
 import { sanitizeRemoteText } from "../utils/bounded-text.js";
 import { AsrError } from "../utils/errors.js";
 import { buildAsrChildEnv } from "./installer.js";
@@ -293,16 +296,24 @@ async function fetchAudioResponse(
 ): Promise<Response> {
   let currentUrl = validatePlaybackMediaUrl(initialUrl);
   for (let redirects = 0; redirects <= MAX_ASR_REDIRECTS; redirects += 1) {
-    const response = await fetchFn(currentUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": config.userAgent,
-        Referer: config.referer,
-        Accept: "audio/mp4,audio/*;q=0.9,application/octet-stream;q=0.5",
-      },
-      redirect: "manual",
-      signal,
-    });
+    let response: Response;
+    try {
+      response = await fetchFn(currentUrl, {
+        method: "GET",
+        headers: {
+          "User-Agent": config.userAgent,
+          Referer: config.referer,
+          Accept: "audio/mp4,audio/*;q=0.9,application/octet-stream;q=0.5",
+        },
+        redirect: "manual",
+        signal,
+      });
+    } catch (error) {
+      if (redirects > 0 && error instanceof FakeIpDnsError) {
+        throw new Error("Media redirect resolution failed");
+      }
+      throw error;
+    }
 
     if (response.status >= 300 && response.status < 400) {
       if (redirects === MAX_ASR_REDIRECTS) {
@@ -378,6 +389,8 @@ export async function downloadPlaybackAudio(
   }
 
   let lastError: unknown;
+  let attemptedCandidates = 0;
+  let fakeIpDnsFailures = 0;
   const aggregateBudget = { remainingBytes: maxBytes };
   const controller = new AbortController();
   const unlinkAbort = linkAbortSignal(signal, controller);
@@ -389,40 +402,50 @@ export async function downloadPlaybackAudio(
   try {
     for (const candidate of candidates.slice(0, 3)) {
       throwIfAborted(signal);
-    try {
-      await fs.promises.rm(destination, { force: true });
-      const response = await fetchAudioResponse(candidate.url, controller.signal, fetchFn);
-      await readBoundedBody(response, destination, aggregateBudget);
-      return;
-    } catch (error) {
-      await fs.promises.rm(destination, { force: true });
-      if (signal?.aborted) {
-        throw createAbortError();
-      }
-      if (error instanceof AsrError && error.code === "ASR_LIMIT_EXCEEDED") {
-        throw error;
-      }
-      if (
-        timedOut &&
-        error instanceof Error &&
-        error.name === "AbortError"
-      ) {
-        lastError = new AsrError(
-          "ASR_AUDIO_UNAVAILABLE",
-          "The temporary audio download timed out.",
-          true,
-        );
-      } else {
-        lastError = error;
+      attemptedCandidates += 1;
+      try {
+        await fs.promises.rm(destination, { force: true });
+        const response = await fetchAudioResponse(candidate.url, controller.signal, fetchFn);
+        await readBoundedBody(response, destination, aggregateBudget);
+        return;
+      } catch (error) {
+        await fs.promises.rm(destination, { force: true });
+        if (signal?.aborted) {
+          throw createAbortError();
+        }
+        if (error instanceof AsrError && error.code === "ASR_LIMIT_EXCEEDED") {
+          throw error;
+        }
+        if (error instanceof FakeIpDnsError) {
+          fakeIpDnsFailures += 1;
+        }
+        if (
+          timedOut &&
+          error instanceof Error &&
+          error.name === "AbortError"
+        ) {
+          lastError = new AsrError(
+            "ASR_AUDIO_UNAVAILABLE",
+            "The temporary audio download timed out.",
+            true,
+          );
+        } else {
+          lastError = error;
+        }
       }
     }
-  }
   } finally {
     clearTimeout(timer);
     unlinkAbort();
     controller.abort();
   }
 
+  if (attemptedCandidates > 0 && fakeIpDnsFailures === attemptedCandidates) {
+    throw new AsrError(
+      "ASR_FAKE_IP_DNS",
+      "All temporary audio candidates resolved only to the standard Fake-IP range.",
+    );
+  }
   if (lastError instanceof AsrError) throw lastError;
   throw new AsrError(
     "ASR_AUDIO_UNAVAILABLE",

@@ -97,6 +97,7 @@ export class NoSubtitleError extends Error {
 export type AsrErrorCode =
   | "ASR_NOT_READY"
   | "ASR_AUDIO_UNAVAILABLE"
+  | "ASR_FAKE_IP_DNS"
   | "ASR_LIMIT_EXCEEDED"
   | "ASR_BUSY"
   | "ASR_TRANSCRIPTION_TIMEOUT"

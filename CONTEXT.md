@@ -93,6 +93,10 @@ A transcript generated locally from the selected Part's audio by the managed
 ASR runtime. It is distinct from every Bilibili-provided subtitle track.
 _Avoid_: Bilibili AI Subtitle, fallback subtitle
 
+**ASR Fake-IP DNS Diagnosis**:
+A user-actionable network diagnosis produced only when every attempted Bilibili media candidate resolves exclusively to the standard `198.18.0.0/15` Fake-IP placeholder range. It does not authorize connecting to that range.
+_Avoid_: Generic DNS failure, proxy failure, CDN IP allowlist
+
 **Subtitle Integrity**:
 Whether a selected subtitle is usable as transcript evidence. Mere presence of
 a subtitle track does not establish Subtitle Integrity.
