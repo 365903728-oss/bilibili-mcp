@@ -100,16 +100,16 @@
     "docs/agent-memory/verification-log.md": "0ee3f44f45803360428f40fc2ccb1f2fb45e4570511c71ada9746582a42c99c6"
   },
   "package": {
-    "output_digest": "349327664349100ff08e9f837f700b6bfa1f7c9532f39c2cd5d57838d16967e8",
+    "output_digest": "b794903d0c96ada487f050e75730b121afbe00df07b0f98c8e1b39cdc72ecb4e",
     "pack_output": [
       {
         "id": "@xzxzzx/bilibili-mcp@1.13.0",
         "name": "@xzxzzx/bilibili-mcp",
         "version": "1.13.0",
-        "size": 1136287,
-        "unpackedSize": 1927300,
-        "shasum": "e4ae76277f5b2bfc769dd160373a2293d0b84a7b",
-        "integrity": "sha512-gmux7ccocFj4mROokWTQLWwmwbp8BoJEB2CeD3CKVhFj0Ebf2dRpw+w6uUp1vR8itqK8WdmrOZzkF5eXBbojHg==",
+        "size": 1136900,
+        "unpackedSize": 1928398,
+        "shasum": "fc3758a3062c45d0426ef02965103278e9643bca",
+        "integrity": "sha512-f1lQcatpVgD6l9uh2xMUi41uOVo+r3P6mNMUPFkmAGpEeTjkgqq2/pgIGttepz+Mp20YboYos0es8zKCt2NZ5A==",
         "filename": "xzxzzx-bilibili-mcp-1.13.0.tgz",
         "files": [
           {
@@ -119,12 +119,12 @@
           },
           {
             "path": "README_EN.md",
-            "size": 19655,
+            "size": 19822,
             "mode": 420
           },
           {
             "path": "README.md",
-            "size": 18094,
+            "size": 18239,
             "mode": 420
           },
           {
@@ -564,12 +564,12 @@
           },
           {
             "path": "dist/cli.js",
-            "size": 16111,
+            "size": 16406,
             "mode": 420
           },
           {
             "path": "dist/cli.js.map",
-            "size": 13784,
+            "size": 13924,
             "mode": 420
           },
           {
@@ -1054,12 +1054,12 @@
           },
           {
             "path": "docs/client-setup.en.md",
-            "size": 44494,
+            "size": 44684,
             "mode": 420
           },
           {
             "path": "docs/client-setup.md",
-            "size": 42616,
+            "size": 42777,
             "mode": 420
           },
           {
