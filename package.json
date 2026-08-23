@@ -14,6 +14,7 @@
     "build": "node --input-type=commonjs -e \"const{rmSync}=require('fs');const{resolve,dirname,basename}=require('path');const d=resolve('dist');if(dirname(d)!==process.cwd()||basename(d)!=='dist'){console.error('Safety check failed: '+d);process.exit(1);}rmSync(d,{recursive:true,force:true});\" && tsc",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
+    "test:fake-ip": "vitest run tests/pinned-https.test.ts tests/asr-transcription.test.ts tests/server-error-next-steps.test.ts",
     "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",

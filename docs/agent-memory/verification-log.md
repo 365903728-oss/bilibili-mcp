@@ -2590,3 +2590,31 @@ Six release blockers fixed; one regression proof per root cause (new tests
   file sizes. The exact conformance gate and Harness core suite passed after the
   refreshed three-level receipt chain; no dependency, product behavior, proxy
   configuration, tag, release, or publication changed.
+
+## 2026-08-23 — Issue #59 Cross-Node And Real FlClash Acceptance
+
+- Automation: `test:fake-ip` runs the pinned-HTTPS DNS contract, all-candidate
+  ASR aggregation, and public MCP error structure. The same 92 tests passed on
+  Node 20.20.2, 22.23.2, and 25.9.0. Verify now carries a three-version matrix,
+  and the aggregate `Required` job depends on it. The matrix configuration
+  regression failed 2/2 before the workflow change and passed afterward.
+- Full verification: TypeScript build passed; Vitest passed 44 files / 1,076
+  tests; npm pack dry-run contained 193 files; `npm audit --omit=dev` reported
+  zero production vulnerabilities.
+- Real environment: with FlClash Rule mode, TUN, and Fake-IP active, temporarily
+  removing only `+.bilivideo.com` and `+.bilivideo.cn` produced exclusively
+  standard Fake-IP answers. The same public `force_asr` MCP request returned
+  `ASR_FAKE_IP_DNS` in 2,223 ms before model work, with category `network`,
+  non-retryable, and user-action-required.
+- Recovery evidence: after the user restored and reloaded the approved override,
+  both filters returned, sampled media DNS resolved outside the standard
+  Fake-IP range, and the same CPU `small` ASR path completed with
+  `data_source=asr` and a non-empty 1,744-character transcript. The transcript,
+  Cookie, signed URL, full DNS answers, proxy node, and private profile content
+  were not retained.
+- Boundary: no product runtime code, dependency, MCP schema, proxy node, TUN,
+  rule mode, model, release, or publication changed. Hosted matrix evidence
+  remains a later push/PR gate.
+- Harness: after refreshing the canonical LF package receipt and durable-memory
+  hashes, exact real-pilot conformance passed 1/1 and the contracts, events,
+  adapters, and memory core suite passed 102 tests with 15 skipped.

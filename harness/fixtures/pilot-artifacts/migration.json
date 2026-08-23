@@ -89,27 +89,27 @@
     }
   ],
   "durable_memory": {
-    "docs/agent-memory/active-work.md": "c6bf8ad518f3488d3440db12d27550466143fdd49a85a5e35c67297d7d60305a",
-    "docs/agent-memory/codemap.md": "e08ec7f0539e6c2fd96b6f8434d76552d863b346e434a7d1e6c6a1c61c188ff7",
+    "docs/agent-memory/active-work.md": "469bf4c917953eee9a7e19ad395d9a84c82bbbe7577ab6314efaeb64fb3aa248",
+    "docs/agent-memory/codemap.md": "5d73f156c64b917289a744175c30456530f9d1adcc310195c38533215db22364",
     "docs/agent-memory/decisions.md": "302b443c014aa57294dfe2eaed16c18677c89a7fdb653919041304a46afa672e",
     "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
     "docs/agent-memory/harness-eval.md": "f531cc2d0e69ccc8d41c882c9aefdae03d5583789bc19c51dd45a4188fe9a370",
     "docs/agent-memory/harness-security.md": "b907339f85c0ba13c2a8642b475aa682ae1b313cb51cebec9977aca798df3430",
     "docs/agent-memory/lessons-learned.md": "6a0e45bc73159237fb3200a3725d12d54dd0d83aa5c8eebcec5ffb9bd2efb7d7",
     "docs/agent-memory/project-facts.md": "ce49559de2e1ed1ecb322ecd2f0d3ff62887c9ca1f7d885ab2b47ab9ff6b7e3c",
-    "docs/agent-memory/verification-log.md": "74dc17820d472a671ea5b2ecfed86df0844eb74c8bea807fe0c20e95ecad876c"
+    "docs/agent-memory/verification-log.md": "0ee3f44f45803360428f40fc2ccb1f2fb45e4570511c71ada9746582a42c99c6"
   },
   "package": {
-    "output_digest": "bd1706df97cabcab513ef17abeef73b8e6fbf38022c9c70fd0b54f56257f1b6f",
+    "output_digest": "349327664349100ff08e9f837f700b6bfa1f7c9532f39c2cd5d57838d16967e8",
     "pack_output": [
       {
         "id": "@xzxzzx/bilibili-mcp@1.13.0",
         "name": "@xzxzzx/bilibili-mcp",
         "version": "1.13.0",
-        "size": 1136235,
-        "unpackedSize": 1927169,
-        "shasum": "f8af318ac78fdd264347075f25f04c82d5e37e68",
-        "integrity": "sha512-uOi4xmIrT/Lz3PBmk7NZI7lLXI229OpPoKcVxJk88HTng+xl71U2j5NDMO4q5jO56GmHT27w3J7CVz7Al3LmiQ==",
+        "size": 1136287,
+        "unpackedSize": 1927300,
+        "shasum": "e4ae76277f5b2bfc769dd160373a2293d0b84a7b",
+        "integrity": "sha512-gmux7ccocFj4mROokWTQLWwmwbp8BoJEB2CeD3CKVhFj0Ebf2dRpw+w6uUp1vR8itqK8WdmrOZzkF5eXBbojHg==",
         "filename": "xzxzzx-bilibili-mcp-1.13.0.tgz",
         "files": [
           {
@@ -1074,7 +1074,7 @@
           },
           {
             "path": "package.json",
-            "size": 2349,
+            "size": 2480,
             "mode": 420
           }
         ],
