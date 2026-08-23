@@ -14,8 +14,9 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
 - `src/cli.ts`: package CLI entry point. Exports a testable `createCli()`
   factory, uses the Commander root action for no-argument bounded stdio
   startup, and exposes `setup` (credentials plus optional ASR with three-model
-  selector), `doctor` (credential and ASR status plus `asr.model` key),
-  `config`, `check`, `check-update`, and `version`.
+  selector), `doctor` (credential status plus model, controlled execution
+  Profile, Device Readiness, migration status, and optional sanitized failure
+  category), `config`, `check`, `check-update`, and `version`.
 - `src/config.ts`: runtime configuration with strict positive-safe-integer
   validation for rate limits, timeouts, and cache sizing, plus canonical
   supported-language selection that preserves `ai-zh` and rejects unknown values.
@@ -42,19 +43,25 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
 
 ## ASR Runtime (Phases 1-3)
 
-- `src/asr/state.ts`: three-model allowlist (`tiny`/`base`/`small` with pinned revisions and approximate sizes), model-spec resolution and validation, derived user paths (`~/.bilibili-mcp/asr/`), versioned state read/validation (accepts any allowlisted repository/revision), and atomic state write (parameterized by model key, defaults to `small`).
+- `src/asr/state.ts`: three-model allowlist (`tiny`/`base`/`small` with pinned
+  revisions and approximate sizes), controlled Execution Profile/failure
+  enums, derived user paths (`~/.bilibili-mcp/asr/`), strict v1/v2 state
+  validation, v1 migration-pending projection, and atomic v2 `cpu/int8` ready
+  write (parameterized by model key, defaults to `small`).
 - `src/asr/installer.ts`: injectable Python 3.9+ discovery (with
   `BILIBILI_ASR_PYTHON` override), allowlisted child environment, subprocess
   deadlines/output caps, user-scoped venv creation, pinned pip install,
-  staged/budgeted/no-symlink snapshot download, CPU INT8 model-load
-  verification, atomic activation, and failure cleanup. One active model reuses
-  the Phase 1 directory.
+  staged/budgeted/no-symlink snapshot download, generated short-WAV CPU INT8
+  inference with full generator consumption, temporary-audio cleanup, same-model
+  v1 promotion without reinstall, atomic Profile activation, and failure cleanup.
+  One active model reuses the Phase 1 directory.
 - `src/asr/transcription.ts`: explicit ready-state-only ASR orchestration. It
   requires trusted duration, owns one aggregate audio deadline/byte budget,
   unique temporary directories, one-active/no-queue concurrency, bounded
   Windows Job/POSIX `RLIMIT` managed-Python execution, strict NDJSON,
-  cancellation/tree kill, guarded cleanup, and all-candidate Fake-IP failure
-  aggregation without preventing later-candidate success. MCP requests never
+  cancellation/tree kill, controlled Profile-driven Python argv, legacy v1 CPU
+  fallback, guarded cleanup, and all-candidate Fake-IP failure aggregation
+  without preventing later-candidate success. MCP requests never
   install or switch models.
 
 ## MCP Tool Surface
@@ -122,16 +129,24 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 
 - `tests/mcp-server-smoke.test.ts`: built `index.js`/`cli.js` stdio coverage, Agent-facing doctor/setup/version CLI probes, MCP handler smoke coverage, and a public JSON-clean `initialize` → `tools/list` → representative `tools/call` wire test.
 - `tests/cli.test.ts`: deterministic CLI tests for help output,
-  `buildDoctorStatus` JSON contract (including ASR object), credential-source
-  priority, isolated blank-replacement protection, and no-leak checks.
+  `buildDoctorStatus` JSON contract (including ASR Profile/readiness/migration
+  fields and sanitized failure category), credential-source priority, isolated
+  blank-replacement protection, and no-leak checks.
 - `tests/config.test.ts`: canonical-language behavior and table-driven strict
   validation for every user-facing numeric environment variable.
 - `tests/index-env-order.test.ts`: mocked dotenv regression proving the entrypoint
   loads `.env` before runtime config is imported and validated.
-- `tests/asr-installer.test.ts`: deterministic installer/state tests. State read/validation/write, Python discovery (override/path/version), venv/pip/download/verify subprocess gating, and full orchestration success/failure. No tests invoke real Python, pip, network, or model download.
+- `tests/asr-installer.test.ts`: deterministic installer/state tests. Strict
+  v1/v2 state validation, atomic writes, managed-path safety, Python discovery,
+  venv/pip/download gates, generated-WAV inference/cleanup, same-model v1
+  promotion, and full orchestration success/failure. No tests invoke real
+  Python, pip, network, or model download.
 - `tests/asr-installer-process.test.ts`: mocked default subprocess deadlines,
   output ceilings, argv, stdio, and platform process-group settings.
-- `tests/asr-transcription.test.ts`: deterministic ready-state, download, redirect, size/MIME, Fake-IP candidate aggregation, child argv/environment, strict output, timeout/kill, cleanup, and concurrency tests with no real network, Python, audio, Cookie, or model.
+- `tests/asr-transcription.test.ts`: deterministic v1/v2 ready-state and
+  Profile-driven runner coverage plus download, redirect, size/MIME, Fake-IP
+  aggregation, child argv/environment, strict output, timeout/kill, cleanup,
+  and concurrency tests with no real network, Python, audio, Cookie, or model.
 - `tests/bilibili-playback.test.ts`: deterministic playurl auth/parameter, malformed-versus-empty DASH, duration, CDN allowlist, and candidate-order tests.
 - `tests/bounded-stdio-transport.test.ts`: inbound/outbound framing ceilings,
   UTF-8 byte accounting, fixed-buffer chunking, and fail-closed overflow.

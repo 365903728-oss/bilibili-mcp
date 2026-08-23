@@ -772,3 +772,25 @@
 - Impact: Issue #40 and the related locally recorded Issue #41 defects are now
   available from npm and the Official MCP Registry. After follow-up user
   authorization, Registry `1.12.0` is `active` and `isLatest=true`.
+
+## 2026-08-24
+
+- Fact: The isolated Issue #65 candidate upgrades managed ASR state to v2 and
+  persists a ready Profile only after the selected local model completes a
+  generated short-WAV inference on `cpu/int8` and the temporary WAV is removed.
+- Evidence: `src/asr/state.ts`, `src/asr/installer.ts`, deterministic state and
+  installer regressions, 282 focused tests, and 44 files / 1,104 full tests.
+- Impact: New CPU setup records actual execution facts instead of intent. A
+  same-model v1 install can be promoted with one probe and no reinstall or model
+  download; failure preserves the exact previous v1 state.
+
+- Fact: `doctor --json` now derives model, device, compute type, Device
+  Readiness, migration status, and optional sanitized failure category from the
+  controlled state. The Python runner receives its Profile through validated
+  argv, while the public transcript and MCP schemas remain unchanged.
+- Evidence: `src/cli.ts`, `src/asr/transcription.ts`, CLI/transcription tests,
+  build, package dry run, production audit, and three-axis review.
+- Impact: v1 reports migration pending without claiming a device; v2 currently
+  accepts only verified `cpu/int8` as ready. `cuda/float16` remains a controlled
+  future Profile but cannot become disk-ready until #66 implements GPU
+  readiness; #67 still owns first-ASR automatic migration.

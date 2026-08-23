@@ -12,9 +12,15 @@ import { buildPackageUpdateInfo } from "./utils/update-check.js";
 import { BoundedStdioServerTransport } from "./server/bounded-stdio-transport.js";
 
 import {
+  ASR_FAILURE_CATEGORIES,
   readAsrState,
   deriveAsrPaths,
+  resolveExecutionProfile,
   type AsrStateKind,
+  type AsrDeviceReadiness,
+  type AsrExecutionProfile,
+  type AsrFailureCategory,
+  type AsrMigrationStatus,
   ASR_MODEL_SPECS,
   resolveModelSpec,
   type AsrModelKey,
@@ -191,6 +197,11 @@ export interface DoctorStatus {
   asr: {
     status: AsrStateKind;
     model: AsrModelKey | null;
+    device: AsrExecutionProfile["device"] | null;
+    compute_type: AsrExecutionProfile["computeType"] | null;
+    device_readiness: AsrDeviceReadiness;
+    migration_status: AsrMigrationStatus | null;
+    failure_category: AsrFailureCategory | null;
   };
   status: "locally_ready" | "needs_credentials";
   next_steps: string[];
@@ -208,6 +219,25 @@ export function buildDoctorStatus(
 
   const asrState = readAsrStateFn(asrPaths.stateFile);
   const asrModelKey: AsrModelKey | null = asrState.modelKey ?? null;
+  const executionProfile = asrState.kind === "ready" && asrState.executionProfile !== undefined
+    ? resolveExecutionProfile(
+        asrState.executionProfile.device,
+        asrState.executionProfile.computeType,
+      )
+    : undefined;
+  const profileReady = executionProfile !== undefined &&
+    asrState.deviceReadiness === "ready" &&
+    asrState.migrationStatus === "completed";
+  const migrationPending = asrState.kind === "ready" &&
+    executionProfile === undefined &&
+    (asrState.version === 1 ||
+      (asrState.deviceReadiness === "migration_pending" &&
+        asrState.migrationStatus === "pending"));
+  const failureCategory = profileReady &&
+    typeof asrState.failureCategory === "string" &&
+    (ASR_FAILURE_CATEGORIES as readonly string[]).includes(asrState.failureCategory)
+    ? asrState.failureCategory
+    : null;
 
   return {
     package_name: "@xzxzzx/bilibili-mcp",
@@ -225,6 +255,19 @@ export function buildDoctorStatus(
     asr: {
       status: asrState.kind,
       model: asrModelKey,
+      device: profileReady ? executionProfile.device : null,
+      compute_type: profileReady ? executionProfile.computeType : null,
+      device_readiness: profileReady
+        ? "ready"
+        : migrationPending
+          ? "migration_pending"
+          : "not_ready",
+      migration_status: profileReady
+        ? "completed"
+        : migrationPending
+          ? "pending"
+          : null,
+      failure_category: failureCategory,
     },
     status: isReady ? "locally_ready" : "needs_credentials",
     next_steps: isReady
@@ -256,6 +299,16 @@ export function doctorCommand(
       console.log(`ASR: ${status.asr.status}`);
       if (status.asr.model) {
         console.log(`ASR model: ${status.asr.model}`);
+      }
+      console.log(`ASR device readiness: ${status.asr.device_readiness}`);
+      if (status.asr.device && status.asr.compute_type) {
+        console.log(`ASR execution profile: ${status.asr.device}/${status.asr.compute_type}`);
+      }
+      if (status.asr.migration_status) {
+        console.log(`ASR migration status: ${status.asr.migration_status}`);
+      }
+      if (status.asr.failure_category) {
+        console.log(`ASR failure category: ${status.asr.failure_category}`);
       }
       console.log(`Status: ${status.status}`);
       if (status.next_steps.length > 0) {

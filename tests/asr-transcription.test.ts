@@ -21,6 +21,8 @@ import type { PlaybackAudioCandidate } from "../src/bilibili/playback.js";
 import { FakeIpDnsError } from "../src/security/pinned-https.js";
 import { AsrError } from "../src/utils/errors.js";
 
+const CPU_PROFILE = { device: "cpu", computeType: "int8" } as const;
+
 const tempDirs: string[] = [];
 const candidate: PlaybackAudioCandidate = {
   url: "https://upos-sz-mirrorcoso1.bilivideo.com/audio.m4s?token=signed",
@@ -37,7 +39,12 @@ function readyDependencies() {
       model: path.join("managed-root", "models"),
       stateFile: path.join("managed-root", "state.json"),
     }),
-    getState: () => ({ kind: "ready" as const }),
+    getState: () => ({
+      kind: "ready" as const,
+      executionProfile: CPU_PROFILE,
+      deviceReadiness: "ready" as const,
+      migrationStatus: "completed" as const,
+    }),
   };
 }
 
@@ -119,7 +126,7 @@ describe("ASR child isolation and lifecycle", () => {
       "managed-python",
       "managed-model",
       "temporary-audio",
-      { spawnFn: spawnFn as never },
+      { executionProfile: CPU_PROFILE, spawnFn: spawnFn as never },
     );
     child.stdout.write(fakeNdjson());
     child.emit("close", 0);
@@ -129,8 +136,9 @@ describe("ASR child isolation and lifecycle", () => {
     const [executable, argv, options] = spawnFn.mock.calls[0];
     expect(executable).toBe("managed-python");
     expect(argv[0]).toBe("-I");
-    expect(argv.at(-2)).toBe("managed-model");
-    expect(argv.at(-1)).toBe("temporary-audio");
+    expect(argv.slice(-4)).toEqual(["managed-model", "temporary-audio", "cpu", "int8"]);
+    expect(argv[2]).toContain("device=sys.argv[3]");
+    expect(argv[2]).toContain("compute_type=sys.argv[4]");
     expect(argv[2]).toContain("CreateJobObjectW");
     expect(argv[2]).toContain("AssignProcessToJobObject");
     expect(argv[2]).toContain("RLIMIT_AS");
@@ -156,6 +164,7 @@ describe("ASR child isolation and lifecycle", () => {
     child.kill = vi.fn(() => true);
     const spawnFn = vi.fn(() => child as never);
     const promise = runManagedAsrRuntime("python", "model", "audio", {
+      executionProfile: CPU_PROFILE,
       spawnFn: spawnFn as never,
       signal: controller.signal,
     });
@@ -194,6 +203,7 @@ describe("ASR child isolation and lifecycle", () => {
     const spawnFn = vi.fn(() => child as never);
 
     const promise = runManagedAsrRuntime("python", "model", "audio", {
+      executionProfile: CPU_PROFILE,
       spawnFn: spawnFn as never,
       timeoutMs: 5,
     });
@@ -216,6 +226,7 @@ describe("ASR child isolation and lifecycle", () => {
     });
     const spawnFn = vi.fn(() => child as never);
     const promise = runManagedAsrRuntime("python", "model", "audio", {
+      executionProfile: CPU_PROFILE,
       spawnFn: spawnFn as never,
       timeoutMs: 1_000,
     });
@@ -614,6 +625,91 @@ describe("ASR orchestration", () => {
     )).resolves.toMatchObject({ language: "en" });
     expect(removeTempDir).toHaveBeenCalledOnce();
     expect(runRuntime).toHaveBeenCalledOnce();
+    expect(runRuntime.mock.calls[0][3]).toEqual(CPU_PROFILE);
+  });
+
+  it("uses the controlled legacy CPU fallback for a v1 migration-pending state", async () => {
+    const runRuntime = vi.fn(async () => ({ language: "zh", segments: [] }));
+
+    await transcribeVideoPart(
+      { bvid: "BV1T6PQzQErF", cid: 12345, durationSeconds: 60 },
+      {
+        ...readyDependencies(),
+        getState: () => ({
+          kind: "ready",
+          version: 1,
+          deviceReadiness: "migration_pending",
+          migrationStatus: "pending",
+        }),
+        getPlayback: async () => ({ candidates: [candidate], durationSeconds: 60 }),
+        createTempDir: async () => path.join(os.tmpdir(), `${ASR_TEMP_PREFIX}legacy`),
+        removeTempDir: vi.fn(async () => undefined),
+        downloadAudio: vi.fn(async () => undefined),
+        runRuntime,
+      },
+    );
+
+    expect(runRuntime.mock.calls[0][3]).toEqual(CPU_PROFILE);
+  });
+
+  it("rejects an unallowlisted injected profile before playback or subprocess work", async () => {
+    const getPlayback = vi.fn();
+    const runRuntime = vi.fn();
+
+    await expect(transcribeVideoPart(
+      { bvid: "BV1T6PQzQErF", cid: 12345, durationSeconds: 60 },
+      {
+        ...readyDependencies(),
+        getState: () => ({
+          kind: "ready",
+          executionProfile: { device: "cpu", computeType: "float16" },
+          deviceReadiness: "ready",
+          migrationStatus: "completed",
+        } as never),
+        getPlayback,
+        runRuntime,
+      },
+    )).rejects.toMatchObject({ code: "ASR_NOT_READY" });
+    expect(getPlayback).not.toHaveBeenCalled();
+    expect(runRuntime).not.toHaveBeenCalled();
+  });
+
+  it("rejects a CPU profile that has not reached ready/completed", async () => {
+    const getPlayback = vi.fn();
+
+    await expect(transcribeVideoPart(
+      { bvid: "BV1T6PQzQErF", cid: 12345, durationSeconds: 60 },
+      {
+        ...readyDependencies(),
+        getState: () => ({
+          kind: "ready",
+          executionProfile: CPU_PROFILE,
+          deviceReadiness: "migration_pending",
+          migrationStatus: "pending",
+        }),
+        getPlayback,
+      },
+    )).rejects.toMatchObject({ code: "ASR_NOT_READY" });
+    expect(getPlayback).not.toHaveBeenCalled();
+  });
+
+  it("does not execute a CUDA profile before the CUDA readiness ticket", async () => {
+    const getPlayback = vi.fn();
+
+    await expect(transcribeVideoPart(
+      { bvid: "BV1T6PQzQErF", cid: 12345, durationSeconds: 60 },
+      {
+        ...readyDependencies(),
+        getState: () => ({
+          kind: "ready",
+          executionProfile: { device: "cuda", computeType: "float16" },
+          deviceReadiness: "ready",
+          migrationStatus: "completed",
+        }),
+        getPlayback,
+      },
+    )).rejects.toMatchObject({ code: "ASR_NOT_READY" });
+    expect(getPlayback).not.toHaveBeenCalled();
   });
 
   it("cleans the request directory after download or runtime failure", async () => {

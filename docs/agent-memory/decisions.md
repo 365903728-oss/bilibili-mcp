@@ -859,3 +859,34 @@
   domain-wildcard `fake-ip-filter`, rule-mode `real-ip`, and domain-specific DNS
   policy. Issue #57 fixes the public category as `network`, non-retryable, and
   user-action-required.
+
+## 2026-08-24 — CPU ASR Execution Profile
+
+- Decision: State v2 may become ready only as the currently verified and
+  executable `cpu/int8` Profile. Keep `cuda/float16` in the controlled Profile
+  resolver, but do not accept it as disk-ready until #66 supplies real GPU
+  readiness and execution.
+- Reason: `doctor`, setup idempotency, and transcription must describe the same
+  executable fact; accepting CUDA early would report ready while the current
+  ASR path correctly refuses it.
+- Evidence: state, doctor, setup, and transcription regressions plus independent
+  Standards, Spec, and risk review.
+
+- Decision: CPU readiness requires loading the selected local model, transcribing
+  a program-generated fixed one-second WAV, fully consuming the segment
+  generator, and successfully deleting the temporary WAV before the atomic v2
+  state rename.
+- Reason: model construction alone does not prove the inference path works, and
+  cleanup failure must not publish a false ready Profile.
+- Evidence: deterministic probe-script, generator-consumption, cleanup-failure,
+  v1-promotion, and atomic-rename tests.
+
+- Decision: Legacy v1 preserves its model-ready fact as
+  `migration_pending/pending` and may continue through the controlled CPU path.
+  Setup can promote the same model with one probe and no reinstall or download.
+  The atomic boundary is the state/Profile promotion; existing different-model
+  Phase 2 switching remains unchanged.
+- Reason: #65 must not force existing users to redownload a valid model, while
+  #67 owns first-ASR device migration and #66 owns GPU probing/fallback.
+- Evidence: exact v1 state preservation on probe failure, one-probe promotion,
+  and #65/#55 issue boundary review.

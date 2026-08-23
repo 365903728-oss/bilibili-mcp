@@ -4,7 +4,27 @@ import os from "os";
 import { randomUUID } from "crypto";
 
 export const ASR_PINNED_RUNTIME = "faster-whisper==1.2.1";
-export const ASR_STATE_VERSION = 1;
+export const ASR_STATE_VERSION = 2;
+const ASR_LEGACY_STATE_VERSION = 1;
+
+export const ASR_EXECUTION_PROFILES = [
+  { device: "cpu", computeType: "int8" },
+  { device: "cuda", computeType: "float16" },
+] as const;
+
+export type AsrExecutionProfile = (typeof ASR_EXECUTION_PROFILES)[number];
+export const ASR_CPU_EXECUTION_PROFILE = ASR_EXECUTION_PROFILES[0];
+export type AsrDeviceReadiness = "not_ready" | "migration_pending" | "ready";
+export type AsrMigrationStatus = "pending" | "completed";
+
+export const ASR_FAILURE_CATEGORIES = [
+  "no_nvidia_gpu",
+  "cuda_runtime_missing",
+  "runtime_version_mismatch",
+  "model_probe_failed",
+] as const;
+
+export type AsrFailureCategory = (typeof ASR_FAILURE_CATEGORIES)[number];
 
 export const ASR_MODEL_SPECS = [
   {
@@ -70,6 +90,10 @@ export interface AsrState {
   model?: string;
   revision?: string;
   modelKey?: AsrModelKey;
+  executionProfile?: AsrExecutionProfile;
+  deviceReadiness?: AsrDeviceReadiness;
+  migrationStatus?: AsrMigrationStatus;
+  failureCategory?: AsrFailureCategory;
 }
 
 export function modelKeyForRepo(repository: string, revision: string): AsrModelKey | null {
@@ -125,6 +149,29 @@ function isRealPath(
   }
 }
 
+function hasExactKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  const actual = Object.keys(value).sort();
+  const wanted = [...expected].sort();
+  return actual.length === wanted.length && actual.every((key, index) => key === wanted[index]);
+}
+
+export function resolveExecutionProfile(
+  device: unknown,
+  computeType: unknown,
+): AsrExecutionProfile | undefined {
+  return ASR_EXECUTION_PROFILES.find(
+    (profile) => profile.device === device && profile.computeType === computeType,
+  );
+}
+
+function isFailureCategory(value: unknown): value is AsrFailureCategory {
+  return typeof value === "string" &&
+    (ASR_FAILURE_CATEGORIES as readonly string[]).includes(value);
+}
+
 export function readAsrState(
   stateFile: string,
   readFileSync: typeof fs.readFileSync = fs.readFileSync,
@@ -162,9 +209,11 @@ export function readAsrState(
     return { kind: "incomplete" };
   }
 
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return { kind: "incomplete" };
+  }
+
   if (
-    typeof parsed !== "object" ||
-    parsed === null ||
     parsed.kind !== "ready" ||
     typeof parsed.version !== "number" ||
     typeof parsed.runtime !== "string" ||
@@ -174,16 +223,60 @@ export function readAsrState(
     return { kind: "incomplete" };
   }
 
-  if (parsed.version !== ASR_STATE_VERSION) {
-    return { kind: "incomplete" };
-  }
-
   if (
     parsed.runtime !== ASR_PINNED_RUNTIME ||
     typeof parsed.model !== "string" ||
     typeof parsed.revision !== "string" ||
     !isAllowlistedModel(parsed.model, parsed.revision)
   ) {
+    return { kind: "incomplete" };
+  }
+
+  const legacy = parsed.version === ASR_LEGACY_STATE_VERSION;
+  let executionProfile: AsrExecutionProfile | undefined;
+  let deviceReadiness: AsrDeviceReadiness;
+  let migrationStatus: AsrMigrationStatus;
+  let failureCategory: AsrFailureCategory | undefined;
+
+  if (legacy) {
+    if (!hasExactKeys(parsed, ["kind", "version", "runtime", "model", "revision"])) {
+      return { kind: "incomplete" };
+    }
+    deviceReadiness = "migration_pending";
+    migrationStatus = "pending";
+  } else if (parsed.version === ASR_STATE_VERSION) {
+    const expectedKeys = [
+      "kind",
+      "version",
+      "runtime",
+      "model",
+      "revision",
+      "device",
+      "compute_type",
+      "device_readiness",
+      "migration_status",
+      ...(Object.prototype.hasOwnProperty.call(parsed, "failure_category")
+        ? ["failure_category"]
+        : []),
+    ];
+    if (!hasExactKeys(parsed, expectedKeys)) {
+      return { kind: "incomplete" };
+    }
+    executionProfile = resolveExecutionProfile(parsed.device, parsed.compute_type);
+    if (
+      executionProfile === undefined ||
+      executionProfile.device !== "cpu" ||
+      parsed.device_readiness !== "ready" ||
+      parsed.migration_status !== "completed" ||
+      (Object.prototype.hasOwnProperty.call(parsed, "failure_category") &&
+        !isFailureCategory(parsed.failure_category))
+    ) {
+      return { kind: "incomplete" };
+    }
+    deviceReadiness = "ready";
+    migrationStatus = "completed";
+    failureCategory = parsed.failure_category as AsrFailureCategory | undefined;
+  } else {
     return { kind: "incomplete" };
   }
 
@@ -226,6 +319,10 @@ export function readAsrState(
     model: parsed.model as string,
     revision: parsed.revision as string,
     modelKey: derivedKey ?? undefined,
+    executionProfile,
+    deviceReadiness,
+    migrationStatus,
+    failureCategory,
   };
 }
 
@@ -241,12 +338,16 @@ export function writeAsrState(
   chmodSync: typeof fs.chmodSync = fs.chmodSync,
 ): void {
   const spec = resolveModelSpec(modelKey);
-  const state: AsrState = {
+  const state = {
     kind: "ready",
     version: ASR_STATE_VERSION,
     runtime: ASR_PINNED_RUNTIME,
     model: spec.repository,
     revision: spec.revision,
+    device: "cpu",
+    compute_type: "int8",
+    device_readiness: "ready",
+    migration_status: "completed",
   };
 
   const dir = path.dirname(stateFile);

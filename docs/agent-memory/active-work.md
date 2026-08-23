@@ -2,16 +2,20 @@
 
 ## Current Product Ticket
 
-GitHub Issue #59 completes the approved #56 Fake-IP DNS acceptance after #57
-and #58 merged and closed. Work is isolated on
-`codex/issue-59-fake-ip-qa` from merged PR #62 base
-`03ccb8bf2e1172a7591b893d79f2af699c2532c3` and is directly executed by Codex
-without Paseo. The bounded scope is a Node 20/22/25 focused CI gate plus
-redacted real FlClash Rule + TUN + Fake-IP evidence. Local focused, build,
-complete-suite, package, production-audit, and real pre/post-filter acceptance
-all pass. The user-controlled override was restored and reloaded after QA;
-push, PR, Issue close, release, and publication remain separate authority
-gates.
+GitHub Issue #65 is the current approved child ticket under #55. Work is
+isolated on `codex/issue-65-cpu-execution-profile` from merged PR #68 base
+`547b2bb170121bb7701d523e28f3a1f06b1224a8` and is directly executed by Codex
+without Paseo. The bounded implementation upgrades ASR state to v2, persists
+only a verified `cpu/int8` Execution Profile, derives legacy v1 as model-ready
+with device migration pending, requires a generated short-WAV inference and
+generator consumption before ready, reports controlled readiness fields from
+`doctor`, and drives the existing runner from the validated Profile. CUDA
+readiness, GPU probing/fallback, and first-ASR automatic migration remain #66
+and #67. Focused tests, build, the 44-file / 1,104-test suite, package dry run,
+production audit, and three independent review axes pass; a real model CPU
+smoke remains intentionally unrun because it would touch user-managed ASR
+state. Commit, push, PR, Issue close, release, and publication remain separate
+authority gates.
 
 ## Harness v2
 

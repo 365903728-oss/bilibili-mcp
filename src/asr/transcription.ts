@@ -25,9 +25,12 @@ import { sanitizeRemoteText } from "../utils/bounded-text.js";
 import { AsrError } from "../utils/errors.js";
 import { buildAsrChildEnv } from "./installer.js";
 import {
+  ASR_CPU_EXECUTION_PROFILE,
   deriveAsrPaths,
   readAsrState,
+  resolveExecutionProfile,
   type AsrPaths,
+  type AsrExecutionProfile,
   type AsrState,
 } from "./state.js";
 
@@ -100,7 +103,7 @@ const PYTHON_SCRIPT = [
   "        cap = 64 if hard < 0 else min(64, hard)",
   "        resource.setrlimit(resource.RLIMIT_NPROC, (cap, cap))",
   "from faster_whisper import WhisperModel",
-  "model = WhisperModel(sys.argv[1], device='cpu', compute_type='int8')",
+  "model = WhisperModel(sys.argv[1], device=sys.argv[3], compute_type=sys.argv[4])",
   "segments, info = model.transcribe(sys.argv[2], beam_size=5)",
   "language = info.language if isinstance(info.language, str) else None",
   "print(json.dumps({'type': 'meta', 'language': language}, ensure_ascii=True), flush=True)",
@@ -149,6 +152,7 @@ export interface AsrTranscriptionDependencies {
     pythonExecutable: string,
     modelPath: string,
     audioPath: string,
+    executionProfile: AsrExecutionProfile,
     signal?: AbortSignal,
   ) => Promise<AsrTranscriptionResult>;
 }
@@ -577,11 +581,19 @@ export async function runManagedAsrRuntime(
   modelPath: string,
   audioPath: string,
   options: {
+    executionProfile: AsrExecutionProfile;
     spawnFn?: typeof spawn;
     timeoutMs?: number;
     signal?: AbortSignal;
-  } = {},
+  },
 ): Promise<AsrTranscriptionResult> {
+  const executionProfile = resolveExecutionProfile(
+    options.executionProfile.device,
+    options.executionProfile.computeType,
+  );
+  if (executionProfile === undefined) {
+    throw new AsrError("ASR_NOT_READY", "The ASR execution profile is not allowlisted.");
+  }
   return new Promise((resolve, reject) => {
     const signal = getOperationSignal(options.signal);
     try {
@@ -593,7 +605,15 @@ export async function runManagedAsrRuntime(
     const spawnFn = options.spawnFn ?? spawn;
     const child = spawnFn(
       pythonExecutable,
-      ["-I", "-c", PYTHON_SCRIPT, modelPath, audioPath],
+      [
+        "-I",
+        "-c",
+        PYTHON_SCRIPT,
+        modelPath,
+        audioPath,
+        executionProfile.device,
+        executionProfile.computeType,
+      ],
       {
         env: buildAsrRuntimeEnv(process.env),
         shell: false,
@@ -791,12 +811,13 @@ export async function transcribeVideoPart(
         pythonExecutable: string,
         modelPath: string,
         audioPath: string,
+        executionProfile: AsrExecutionProfile,
         operationSignal?: AbortSignal,
       ) => await runManagedAsrRuntime(
         pythonExecutable,
         modelPath,
         audioPath,
-        { signal: operationSignal },
+        { executionProfile, signal: operationSignal },
       )
     );
   let tempDir: string | undefined;
@@ -810,6 +831,24 @@ export async function transcribeVideoPart(
       throw new AsrError(
         "ASR_NOT_READY",
         "Local ASR is not ready. Run `npx -y @xzxzzx/bilibili-mcp@latest setup`, then inspect `doctor --json`.",
+      );
+    }
+    const executionProfile = state.executionProfile !== undefined &&
+      state.deviceReadiness === "ready" &&
+      state.migrationStatus === "completed"
+      ? resolveExecutionProfile(
+          state.executionProfile.device,
+          state.executionProfile.computeType,
+        )
+      : state.executionProfile === undefined &&
+          state.deviceReadiness === "migration_pending" &&
+          state.migrationStatus === "pending"
+        ? ASR_CPU_EXECUTION_PROFILE
+        : undefined;
+    if (executionProfile === undefined || executionProfile.device !== "cpu") {
+      throw new AsrError(
+        "ASR_NOT_READY",
+        "Local ASR has no verified CPU execution profile. Run setup, then inspect doctor --json.",
       );
     }
 
@@ -831,6 +870,7 @@ export async function transcribeVideoPart(
       managedPythonExecutable(paths.venv),
       paths.model,
       audioPath,
+      executionProfile,
       signal,
     );
   } finally {
