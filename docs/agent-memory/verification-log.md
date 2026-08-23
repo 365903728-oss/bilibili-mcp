@@ -2618,3 +2618,39 @@ Six release blockers fixed; one regression proof per root cause (new tests
 - Harness: after refreshing the canonical LF package receipt and durable-memory
   hashes, exact real-pilot conformance passed 1/1 and the contracts, events,
   adapters, and memory core suite passed 102 tests with 15 skipped.
+
+## 2026-08-24 — Issue #65 CPU Execution Profile
+
+- TDD evidence: tests first failed for v2 Profile persistence, v1 migration
+  projection, real minimal-inference generator consumption, cleanup, Profile
+  argv, doctor fields, contradictory CUDA/failure state, current CUDA readiness,
+  and cleanup-error handling; each passed after its bounded implementation.
+- Final behavior: state v2 writes only verified `cpu/int8` ready/completed;
+  strict enums and exact keys fail closed. V1 remains model-ready with device
+  migration pending, same-model setup performs one CPU probe without reinstall,
+  and failed probe or atomic rename preserves the previous state bytes.
+- Probe and runtime: setup generates a private one-second WAV, loads the selected
+  model, transcribes it, consumes the segment generator, and requires successful
+  cleanup before publishing ready. The existing runner receives only a validated
+  Profile via argv; legacy v1 stays on controlled CPU until #67.
+- Doctor and public boundary: JSON/human output reports controlled model,
+  device, compute type, readiness, migration, and sanitized failure category.
+  Transcript result shape, MCP schema, credentials, resource ceilings, and
+  pinned-HTTPS audio behavior are unchanged.
+- Verification: 4 focused files / 282 tests passed; build passed; the complete
+  Vitest suite passed 44 files / 1,104 tests; the package dry run contained 193
+  files; production audit found zero vulnerabilities. Full audit retained the
+  two unchanged high development-chain findings in `nanoid` and `postcss`.
+  Gitleaks 8.30.1 found zero secrets in the tracked diff and both untracked
+  evidence files.
+- Harness: the core run exposed one stale canonical-LF `LICENSE` size in the
+  mechanically generated package receipt while all other cases passed or
+  skipped for their existing environment gates. After normalizing every
+  packaged text file and refreshing the receipt chain, the exact real-pilot
+  conformance test passed 1/1.
+- Review and residual: Standards, Spec, and risk reviews passed after repairing
+  false-positive managed-path tests, contradictory early CUDA readiness, and
+  cleanup-error publication. No real model CPU smoke ran because it would touch
+  user-managed ASR state; that small Python/PyAV compatibility risk remains a
+  merge/release follow-up. No commit, push, PR, Issue close, release, or publish
+  occurred.

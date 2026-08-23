@@ -956,6 +956,117 @@ describe("buildDoctorStatus Phase 2 model field", () => {
   });
 });
 
+describe("buildDoctorStatus ASR Execution Profile", () => {
+  beforeEach(() => {
+    clearCredentialEnv();
+    credentialManager.clearCredentials();
+    vi.spyOn(fs, "existsSync").mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    credentialManager.clearCredentials();
+  });
+
+  it("reports the verified v2 CPU profile", () => {
+    const status = buildDoctorStatus(vi.fn(() => ({
+      kind: "ready" as const,
+      version: 2,
+      runtime: ASR_PINNED_RUNTIME,
+      model: ASR_PINNED_MODEL,
+      revision: ASR_PINNED_REVISION,
+      modelKey: "small" as const,
+      executionProfile: { device: "cpu" as const, computeType: "int8" as const },
+      deviceReadiness: "ready" as const,
+      migrationStatus: "completed" as const,
+    })));
+
+    expect(status.asr).toEqual({
+      status: "ready",
+      model: "small",
+      device: "cpu",
+      compute_type: "int8",
+      device_readiness: "ready",
+      migration_status: "completed",
+      failure_category: null,
+    });
+  });
+
+  it("reports only an allowlisted sanitized failure category", () => {
+    const status = buildDoctorStatus(vi.fn(() => ({
+      kind: "ready" as const,
+      version: 2,
+      modelKey: "small" as const,
+      executionProfile: { device: "cpu" as const, computeType: "int8" as const },
+      deviceReadiness: "ready" as const,
+      migrationStatus: "completed" as const,
+      failureCategory: "no_nvidia_gpu" as const,
+    })));
+
+    expect(status.asr.failure_category).toBe("no_nvidia_gpu");
+  });
+
+  it("reports v1 as migration pending without claiming a verified device", () => {
+    const status = buildDoctorStatus(vi.fn(() => ({
+      kind: "ready" as const,
+      version: 1,
+      runtime: ASR_PINNED_RUNTIME,
+      model: ASR_PINNED_MODEL,
+      revision: ASR_PINNED_REVISION,
+      modelKey: "small" as const,
+      deviceReadiness: "migration_pending" as const,
+      migrationStatus: "pending" as const,
+    })));
+
+    expect(status.asr).toMatchObject({
+      status: "ready",
+      model: "small",
+      device: null,
+      compute_type: null,
+      device_readiness: "migration_pending",
+      migration_status: "pending",
+      failure_category: null,
+    });
+  });
+
+  it.each(["not_installed", "incomplete"] as const)(
+    "reports %s without an execution profile",
+    (kind) => {
+      const status = buildDoctorStatus(vi.fn(() => ({ kind })));
+      expect(status.asr).toMatchObject({
+        device: null,
+        compute_type: null,
+        device_readiness: "not_ready",
+        migration_status: null,
+        failure_category: null,
+      });
+    },
+  );
+
+  it("never serializes injected stderr, paths, commands, or failure text", () => {
+    const status = buildDoctorStatus(vi.fn(() => ({
+      kind: "ready",
+      version: 2,
+      modelKey: "small",
+      executionProfile: { device: "../../cuda", computeType: "raw-command" },
+      deviceReadiness: "ready",
+      migrationStatus: "completed",
+      failureCategory: "raw stderr at C:\\private\\driver.dll",
+      stderr: "SECRET_STDERR",
+      command: "python --secret",
+      env: "TOKEN=secret",
+    } as never)));
+    const json = JSON.stringify(status);
+
+    expect(status.asr.device).toBeNull();
+    expect(status.asr.failure_category).toBeNull();
+    expect(json).not.toContain("SECRET_STDERR");
+    expect(json).not.toContain("private");
+    expect(json).not.toContain("--secret");
+    expect(json).not.toContain("TOKEN");
+  });
+});
+
 // ---------- Phase 2: setup model selection flow ----------
 
 describe("setupCredentials model selection", () => {

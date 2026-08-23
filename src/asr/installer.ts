@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import {
   ASR_PINNED_RUNTIME,
@@ -407,17 +408,44 @@ export async function verifyModel(
   modelPath: string,
   spawnFn: typeof execFile = execFile,
 ): Promise<void> {
+  const probePath = path.join(os.tmpdir(), `.bilibili-mcp-asr-probe-${randomUUID()}.wav`);
+  const sampleRate = 16_000;
+  const sampleCount = sampleRate;
+  const wav = Buffer.alloc(44 + sampleCount * 2);
+  wav.write("RIFF", 0, "ascii");
+  wav.writeUInt32LE(wav.length - 8, 4);
+  wav.write("WAVEfmt ", 8, "ascii");
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * 2, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write("data", 36, "ascii");
+  wav.writeUInt32LE(sampleCount * 2, 40);
   const script = [
     "import sys",
     "from faster_whisper import WhisperModel",
     `model = WhisperModel(sys.argv[1], device="${DEVICE}", compute_type="${COMPUTE_TYPE}")`,
+    "segments, _ = model.transcribe(sys.argv[2], beam_size=1)",
+    "for _ in segments:",
+    "    pass",
     "print('VERIFIED')",
   ].join("\n");
 
-  const result = await spawnFn(
-    venvPython.executable,
-    toPythonArgs(venvPython, "-c", script, modelPath),
-      );
+  let result: { code: number | null; stdout: string; stderr: string };
+  let probeCreated = false;
+  try {
+    fs.writeFileSync(probePath, wav, { flag: "wx", mode: 0o600 });
+    probeCreated = true;
+    result = await spawnFn(
+      venvPython.executable,
+      toPythonArgs(venvPython, "-c", script, modelPath, probePath),
+    );
+  } finally {
+    if (probeCreated) fs.unlinkSync(probePath);
+  }
   if (result.code !== 0) {
     throw new Error(
       `Model verification failed: ${result.stderr.slice(0, 500)}`,
@@ -521,13 +549,35 @@ export async function runAsrInstallation(
     return { success: false, error: message, asrPaths };
   }
 
-  // Idempotency: if already ready with same model, skip
+  // A legacy v1 state already owns a valid managed model and runtime. Promote
+  // it in place only after the new end-to-end CPU readiness probe succeeds.
   const existingState = readAsrState(asrPaths.stateFile);
-  if (
+  const sameModel =
     existingState.kind === "ready" &&
     existingState.model === modelSpec.repository &&
-    existingState.revision === modelSpec.revision
-  ) {
+    existingState.revision === modelSpec.revision;
+  if (sameModel && existingState.migrationStatus === "pending") {
+    const venvPython: PythonCommand = {
+      executable: path.join(
+        asrPaths.venv,
+        process.platform === "win32" ? "Scripts" : "bin",
+        process.platform === "win32" ? "python.exe" : "python",
+      ),
+      prefixArgs: [],
+    };
+    try {
+      logStage("正在验证模型最小推理（CPU INT8）...");
+      await verifyModel(venvPython, asrPaths.model, spawnFn);
+      writeAsrState(asrPaths.stateFile, modelSpec.key);
+      return { success: true, pythonPath: venvPython.executable, asrPaths };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message, asrPaths };
+    }
+  }
+
+  // Idempotency: a same-model v2 CPU profile has already passed this probe.
+  if (sameModel) {
     return { success: true, pythonPath: "already installed", asrPaths };
   }
 

@@ -24,6 +24,7 @@ import {
   isAllowlistedModel,
   modelKeyForRepo,
   readAsrState,
+  resolveExecutionProfile,
   resolveModelSpec,
   writeAsrState,
   type AsrModelKey,
@@ -51,6 +52,12 @@ describe("deriveAsrPaths", () => {
 });
 
 describe("readAsrState", () => {
+  const validLstatSync = () => vi.fn(() => ({
+    isSymbolicLink: () => false,
+    isDirectory: () => true,
+    isFile: () => true,
+  }));
+
   it("returns not_installed when state file and all artifacts are absent", () => {
     const existsSync = vi.fn(() => false);
     const state = readAsrState("/tmp/asr/state.json", fs.readFileSync, existsSync);
@@ -119,7 +126,17 @@ describe("readAsrState", () => {
   it("returns ready when all fields match AND artifacts exist", () => {
     const existsSync = vi.fn(() => true); // everything exists
     const readFileSync = vi.fn(() =>
-      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+      JSON.stringify({
+        kind: "ready",
+        version: ASR_STATE_VERSION,
+        runtime: ASR_PINNED_RUNTIME,
+        model: ASR_PINNED_MODEL,
+        revision: ASR_PINNED_REVISION,
+        device: "cpu",
+        compute_type: "int8",
+        device_readiness: "ready",
+        migration_status: "completed",
+      }),
     );
     const lstatSync = vi.fn(() => ({
       isSymbolicLink: () => false,
@@ -141,50 +158,55 @@ describe("readAsrState", () => {
     );
     const existsSync = vi.fn((p: string) => p !== venvPython);
     const readFileSync = vi.fn(() =>
-      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION, device: "cpu", compute_type: "int8", device_readiness: "ready", migration_status: "completed" }),
     );
-    const state = readAsrState(stateFile, readFileSync, existsSync);
+    const state = readAsrState(stateFile, readFileSync, existsSync, validLstatSync());
     expect(state.kind).toBe("incomplete");
+    expect(existsSync).toHaveBeenCalledWith(venvPython);
   });
 
   it("returns incomplete when model.bin is missing", () => {
     const modelBin = path.join(path.dirname("/tmp/asr/state.json"), "models", "model.bin");
     const existsSync = vi.fn((p: string) => p !== modelBin);
     const readFileSync = vi.fn(() =>
-      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION, device: "cpu", compute_type: "int8", device_readiness: "ready", migration_status: "completed" }),
     );
-    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, validLstatSync());
     expect(state.kind).toBe("incomplete");
+    expect(existsSync).toHaveBeenCalledWith(modelBin);
   });
 
   it("returns incomplete when config.json is missing", () => {
     const configJson = path.join(path.dirname("/tmp/asr/state.json"), "models", "config.json");
     const existsSync = vi.fn((p: string) => p !== configJson);
     const readFileSync = vi.fn(() =>
-      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION, device: "cpu", compute_type: "int8", device_readiness: "ready", migration_status: "completed" }),
     );
-    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, validLstatSync());
     expect(state.kind).toBe("incomplete");
+    expect(existsSync).toHaveBeenCalledWith(configJson);
   });
 
   it("returns incomplete when tokenizer.json is missing", () => {
     const tok = path.join(path.dirname("/tmp/asr/state.json"), "models", "tokenizer.json");
     const existsSync = vi.fn((p: string) => p !== tok);
     const readFileSync = vi.fn(() =>
-      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION, device: "cpu", compute_type: "int8", device_readiness: "ready", migration_status: "completed" }),
     );
-    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, validLstatSync());
     expect(state.kind).toBe("incomplete");
+    expect(existsSync).toHaveBeenCalledWith(tok);
   });
 
   it("returns incomplete when vocabulary.txt is missing", () => {
     const vocab = path.join(path.dirname("/tmp/asr/state.json"), "models", "vocabulary.txt");
     const existsSync = vi.fn((p: string) => p !== vocab);
     const readFileSync = vi.fn(() =>
-      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION }),
+      JSON.stringify({ kind: "ready", version: ASR_STATE_VERSION, runtime: ASR_PINNED_RUNTIME, model: ASR_PINNED_MODEL, revision: ASR_PINNED_REVISION, device: "cpu", compute_type: "int8", device_readiness: "ready", migration_status: "completed" }),
     );
-    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
+    const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync, validLstatSync());
     expect(state.kind).toBe("incomplete");
+    expect(existsSync).toHaveBeenCalledWith(vocab);
   });
 });
 
@@ -235,6 +257,31 @@ describe("writeAsrState", () => {
     expect(rename).not.toHaveBeenCalled();
     expect(unlink).toHaveBeenCalledWith(expect.stringMatching(/\.state-[0-9a-f-]{36}\.tmp$/));
   });
+
+  it("preserves the previous valid state bytes when atomic rename fails", () => {
+    const previous = JSON.stringify({
+      kind: "ready",
+      version: 1,
+      runtime: ASR_PINNED_RUNTIME,
+      model: ASR_PINNED_MODEL,
+      revision: ASR_PINNED_REVISION,
+    });
+    fs.writeFileSync(stateFile, previous);
+    const randomId = () => "rename-failure";
+
+    expect(() => writeAsrState(
+      stateFile,
+      "small",
+      fs.writeFileSync,
+      (() => { throw new Error("interrupted"); }) as typeof fs.renameSync,
+      fs.unlinkSync,
+      fs.mkdirSync,
+      randomId,
+    )).toThrow("atomically");
+
+    expect(fs.readFileSync(stateFile, "utf8")).toBe(previous);
+    expect(fs.existsSync(path.join(tmpDir, ".state-rename-failure.tmp"))).toBe(false);
+  });
 });
 
 describe("readAsrState symlink safety", () => {
@@ -244,6 +291,10 @@ describe("readAsrState symlink safety", () => {
     runtime: ASR_PINNED_RUNTIME,
     model: ASR_PINNED_MODEL,
     revision: ASR_PINNED_REVISION,
+    device: "cpu",
+    compute_type: "int8",
+    device_readiness: "ready",
+    migration_status: "completed",
   });
 
   const managedPaths = (): Array<[string, "dir" | "file"]> => {
@@ -288,6 +339,7 @@ describe("readAsrState symlink safety", () => {
         lstatSync,
       );
       expect(state.kind).toBe("incomplete");
+      expect(lstatSync).toHaveBeenCalledWith(managed);
     },
   );
 
@@ -349,6 +401,10 @@ describe("readAsrState path type verification", () => {
     runtime: ASR_PINNED_RUNTIME,
     model: ASR_PINNED_MODEL,
     revision: ASR_PINNED_REVISION,
+    device: "cpu",
+    compute_type: "int8",
+    device_readiness: "ready",
+    migration_status: "completed",
   });
   const stateFile = "/tmp/asr/state.json";
   const root = path.dirname(stateFile);
@@ -382,6 +438,7 @@ describe("readAsrState path type verification", () => {
     });
     const state = readAsrState(stateFile, readFileSync, existsSync, lstatSync);
     expect(state.kind).toBe("incomplete");
+    expect(lstatSync).toHaveBeenCalledWith(slot);
   });
 
   it.each(dirSlots)("a file in a directory slot never returns ready: %s", (slot) => {
@@ -399,6 +456,7 @@ describe("readAsrState path type verification", () => {
     });
     const state = readAsrState(stateFile, readFileSync, existsSync, lstatSync);
     expect(state.kind).toBe("incomplete");
+    expect(lstatSync).toHaveBeenCalledWith(slot);
   });
 
   it("never reads a state file that is a directory", () => {
@@ -726,6 +784,10 @@ describe("readAsrState real-fs symlink rejection", () => {
           runtime: ASR_PINNED_RUNTIME,
           model: ASR_PINNED_MODEL,
           revision: ASR_PINNED_REVISION,
+          device: "cpu",
+          compute_type: "int8",
+          device_readiness: "ready",
+          migration_status: "completed",
         }),
       );
       expect(readAsrState(stateFile).kind).toBe("ready");
@@ -932,6 +994,59 @@ describe("downloadModel", () => {
 });
 
 describe("verifyModel", () => {
+  it("runs a minimal inference against a generated WAV and cleans it", async () => {
+    let probePath = "";
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      const script = args[2];
+      probePath = args[4];
+      expect(script).toContain("model.transcribe");
+      expect(script).toContain("for _ in segments");
+      expect(fs.readFileSync(probePath).subarray(0, 4).toString("ascii")).toBe("RIFF");
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn);
+
+    expect(probePath).not.toBe("");
+    expect(fs.existsSync(probePath)).toBe(false);
+  });
+
+  it("cleans the generated WAV when inference fails", async () => {
+    let probePath = "";
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      probePath = args[4];
+      expect(fs.existsSync(probePath)).toBe(true);
+      return Promise.resolve({ code: 1, stdout: "", stderr: "probe failed" });
+    });
+
+    await expect(
+      verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn),
+    ).rejects.toThrow("Model verification failed");
+    expect(fs.existsSync(probePath)).toBe(false);
+  });
+
+  it("does not verify ready when the generated WAV cannot be removed", async () => {
+    let probePath = "";
+    const realUnlinkSync = fs.unlinkSync;
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      probePath = args[4];
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+    const unlinkSpy = vi.spyOn(fs, "unlinkSync").mockImplementation((candidate) => {
+      if (candidate === probePath) throw new Error("cleanup denied");
+      return realUnlinkSync(candidate);
+    });
+
+    try {
+      await expect(
+        verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn),
+      ).rejects.toThrow("cleanup denied");
+    } finally {
+      unlinkSpy.mockRestore();
+      if (probePath) realUnlinkSync(probePath);
+    }
+  });
+
   it("passes model path via argv", async () => {
     const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" }));
     await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn);
@@ -1485,7 +1600,7 @@ describe("readAsrState Phase 2 compatibility", () => {
     const readFileSync = vi.fn(() =>
       JSON.stringify({
         kind: "ready",
-        version: ASR_STATE_VERSION,
+        version: 1,
         runtime: ASR_PINNED_RUNTIME,
         model: "Systran/faster-whisper-tiny",
         revision: "d90ca5fe260221311c53c58e660288d3deb8d356",
@@ -1506,7 +1621,7 @@ describe("readAsrState Phase 2 compatibility", () => {
     const readFileSync = vi.fn(() =>
       JSON.stringify({
         kind: "ready",
-        version: ASR_STATE_VERSION,
+        version: 1,
         runtime: ASR_PINNED_RUNTIME,
         model: "Systran/faster-whisper-base",
         revision: "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
@@ -1526,7 +1641,7 @@ describe("readAsrState Phase 2 compatibility", () => {
     const readFileSync = vi.fn(() =>
       JSON.stringify({
         kind: "ready",
-        version: ASR_STATE_VERSION,
+        version: 1,
         runtime: ASR_PINNED_RUNTIME,
         model: ASR_PINNED_MODEL,
         revision: ASR_PINNED_REVISION,
@@ -1546,7 +1661,7 @@ describe("readAsrState Phase 2 compatibility", () => {
     const readFileSync = vi.fn(() =>
       JSON.stringify({
         kind: "ready",
-        version: ASR_STATE_VERSION,
+        version: 1,
         runtime: ASR_PINNED_RUNTIME,
         model: "evil/model",
         revision: "deadbeef",
@@ -1554,6 +1669,96 @@ describe("readAsrState Phase 2 compatibility", () => {
     );
     const state = readAsrState("/tmp/asr/state.json", readFileSync, existsSync);
     expect(state.kind).toBe("incomplete");
+  });
+});
+
+describe("readAsrState Execution Profile schema", () => {
+  const existsSync = vi.fn(() => true);
+  const lstatSync = vi.fn(() => ({
+    isSymbolicLink: () => false,
+    isDirectory: () => true,
+    isFile: () => true,
+  }));
+  const base = {
+    kind: "ready",
+    version: 2,
+    runtime: ASR_PINNED_RUNTIME,
+    model: ASR_PINNED_MODEL,
+    revision: ASR_PINNED_REVISION,
+    device: "cpu",
+    compute_type: "int8",
+    device_readiness: "ready",
+    migration_status: "completed",
+  };
+  const read = (value: Record<string, unknown>) => readAsrState(
+    "/tmp/asr/state.json",
+    vi.fn(() => JSON.stringify(value)),
+    existsSync,
+    lstatSync,
+  );
+
+  it("reads v1 as model-ready with device migration pending", () => {
+    const state = read({
+      kind: "ready",
+      version: 1,
+      runtime: ASR_PINNED_RUNTIME,
+      model: ASR_PINNED_MODEL,
+      revision: ASR_PINNED_REVISION,
+    });
+
+    expect(state.kind).toBe("ready");
+    expect(state.modelKey).toBe("small");
+    expect(state.executionProfile).toBeUndefined();
+    expect(state.deviceReadiness).toBe("migration_pending");
+    expect(state.migrationStatus).toBe("pending");
+  });
+
+  it("reads a verified v2 CPU profile", () => {
+    const state = read(base);
+
+    expect(state.kind).toBe("ready");
+    expect(state.executionProfile).toEqual({ device: "cpu", computeType: "int8" });
+    expect(state.deviceReadiness).toBe("ready");
+    expect(state.migrationStatus).toBe("completed");
+    expect(state.failureCategory).toBeUndefined();
+  });
+
+  it("recognizes the future CUDA profile but does not mark it ready before GPU support", () => {
+    expect(resolveExecutionProfile("cuda", "float16")).toEqual({
+      device: "cuda",
+      computeType: "float16",
+    });
+
+    const state = read({
+      ...base,
+      device: "cuda",
+      compute_type: "float16",
+    });
+
+    expect(state.kind).toBe("incomplete");
+  });
+
+  it("accepts a sanitized GPU failure category on the CPU fallback profile", () => {
+    const state = read({
+      ...base,
+      failure_category: "no_nvidia_gpu",
+    });
+
+    expect(state.executionProfile).toEqual({ device: "cpu", computeType: "int8" });
+    expect(state.failureCategory).toBe("no_nvidia_gpu");
+  });
+
+  it.each([
+    ["device", { device: "../../gpu" }],
+    ["compute type", { compute_type: "__import__('os')" }],
+    ["cross-paired profile", { device: "cpu", compute_type: "float16" }],
+    ["readiness", { device_readiness: "maybe" }],
+    ["migration status", { migration_status: "running" }],
+    ["failure category", { failure_category: "raw stderr: C:\\secret" }],
+    ["CUDA ready with a GPU failure category", { device: "cuda", compute_type: "float16", failure_category: "no_nvidia_gpu" }],
+    ["unexpected sensitive field", { stderr: "C:\\secret" }],
+  ])("fails closed for invalid %s", (_label, overrides) => {
+    expect(read({ ...base, ...overrides }).kind).toBe("incomplete");
   });
 });
 
@@ -1576,6 +1781,13 @@ describe("writeAsrState Phase 2", () => {
     const parsed = JSON.parse(fs.readFileSync(stateFile, "utf8"));
     expect(parsed.model).toBe("Systran/faster-whisper-tiny");
     expect(parsed.revision).toBe("d90ca5fe260221311c53c58e660288d3deb8d356");
+    expect(parsed).toMatchObject({
+      version: 2,
+      device: "cpu",
+      compute_type: "int8",
+      device_readiness: "ready",
+      migration_status: "completed",
+    });
   });
 
   it("writes base model state", () => {
@@ -1713,6 +1925,65 @@ describe("runAsrInstallation with modelKey", () => {
     expect(spawnFn).not.toHaveBeenCalled();
 
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
+  });
+
+  it("promotes a same-model v1 state with one CPU probe and no reinstall", async () => {
+    const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), "bilibili-mcp-asr-v1-promote-"));
+    const stateFile = path.join(tmpBase, "state.json");
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    fs.mkdirSync(path.join(tmpBase, "models"));
+    for (const file of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(tmpBase, "models", file), "placeholder");
+    }
+    fs.writeFileSync(stateFile, JSON.stringify({
+      kind: "ready",
+      version: 1,
+      runtime: ASR_PINNED_RUNTIME,
+      model: ASR_PINNED_MODEL,
+      revision: ASR_PINNED_REVISION,
+    }));
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" }));
+
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "small" });
+
+    expect(result.success).toBe(true);
+    expect(spawnFn).toHaveBeenCalledTimes(1);
+    expect(spawnFn.mock.calls[0][1]).toContain(path.join(tmpBase, "models"));
+    const state = readAsrState(stateFile);
+    expect(state.executionProfile).toEqual({ device: "cpu", computeType: "int8" });
+    expect(state.migrationStatus).toBe("completed");
+    fs.rmSync(tmpBase, { recursive: true, force: true });
+  });
+
+  it("keeps a same-model v1 state unchanged when the CPU probe fails", async () => {
+    const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), "bilibili-mcp-asr-v1-fail-"));
+    const stateFile = path.join(tmpBase, "state.json");
+    const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, os.platform() === "win32" ? "python.exe" : "python"), "fake");
+    fs.mkdirSync(path.join(tmpBase, "models"));
+    for (const file of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(tmpBase, "models", file), "placeholder");
+    }
+    const previous = JSON.stringify({
+      kind: "ready",
+      version: 1,
+      runtime: ASR_PINNED_RUNTIME,
+      model: ASR_PINNED_MODEL,
+      revision: ASR_PINNED_REVISION,
+    });
+    fs.writeFileSync(stateFile, previous);
+    const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "probe failed" }));
+
+    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "small" });
+
+    expect(result.success).toBe(false);
+    expect(spawnFn).toHaveBeenCalledTimes(1);
+    expect(fs.readFileSync(stateFile, "utf8")).toBe(previous);
+    expect(readAsrState(stateFile).migrationStatus).toBe("pending");
+    fs.rmSync(tmpBase, { recursive: true, force: true });
   });
 
   it("already-installed tiny is idempotent with explicit modelKey", async () => {
@@ -1924,7 +2195,7 @@ describe("readAsrState derived modelKey", () => {
     const readFileSync = vi.fn(() =>
       JSON.stringify({
         kind: "ready",
-        version: ASR_STATE_VERSION,
+        version: 1,
         runtime: ASR_PINNED_RUNTIME,
         model: ASR_PINNED_MODEL,
         revision: ASR_PINNED_REVISION,
@@ -1944,7 +2215,7 @@ describe("readAsrState derived modelKey", () => {
     const readFileSync = vi.fn(() =>
       JSON.stringify({
         kind: "ready",
-        version: ASR_STATE_VERSION,
+        version: 1,
         runtime: ASR_PINNED_RUNTIME,
         model: "Systran/faster-whisper-tiny",
         revision: "d90ca5fe260221311c53c58e660288d3deb8d356",
