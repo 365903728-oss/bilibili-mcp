@@ -2,12 +2,13 @@
 
 ## Current Product Ticket
 
-GitHub Issue #57 implements the approved #56 Fake-IP DNS diagnostic. Work is
-isolated on `codex/issue-57-fake-ip-dns` from merged #54 base `5e3d2d9` and is
-directly executed by Codex without Paseo. The bounded scope is DNS
-classification, audio-candidate failure aggregation, structured MCP guidance,
-deterministic tests, and official IANA/Mihomo research. Commit, push, PR,
-release, and publication remain separate authority gates.
+GitHub Issue #58 completes the approved #56 Fake-IP DNS user guidance after
+#57 merged. Work is isolated on `codex/issue-58-fake-ip-guidance` from merged
+#57 base `c95d05d2b2efd355241b3fcc202140a66cda14b3` and is directly executed by
+Codex without Paseo. The bounded scope is the structured MCP remedy choices,
+public response regression coverage, and bilingual tool-reference
+troubleshooting. Commit, push, PR, release, and publication remain separate
+authority gates.
 
 ## Harness v2
 

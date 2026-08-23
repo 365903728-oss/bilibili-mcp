@@ -106,7 +106,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 
 - `src/utils/credentials.ts`: global credential storage and credential source detection.
 - `src/utils/credential-guidance.ts`: safe credential setup instructions, status payloads, and next-step generation.
-- `src/utils/error-guidance.ts`: unified structured MCP error payload mapper with bilingual recovery guidance and category/retry metadata, including the user-actionable `ASR_FAKE_IP_DNS` network diagnosis.
+- `src/utils/error-guidance.ts`: unified structured MCP error payload mapper with bilingual recovery guidance and category/retry metadata, including the user-choice `ASR_FAKE_IP_DNS` cause, security boundary, exact proxy remedies, non-ASR alternative, and no-automatic-action constraints.
 - `src/utils/validation.ts`: BV, language, detail-level, comment/search limits, sort, query, max_matches, context_segments, Favorites cursor (type/length/base64url charset), and Creator Content input (mid/section/cursor/container identity, including the Dynamic section) validation.
 - `src/utils/sanitization.ts`: BV/URL sanitization and output sanitization helpers.
 - `src/utils/errors.ts`: domain-specific error classes and codes.
@@ -154,6 +154,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `tests/server-credential-tools.test.ts`: credential tool behavior and non-leak checks.
 - `tests/update-check.test.ts`: package update guidance behavior and registry-failure fallback.
 - `tests/server-error-next-steps.test.ts`: structured recovery guidance in tool errors, including bounded bilingual Fake-IP cause and remedy choices.
+- `tests/fake-ip-guidance-docs.test.ts`: bilingual tool-reference regression for the Fake-IP cause, exact proxy rules, alternatives, and explicit user-choice boundary.
 - `tests/server-handler-sanitization.test.ts`: handler-level sanitization plus transcript/search structured-output contract checks.
 - `tests/credential-guidance.test.ts`: credential setup/status guidance.
 - `tests/bilibili-video-api.test.ts`: video/subtitle API safety and behavior checks.
