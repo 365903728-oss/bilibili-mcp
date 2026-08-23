@@ -204,6 +204,7 @@
 | `SUBTITLE_UNAVAILABLE` | 视频无可用的字幕 | 对 `get_video_transcript` 可重试并设置 `fallback_to_description: true` |
 | `ASR_NOT_READY` | 本地 ASR 未就绪 | 在本地运行 `setup`，并用 `doctor --json` 确认 ready |
 | `ASR_AUDIO_UNAVAILABLE` | 无法安全获取临时纯音频 | 稍后重试；Bilibili 播放地址是临时的 |
+| `ASR_FAKE_IP_DNS` | 代理 DNS 为 Bilibili 音频媒体域名返回标准 Fake-IP | 向用户解释三个安全方案，并等待用户明确选择；不要自动重试 |
 | `ASR_LIMIT_EXCEEDED` | 分集、音频或输出超过安全限制 | 选择更短的 Part 或使用原生字幕 |
 | `ASR_BUSY` | 已有一个本地 ASR 任务 | 当前任务完成后重试；不会排队 |
 | `ASR_TRANSCRIPTION_TIMEOUT` | 本地转录超过 30 分钟 | 稍后重试或选择更短的 Part |
@@ -217,6 +218,18 @@
 | `COMMENTS_DISABLED` | 视频评论已关闭或访问受限 | 改用字幕或元数据工具；也可在 Bilibili 页面确认 |
 | `BILIBILI_API_ERROR` | 其他 Bilibili API 错误 | 临时问题可稍后重试；持续出现请带错误码反馈 |
 | `UNKNOWN_ERROR` | 未知错误 | 稍后重试；反馈时请勿包含 Cookie 或凭据 |
+
+### ASR Fake-IP DNS 诊断
+
+出现 `ASR_FAKE_IP_DNS` 时，代理 DNS 返回的是 `198.18.0.0/15` 标准 Fake-IP 占位地址，不是真实的 Bilibili 音频 CDN 公网地址；具体公网地址会因用户、域名、缓存和时间不同而变化。服务会停止下载，以避免连接本地、私有或特殊用途地址。这通常不是 Cookie、ASR 模型、BVID 或普通的临时播放故障。
+
+AI Agent 应先解释原因，列出以下选择，然后等待用户明确选择：
+
+1. **推荐：保留 TUN 和规则模式。** 编辑当前生效的代理配置，把精确规则 `+.bilivideo.com` 和 `+.bilivideo.cn` 加入 `fake-ip-filter`。保存并重新加载配置，或重启代理内核，然后重试 ASR。此方案仅让这些域名返回真实 IP，其他 TUN 行为和路由规则保持不变。
+2. **改用真实公网 IP DNS 模式。** 切换到 `redir-host` 或等效模式。这会改变代理客户端的 DNS 行为；应用并重新加载设置后，再重试 ASR。
+3. **不改变网络。** 改用 Human Subtitle（人工字幕）、Bilibili AI 字幕或视频简介；此时无法获得 Local ASR Transcript（本地 ASR 转录）。
+
+Agent 不得自动关闭 TUN、修改代理配置、使用公共 DoH 绕过用户的 DNS 策略，或在设置未改变时盲目重试。不要在 MCP 服务中放行 `198.18.0.0/15`。
 
 </details>
 

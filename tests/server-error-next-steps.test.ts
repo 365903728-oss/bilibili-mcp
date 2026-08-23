@@ -356,18 +356,42 @@ describe("structured MCP error categories", () => {
       userActionRequired: true,
     });
     expect(payload.category).toBe("network");
-    expect(`${payload.message_en} ${payload.next_steps_en.join(" ")}`).toMatch(
-      /198\.18\.0\.0\/15.*Fake-IP.*reject/is,
+    expect(response).not.toHaveProperty("structuredContent");
+
+    const guidanceEn = `${payload.message_en} ${payload.next_steps_en.join(" ")}`;
+    const guidanceZh = `${payload.message_zh} ${payload.next_steps_zh.join(" ")}`;
+    expect(guidanceEn).toMatch(
+      /198\.18\.0\.0\/15.*placeholder.*not the real public Bilibili audio CDN.*vary.*user.*domain.*cache.*time/is,
     );
-    expect(`${payload.message_zh} ${payload.next_steps_zh.join(" ")}`).toMatch(
-      /198\.18\.0\.0\/15.*Fake-IP.*拒绝/is,
+    expect(guidanceZh).toMatch(
+      /198\.18\.0\.0\/15.*占位.*不是真实的 Bilibili 音频 CDN 公网地址.*用户.*域名.*缓存.*时间.*不同/is,
     );
-    expect(payload.next_steps_en.join(" ")).toMatch(
-      /choose.*fake-ip-filter.*\*\.bilivideo\.com.*\*\.bilivideo\.cn.*reconnect/is,
+    expect(guidanceEn).toMatch(
+      /stopped.*local.*private.*special-use.*not.*Cookie.*ASR model.*BVID.*ordinary temporary playback/is,
     );
-    expect(payload.next_steps_zh.join(" ")).toMatch(
-      /选择.*fake-ip-filter.*\*\.bilivideo\.com.*\*\.bilivideo\.cn.*重连/is,
+    expect(guidanceZh).toMatch(
+      /停止.*本地.*私有.*特殊用途.*通常不是.*Cookie.*ASR 模型.*BVID.*普通的临时播放/is,
     );
+    expect(guidanceEn).toMatch(
+      /recommended.*keep TUN.*rule mode.*current active config.*\+\.bilivideo\.com.*\+\.bilivideo\.cn.*fake-ip-filter.*save.*reload.*restart the proxy kernel.*retry ASR/is,
+    );
+    expect(guidanceZh).toMatch(
+      /推荐.*保留 TUN.*规则模式.*当前生效的配置.*\+\.bilivideo\.com.*\+\.bilivideo\.cn.*fake-ip-filter.*保存.*重新加载.*重启代理内核.*重试 ASR/is,
+    );
+    expect(guidanceEn).toMatch(/only those domains.*real IP.*other TUN.*rules.*unchanged/is);
+    expect(guidanceZh).toMatch(/仅.*这些域名.*真实 IP.*其他 TUN.*规则.*不变/is);
+    expect(guidanceEn).toMatch(/redir-host.*real public IP DNS.*changes.*DNS behavior.*retry ASR/is);
+    expect(guidanceZh).toMatch(/redir-host.*真实公网 IP DNS.*改变.*DNS 行为.*重试 ASR/is);
+    expect(guidanceEn).toMatch(
+      /Human Subtitle.*Bilibili AI Subtitle.*video description.*Local ASR Transcript.*unavailable/is,
+    );
+    expect(guidanceZh).toMatch(
+      /人工字幕.*Bilibili AI 字幕.*视频简介.*无法获得本地 ASR 转录/is,
+    );
+    expect(guidanceEn).toMatch(/list these choices.*wait.*explicit choice/is);
+    expect(guidanceZh).toMatch(/列出这些方案.*等待.*明确选择/is);
+    expect(guidanceEn).toMatch(/do not.*close TUN.*edit.*proxy config.*public DoH.*blindly retry/is);
+    expect(guidanceZh).toMatch(/不要.*关闭 TUN.*修改.*代理配置.*公共 DoH.*盲目重试/is);
     expect(rendered).toContain("Do not allowlist 198.18.0.0/15");
     expect(rendered).not.toMatch(/SESSDATA|bili_jct|DedeUserID|token=|audio\.m4s|Authorization/i);
   });

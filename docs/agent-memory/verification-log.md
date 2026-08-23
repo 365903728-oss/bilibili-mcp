@@ -2550,3 +2550,43 @@ Six release blockers fixed; one regression proof per root cause (new tests
   cap remain unchanged. No Cookie, Authorization value, signed media URL, full
   DNS response, proxy-node detail, local configuration, commit, push, PR, tag,
   release, or publication was introduced.
+
+## 2026-08-23 — Issue #58 Fake-IP DNS User Guidance
+
+- Red/green evidence: the public MCP regression first failed because the
+  `ASR_FAKE_IP_DNS` payload lacked the complete cause, exact proxy rules, three
+  choices, and explicit user-decision boundary. A new bilingual documentation
+  regression then failed because neither tool reference documented the code.
+  Both seams passed after the scoped guidance and documentation changes.
+- Final behavior: the bilingual network error explains that `198.18.0.0/15`
+  contains proxy placeholders rather than stable CDN public addresses, preserves
+  the local/private/special-address rejection, excludes common false causes, and
+  offers the exact `fake-ip-filter`, `redir-host`, or non-ASR choices. The Agent
+  must wait for the user's explicit choice and must not modify proxy state, bypass
+  DNS policy with public DoH, or blindly retry.
+- Verification: the two focused files passed 28/28; TypeScript build passed; the
+  complete Vitest suite passed 43 files / 1074 tests; and
+  `npm pack --dry-run --json --ignore-scripts` passed with the bilingual tool
+  references present in the package.
+- Security: gitleaks 8.30.1 found zero secrets in the tracked diff and untracked
+  documentation test. `npm audit --omit=dev --json` found zero production
+  vulnerabilities. The full audit retained two high findings in the unchanged
+  Vitest/Vite development chain (`postcss` and `nanoid`); no dependency was
+  changed or auto-fixed under this ticket.
+- Review and boundary: Spec Review found no gap. Standards and risk reviews found
+  only the expected stale Harness receipts after memory edits; LF-normalized
+  receipt synchronization and the exact conformance gate cleared that finding.
+  At implementation-acceptance time no Cookie, token, signed media URL, DNS
+  response, proxy configuration, success `structuredContent`, dependency,
+  commit, push, PR, tag, release, or publication had been introduced.
+- Harness: the exact real-pilot conformance test and the contracts, events,
+  adapters, and memory core suite passed after the two-level receipt refresh.
+- PR #62 review repair: after the scoped commit and push were explicitly
+  authorized, Codex Review found that the migration artifact still carried a
+  parent package dry-run even though packaged docs and compiled guidance had
+  changed. The repair regenerates the 193-entry package receipt from a clean LF
+  Linux build, updates its canonical output digest and outer receipt, and makes
+  conformance verify `unpackedSize` plus LF-normalized packaged text/compiled
+  file sizes. The exact conformance gate and Harness core suite passed after the
+  refreshed three-level receipt chain; no dependency, product behavior, proxy
+  configuration, tag, release, or publication changed.

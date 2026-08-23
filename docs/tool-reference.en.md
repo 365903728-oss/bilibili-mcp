@@ -202,6 +202,7 @@ Supported error codes:
 | `SUBTITLE_UNAVAILABLE` | No subtitles available for this video | For `get_video_transcript`, retry with `fallback_to_description: true` |
 | `ASR_NOT_READY` | Local ASR is not ready | Run local `setup`, then confirm ready with `doctor --json` |
 | `ASR_AUDIO_UNAVAILABLE` | Safe temporary audio is unavailable | Retry later; Bilibili playback URLs are temporary |
+| `ASR_FAKE_IP_DNS` | Proxy DNS returned standard Fake-IP for Bilibili audio media domains | Explain the three safe choices and wait for the user's explicit choice; do not retry automatically |
 | `ASR_LIMIT_EXCEEDED` | Part, audio, or output exceeds a safety bound | Choose a shorter Part or use native subtitles |
 | `ASR_BUSY` | One local ASR job is already active | Retry after it finishes; requests are not queued |
 | `ASR_TRANSCRIPTION_TIMEOUT` | Local transcription exceeded 30 minutes | Retry later or choose a shorter Part |
@@ -215,6 +216,18 @@ Supported error codes:
 | `COMMENTS_DISABLED` | Comments are disabled or restricted | Use transcript or metadata tools; confirm on the Bilibili page |
 | `BILIBILI_API_ERROR` | Other Bilibili API errors | Retry if it looks temporary; include the code when reporting repeated issues |
 | `UNKNOWN_ERROR` | Unknown failure | Retry later; never include Cookie values when reporting |
+
+### ASR Fake-IP DNS troubleshooting
+
+`ASR_FAKE_IP_DNS` means the proxy DNS returned standard `198.18.0.0/15` Fake-IP placeholders, not the real public Bilibili audio CDN addresses. Exact public addresses vary by user, domain, cache, and time. The server stops the download to avoid connecting to local, private, or special-use addresses. This is normally not a Cookie, ASR model, BVID, or ordinary temporary playback failure.
+
+The AI agent should explain the cause, list these choices, and wait for the user's explicit choice:
+
+1. **Recommended: keep TUN and rule mode.** Edit the current active proxy config and add the exact rules `+.bilivideo.com` and `+.bilivideo.cn` to `fake-ip-filter`. Save and reload the config or restart the proxy kernel, then retry ASR. Only these domains will return a real IP; other TUN behavior and routing rules remain unchanged.
+2. **Use real-public-IP DNS mode.** Switch to `redir-host` or an equivalent mode. This changes the proxy client's DNS behavior; apply and reload the setting, then retry ASR.
+3. **Leave the network unchanged.** Use Human Subtitle, Bilibili AI Subtitle, or the video description. Local ASR Transcript will be unavailable.
+
+The agent must not automatically close TUN, edit the proxy config, use public DoH to bypass the user's DNS policy, or blindly retry without a settings change. Never allowlist `198.18.0.0/15` in the MCP server.
 
 ## Call examples
 
