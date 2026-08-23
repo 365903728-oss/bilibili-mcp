@@ -7,6 +7,7 @@ import {
   buildDoctorStatus,
   createCli,
   doctorCommand,
+  parseDeviceChoice,
   parseModelChoice,
   setupCredentials,
   type DoctorStatus,
@@ -65,6 +66,7 @@ describe("CLI help and commands", () => {
 
     expect(output).toContain("--non-interactive");
     expect(output).toContain("--asr-model");
+    expect(output).toContain("--asr-device");
   });
 
   it("help output does not contain duplicated [command] placeholder in a single line", () => {
@@ -610,13 +612,14 @@ describe("setup credential loadability", () => {
     const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")   // Yes to ASR
-      .mockResolvedValueOnce("");   // Enter = small model
+      .mockResolvedValueOnce("")    // Enter = small model
+      .mockResolvedValueOnce("");   // Enter = auto
 
     await setupCredentials(configure, runAsr, askHiddenFn);
 
     expect(configure).not.toHaveBeenCalled();
     expect(runAsr).toHaveBeenCalledOnce();
-    expect(runAsr).toHaveBeenCalledWith("small");
+    expect(runAsr).toHaveBeenCalledWith("small", "auto");
   });
 
   it("failed opted-in ASR installation sets process.exitCode 1", async () => {
@@ -626,7 +629,8 @@ describe("setup credential loadability", () => {
     const runAsr = vi.fn(async (_modelKey: string) => ({ success: false, error: "test failure" }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")   // Yes to ASR
-      .mockResolvedValueOnce("");   // Enter = small model
+      .mockResolvedValueOnce("")    // Enter = small model
+      .mockResolvedValueOnce("");   // Enter = auto
 
     process.exitCode = undefined;
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -642,12 +646,155 @@ describe("setup credential loadability", () => {
     const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")   // Yes to ASR
-      .mockResolvedValueOnce("");   // Enter = small model
+      .mockResolvedValueOnce("")    // Enter = small model
+      .mockResolvedValueOnce("");   // Enter = auto
 
     process.exitCode = undefined;
     await setupCredentials(configure, runAsr, askHiddenFn);
 
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it("reports the validated CUDA profile instead of claiming CPU", async () => {
+    Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true });
+    vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const askHiddenFn = vi.fn()
+      .mockResolvedValueOnce("y")
+      .mockResolvedValueOnce("")
+      .mockResolvedValueOnce("auto");
+
+    await setupCredentials(
+      vi.fn(async () => {}),
+      vi.fn(async () => ({
+        success: true,
+        executionProfile: { device: "cuda" as const, computeType: "float16" as const },
+      })),
+      askHiddenFn,
+    );
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(output).toContain("CUDA Float16");
+    expect(output).not.toContain("通过 CPU INT8 验证");
+  });
+
+  it("explains an auto GPU failure and lets the user choose how to proceed", async () => {
+    Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true });
+    vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const askHiddenFn = vi.fn()
+      .mockResolvedValueOnce("y")
+      .mockResolvedValueOnce("")
+      .mockResolvedValueOnce("auto");
+
+    await setupCredentials(
+      vi.fn(async () => {}),
+      vi.fn(async () => ({
+        success: true,
+        executionProfile: { device: "cpu" as const, computeType: "int8" as const },
+        failureCategory: "cuda_runtime_missing" as const,
+      })),
+      askHiddenFn,
+    );
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(output).toContain("cuda_runtime_missing");
+    expect(output).toContain("CUDA、cuBLAS 或 cuDNN");
+    expect(output).toContain("CUDA 12");
+    expect(output).toContain("github.com/SYSTRAN/faster-whisper#gpu");
+    expect(output).toContain("CPU INT8");
+    expect(output).toContain("不会自动安装或修改");
+    expect(output).toContain("重新运行 setup");
+  });
+
+  it("explains explicit CUDA failure without silently falling back", async () => {
+    Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true });
+    vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const askHiddenFn = vi.fn()
+      .mockResolvedValueOnce("y")
+      .mockResolvedValueOnce("")
+      .mockResolvedValueOnce("cuda");
+    process.exitCode = undefined;
+
+    await setupCredentials(
+      vi.fn(async () => {}),
+      vi.fn(async () => ({
+        success: false,
+        error: "ASR device readiness failed (runtime_version_mismatch)",
+        failureCategory: "runtime_version_mismatch" as const,
+      })),
+      askHiddenFn,
+    );
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(process.exitCode).toBe(1);
+    expect(output).toContain("runtime_version_mismatch");
+    expect(output).toContain("升级 NVIDIA 驱动");
+    expect(output).toContain("没有回退到 CPU");
+    expect(output).toContain("选择 cpu");
+    expect(output).toContain("重新选择 cuda");
+  });
+
+  it("labels an explicit CPU readiness failure as CPU instead of GPU", async () => {
+    Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true });
+    vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const askHiddenFn = vi.fn()
+      .mockResolvedValueOnce("y")
+      .mockResolvedValueOnce("")
+      .mockResolvedValueOnce("cpu");
+    process.exitCode = undefined;
+
+    await setupCredentials(
+      vi.fn(async () => {}),
+      vi.fn(async () => ({
+        success: false,
+        error: "ASR device readiness failed (model_probe_failed)",
+        failureCategory: "model_probe_failed" as const,
+        failureDevice: "cpu" as const,
+      })),
+      askHiddenFn,
+    );
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(process.exitCode).toBe(1);
+    expect(output).toContain("CPU 验证失败");
+    expect(output).not.toContain("GPU 验证失败");
+    expect(output).not.toContain("升级 NVIDIA 驱动");
+  });
+
+  it("explains both failures when auto GPU and CPU readiness fail", async () => {
+    Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true });
+    vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const askHiddenFn = vi.fn()
+      .mockResolvedValueOnce("y")
+      .mockResolvedValueOnce("")
+      .mockResolvedValueOnce("auto");
+    process.exitCode = undefined;
+
+    await setupCredentials(
+      vi.fn(async () => {}),
+      vi.fn(async () => ({
+        success: false,
+        error: "ASR device readiness failed (model_probe_failed)",
+        failureCategory: "model_probe_failed" as const,
+        failureDevice: "cpu" as const,
+        gpuFailureCategory: "cuda_runtime_missing" as const,
+      })),
+      askHiddenFn,
+    );
+
+    const output = logSpy.mock.calls.flat().join("\n");
+    expect(process.exitCode).toBe(1);
+    expect(output).toContain("GPU 验证失败");
+    expect(output).toContain("cuda_runtime_missing");
+    expect(output).toContain("CPU 回退验证也失败");
+    expect(output).toContain("model_probe_failed");
   });
 
   it("redacts credential-looking values from ASR error messages", async () => {
@@ -660,7 +807,8 @@ describe("setup credential loadability", () => {
     }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")   // Yes to ASR
-      .mockResolvedValueOnce("");   // Enter = small model
+      .mockResolvedValueOnce("")    // Enter = small model
+      .mockResolvedValueOnce("");   // Enter = auto
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
@@ -753,7 +901,37 @@ describe("setup credential loadability", () => {
       expect(configure).not.toHaveBeenCalled();
       expect(askHiddenFn).not.toHaveBeenCalled();
       expect(runAsr).toHaveBeenCalledOnce();
-      expect(runAsr).toHaveBeenCalledWith("tiny");
+      expect(runAsr).toHaveBeenCalledWith("tiny", "auto");
+    });
+
+    it("passes an explicit CUDA preference in non-interactive setup", async () => {
+      vi.spyOn(credentialManager, "getCredentialSource").mockReturnValue("global_config");
+      vi.spyOn(credentialManager, "getCredentials").mockReturnValue({
+        sessdata: "s", bili_jct: "j", dedeuserid: "d", expiresAt: Date.now() + 86400000,
+      });
+      const runAsr = vi.fn(async () => ({ success: true }));
+
+      await setupCredentials(vi.fn(), runAsr, vi.fn(), {
+        nonInteractive: true,
+        asrModel: "small",
+        asrDevice: "cuda",
+      });
+
+      expect(runAsr).toHaveBeenCalledWith("small", "cuda");
+    });
+
+    it("rejects --asr-device without --asr-model", async () => {
+      const runAsr = vi.fn(async () => ({ success: true }));
+      process.exitCode = undefined;
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await setupCredentials(vi.fn(), runAsr, vi.fn(), {
+        nonInteractive: true,
+        asrDevice: "cpu",
+      });
+
+      expect(process.exitCode).toBe(1);
+      expect(runAsr).not.toHaveBeenCalled();
     });
 
     it("rejects non-interactive setup when the credential source is none even with loadable credentials", async () => {
@@ -855,6 +1033,21 @@ describe("parseModelChoice", () => {
   it("whitespace-only input trims to empty and defaults to small", () => {
     expect(parseModelChoice(" ")).toBe("small");
     expect(parseModelChoice("\t")).toBe("small");
+  });
+});
+
+describe("parseDeviceChoice", () => {
+  it.each([
+    ["", "auto"],
+    ["auto", "auto"],
+    [" CPU ", "cpu"],
+    ["CUDA", "cuda"],
+  ])("parses %j as %s", (input, expected) => {
+    expect(parseDeviceChoice(input)).toBe(expected);
+  });
+
+  it.each(["gpu", "1", "float16", "../cuda"])("rejects %j", (input) => {
+    expect(parseDeviceChoice(input)).toBeNull();
   });
 });
 
@@ -992,6 +1185,30 @@ describe("buildDoctorStatus ASR Execution Profile", () => {
     });
   });
 
+  it("reports the verified v2 CUDA profile", () => {
+    const status = buildDoctorStatus(vi.fn(() => ({
+      kind: "ready" as const,
+      version: 2,
+      runtime: ASR_PINNED_RUNTIME,
+      model: ASR_PINNED_MODEL,
+      revision: ASR_PINNED_REVISION,
+      modelKey: "small" as const,
+      executionProfile: { device: "cuda" as const, computeType: "float16" as const },
+      deviceReadiness: "ready" as const,
+      migrationStatus: "completed" as const,
+    })));
+
+    expect(status.asr).toEqual({
+      status: "ready",
+      model: "small",
+      device: "cuda",
+      compute_type: "float16",
+      device_readiness: "ready",
+      migration_status: "completed",
+      failure_category: null,
+    });
+  });
+
   it("reports only an allowlisted sanitized failure category", () => {
     const status = buildDoctorStatus(vi.fn(() => ({
       kind: "ready" as const,
@@ -1104,11 +1321,26 @@ describe("setupCredentials model selection", () => {
     const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")   // Yes to ASR
-      .mockResolvedValueOnce("");   // Enter = small
+      .mockResolvedValueOnce("")    // Enter = small
+      .mockResolvedValueOnce("");   // Enter = auto
 
     await setupCredentials(configure, runAsr, askHiddenFn);
 
-    expect(runAsr).toHaveBeenCalledWith("small");
+    expect(runAsr).toHaveBeenCalledWith("small", "auto");
+  });
+
+  it("passes an explicit CPU preference after model selection", async () => {
+    Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true });
+    vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
+    const runAsr = vi.fn(async () => ({ success: true }));
+    const askHiddenFn = vi.fn()
+      .mockResolvedValueOnce("y")
+      .mockResolvedValueOnce("base")
+      .mockResolvedValueOnce("cpu");
+
+    await setupCredentials(vi.fn(async () => {}), runAsr, askHiddenFn);
+
+    expect(runAsr).toHaveBeenCalledWith("base", "cpu");
   });
 
   it("numeric 1 selects tiny", async () => {
@@ -1118,11 +1350,12 @@ describe("setupCredentials model selection", () => {
     const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")   // Yes to ASR
-      .mockResolvedValueOnce("1");  // tiny
+      .mockResolvedValueOnce("1")   // tiny
+      .mockResolvedValueOnce("");   // auto
 
     await setupCredentials(configure, runAsr, askHiddenFn);
 
-    expect(runAsr).toHaveBeenCalledWith("tiny");
+    expect(runAsr).toHaveBeenCalledWith("tiny", "auto");
   });
 
   it("numeric 2 selects base", async () => {
@@ -1132,11 +1365,12 @@ describe("setupCredentials model selection", () => {
     const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")
-      .mockResolvedValueOnce("2");
+      .mockResolvedValueOnce("2")
+      .mockResolvedValueOnce("");
 
     await setupCredentials(configure, runAsr, askHiddenFn);
 
-    expect(runAsr).toHaveBeenCalledWith("base");
+    expect(runAsr).toHaveBeenCalledWith("base", "auto");
   });
 
   it("name 'tiny' selects tiny", async () => {
@@ -1146,11 +1380,12 @@ describe("setupCredentials model selection", () => {
     const runAsr = vi.fn(async (_modelKey: string) => ({ success: true }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")
-      .mockResolvedValueOnce("tiny");
+      .mockResolvedValueOnce("tiny")
+      .mockResolvedValueOnce("");
 
     await setupCredentials(configure, runAsr, askHiddenFn);
 
-    expect(runAsr).toHaveBeenCalledWith("tiny");
+    expect(runAsr).toHaveBeenCalledWith("tiny", "auto");
   });
 
   it("re-prompts on invalid input then accepts valid input", async () => {
@@ -1162,13 +1397,13 @@ describe("setupCredentials model selection", () => {
       .mockResolvedValueOnce("y")       // Yes to ASR
       .mockResolvedValueOnce("invalid") // re-prompt
       .mockResolvedValueOnce("4")       // re-prompt
-      .mockResolvedValueOnce("small");  // valid
+      .mockResolvedValueOnce("small")   // valid model
+      .mockResolvedValueOnce("");        // auto
 
     await setupCredentials(configure, runAsr, askHiddenFn);
 
-    expect(runAsr).toHaveBeenCalledWith("small");
-    // 4 total calls: y, invalid, 4, small
-    expect(askHiddenFn).toHaveBeenCalledTimes(4);
+    expect(runAsr).toHaveBeenCalledWith("small", "auto");
+    expect(askHiddenFn).toHaveBeenCalledTimes(5);
   });
 
   it("re-prompts indefinitely until valid (no infinite loop in tests)", async () => {
@@ -1182,13 +1417,14 @@ describe("setupCredentials model selection", () => {
       if (callCount === 1) return "y";    // Yes
       if (callCount === 2) return "bad";  // re-prompt
       if (callCount === 3) return "xyz";  // re-prompt
-      return "base";                      // valid
+      if (callCount === 4) return "base"; // valid model
+      return "auto";
     });
 
     await setupCredentials(configure, runAsr, askHiddenFn);
 
-    expect(runAsr).toHaveBeenCalledWith("base");
-    expect(callCount).toBe(4);
+    expect(runAsr).toHaveBeenCalledWith("base", "auto");
+    expect(callCount).toBe(5);
   });
 
   it("No answer does not print model selector text", async () => {
@@ -1219,7 +1455,8 @@ describe("setupCredentials model selection", () => {
     const runAsr = vi.fn(async (_modelKey: AsrModelKey) => ({ success: true }));
     const askHiddenFn = vi.fn()
       .mockResolvedValueOnce("y")   // Yes
-      .mockResolvedValueOnce("");   // Enter = small
+      .mockResolvedValueOnce("")    // Enter = small
+      .mockResolvedValueOnce("");   // Enter = auto
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     await setupCredentials(configure, runAsr, askHiddenFn);
@@ -1233,7 +1470,7 @@ describe("setupCredentials model selection", () => {
       "速度优先：适合快速提取和长视频初筛，准确率相对较低",
     );
     expect(allOutput).toContain("均衡：兼顾速度、质量和资源占用");
-    expect(allOutput).toContain("质量优先：CPU 耗时和内存占用更高");
+    expect(allOutput).toContain("质量优先：耗时和内存占用更高");
     expect(allOutput).toContain("推荐");
 
     logSpy.mockRestore();

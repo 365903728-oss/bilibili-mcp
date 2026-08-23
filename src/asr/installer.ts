@@ -4,10 +4,19 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import {
+  ASR_CUDA_EXECUTION_PROFILE,
+  ASR_CPU_EXECUTION_PROFILE,
+  ASR_FAILURE_CATEGORIES,
+  ASR_PINNED_CTRANSLATE2,
   ASR_PINNED_RUNTIME,
   deriveAsrPaths,
   readAsrState,
+  resolveDevicePreference,
+  resolveExecutionProfile,
   resolveModelSpec,
+  type AsrExecutionProfile,
+  type AsrDevicePreference,
+  type AsrFailureCategory,
   type AsrModelKey,
   type AsrModelSpec,
   type AsrPaths,
@@ -16,8 +25,14 @@ import {
 
 export const PYTHON_MIN_MAJOR = 3;
 export const PYTHON_MIN_MINOR = 9;
-export const COMPUTE_TYPE = "int8";
-export const DEVICE = "cpu";
+export const COMPUTE_TYPE = ASR_CPU_EXECUTION_PROFILE.computeType;
+export const DEVICE = ASR_CPU_EXECUTION_PROFILE.device;
+const ASR_READINESS_EXIT_CODES: Record<AsrFailureCategory, number> = {
+  no_nvidia_gpu: 20,
+  cuda_runtime_missing: 21,
+  runtime_version_mismatch: 22,
+  model_probe_failed: 23,
+};
 const DIAG_MAX = 2000;
 const MAX_INSTALLER_OUTPUT_BYTES = 64 * 1024;
 const MAX_MODEL_FILES = 10_000;
@@ -27,6 +42,18 @@ const MODEL_BUDGET_OVERHEAD_BYTES = 64 * 1024 * 1024;
 export interface PythonCommand {
   executable: string;
   prefixArgs: string[];
+}
+
+export class AsrReadinessError extends Error {
+  constructor(
+    readonly category: AsrFailureCategory,
+    readonly device?: AsrExecutionProfile["device"],
+    readonly gpuFailureCategory?: AsrFailureCategory,
+    readonly allowFallback = true,
+  ) {
+    super(`ASR device readiness failed (${category})`);
+    this.name = "AsrReadinessError";
+  }
 }
 
 function toPythonArgs(cmd: PythonCommand, ...extra: string[]): string[] {
@@ -48,6 +75,8 @@ const ASR_CHILD_ENV_ALLOWLIST = new Set([
   "NO_COLOR",
   "SSL_CERT_FILE",
   "SSL_CERT_DIR",
+  "CUDA_PATH",
+  "LD_LIBRARY_PATH",
 ]);
 
 export function buildAsrChildEnv(
@@ -246,6 +275,14 @@ export async function discoverPython(
   );
 }
 
+function pythonCommandForVenv(venvPath: string): PythonCommand {
+  const binDir = path.join(venvPath, process.platform === "win32" ? "Scripts" : "bin");
+  return {
+    executable: path.join(binDir, process.platform === "win32" ? "python.exe" : "python"),
+    prefixArgs: [],
+  };
+}
+
 export async function createVenv(
   python: PythonCommand,
   venvPath: string,
@@ -259,10 +296,7 @@ export async function createVenv(
     throw new Error(`venv creation failed: ${result.stderr.slice(0, 500)}`);
   }
 
-  const binDir = path.join(venvPath, process.platform === "win32" ? "Scripts" : "bin");
-  const pythonExe = path.join(binDir, process.platform === "win32" ? "python.exe" : "python");
-
-  return { executable: pythonExe, prefixArgs: [] };
+  return pythonCommandForVenv(venvPath);
 }
 
 export async function installRuntime(
@@ -271,12 +305,18 @@ export async function installRuntime(
 ): Promise<void> {
   const result = await spawnFn(
     venvPython.executable,
-    toPythonArgs(venvPython, "-m", "pip", "install", "--quiet", ASR_PINNED_RUNTIME),
-      );
+    toPythonArgs(
+      venvPython,
+      "-m",
+      "pip",
+      "install",
+      "--quiet",
+      ASR_PINNED_RUNTIME,
+      ASR_PINNED_CTRANSLATE2,
+    ),
+  );
   if (result.code !== 0) {
-    throw new Error(
-      `pip install faster-whisper failed: ${result.stderr.slice(0, 500)}`,
-    );
+    throw new Error("pip install for the managed ASR runtime failed");
   }
 }
 
@@ -406,8 +446,16 @@ export async function downloadModel(
 export async function verifyModel(
   venvPython: PythonCommand,
   modelPath: string,
+  executionProfile: AsrExecutionProfile = ASR_CPU_EXECUTION_PROFILE,
   spawnFn: typeof execFile = execFile,
 ): Promise<void> {
+  const profile = resolveExecutionProfile(
+    executionProfile.device,
+    executionProfile.computeType,
+  );
+  if (profile === undefined) {
+    throw new AsrReadinessError("model_probe_failed");
+  }
   const probePath = path.join(os.tmpdir(), `.bilibili-mcp-asr-probe-${randomUUID()}.wav`);
   const sampleRate = 16_000;
   const sampleCount = sampleRate;
@@ -425,53 +473,176 @@ export async function verifyModel(
   wav.write("data", 36, "ascii");
   wav.writeUInt32LE(sampleCount * 2, 40);
   const script = [
-    "import sys",
-    "from faster_whisper import WhisperModel",
-    `model = WhisperModel(sys.argv[1], device="${DEVICE}", compute_type="${COMPUTE_TYPE}")`,
-    "segments, _ = model.transcribe(sys.argv[2], beam_size=1)",
-    "for _ in segments:",
-    "    pass",
-    "print('VERIFIED')",
+    "import ctypes, importlib.metadata, sys",
+    "def fail(category, code):",
+    "    print('FAILED:' + category, flush=True)",
+    "    raise SystemExit(code)",
+    "try:",
+    "    model_path, probe_path, pinned_ct2, device, compute_type = sys.argv[1:6]",
+    "    if importlib.metadata.version('ctranslate2') != pinned_ct2:",
+    "        fail('runtime_version_mismatch', 22)",
+    "    if device == 'cuda':",
+    "        try:",
+    "            cuda = ctypes.WinDLL('nvcuda.dll') if sys.platform == 'win32' else ctypes.CDLL('libcuda.so.1')",
+    "        except OSError:",
+    "            fail('cuda_runtime_missing', 21)",
+    "        status = int(cuda.cuInit(0))",
+    "        if status in (35, 803):",
+    "            fail('runtime_version_mismatch', 22)",
+    "        if status == 100:",
+    "            fail('no_nvidia_gpu', 20)",
+    "        if status != 0:",
+    "            fail('model_probe_failed', 23)",
+    "        count = ctypes.c_int()",
+    "        status = int(cuda.cuDeviceGetCount(ctypes.byref(count)))",
+    "        if status in (35, 803):",
+    "            fail('runtime_version_mismatch', 22)",
+    "        if status == 100 or (status == 0 and count.value == 0):",
+    "            fail('no_nvidia_gpu', 20)",
+    "        if status != 0:",
+    "            fail('model_probe_failed', 23)",
+    "    from faster_whisper import WhisperModel",
+    "    model = WhisperModel(model_path, device=device, compute_type=compute_type)",
+    "    segments, _ = model.transcribe(probe_path, beam_size=1)",
+    "    for _ in segments:",
+    "        pass",
+    "except Exception as error:",
+    "    message = str(error).lower()",
+    "    if device == 'cuda':",
+    "        if any(token in message for token in ('insufficient driver', 'driver mismatch', 'unsupported cuda version')):",
+    "            fail('runtime_version_mismatch', 22)",
+    "        if any(token in message for token in ('cublas', 'cudnn', 'nvcuda', 'libcuda', 'cuda runtime', 'cannot be loaded', 'library not found', 'dll not found')):",
+    "            fail('cuda_runtime_missing', 21)",
+    "    fail('model_probe_failed', 23)",
+    "print('VERIFIED', flush=True)",
   ].join("\n");
 
-  let result: { code: number | null; stdout: string; stderr: string };
+  let result: { code: number | null; stdout: string; stderr: string } | undefined;
   let probeCreated = false;
+  let cleanupFailed = false;
   try {
     fs.writeFileSync(probePath, wav, { flag: "wx", mode: 0o600 });
     probeCreated = true;
     result = await spawnFn(
       venvPython.executable,
-      toPythonArgs(venvPython, "-c", script, modelPath, probePath),
+      toPythonArgs(
+        venvPython,
+        "-c",
+        script,
+        modelPath,
+        probePath,
+        ASR_PINNED_CTRANSLATE2.split("==", 2)[1],
+        profile.device,
+        profile.computeType,
+      ),
     );
+  } catch {
+    // Map subprocess and local probe failures after cleanup so a cleanup
+    // failure can prevent auto fallback from publishing a ready Profile.
   } finally {
-    if (probeCreated) fs.unlinkSync(probePath);
+    if (probeCreated) {
+      try {
+        fs.unlinkSync(probePath);
+      } catch {
+        cleanupFailed = true;
+      }
+    }
   }
-  if (result.code !== 0) {
-    throw new Error(
-      `Model verification failed: ${result.stderr.slice(0, 500)}`,
+  if (cleanupFailed) {
+    throw new AsrReadinessError(
+      "model_probe_failed",
+      profile.device,
+      undefined,
+      false,
     );
+  }
+  if (result === undefined) {
+    throw new AsrReadinessError("model_probe_failed", profile.device);
   }
 
-  if (result.stdout.trim() !== "VERIFIED") {
-    throw new Error("Model verification did not confirm load");
+  if (result.code === 0 && result.stdout.trim() === "VERIFIED") {
+    return;
   }
+
+  const match = /^FAILED:([a-z_]+)$/.exec(result.stdout.trim());
+  const matchedCategory = match !== null &&
+      (ASR_FAILURE_CATEGORIES as readonly string[]).includes(match[1])
+    ? match[1] as AsrFailureCategory
+    : undefined;
+  const category = matchedCategory !== undefined &&
+      result.code === ASR_READINESS_EXIT_CODES[matchedCategory]
+    ? matchedCategory
+    : "model_probe_failed";
+  throw new AsrReadinessError(category, profile.device);
 }
 
 export interface InstallResult {
   success: boolean;
   error?: string;
   pythonPath?: string;
+  executionProfile?: AsrExecutionProfile;
+  failureCategory?: AsrFailureCategory;
+  failureDevice?: AsrExecutionProfile["device"];
+  gpuFailureCategory?: AsrFailureCategory;
   asrPaths: AsrPaths;
 }
 
-function prepareModelStaging(asrPaths: AsrPaths): string {
+async function verifyDeviceReadiness(
+  venvPython: PythonCommand,
+  modelPath: string,
+  preference: AsrDevicePreference,
+  spawnFn: typeof execFile,
+  logStage: (stage: string) => void,
+): Promise<{
+  executionProfile: AsrExecutionProfile;
+  failureCategory?: AsrFailureCategory;
+}> {
+  if (preference === "cpu") {
+    logStage("正在验证模型最小推理（CPU INT8）...");
+    await verifyModel(venvPython, modelPath, ASR_CPU_EXECUTION_PROFILE, spawnFn);
+    return { executionProfile: ASR_CPU_EXECUTION_PROFILE };
+  }
+
+  try {
+    logStage("正在验证 NVIDIA GPU 最小推理（CUDA Float16）...");
+    await verifyModel(venvPython, modelPath, ASR_CUDA_EXECUTION_PROFILE, spawnFn);
+    return { executionProfile: ASR_CUDA_EXECUTION_PROFILE };
+  } catch (error) {
+    const readinessError = error instanceof AsrReadinessError
+      ? error
+      : new AsrReadinessError("model_probe_failed", "cuda");
+    if (preference === "cuda" || !readinessError.allowFallback) {
+      throw readinessError;
+    }
+
+    logStage(`GPU 验证未通过（${readinessError.category}），正在验证 CPU INT8 回退...`);
+    try {
+      await verifyModel(venvPython, modelPath, ASR_CPU_EXECUTION_PROFILE, spawnFn);
+    } catch (cpuError) {
+      const cpuReadinessError = cpuError instanceof AsrReadinessError
+        ? cpuError
+        : new AsrReadinessError("model_probe_failed", "cpu");
+      throw new AsrReadinessError(
+        cpuReadinessError.category,
+        "cpu",
+        readinessError.category,
+      );
+    }
+    return {
+      executionProfile: ASR_CPU_EXECUTION_PROFILE,
+      failureCategory: readinessError.category,
+    };
+  }
+}
+
+function prepareModelStaging(asrPaths: AsrPaths, preserveExistingModel: boolean): string {
   const root = path.resolve(asrPaths.root);
   const model = path.resolve(asrPaths.model);
   if (path.dirname(model) !== root || path.basename(model) !== "models") {
     throw new Error("ASR model path is outside the managed root");
   }
   const staging = path.join(root, `.models-staging-${randomUUID()}`);
-  if (fs.existsSync(model)) {
+  if (fs.existsSync(model) && !preserveExistingModel) {
     const stat = fs.lstatSync(model);
     if (!stat.isDirectory() || stat.isSymbolicLink()) {
       throw new Error("Existing ASR model path is unsafe");
@@ -495,6 +666,29 @@ function cleanupModelStaging(asrPaths: AsrPaths, staging: string): void {
   fs.rmSync(target, { recursive: true, force: true });
 }
 
+function prepareRuntimeStaging(asrPaths: AsrPaths): string {
+  const root = path.resolve(asrPaths.root);
+  const venv = path.resolve(asrPaths.venv);
+  if (path.dirname(venv) !== root || path.basename(venv) !== "venv") {
+    throw new Error("ASR runtime path is outside the managed root");
+  }
+  const staging = path.join(root, `.venv-staging-${randomUUID()}`);
+  fs.mkdirSync(staging, { recursive: false, mode: 0o700 });
+  return staging;
+}
+
+function cleanupRuntimeStaging(asrPaths: AsrPaths, staging: string): void {
+  const root = path.resolve(asrPaths.root);
+  const target = path.resolve(staging);
+  if (
+    path.dirname(target) !== root ||
+    !path.basename(target).startsWith(".venv-staging-")
+  ) {
+    throw new Error("Refused unsafe ASR runtime staging cleanup");
+  }
+  fs.rmSync(target, { recursive: true, force: true });
+}
+
 export async function runAsrInstallation(
   options: {
     fsMkdirSync?: typeof fs.mkdirSync;
@@ -503,6 +697,7 @@ export async function runAsrInstallation(
     asrBase?: string;
     pythonOverride?: string;
     modelKey?: AsrModelKey;
+    devicePreference?: AsrDevicePreference;
     spawnFn?: typeof execFile;
     onStage?: (stage: string) => void;
   } = {},
@@ -513,7 +708,11 @@ export async function runAsrInstallation(
   const spawnFn = options.spawnFn ?? execFile;
   const logStage = options.onStage ?? (() => {});
   const asrPaths = deriveAsrPaths(options.asrBase);
+  let venvStaging: string | undefined;
+  let venvBackup: string | undefined;
   let modelStaging: string | undefined;
+  let modelBackup: string | undefined;
+  let stateBackup: string | undefined;
 
   // Fail before ANY mutation when an existing ASR root is a symlink or not
   // a real directory; an absent root is created owner-only later.
@@ -541,6 +740,14 @@ export async function runAsrInstallation(
 
   // Resolve model before any mutation
   const modelKey = options.modelKey ?? "small";
+  const devicePreference = resolveDevicePreference(options.devicePreference ?? "auto");
+  if (devicePreference === undefined) {
+    return {
+      success: false,
+      error: "Invalid ASR device preference. Expected auto, cpu, or cuda.",
+      asrPaths,
+    };
+  }
   let modelSpec: AsrModelSpec;
   try {
     modelSpec = resolveModelSpec(modelKey);
@@ -549,103 +756,194 @@ export async function runAsrInstallation(
     return { success: false, error: message, asrPaths };
   }
 
-  // A legacy v1 state already owns a valid managed model and runtime. Promote
-  // it in place only after the new end-to-end CPU readiness probe succeeds.
   const existingState = readAsrState(asrPaths.stateFile);
   const sameModel =
     existingState.kind === "ready" &&
     existingState.model === modelSpec.repository &&
     existingState.revision === modelSpec.revision;
-  if (sameModel && existingState.migrationStatus === "pending") {
-    const venvPython: PythonCommand = {
-      executable: path.join(
-        asrPaths.venv,
-        process.platform === "win32" ? "Scripts" : "bin",
-        process.platform === "win32" ? "python.exe" : "python",
-      ),
-      prefixArgs: [],
-    };
-    try {
-      logStage("正在验证模型最小推理（CPU INT8）...");
-      await verifyModel(venvPython, asrPaths.model, spawnFn);
-      writeAsrState(asrPaths.stateFile, modelSpec.key);
-      return { success: true, pythonPath: venvPython.executable, asrPaths };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { success: false, error: message, asrPaths };
-    }
-  }
-
-  // Idempotency: a same-model v2 CPU profile has already passed this probe.
-  if (sameModel) {
-    return { success: true, pythonPath: "already installed", asrPaths };
-  }
+  const hasReadyInstallation = existingState.kind === "ready";
 
   // ponytail: one active model reuses the Phase 1 directory; use per-model
   // directories only if retaining several installed models becomes a real need.
 
-  // Invalidate stale state marker so a failed retry does not leave
-  // behind a valid-looking marker alongside now-present artifacts.
-  if (existingState.kind !== "not_installed") {
-    try {
-      unlinkSyncFn(asrPaths.stateFile);
-    } catch (err: unknown) {
-      const code = (err as NodeJS.ErrnoException)?.code;
-      if (code !== "ENOENT") {
-        return {
-          success: false,
-          error: `Cannot clear stale ASR state: ${(err as Error)?.message ?? String(err)}`,
-          asrPaths,
-        };
-      }
-    }
-  }
-
   try {
+    let python: PythonCommand;
+    let targetVenv: string;
     const pythonOverride = options.pythonOverride ?? process.env.BILIBILI_ASR_PYTHON;
-    logStage("正在查找 Python 3.9+...");
-    const python = await discoverPython(spawnFn, pythonOverride);
+    if (hasReadyInstallation) {
+      if (pythonOverride?.trim()) {
+        logStage("正在查找 Python 3.9+...");
+        python = await discoverPython(spawnFn, pythonOverride);
+      } else {
+        python = pythonCommandForVenv(asrPaths.venv);
+      }
+      venvStaging = prepareRuntimeStaging(asrPaths);
+      targetVenv = venvStaging;
+      logStage("正在创建隔离的 ASR 运行时...");
+    } else {
+      logStage("正在查找 Python 3.9+...");
+      python = await discoverPython(spawnFn, pythonOverride);
+      targetVenv = asrPaths.venv;
+      logStage("正在创建虚拟环境...");
+    }
 
-    logStage("正在创建虚拟环境...");
-    const venvPython = await createVenv(python, asrPaths.venv, spawnFn, mkdirSyncFn);
+    const venvPython = await createVenv(python, targetVenv, spawnFn, mkdirSyncFn);
 
-    logStage("正在安装 faster-whisper...");
+    logStage("正在安装受控 ASR 运行时...");
     await installRuntime(venvPython, spawnFn);
 
-    const modelBudget = modelInstallBudgetBytes(modelSpec);
-    assertInstallFreeSpace(asrPaths.root, modelBudget);
-    modelStaging = prepareModelStaging(asrPaths);
+    let candidateModel = asrPaths.model;
+    let modelBudget: number | undefined;
+    if (!sameModel) {
+      modelBudget = modelInstallBudgetBytes(modelSpec);
+      assertInstallFreeSpace(asrPaths.root, modelBudget);
+      modelStaging = prepareModelStaging(asrPaths, hasReadyInstallation);
 
-    logStage(`正在下载模型（约 ${modelSpec.approximateMB} MB）...`);
-    await downloadModel(
-      venvPython,
-      modelStaging,
-      modelSpec.repository,
-      modelSpec.revision,
-      spawnFn,
-      mkdirSyncFn,
-      modelBudget,
-    );
-
-    logStage("正在验证模型加载（CPU INT8）...");
-    await verifyModel(venvPython, modelStaging, spawnFn);
-    validateModelInstallTree(modelStaging, modelBudget);
-    if (fs.existsSync(asrPaths.model)) {
-      throw new Error("ASR model destination changed during setup");
+      logStage(`正在下载模型（约 ${modelSpec.approximateMB} MB）...`);
+      await downloadModel(
+        venvPython,
+        modelStaging,
+        modelSpec.repository,
+        modelSpec.revision,
+        spawnFn,
+        mkdirSyncFn,
+        modelBudget,
+      );
+      candidateModel = modelStaging;
     }
-    fs.renameSync(modelStaging, asrPaths.model);
-    modelStaging = undefined;
+
+    const readiness = await verifyDeviceReadiness(
+      venvPython,
+      candidateModel,
+      devicePreference,
+      spawnFn,
+      logStage,
+    );
+    if (modelStaging !== undefined && modelBudget !== undefined) {
+      validateModelInstallTree(modelStaging, modelBudget);
+    }
+
+    if (hasReadyInstallation) {
+      const candidateStateBackup = path.join(
+        asrPaths.root,
+        `.state-backup-${randomUUID()}.json`,
+      );
+      fs.renameSync(asrPaths.stateFile, candidateStateBackup);
+      stateBackup = candidateStateBackup;
+
+      const venvStat = fs.lstatSync(asrPaths.venv);
+      if (!venvStat.isDirectory() || venvStat.isSymbolicLink()) {
+        throw new Error("Existing ASR runtime path is unsafe");
+      }
+      const candidateVenvBackup = path.join(asrPaths.root, `.venv-backup-${randomUUID()}`);
+      fs.renameSync(asrPaths.venv, candidateVenvBackup);
+      venvBackup = candidateVenvBackup;
+      fs.renameSync(venvStaging!, asrPaths.venv);
+      venvStaging = undefined;
+    }
+
+    if (modelStaging !== undefined) {
+      if (fs.existsSync(asrPaths.model)) {
+        const modelStat = fs.lstatSync(asrPaths.model);
+        if (!modelStat.isDirectory() || modelStat.isSymbolicLink()) {
+          throw new Error("Existing ASR model path is unsafe");
+        }
+        const candidateModelBackup = path.join(
+          asrPaths.root,
+          `.models-backup-${randomUUID()}`,
+        );
+        fs.renameSync(asrPaths.model, candidateModelBackup);
+        modelBackup = candidateModelBackup;
+      }
+      fs.renameSync(modelStaging, asrPaths.model);
+      modelStaging = undefined;
+    }
 
     writeAsrState(
       asrPaths.stateFile,
       modelSpec.key,
+      readiness,
       fs.writeFileSync,
       fs.renameSync,
-      fs.unlinkSync,
+      unlinkSyncFn,
       mkdirSyncFn,
     );
-    return { success: true, pythonPath: python.executable, asrPaths };
+
+    // Publication is complete. Backup deletion is best-effort and cannot turn
+    // an already-active verified Profile into a reported failure.
+    if (modelBackup !== undefined) {
+      try { fs.rmSync(modelBackup, { recursive: true, force: true }); } catch { /* best-effort */ }
+      modelBackup = undefined;
+    }
+    if (venvBackup !== undefined) {
+      try { fs.rmSync(venvBackup, { recursive: true, force: true }); } catch { /* best-effort */ }
+      venvBackup = undefined;
+    }
+    if (stateBackup !== undefined) {
+      try { unlinkSyncFn(stateBackup); } catch { /* best-effort */ }
+      stateBackup = undefined;
+    }
+    return {
+      success: true,
+      pythonPath: hasReadyInstallation
+        ? pythonCommandForVenv(asrPaths.venv).executable
+        : python.executable,
+      executionProfile: readiness.executionProfile,
+      failureCategory: readiness.failureCategory,
+      asrPaths,
+    };
   } catch (error) {
+    let rollbackFailed = false;
+    if (modelBackup !== undefined) {
+      try {
+        if (fs.existsSync(asrPaths.model)) {
+          fs.rmSync(asrPaths.model, { recursive: true, force: true });
+        }
+        if (fs.existsSync(modelBackup)) {
+          fs.renameSync(modelBackup, asrPaths.model);
+        }
+        modelBackup = undefined;
+      } catch {
+        rollbackFailed = true;
+      }
+    }
+    if (venvBackup !== undefined) {
+      try {
+        if (fs.existsSync(asrPaths.venv)) {
+          fs.rmSync(asrPaths.venv, { recursive: true, force: true });
+        }
+        if (fs.existsSync(venvBackup)) {
+          fs.renameSync(venvBackup, asrPaths.venv);
+        }
+        venvBackup = undefined;
+      } catch {
+        rollbackFailed = true;
+      }
+    }
+    if (stateBackup !== undefined) {
+      if (!rollbackFailed) {
+        try {
+          if (fs.existsSync(asrPaths.stateFile)) {
+            unlinkSyncFn(asrPaths.stateFile);
+          }
+          fs.renameSync(stateBackup, asrPaths.stateFile);
+          stateBackup = undefined;
+        } catch {
+          rollbackFailed = true;
+        }
+      }
+      if (rollbackFailed) {
+        // The previous state must not describe partially restored artifacts.
+        // Leaving its backup inactive makes all future reads fail closed.
+        try {
+          if (fs.existsSync(asrPaths.stateFile)) {
+            unlinkSyncFn(asrPaths.stateFile);
+          }
+        } catch {
+          // The bounded rollback error below remains authoritative.
+        }
+      }
+    }
     if (modelStaging !== undefined) {
       try {
         cleanupModelStaging(asrPaths, modelStaging);
@@ -653,7 +951,24 @@ export async function runAsrInstallation(
         // Keep the original bounded setup error.
       }
     }
+    if (venvStaging !== undefined) {
+      try {
+        cleanupRuntimeStaging(asrPaths, venvStaging);
+      } catch {
+        // Keep the original bounded setup error.
+      }
+    }
     const message = error instanceof Error ? error.message : String(error);
-    return { success: false, error: message, asrPaths };
+    const readinessError = error instanceof AsrReadinessError ? error : undefined;
+    return {
+      success: false,
+      error: rollbackFailed
+        ? "ASR setup failed and the previous installation could not be restored"
+        : message,
+      failureCategory: readinessError?.category,
+      failureDevice: readinessError?.device,
+      gpuFailureCategory: readinessError?.gpuFailureCategory,
+      asrPaths,
+    };
   }
 }

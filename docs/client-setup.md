@@ -69,13 +69,13 @@ bilibili-mcp --help
    完成凭证配置后，setup 会询问是否安装可选的本地 ASR 模型。
    这是纯本地操作——不要替我选择，也不要代收模型文件；让我自己按提示
    输入 y 继续，或直接回车跳过 [y/N]。选择安装后会显示三个模型选项，
-   自行选择或按 Enter 选择推荐的 small。
+   自行选择或按 Enter 选择推荐的 small；随后选择 auto、cpu 或 cuda（默认 auto）。
    安装完成后，可在明确需要无字幕回退时调用 get_video_transcript 并设置
    fallback_to_asr=true；默认调用不会运行 ASR，也不会在 MCP 内下载或切换模型。
    自动化/无终端场景：bilibili-mcp setup --non-interactive 使用已有的环境变量或
    全局配置文件凭据，绝不从 stdin/argv 读取凭据值、绝不提示；无 --asr-model 时仅确认凭据可加载
-   即成功退出（exit 0），加 --asr-model <tiny|base|small> 可安装指定模型
-   （必须与 --non-interactive 同用）。
+   即成功退出（exit 0），加 --asr-model <tiny|base|small> 可安装指定模型，
+   --asr-device <auto|cpu|cuda> 可选择设备偏好（默认 auto；两者必须与 --non-interactive 同用）。
 
 6. 配置完成后，重启或重连这个 MCP server，使其重新加载凭证。
 
@@ -1349,15 +1349,18 @@ bilibili-mcp check
 - 选择 Yes 后，会显示三个可选模型：
   - `1. tiny`（约 78.2 MB）— 速度优先：适合快速提取和长视频初筛，准确率相对较低
   - `2. base`（约 148 MB）— 均衡：兼顾速度、质量和资源占用
-  - `3. small`（约 486 MB）— 质量优先：CPU 耗时和内存占用更高；[推荐]，Enter 默认选择
+  - `3. small`（约 486 MB）— 质量优先：耗时和内存占用更高；[推荐]，Enter 默认选择
 - 输入数字 `1/2/3` 或名称 `tiny/base/small` 选择；无效输入会重新提示，不会启动安装。
-- runtime 固定为 `faster-whisper==1.2.1`，加上运行时库的总磁盘开销。
+- 随后选择 `auto/cpu/cuda`，Enter 默认 `auto`。`auto` 优先完整验证 GPU，失败时说明脱敏原因并验证 CPU 回退；`cpu` 跳过 GPU；显式 `cuda` 失败不回退。
+- 非交互形式为 `setup --non-interactive --asr-model <tiny|base|small> --asr-device <auto|cpu|cuda>`；省略 `--asr-device` 时同样默认 `auto`。
+- runtime 固定为 `faster-whisper==1.2.1` 与 `ctranslate2==4.8.0`，加上运行时库的总磁盘开销。
 - 需要本机装有 Python 3.9+。可通过设置 `BILIBILI_ASR_PYTHON` 环境变量指定 Python 可执行文件。
 - 安装内容存放在用户管理的 `~/.bilibili-mcp/asr/` 中；不修改系统 Python。
-- 同一目录只保留一个活跃模型，切换模型时清空旧的就绪状态。
-- 安装完成后通过 CPU INT8 加载模型进行验证；不需要系统 FFmpeg（PyAV 已捆绑 FFmpeg 库）。
-- 安装失败不会留下就绪标记；已下载的部分文件保留，重新运行 `setup` 可从断点续传。
-- `doctor --json` 的 `asr.status` 和 `asr.model` 字段为纯信息字段，不影响凭证退出状态。
+- 同一目录只保留一个活跃模型；切换模型或显式 CUDA 验证失败时，原来已验证的模型与 Profile 不会被替换。
+- readiness 使用所选本地模型和程序生成的固定短 WAV，真实加载模型、执行最小转写并完整消费结果；临时 WAV 随后清理，不访问 Bilibili。系统 FFmpeg 不需要另装（PyAV 已捆绑相关库）。
+- 项目不会安装或修改 NVIDIA 驱动、CUDA、cuBLAS、cuDNN、系统 `PATH`、`LD_LIBRARY_PATH` 或全局 Python。GPU 失败时可继续使用已验证 CPU，或自行修复环境后重新运行 `setup`；每次重跑都会重新验证。
+- 新安装失败不会留下 ready 状态；已有 ready 配置在失败时保持不变。
+- `doctor --json` 的 `asr.status`、`asr.model`、`device`、`compute_type`、`device_readiness` 与 `failure_category` 字段为纯信息字段，不影响凭证退出状态。
 - MCP 调用不会下载或切换模型；仅使用 `doctor --json` 显示 ready 的当前模型。
 - `get_video_transcript` 只有显式设置 `fallback_to_asr: true` 且确认无可用字幕时才运行 ASR；原生字幕、Cookie/API/网络错误都不会触发。
 - ASR 只处理一个已解析 Part，单 Part 最长 2 小时、临时音频最多 128 MiB，同时只允许一个转录任务且不排队。

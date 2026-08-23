@@ -55,7 +55,7 @@ Bilibili MCP 是一个本地 MCP server，让 AI Agent 读取 Bilibili 内容。
    npx -y @xzxzzx/bilibili-mcp@latest check
    npx -y @xzxzzx/bilibili-mcp@latest doctor --json
    doctor --json 只检查本机配置状态，不能代替后面的实时登录验证。
-   setup 会询问是否安装可选的本地 ASR 模型，选否即可。自动化环境可用 setup --non-interactive（凭据来自已有的环境变量或全局配置，绝不提示、也绝不从 stdin/argv 读取凭据值）；加 --asr-model <tiny|base|small> 可同时安装指定模型。
+   setup 会询问是否安装可选的本地 ASR 模型，选否即可。自动化环境可用 setup --non-interactive（凭据来自已有的环境变量或全局配置，绝不提示、也绝不从 stdin/argv 读取凭据值）；加 --asr-model <tiny|base|small> 可同时安装指定模型，--asr-device <auto|cpu|cuda> 选择设备偏好（默认 auto）。
 5. 让我重启或重连客户端。你无法代替我完成这一步时，请明确让我操作。
 6. 重连后调用 MCP 工具 check_bilibili_credentials。
    只有 configured: true 且 logged_in: true 才报告成功。
@@ -170,9 +170,11 @@ Bilibili 会把部分视频的 AI 识别字幕标为 `ai-zh`、`ai-en`、`ai-ja`
 |---|---|---|
 | tiny | ~78 MB | 速度优先：适合快速提取和长视频初筛；准确率相对较低 |
 | base | ~148 MB | 均衡：兼顾速度、质量和资源占用 |
-| small | ~486 MB | 质量优先：CPU 耗时和内存占用更高；推荐，Enter 默认选中 |
+| small | ~486 MB | 质量优先：耗时和内存占用更高；推荐，Enter 默认选中 |
 
-Runtime 固定为 `faster-whisper==1.2.1`，模型存放在用户目录 `~/.bilibili-mcp/asr/`，通过 CPU INT8 加载验证后才算就绪，不需要系统 FFmpeg；同一目录仅保留一个活跃模型。`doctor --json` 的 `asr.status` 和 `asr.model` 报告就绪状态与已选模型（纯信息字段，不影响凭证退出状态）。
+Runtime 固定为 `faster-whisper==1.2.1` 与 `ctranslate2==4.8.0`，模型存放在用户目录 `~/.bilibili-mcp/asr/`，不需要系统 FFmpeg；同一目录仅保留一个活跃模型。选择模型后还需选择设备偏好：`auto`（默认）先用程序生成的固定短 WAV 完整验证 `cuda/float16`，失败时说明脱敏原因并验证、保存 `cpu/int8`；`cpu` 跳过 GPU；`cuda` 验证失败则报错且不回退。`doctor --json` 会报告实际生效的 `device`、`compute_type`、readiness 与脱敏失败类别。
+
+项目不会安装或修改 NVIDIA 驱动、CUDA、cuBLAS、cuDNN、系统 `PATH`、`LD_LIBRARY_PATH` 或全局 Python。GPU 验证失败后，你可以继续使用已经验证的 CPU，也可以自行修复 GPU 环境后重新运行 `setup`；每次重新运行都会再次验证设备。
 
 **边界：**本地转录始终被约束在安全范围内——显式选择、资源受限、Cookie 隔离：
 

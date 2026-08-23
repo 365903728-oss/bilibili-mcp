@@ -577,3 +577,24 @@
 - Future behavior: for CLI tests that must terminate existing prompt loops,
   make mocks choose a terminating branch (for example "n" to skip ASR) and run
   each red test in isolation.
+
+## 2026-08-24 — ASR runtime replacement
+
+- Lesson: A readiness probe cannot protect a working installation if setup
+  mutates that installation before probing. Build runtime and model candidates
+  in sibling staging directories and probe there. Before activation, move the
+  old ready state out of the active slot; restore it only if every artifact
+  rollback succeeds, otherwise keep state inactive so the runner fails closed.
+- Evidence: Issue #66 review reproduced explicit-CUDA and model-switch failures
+  that otherwise left the previous Profile pointing at changed runtime bytes.
+- Future behavior: any ASR dependency, model, or device migration must preserve
+  the exact prior verified state/runtime/model until the replacement probe has
+  succeeded.
+
+- Lesson: Probe cleanup failure is not a normal device-readiness failure. Auto
+  fallback must stop rather than publish CPU ready while a generated WAV from
+  the failed GPU attempt remains undeleted.
+- Evidence: Issue #66 risk review reproduced a successful CPU fallback with an
+  orphaned GPU probe before the cleanup failure became non-fallbackable.
+- Future behavior: every readiness attempt must complete its own cleanup before
+  another device probe or ready-state publication is allowed.

@@ -46,21 +46,25 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
 - `src/asr/state.ts`: three-model allowlist (`tiny`/`base`/`small` with pinned
   revisions and approximate sizes), controlled Execution Profile/failure
   enums, derived user paths (`~/.bilibili-mcp/asr/`), strict v1/v2 state
-  validation, v1 migration-pending projection, and atomic v2 `cpu/int8` ready
-  write (parameterized by model key, defaults to `small`).
+  validation, v1 migration-pending projection, and atomic v2 verified
+  `cpu/int8` or `cuda/float16` ready writes (parameterized by model key,
+  defaults to `small`).
 - `src/asr/installer.ts`: injectable Python 3.9+ discovery (with
   `BILIBILI_ASR_PYTHON` override), allowlisted child environment, subprocess
-  deadlines/output caps, user-scoped venv creation, pinned pip install,
-  staged/budgeted/no-symlink snapshot download, generated short-WAV CPU INT8
-  inference with full generator consumption, temporary-audio cleanup, same-model
-  v1 promotion without reinstall, atomic Profile activation, and failure cleanup.
-  One active model reuses the Phase 1 directory.
+  deadlines/output caps, user-scoped venv creation, exact faster-whisper and
+  CTranslate2 pins, staged/budgeted/no-symlink snapshot download, `auto | cpu |
+  cuda` readiness with generated short-WAV inference and full generator
+  consumption, sanitized GPU failure categories, temporary-audio cleanup,
+  same-model v1 promotion, staged runtime/model publication with captured-error
+  rollback, and fail-closed state invalidation when rollback is incomplete. One
+  active model reuses the Phase 1 directory; a failed probe keeps the prior
+  verified installation.
 - `src/asr/transcription.ts`: explicit ready-state-only ASR orchestration. It
   requires trusted duration, owns one aggregate audio deadline/byte budget,
   unique temporary directories, one-active/no-queue concurrency, bounded
   Windows Job/POSIX `RLIMIT` managed-Python execution, strict NDJSON,
-  cancellation/tree kill, controlled Profile-driven Python argv, legacy v1 CPU
-  fallback, guarded cleanup, and all-candidate Fake-IP failure aggregation
+  cancellation/tree kill, validated `cpu/int8` or `cuda/float16` Profile-driven
+  Python argv, legacy v1 CPU fallback, guarded cleanup, and all-candidate Fake-IP failure aggregation
   without preventing later-candidate success. MCP requests never
   install or switch models.
 

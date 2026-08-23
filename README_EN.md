@@ -57,7 +57,7 @@ Please help me install the Bilibili MCP server: @xzxzzx/bilibili-mcp.
    npx -y @xzxzzx/bilibili-mcp@latest check
    npx -y @xzxzzx/bilibili-mcp@latest doctor --json
    doctor --json checks local configuration only; it does not replace the live login verification below.
-   setup will ask about installing the optional local ASR model; choosing no is fine. Automated environments can run setup --non-interactive (credentials come from existing environment variables or the global config file; no prompts, and credential values are never read from stdin/argv); add --asr-model <tiny|base|small> to also install a given model.
+   setup will ask about installing the optional local ASR model; choosing no is fine. Automated environments can run setup --non-interactive (credentials come from existing environment variables or the global config file; no prompts, and credential values are never read from stdin/argv); add --asr-model <tiny|base|small> to install a model and --asr-device <auto|cpu|cuda> to choose the device preference (default: auto).
 5. Ask me to restart or reconnect the client. When you can't do it for me,
    tell me explicitly to do it myself.
 6. After reconnect, call the MCP tool check_bilibili_credentials.
@@ -178,9 +178,11 @@ Some videos ship without any subtitle. Once you install a local ASR model, `get_
 |---|---|---|
 | tiny | ~78 MB | Speed-first: suited to quick extraction and initial review of long videos; relatively lower accuracy |
 | base | ~148 MB | Balanced: balances speed, quality, and resource use |
-| small | ~486 MB | Quality-first: higher CPU time and memory use; recommended, selected on Enter |
+| small | ~486 MB | Quality-first: higher runtime and memory use; recommended, selected on Enter |
 
-The runtime is pinned to `faster-whisper==1.2.1`. Models live under `~/.bilibili-mcp/asr/`, are verified by a CPU INT8 load before being marked ready, and do not require system FFmpeg; only one active model is kept per directory. `doctor --json` reports readiness and the selected model via `asr.status` and `asr.model` (informational fields that never affect credential exit codes).
+The runtime is pinned to `faster-whisper==1.2.1` and `ctranslate2==4.8.0`. Models live under `~/.bilibili-mcp/asr/`, do not require system FFmpeg, and only one active model is kept per directory. After choosing a model, choose a device preference: `auto` (default) performs a complete `cuda/float16` check with a generated fixed short WAV, explains a sanitized failure and verifies/saves `cpu/int8` when CUDA is not ready; `cpu` skips GPU probing; `cuda` fails without CPU fallback. `doctor --json` reports the effective device, compute type, readiness, and sanitized failure category.
+
+The project never installs or modifies NVIDIA drivers, CUDA, cuBLAS, cuDNN, the system `PATH`, `LD_LIBRARY_PATH`, or global Python. After a GPU failure, you decide whether to keep the verified CPU profile or repair the GPU environment and rerun `setup`; every setup rerun rechecks device readiness.
 
 **Boundaries:** local transcription stays within safe bounds — opt-in, resource-capped, Cookie-isolated:
 

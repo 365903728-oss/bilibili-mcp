@@ -4,6 +4,7 @@ import os from "os";
 import { randomUUID } from "crypto";
 
 export const ASR_PINNED_RUNTIME = "faster-whisper==1.2.1";
+export const ASR_PINNED_CTRANSLATE2 = "ctranslate2==4.8.0";
 export const ASR_STATE_VERSION = 2;
 const ASR_LEGACY_STATE_VERSION = 1;
 
@@ -14,6 +15,9 @@ export const ASR_EXECUTION_PROFILES = [
 
 export type AsrExecutionProfile = (typeof ASR_EXECUTION_PROFILES)[number];
 export const ASR_CPU_EXECUTION_PROFILE = ASR_EXECUTION_PROFILES[0];
+export const ASR_CUDA_EXECUTION_PROFILE = ASR_EXECUTION_PROFILES[1];
+export const ASR_DEVICE_PREFERENCES = ["auto", "cpu", "cuda"] as const;
+export type AsrDevicePreference = (typeof ASR_DEVICE_PREFERENCES)[number];
 export type AsrDeviceReadiness = "not_ready" | "migration_pending" | "ready";
 export type AsrMigrationStatus = "pending" | "completed";
 
@@ -96,6 +100,11 @@ export interface AsrState {
   failureCategory?: AsrFailureCategory;
 }
 
+export interface AsrStateWriteOptions {
+  executionProfile?: AsrExecutionProfile;
+  failureCategory?: AsrFailureCategory;
+}
+
 export function modelKeyForRepo(repository: string, revision: string): AsrModelKey | null {
   const spec = ASR_MODEL_SPECS.find(
     (s) => s.repository === repository && s.revision === revision,
@@ -165,6 +174,13 @@ export function resolveExecutionProfile(
   return ASR_EXECUTION_PROFILES.find(
     (profile) => profile.device === device && profile.computeType === computeType,
   );
+}
+
+export function resolveDevicePreference(value: unknown): AsrDevicePreference | undefined {
+  return typeof value === "string" &&
+    (ASR_DEVICE_PREFERENCES as readonly string[]).includes(value)
+    ? value as AsrDevicePreference
+    : undefined;
 }
 
 function isFailureCategory(value: unknown): value is AsrFailureCategory {
@@ -265,11 +281,10 @@ export function readAsrState(
     executionProfile = resolveExecutionProfile(parsed.device, parsed.compute_type);
     if (
       executionProfile === undefined ||
-      executionProfile.device !== "cpu" ||
       parsed.device_readiness !== "ready" ||
       parsed.migration_status !== "completed" ||
       (Object.prototype.hasOwnProperty.call(parsed, "failure_category") &&
-        !isFailureCategory(parsed.failure_category))
+        (!isFailureCategory(parsed.failure_category) || executionProfile.device === "cuda"))
     ) {
       return { kind: "incomplete" };
     }
@@ -329,6 +344,7 @@ export function readAsrState(
 export function writeAsrState(
   stateFile: string,
   modelKey: AsrModelKey = "small",
+  options: AsrStateWriteOptions = {},
   writeFileSync: typeof fs.writeFileSync = fs.writeFileSync,
   renameSync: typeof fs.renameSync = fs.renameSync,
   unlinkSync: typeof fs.unlinkSync = fs.unlinkSync,
@@ -338,16 +354,33 @@ export function writeAsrState(
   chmodSync: typeof fs.chmodSync = fs.chmodSync,
 ): void {
   const spec = resolveModelSpec(modelKey);
+  const executionProfile = options.executionProfile ?? ASR_CPU_EXECUTION_PROFILE;
+  const resolvedProfile = resolveExecutionProfile(
+    executionProfile.device,
+    executionProfile.computeType,
+  );
+  if (resolvedProfile === undefined) {
+    throw new Error("Invalid ASR execution profile");
+  }
+  if (
+    options.failureCategory !== undefined &&
+    (!isFailureCategory(options.failureCategory) || resolvedProfile.device === "cuda")
+  ) {
+    throw new Error("Invalid ASR failure category for execution profile");
+  }
   const state = {
     kind: "ready",
     version: ASR_STATE_VERSION,
     runtime: ASR_PINNED_RUNTIME,
     model: spec.repository,
     revision: spec.revision,
-    device: "cpu",
-    compute_type: "int8",
+    device: resolvedProfile.device,
+    compute_type: resolvedProfile.computeType,
     device_readiness: "ready",
     migration_status: "completed",
+    ...(options.failureCategory === undefined
+      ? {}
+      : { failure_category: options.failureCategory }),
   };
 
   const dir = path.dirname(stateFile);

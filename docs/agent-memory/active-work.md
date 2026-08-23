@@ -2,20 +2,25 @@
 
 ## Current Product Ticket
 
-GitHub Issue #65 is the current approved child ticket under #55. Work is
-isolated on `codex/issue-65-cpu-execution-profile` from merged PR #68 base
-`547b2bb170121bb7701d523e28f3a1f06b1224a8` and is directly executed by Codex
-without Paseo. The bounded implementation upgrades ASR state to v2, persists
-only a verified `cpu/int8` Execution Profile, derives legacy v1 as model-ready
-with device migration pending, requires a generated short-WAV inference and
-generator consumption before ready, reports controlled readiness fields from
-`doctor`, and drives the existing runner from the validated Profile. CUDA
-readiness, GPU probing/fallback, and first-ASR automatic migration remain #66
-and #67. Focused tests, build, the 44-file / 1,104-test suite, package dry run,
-production audit, and three independent review axes pass; a real model CPU
-smoke remains intentionally unrun because it would touch user-managed ASR
-state. Commit, push, PR, Issue close, release, and publication remain separate
-authority gates.
+GitHub Issue #66 is the current approved child ticket under #55. Work is
+isolated on `codex/issue-66-cuda-readiness` from base
+`6199142cb35a5d3b12f70ee1c41a65e60d3ca696` and is directly executed by Codex
+without Paseo. The implementation adds `auto | cpu | cuda` setup preferences,
+pins `faster-whisper==1.2.1` with `ctranslate2==4.8.0`, verifies the selected
+Profile through generated-WAV inference, and publishes staged runtime/model
+artifacts before the matching ready state. Auto saves CUDA only after real success and otherwise
+explains a sanitized category before verified CPU fallback; explicit CUDA
+never falls back; a readiness failure before activation preserves the prior
+installation. Captured activation errors roll back, and incomplete rollback
+leaves the ready state inactive so the runner fails closed. Focused tests,
+build, the 44-file / 1,145-test suite, isolated exact-pin CPU setup and
+runner smoke, and independent review pass. A fresh Windows run with externally
+supplied CUDA 12 libraries also completed exact-pair setup as `cuda/float16`
+and produced a non-empty actual runner transcript, satisfying the final #66
+hardware gate without changing persistent host configuration. The candidate is
+locally accepted; the user has separately authorized its focused commit and
+push on this branch. First-ASR automatic migration remains #67. PR, merge,
+Issue close, release, and publication remain separate authority gates.
 
 ## Harness v2
 

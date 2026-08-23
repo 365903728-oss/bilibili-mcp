@@ -794,3 +794,26 @@
   accepts only verified `cpu/int8` as ready. `cuda/float16` remains a controlled
   future Profile but cannot become disk-ready until #66 implements GPU
   readiness; #67 still owns first-ASR automatic migration.
+
+- Fact: The isolated Issue #66 candidate accepts setup device preference
+  `auto | cpu | cuda`, installs the exact `faster-whisper==1.2.1` and
+  `ctranslate2==4.8.0` pair, and can persist either verified `cpu/int8` or
+  verified `cuda/float16`.
+- Evidence: device/state/installer/CLI regressions, 321 focused tests, 44 files /
+  1,145 full tests, build, isolated exact-pin setup, and independent review.
+- Impact: `auto` probes CUDA first and falls back only to independently verified
+  CPU; explicit CUDA failure preserves the old state, model, and runtime. Only
+  fixed sanitized failure categories reach doctor/setup guidance. Cleanup
+  failure cannot trigger fallback, and incomplete activation rollback leaves
+  state inactive rather than exposing an unverified ready combination.
+
+- Fact: Without externally exposed CUDA inference libraries, the fresh Windows
+  exact-pair probe returns `cuda_runtime_missing`; with CUDA 12 cuBLAS, cuDNN 9,
+  and CUDA Runtime supplied from a disposable external environment through
+  process-local `PATH`, the same RTX machine publishes `cuda/float16` and the
+  actual managed runner produces a non-empty transcript.
+- Evidence: `docs/research/2026-08-24-asr-cuda-readiness.md` and
+  `docs/qa/2026-08-24-asr-cuda-readiness.md`.
+- Impact: Issue #66's Windows GPU gate is satisfied without making the project
+  install or persist system CUDA components. Linux GPU remains unverified, and
+  first-ASR automatic migration remains #67.
