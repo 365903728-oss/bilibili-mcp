@@ -199,7 +199,11 @@ export async function pinnedHttpsFetch(
   headers.delete("authorization");
   headers.delete("proxy-authorization");
   const requestImpl = options.request ?? https.request;
-  const lookup: LookupFunction = (_hostname, _options, callback) => {
+  const lookup: LookupFunction = (_hostname, lookupOptions, callback) => {
+    if (lookupOptions.all) {
+      callback(null, [pinned]);
+      return;
+    }
     callback(null, pinned.address, pinned.family);
   };
 

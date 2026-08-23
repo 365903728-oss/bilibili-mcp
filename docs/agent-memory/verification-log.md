@@ -2497,3 +2497,27 @@ Six release blockers fixed; one regression proof per root cause (new tests
   102/102 with 15 environment-dependent skips. After recording this result,
   the final durable hashes were regenerated and the exact conformance test was
   rerun against the fixed receipt.
+
+## 2026-08-23 — Issue #54 Node 25 Pinned Lookup Repair
+
+- Red evidence: the focused regression invoked the injected HTTPS lookup with
+  `all: true` and received a single address string instead of the required
+  address-record array; the unmodified behavior failed 1 of 20 focused tests.
+- Green evidence: the lookup now returns the same validated pinned address as a
+  one-element array only when `all` is requested and preserves the legacy
+  address/family callback otherwise. Build passed; 42 files / 1058 tests passed;
+  the focused 20-test file passed on Node 20, 22, and 25.
+- Live evidence: on Node 25.6.1, the repaired `pinnedHttpsFetch` retrieved the
+  reported BVID's selected representation with HTTP 200, `video/mp4`, and
+  content length 12,050,979 bytes when supplied one public resolver result.
+- Release-gate live smoke: after the local resolver returned public CDN
+  addresses, the repaired Node 25.6.1 path downloaded the selected 12,050,979
+  byte audio candidate and the complete MCP `force_asr` call finished with
+  `isError=false` and `data_source=asr`. No transcript body or credential value
+  was recorded.
+- Review and boundary: Standards Review found no issue; Spec Review found no
+  implementation deviation. The previously retained resolver-environment caveat
+  is now cleared by the complete live smoke. Scoped added-line secret scanning
+  passed, with one unchanged synthetic test fixture. At verification-capture
+  time, no dependency, public MCP schema, commit, push, PR, tag, release, or
+  publication change had occurred.
