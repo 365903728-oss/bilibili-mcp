@@ -136,6 +136,26 @@ describe("pinned playback HTTPS", () => {
         },
       );
     });
+
+    await new Promise<void>((resolve, reject) => {
+      const lookup = capturedOptions?.lookup;
+      expect(lookup).toBeTypeOf("function");
+      lookup!(
+        "cdn.bilivideo.com",
+        { all: true },
+        (error, addresses) => {
+          try {
+            expect(error).toBeNull();
+            expect(addresses).toEqual([
+              { address: "8.8.8.8", family: 4 },
+            ]);
+            resolve();
+          } catch (assertionError) {
+            reject(assertionError);
+          }
+        },
+      );
+    });
   });
 
   it("rejects non-media hosts before DNS or network dispatch", async () => {
