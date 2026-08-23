@@ -1101,7 +1101,7 @@ describe("setupCredentials model selection", () => {
     logSpy.mockRestore();
   });
 
-  it("model selector text is printed after Yes", async () => {
+  it("model selector explains every Model Tier after Yes", async () => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true });
     vi.spyOn(credentialManager, "getCredentials").mockReturnValue(null);
     const configure = vi.fn(async () => {});
@@ -1118,6 +1118,11 @@ describe("setupCredentials model selection", () => {
     expect(allOutput).toMatch(/2\.\s*base/);
     expect(allOutput).toMatch(/3\.\s*small/);
     expect(allOutput).toMatch(/请选择模型/);
+    expect(allOutput).toContain(
+      "速度优先：适合快速提取和长视频初筛，准确率相对较低",
+    );
+    expect(allOutput).toContain("均衡：兼顾速度、质量和资源占用");
+    expect(allOutput).toContain("质量优先：CPU 耗时和内存占用更高");
     expect(allOutput).toContain("推荐");
 
     logSpy.mockRestore();

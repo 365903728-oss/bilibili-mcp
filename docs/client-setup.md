@@ -1347,9 +1347,9 @@ bilibili-mcp check
 完成凭证配置后，`setup` 会询问是否安装可选的本地 ASR 模型（默认为否 `[y/N]`）。
 
 - 选择 Yes 后，会显示三个可选模型：
-  - `1. tiny`（约 78.2 MB）— 最小体积
-  - `2. base`（约 148 MB）
-  - `3. small`（约 486 MB）— [推荐]，Enter 默认选择
+  - `1. tiny`（约 78.2 MB）— 速度优先：适合快速提取和长视频初筛，准确率相对较低
+  - `2. base`（约 148 MB）— 均衡：兼顾速度、质量和资源占用
+  - `3. small`（约 486 MB）— 质量优先：CPU 耗时和内存占用更高；[推荐]，Enter 默认选择
 - 输入数字 `1/2/3` 或名称 `tiny/base/small` 选择；无效输入会重新提示，不会启动安装。
 - runtime 固定为 `faster-whisper==1.2.1`，加上运行时库的总磁盘开销。
 - 需要本机装有 Python 3.9+。可通过设置 `BILIBILI_ASR_PYTHON` 环境变量指定 Python 可执行文件。

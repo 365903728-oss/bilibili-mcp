@@ -1354,9 +1354,9 @@ bilibili-mcp check
 After credentials are configured, `setup` asks whether to install an optional local ASR model (defaults to No `[y/N]`).
 
 - After choosing Yes, three model choices are displayed:
-  - `1. tiny` (~78.2 MB) — smallest footprint
-  - `2. base` (~148 MB)
-  - `3. small` (~486 MB) — [recommended], selected on Enter
+  - `1. tiny` (~78.2 MB) — Speed-first: suited to quick extraction and initial review of long videos, with relatively lower accuracy
+  - `2. base` (~148 MB) — Balanced: balances speed, quality, and resource use
+  - `3. small` (~486 MB) — Quality-first: higher CPU time and memory use; [recommended], selected on Enter
 - Enter `1/2/3` or `tiny/base/small` to choose; invalid input re-prompts without starting installation.
 - Runtime is fixed at `faster-whisper==1.2.1` plus runtime library overhead.
 - Requires Python 3.9+ on the machine. Set the `BILIBILI_ASR_PYTHON` environment variable to override the Python executable.

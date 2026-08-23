@@ -176,9 +176,9 @@ Some videos ship without any subtitle. Once you install a local ASR model, `get_
 
 | Model | Size | Notes |
 |---|---|---|
-| tiny | ~78 MB | smallest footprint |
-| base | ~148 MB | middle ground |
-| small | ~486 MB | recommended, selected on Enter |
+| tiny | ~78 MB | Speed-first: suited to quick extraction and initial review of long videos; relatively lower accuracy |
+| base | ~148 MB | Balanced: balances speed, quality, and resource use |
+| small | ~486 MB | Quality-first: higher CPU time and memory use; recommended, selected on Enter |
 
 The runtime is pinned to `faster-whisper==1.2.1`. Models live under `~/.bilibili-mcp/asr/`, are verified by a CPU INT8 load before being marked ready, and do not require system FFmpeg; only one active model is kept per directory. `doctor --json` reports readiness and the selected model via `asr.status` and `asr.model` (informational fields that never affect credential exit codes).
 
