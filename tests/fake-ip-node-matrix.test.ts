@@ -22,5 +22,8 @@ describe("Fake-IP Node compatibility gate", () => {
     expect(verifyWorkflow).toContain("npm run test:fake-ip");
     expect(verifyWorkflow).toMatch(/required:[\s\S]*needs:[\s\S]*- fake_ip_node/);
     expect(verifyWorkflow).toContain("FAKE_IP_NODE_RESULT:");
+    expect(verifyWorkflow).toContain(
+      'test "$FAKE_IP_NODE_RESULT" = success',
+    );
   });
 });
