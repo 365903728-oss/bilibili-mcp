@@ -845,3 +845,17 @@
 - Evidence: `src/cli.ts` `SetupCredentialsOptions`, focused CLI tests, and
   post-build child smoke with piped/closed stdin and synthetic environment
   credentials.
+
+## 2026-08-23 — ASR Fake-IP DNS diagnosis
+
+- Decision: Emit `ASR_FAKE_IP_DNS` only when every attempted audio candidate
+  fails because all of that candidate's bounded DNS answers are IPv4 addresses
+  inside `198.18.0.0/15`.
+- Reason: This gives AI Agents an actionable diagnosis without weakening the
+  pinned-HTTPS SSRF boundary or mislabeling mixed DNS/media failures. Later
+  candidates still run, and any usable candidate preserves normal success.
+- Evidence: IANA's special-purpose registry marks `198.18.0.0/15` as
+  non-globally-reachable benchmarking space; Mihomo documents Fake-IP ranges,
+  domain-wildcard `fake-ip-filter`, rule-mode `real-ip`, and domain-specific DNS
+  policy. Issue #57 fixes the public category as `network`, non-retryable, and
+  user-action-required.

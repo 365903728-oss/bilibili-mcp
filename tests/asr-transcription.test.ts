@@ -18,6 +18,7 @@ import {
   transcribeVideoPart,
 } from "../src/asr/transcription.js";
 import type { PlaybackAudioCandidate } from "../src/bilibili/playback.js";
+import { FakeIpDnsError } from "../src/security/pinned-https.js";
 import { AsrError } from "../src/utils/errors.js";
 
 const tempDirs: string[] = [];
@@ -274,6 +275,99 @@ describe("temporary audio download", () => {
     await downloadPlaybackAudio([candidate], destination, fetchFn);
 
     expect(await fs.promises.readFile(destination)).toEqual(Buffer.from([1, 2, 3]));
+  });
+
+  it("returns ASR_FAKE_IP_DNS only when every attempted candidate resolves to Fake-IP", async () => {
+    const dir = await createAsrTempDir(ASR_TEMP_PREFIX);
+    tempDirs.push(dir);
+    const destination = path.join(dir, "audio.m4a");
+    const candidates = [
+      candidate,
+      { ...candidate, url: "https://upos-sz-mirrorcoso2.bilivideo.com/audio.m4s" },
+    ];
+    const fetchFn = vi.fn(async () => {
+      throw new FakeIpDnsError();
+    });
+
+    await expect(
+      downloadPlaybackAudio(candidates, destination, fetchFn),
+    ).rejects.toMatchObject({
+      code: "ASR_FAKE_IP_DNS",
+      retryable: false,
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues to a usable candidate after a Fake-IP DNS failure", async () => {
+    const dir = await createAsrTempDir(ASR_TEMP_PREFIX);
+    tempDirs.push(dir);
+    const destination = path.join(dir, "audio.m4a");
+    const candidates = [
+      candidate,
+      { ...candidate, url: "https://upos-sz-mirrorcoso2.bilivideo.com/audio.m4s" },
+    ];
+    const fetchFn = vi
+      .fn()
+      .mockRejectedValueOnce(new FakeIpDnsError())
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { "content-type": "audio/mp4", "content-length": "3" },
+        }),
+      );
+
+    await downloadPlaybackAudio(candidates, destination, fetchFn);
+
+    expect(await fs.promises.readFile(destination)).toEqual(Buffer.from([1, 2, 3]));
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [new FakeIpDnsError(), new Error("synthetic resolution failure")],
+    [new Error("synthetic resolution failure"), new FakeIpDnsError()],
+    [
+      new FakeIpDnsError(),
+      new AsrError("ASR_AUDIO_UNAVAILABLE", "synthetic media failure", true),
+    ],
+    [
+      new AsrError("ASR_AUDIO_UNAVAILABLE", "synthetic media failure", true),
+      new FakeIpDnsError(),
+    ],
+  ])("keeps mixed candidate failures generic", async (firstError, secondError) => {
+    const dir = await createAsrTempDir(ASR_TEMP_PREFIX);
+    tempDirs.push(dir);
+    const destination = path.join(dir, "audio.m4a");
+    const candidates = [
+      candidate,
+      { ...candidate, url: "https://upos-sz-mirrorcoso2.bilivideo.com/audio.m4s" },
+    ];
+    const fetchFn = vi
+      .fn()
+      .mockRejectedValueOnce(firstError)
+      .mockRejectedValueOnce(secondError);
+
+    await expect(
+      downloadPlaybackAudio(candidates, destination, fetchFn),
+    ).rejects.toMatchObject({ code: "ASR_AUDIO_UNAVAILABLE" });
+  });
+
+  it("keeps a public redirect followed by Fake-IP generic", async () => {
+    const dir = await createAsrTempDir(ASR_TEMP_PREFIX);
+    tempDirs.push(dir);
+    const destination = path.join(dir, "audio.m4a");
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://upos-sz-mirrorcoso2.bilivideo.com/audio.m4s" },
+        }),
+      )
+      .mockRejectedValueOnce(new FakeIpDnsError());
+
+    await expect(
+      downloadPlaybackAudio([candidate], destination, fetchFn),
+    ).rejects.toMatchObject({ code: "ASR_AUDIO_UNAVAILABLE" });
   });
 
   it("revalidates every redirect and never exposes the signed location", async () => {

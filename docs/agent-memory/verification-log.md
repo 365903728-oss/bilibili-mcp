@@ -2521,3 +2521,32 @@ Six release blockers fixed; one regression proof per root cause (new tests
   passed, with one unchanged synthetic test fixture. At verification-capture
   time, no dependency, public MCP schema, commit, push, PR, tag, release, or
   publication change had occurred.
+
+## 2026-08-23 — Issue #57 Fake-IP DNS Diagnosis
+
+- Red/green evidence: boundary DNS tests first reproduced generic rejection for
+  `198.18.0.0/15`; candidate aggregation first returned
+  `ASR_AUDIO_UNAVAILABLE`; the public MCP seam first returned `UNKNOWN_ERROR`;
+  and a later regression test reproduced a false `ASR_FAKE_IP_DNS` after a
+  successful public redirect hop. Each failed before its corresponding bounded
+  implementation change and passed afterward.
+- Final behavior: a candidate is classified only when its bounded first-hop DNS
+  answers are exclusively inside `198.18.0.0/15`. The addresses remain rejected;
+  a later usable candidate still succeeds; mixed DNS, redirect, special-address,
+  and media failures remain generic. Only all attempted candidates with the
+  exclusive first-hop cause produce public `ASR_FAKE_IP_DNS`, category `network`,
+  `retryable=false`, and `user_action_required=true`.
+- Verification: the focused DNS, aggregation, public MCP, and playback matrix
+  passed 103/103; the complete Vitest suite passed 42 files / 1072 tests;
+  TypeScript build and `npm pack --dry-run --json --ignore-scripts` passed.
+- Security: gitleaks 8.30.1 found zero secrets in the complete diff and the new
+  research note. `npm audit --omit=dev --json` found zero production
+  vulnerabilities. The full audit retained two high findings in the unchanged
+  Vitest/Vite development chain (`postcss` and `nanoid`); no dependency was
+  changed or auto-fixed under this ticket.
+- Review and boundary: Standards, Spec, and risk reviews passed after the
+  redirect-attribution repair. TLS, Host, SNI, redirect revalidation, credential
+  stripping, connection pinning, transcript success shape, and the three-candidate
+  cap remain unchanged. No Cookie, Authorization value, signed media URL, full
+  DNS response, proxy-node detail, local configuration, commit, push, PR, tag,
+  release, or publication was introduced.

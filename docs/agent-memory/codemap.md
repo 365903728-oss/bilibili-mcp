@@ -27,9 +27,10 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
 - `src/security/operation-context.ts`: per-MCP-call `AbortSignal` propagation,
   linked abort helpers, and abortable delay.
 - `src/security/pinned-https.ts`: final playback-media HTTPS sink with
-  provider-host validation, all-answer public DNS checks, connection pinning,
-  original-host TLS validation, manual redirect responses, and credential
-  stripping. Callers must validate and pin every redirect hop.
+  provider-host validation, all-answer public DNS checks, exact all-answer
+  `198.18.0.0/15` Fake-IP classification, connection pinning, original-host TLS
+  validation, manual redirect responses, and credential stripping. Callers
+  must validate and pin every redirect hop.
 - `src/server/bounded-stdio-transport.ts`: fixed-buffer JSON-RPC line framing
   with 1 MiB inbound and 4 MiB outbound ceilings and write backpressure.
 - `src/server/error-response.ts`: shared successful/error response
@@ -52,8 +53,9 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
   requires trusted duration, owns one aggregate audio deadline/byte budget,
   unique temporary directories, one-active/no-queue concurrency, bounded
   Windows Job/POSIX `RLIMIT` managed-Python execution, strict NDJSON,
-  cancellation/tree kill, and guarded cleanup. MCP requests never install or
-  switch models.
+  cancellation/tree kill, guarded cleanup, and all-candidate Fake-IP failure
+  aggregation without preventing later-candidate success. MCP requests never
+  install or switch models.
 
 ## MCP Tool Surface
 
@@ -104,7 +106,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 
 - `src/utils/credentials.ts`: global credential storage and credential source detection.
 - `src/utils/credential-guidance.ts`: safe credential setup instructions, status payloads, and next-step generation.
-- `src/utils/error-guidance.ts`: unified structured MCP error payload mapper with bilingual recovery guidance and category/retry metadata.
+- `src/utils/error-guidance.ts`: unified structured MCP error payload mapper with bilingual recovery guidance and category/retry metadata, including the user-actionable `ASR_FAKE_IP_DNS` network diagnosis.
 - `src/utils/validation.ts`: BV, language, detail-level, comment/search limits, sort, query, max_matches, context_segments, Favorites cursor (type/length/base64url charset), and Creator Content input (mid/section/cursor/container identity, including the Dynamic section) validation.
 - `src/utils/sanitization.ts`: BV/URL sanitization and output sanitization helpers.
 - `src/utils/errors.ts`: domain-specific error classes and codes.
@@ -129,7 +131,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `tests/asr-installer.test.ts`: deterministic installer/state tests. State read/validation/write, Python discovery (override/path/version), venv/pip/download/verify subprocess gating, and full orchestration success/failure. No tests invoke real Python, pip, network, or model download.
 - `tests/asr-installer-process.test.ts`: mocked default subprocess deadlines,
   output ceilings, argv, stdio, and platform process-group settings.
-- `tests/asr-transcription.test.ts`: deterministic ready-state, download, redirect, size/MIME, child argv/environment, strict output, timeout/kill, cleanup, and concurrency tests with no real network, Python, audio, Cookie, or model.
+- `tests/asr-transcription.test.ts`: deterministic ready-state, download, redirect, size/MIME, Fake-IP candidate aggregation, child argv/environment, strict output, timeout/kill, cleanup, and concurrency tests with no real network, Python, audio, Cookie, or model.
 - `tests/bilibili-playback.test.ts`: deterministic playurl auth/parameter, malformed-versus-empty DASH, duration, CDN allowlist, and candidate-order tests.
 - `tests/bounded-stdio-transport.test.ts`: inbound/outbound framing ceilings,
   UTF-8 byte accounting, fixed-buffer chunking, and fail-closed overflow.
@@ -140,8 +142,9 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
   single-flight cancellation/deadline/waiter behavior.
 - `tests/mcp-response-budget.test.ts`: exact successful payload/envelope
   boundaries and text/structured parity.
-- `tests/pinned-https.test.ts`: DNS/public-address rejection, connection
-  pinning, TLS hostname retention, header stripping, and host enforcement.
+- `tests/pinned-https.test.ts`: DNS/public-address rejection, exact Fake-IP
+  range and mixed-answer classification, connection pinning, TLS hostname
+  retention, header stripping, and host enforcement.
 - `tests/publish-workflow-pins.test.ts`: full immutable SHA enforcement for
   every third-party Action across all repository workflows.
 - `tests/subtitle-fallback-security.test.ts`: malformed subtitle fail-closed
@@ -150,7 +153,7 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `tests/server-tools.test.ts`: MCP tool discovery and public input/output schema coverage.
 - `tests/server-credential-tools.test.ts`: credential tool behavior and non-leak checks.
 - `tests/update-check.test.ts`: package update guidance behavior and registry-failure fallback.
-- `tests/server-error-next-steps.test.ts`: structured recovery guidance in tool errors.
+- `tests/server-error-next-steps.test.ts`: structured recovery guidance in tool errors, including bounded bilingual Fake-IP cause and remedy choices.
 - `tests/server-handler-sanitization.test.ts`: handler-level sanitization plus transcript/search structured-output contract checks.
 - `tests/credential-guidance.test.ts`: credential setup/status guidance.
 - `tests/bilibili-video-api.test.ts`: video/subtitle API safety and behavior checks.

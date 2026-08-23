@@ -37,6 +37,57 @@ describe("pinned playback HTTPS", () => {
     },
   );
 
+  it.each([
+    ["lower boundary", "198.18.0.0"],
+    ["upper boundary", "198.19.255.255"],
+  ])("classifies all-%s DNS answers as standard Fake-IP", async (_label, address) => {
+    await expect(
+      resolvePinnedAddress("cdn.bilivideo.com", async () => [
+        { address, family: 4 },
+      ]),
+    ).rejects.toMatchObject({ name: "FakeIpDnsError" });
+  });
+
+  it("classifies a multi-answer candidate only when every answer is standard Fake-IP", async () => {
+    await expect(
+      resolvePinnedAddress("cdn.bilivideo.com", async () => [
+        { address: "198.18.0.1", family: 4 },
+        { address: "198.19.255.254", family: 4 },
+      ]),
+    ).rejects.toMatchObject({ name: "FakeIpDnsError" });
+  });
+
+  it.each(["198.17.255.255", "198.20.0.0"])(
+    "does not classify adjacent address %s as standard Fake-IP",
+    async (address) => {
+      await expect(
+        resolvePinnedAddress("cdn.bilivideo.com", async () => [
+          { address, family: 4 },
+        ]),
+      ).resolves.toMatchObject({ address, family: 4 });
+    },
+  );
+
+  it("does not classify mixed Fake-IP and other DNS answers as standard Fake-IP", async () => {
+    for (const answers of [
+      [
+        { address: "198.18.0.1", family: 4 as const },
+        { address: "8.8.8.8", family: 4 as const },
+      ],
+      [
+        { address: "198.19.255.254", family: 4 as const },
+        { address: "127.0.0.1", family: 4 as const },
+      ],
+    ]) {
+      await expect(
+        resolvePinnedAddress("cdn.bilivideo.com", async () => answers),
+      ).rejects.toMatchObject({
+        name: "Error",
+        message: "Media hostname did not resolve to public addresses",
+      });
+    }
+  });
+
   it("rejects empty, mixed-publicity, and resolver-failure answers", async () => {
     await expect(
       resolvePinnedAddress("cdn.bilivideo.com", async () => []),

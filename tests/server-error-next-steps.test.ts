@@ -330,6 +330,48 @@ describe("generic MCP error credential next_steps", () => {
 });
 
 describe("structured MCP error categories", () => {
+  it("explains standard Fake-IP DNS and lets the user choose a safe remedy", async () => {
+    mockGetVideoTranscriptData.mockRejectedValueOnce(
+      new AsrError(
+        "ASR_FAKE_IP_DNS",
+        "safe bounded Fake-IP diagnosis",
+      ),
+    );
+    const handler = getCallToolHandler();
+    const response = await handler({
+      method: "tools/call",
+      jsonrpc: "2.0",
+      id: 29,
+      params: {
+        name: "get_video_transcript",
+        arguments: { bvid_or_url: "BV1T6PQzQErF", force_asr: true },
+      },
+    });
+    const payload = JSON.parse(response.content[0].text);
+    const rendered = JSON.stringify(payload);
+
+    expect(response.isError).toBe(true);
+    expectStructuredError(payload, "ASR_FAKE_IP_DNS", {
+      retryable: false,
+      userActionRequired: true,
+    });
+    expect(payload.category).toBe("network");
+    expect(`${payload.message_en} ${payload.next_steps_en.join(" ")}`).toMatch(
+      /198\.18\.0\.0\/15.*Fake-IP.*reject/is,
+    );
+    expect(`${payload.message_zh} ${payload.next_steps_zh.join(" ")}`).toMatch(
+      /198\.18\.0\.0\/15.*Fake-IP.*拒绝/is,
+    );
+    expect(payload.next_steps_en.join(" ")).toMatch(
+      /choose.*fake-ip-filter.*\*\.bilivideo\.com.*\*\.bilivideo\.cn.*reconnect/is,
+    );
+    expect(payload.next_steps_zh.join(" ")).toMatch(
+      /选择.*fake-ip-filter.*\*\.bilivideo\.com.*\*\.bilivideo\.cn.*重连/is,
+    );
+    expect(rendered).toContain("Do not allowlist 198.18.0.0/15");
+    expect(rendered).not.toMatch(/SESSDATA|bili_jct|DedeUserID|token=|audio\.m4s|Authorization/i);
+  });
+
   it.each([
     ["ASR_NOT_READY", false, true],
     ["ASR_AUDIO_UNAVAILABLE", true, false],

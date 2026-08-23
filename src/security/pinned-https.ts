@@ -14,6 +14,13 @@ export type AddressResolver = (
   hostname: string,
 ) => Promise<ResolvedAddress[]>;
 
+export class FakeIpDnsError extends Error {
+  constructor() {
+    super("Media hostname resolved only to the standard Fake-IP range");
+    this.name = "FakeIpDnsError";
+  }
+}
+
 function parseIpv4(address: string): number[] | null {
   if (isIP(address) !== 4) return null;
   const octets = address.split(".").map(Number);
@@ -37,6 +44,11 @@ function isPublicIpv4(address: string): boolean {
   if (a === 203 && b === 0 && c === 113) return false;
   if (a >= 224) return false;
   return true;
+}
+
+function isStandardFakeIpv4(address: string): boolean {
+  const octets = parseIpv4(address);
+  return octets !== null && octets[0] === 198 && (octets[1] === 18 || octets[1] === 19);
 }
 
 function parseIpv6(address: string): number[] | null {
@@ -130,6 +142,15 @@ export async function resolvePinnedAddress(
     answers = await resolver(hostname);
   } catch {
     throw new Error("Media hostname resolution failed");
+  }
+  if (
+    answers.length > 0 &&
+    answers.length <= 32 &&
+    answers.every(
+      (answer) => answer.family === 4 && isStandardFakeIpv4(answer.address),
+    )
+  ) {
+    throw new FakeIpDnsError();
   }
   if (
     answers.length === 0 ||
