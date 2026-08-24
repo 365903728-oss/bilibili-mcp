@@ -13,10 +13,12 @@ import {
   downloadPlaybackAudio,
   MAX_ASR_AUDIO_BYTES,
   MAX_ASR_STDOUT_BYTES,
+  migrateLegacyAsrState,
   parseAsrNdjson,
   runManagedAsrRuntime,
   transcribeVideoPart,
 } from "../src/asr/transcription.js";
+import { AsrReadinessError } from "../src/asr/installer.js";
 import type { PlaybackAudioCandidate } from "../src/bilibili/playback.js";
 import { FakeIpDnsError } from "../src/security/pinned-https.js";
 import { AsrError } from "../src/utils/errors.js";
@@ -638,16 +640,24 @@ describe("ASR orchestration", () => {
     expect(runRuntime.mock.calls[0][3]).toEqual(CPU_PROFILE);
   });
 
-  it("uses the controlled legacy CPU fallback for a v1 migration-pending state", async () => {
+  it("migrates a v1 state and uses the verified CUDA profile in the same request", async () => {
     const runRuntime = vi.fn(async () => ({ language: "zh", segments: [] }));
+    const writeState = vi.fn();
+    const migrateLegacyState = vi.fn((paths, state, signal) =>
+      migrateLegacyAsrState(paths, state, {
+        verifyReadiness: vi.fn(async () => ({ executionProfile: CUDA_PROFILE })),
+        writeState,
+        logResult: vi.fn(),
+      }, signal));
 
-    await transcribeVideoPart(
+    await expect(transcribeVideoPart(
       { bvid: "BV1T6PQzQErF", cid: 12345, durationSeconds: 60 },
       {
         ...readyDependencies(),
         getState: () => ({
           kind: "ready",
           version: 1,
+          modelKey: "small",
           deviceReadiness: "migration_pending",
           migrationStatus: "pending",
         }),
@@ -656,6 +666,38 @@ describe("ASR orchestration", () => {
         removeTempDir: vi.fn(async () => undefined),
         downloadAudio: vi.fn(async () => undefined),
         runRuntime,
+        migrateLegacyState,
+      },
+    )).resolves.toEqual({ language: "zh", segments: [] });
+
+    expect(migrateLegacyState).toHaveBeenCalledOnce();
+    expect(writeState).toHaveBeenCalledWith(path.join("managed-root", "state.json"), "small", {
+      executionProfile: CUDA_PROFILE,
+    });
+    expect(runRuntime.mock.calls[0][3]).toEqual(CUDA_PROFILE);
+  });
+
+  it("uses the persisted CPU fallback profile in the same migration request", async () => {
+    const runRuntime = vi.fn(async () => ({ language: "zh", segments: [] }));
+    const migrateLegacyState = vi.fn(async () => CPU_PROFILE);
+
+    await transcribeVideoPart(
+      { bvid: "BV1T6PQzQErF", cid: 12345, durationSeconds: 60 },
+      {
+        ...readyDependencies(),
+        getState: () => ({
+          kind: "ready",
+          version: 1,
+          modelKey: "small",
+          deviceReadiness: "migration_pending",
+          migrationStatus: "pending",
+        }),
+        getPlayback: async () => ({ candidates: [candidate], durationSeconds: 60 }),
+        createTempDir: async () => path.join(os.tmpdir(), `${ASR_TEMP_PREFIX}fallback`),
+        removeTempDir: vi.fn(async () => undefined),
+        downloadAudio: vi.fn(async () => undefined),
+        runRuntime,
+        migrateLegacyState,
       },
     );
 
@@ -705,6 +747,7 @@ describe("ASR orchestration", () => {
 
   it("runs the exact verified CUDA profile from state", async () => {
     const runRuntime = vi.fn(async () => ({ language: "zh", segments: [] }));
+    const migrateLegacyState = vi.fn();
 
     await expect(transcribeVideoPart(
       { bvid: "BV1T6PQzQErF", cid: 12345, durationSeconds: 60 },
@@ -721,9 +764,47 @@ describe("ASR orchestration", () => {
         removeTempDir: vi.fn(async () => undefined),
         downloadAudio: vi.fn(async () => undefined),
         runRuntime,
+        migrateLegacyState,
       },
     )).resolves.toMatchObject({ language: "zh" });
     expect(runRuntime.mock.calls[0][3]).toEqual(CUDA_PROFILE);
+    expect(migrateLegacyState).not.toHaveBeenCalled();
+  });
+
+  it("keeps the single ASR slot while legacy migration is running", async () => {
+    let releaseMigration!: (profile: typeof CPU_PROFILE) => void;
+    const migration = new Promise<typeof CPU_PROFILE>((resolve) => {
+      releaseMigration = resolve;
+    });
+    const migrateLegacyState = vi.fn(() => migration);
+    const getPlayback = vi.fn(async () => ({ candidates: [], durationSeconds: 60 }));
+    const dependencies = {
+      ...readyDependencies(),
+      getState: () => ({
+        kind: "ready" as const,
+        version: 1,
+        modelKey: "small" as const,
+        deviceReadiness: "migration_pending" as const,
+        migrationStatus: "pending" as const,
+      }),
+      migrateLegacyState,
+      getPlayback,
+    };
+    const first = transcribeVideoPart(
+      { bvid: "BV1T6PQzQErF", cid: 1, durationSeconds: 60 },
+      dependencies,
+    );
+    await Promise.resolve();
+
+    await expect(transcribeVideoPart(
+      { bvid: "BV1T6PQzQErF", cid: 2, durationSeconds: 60 },
+      dependencies,
+    )).rejects.toMatchObject({ code: "ASR_BUSY", retryable: true });
+    expect(migrateLegacyState).toHaveBeenCalledOnce();
+    expect(getPlayback).not.toHaveBeenCalled();
+
+    releaseMigration(CPU_PROFILE);
+    await expect(first).resolves.toBeNull();
   });
 
   it("cleans the request directory after download or runtime failure", async () => {
@@ -885,5 +966,97 @@ describe("ASR orchestration", () => {
     await expect(cleanupAsrTempDir(path.join(os.tmpdir(), `${ASR_TEMP_PREFIX}models`))).rejects.toMatchObject({
       code: "ASR_TRANSCRIPTION_FAILED",
     });
+  });
+});
+
+describe("legacy ASR device migration", () => {
+  const paths = readyDependencies().getPaths();
+  const state = {
+    kind: "ready" as const,
+    version: 1,
+    modelKey: "small" as const,
+    deviceReadiness: "migration_pending" as const,
+    migrationStatus: "pending" as const,
+  };
+
+  it("records only the sanitized GPU failure category with the CPU fallback", async () => {
+    const verifyReadiness = vi.fn(async () => ({
+      executionProfile: CPU_PROFILE,
+      failureCategory: "cuda_runtime_missing" as const,
+    }));
+    const writeState = vi.fn();
+    const logResult = vi.fn();
+
+    await expect(migrateLegacyAsrState(paths, state, {
+      verifyReadiness,
+      writeState,
+      logResult,
+    })).resolves.toEqual(CPU_PROFILE);
+
+    expect(writeState).toHaveBeenCalledWith(paths.stateFile, "small", {
+      executionProfile: CPU_PROFILE,
+      failureCategory: "cuda_runtime_missing",
+    });
+    expect(logResult).toHaveBeenCalledOnce();
+    expect(JSON.stringify(logResult.mock.calls)).not.toContain("stderr");
+  });
+
+  it("keeps v1 pending when CPU fallback readiness fails", async () => {
+    const writeState = vi.fn();
+    const logResult = vi.fn();
+
+    await expect(migrateLegacyAsrState(paths, state, {
+      verifyReadiness: vi.fn(async () => {
+        throw new AsrReadinessError(
+          "model_probe_failed",
+          "cpu",
+          "cuda_runtime_missing",
+        );
+      }),
+      writeState,
+      logResult,
+    })).rejects.toMatchObject({ code: "ASR_TRANSCRIPTION_FAILED" });
+
+    expect(writeState).not.toHaveBeenCalled();
+    expect(logResult).not.toHaveBeenCalled();
+  });
+
+  it("keeps v1 pending when the verified profile cannot be persisted", async () => {
+    const logResult = vi.fn();
+
+    await expect(migrateLegacyAsrState(paths, state, {
+      verifyReadiness: vi.fn(async () => ({ executionProfile: CUDA_PROFILE })),
+      writeState: vi.fn(() => {
+        throw new Error("disk write failed");
+      }),
+      logResult,
+    })).rejects.toMatchObject({ code: "ASR_TRANSCRIPTION_FAILED", retryable: true });
+
+    expect(logResult).not.toHaveBeenCalled();
+  });
+
+  it("does not persist readiness when the request is interrupted before the write", async () => {
+    const controller = new AbortController();
+    const writeState = vi.fn();
+    const verifyReadiness = vi.fn((
+      _paths: unknown,
+      signal?: AbortSignal,
+    ) => new Promise<never>((_resolve, reject) => {
+      expect(signal).toBe(controller.signal);
+      signal?.addEventListener("abort", () => reject(new DOMException(
+        "The operation was aborted.",
+        "AbortError",
+      )), { once: true });
+    }));
+    const pending = migrateLegacyAsrState(paths, state, {
+      verifyReadiness,
+      writeState,
+      logResult: vi.fn(),
+    }, controller.signal);
+
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(verifyReadiness).toHaveBeenCalledOnce();
+    expect(writeState).not.toHaveBeenCalled();
   });
 });

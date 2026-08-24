@@ -817,3 +817,20 @@
 - Impact: Issue #66's Windows GPU gate is satisfied without making the project
   install or persist system CUDA components. Linux GPU remains unverified, and
   first-ASR automatic migration remains #67.
+
+- Fact: The isolated Issue #67 candidate performs v1 device migration only
+  inside the first explicit ASR request and the existing one-active/no-queue
+  slot. It reuses the installed model and #66 readiness probe, atomically writes
+  the verified v2 Profile and optional fixed failure category, then continues
+  that request on the same Profile; completed v2 requests do not probe again.
+- Evidence: `src/asr/installer.ts`, `src/asr/transcription.ts`, 235 focused
+  tests, 44 files / 1,152 full tests, build, disposable Windows exact-pin
+  auto/CPU migration smoke, package dry run, production audit, and two-axis
+  review.
+- Impact: Concurrent first-ASR requests still receive retryable `ASR_BUSY`.
+  Abort terminates readiness and leaves v1 pending; readiness or persistence
+  failure keeps v1 pending with existing ASR failure semantics. The public
+  transcript/schema remains device-free, and `setup` is the only retry route.
+  The Windows NVIDIA host lacked usable CUDA libraries in this smoke, so the
+  observed real path was sanitized GPU failure followed by verified CPU
+  fallback; Linux GPU remains unverified.

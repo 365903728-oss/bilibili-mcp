@@ -23,14 +23,20 @@ import {
 } from "../security/pinned-https.js";
 import { sanitizeRemoteText } from "../utils/bounded-text.js";
 import { AsrError } from "../utils/errors.js";
-import { buildAsrChildEnv } from "./installer.js";
+import { logger } from "../utils/logger.js";
 import {
-  ASR_CPU_EXECUTION_PROFILE,
+  AsrReadinessError,
+  buildAsrChildEnv,
+  verifyInstalledDeviceReadiness,
+} from "./installer.js";
+import {
   deriveAsrPaths,
   readAsrState,
   resolveExecutionProfile,
+  writeAsrState,
   type AsrPaths,
   type AsrExecutionProfile,
+  type AsrFailureCategory,
   type AsrState,
 } from "./state.js";
 
@@ -155,6 +161,11 @@ export interface AsrTranscriptionDependencies {
     executionProfile: AsrExecutionProfile,
     signal?: AbortSignal,
   ) => Promise<AsrTranscriptionResult>;
+  migrateLegacyState?: (
+    paths: AsrPaths,
+    state: AsrState,
+    signal?: AbortSignal,
+  ) => Promise<AsrExecutionProfile>;
 }
 
 let activeTranscriptions = 0;
@@ -763,6 +774,92 @@ export async function cleanupAsrTempDir(tempDir: string): Promise<void> {
   createdAsrTempDirs.delete(target);
 }
 
+type LegacyMigrationResult = {
+  executionProfile: AsrExecutionProfile;
+  failureCategory?: AsrFailureCategory;
+};
+
+export async function migrateLegacyAsrState(
+  paths: AsrPaths,
+  state: AsrState,
+  dependencies: {
+    verifyReadiness?: (
+      paths: AsrPaths,
+      signal?: AbortSignal,
+    ) => Promise<LegacyMigrationResult>;
+    writeState?: typeof writeAsrState;
+    logResult?: (result: LegacyMigrationResult) => void;
+  } = {},
+  signal?: AbortSignal,
+): Promise<AsrExecutionProfile> {
+  if (
+    state.kind !== "ready" ||
+    state.version !== 1 ||
+    state.modelKey === undefined ||
+    state.executionProfile !== undefined ||
+    state.deviceReadiness !== "migration_pending" ||
+    state.migrationStatus !== "pending"
+  ) {
+    throw new AsrError(
+      "ASR_NOT_READY",
+      "Local ASR is not eligible for automatic device migration. Run setup, then inspect doctor --json.",
+    );
+  }
+
+  const verifyReadiness = dependencies.verifyReadiness ??
+    ((currentPaths: AsrPaths, operationSignal?: AbortSignal) =>
+      verifyInstalledDeviceReadiness(currentPaths, "auto", operationSignal));
+  const writeState = dependencies.writeState ?? writeAsrState;
+  const logResult = dependencies.logResult ?? ((result: LegacyMigrationResult) => {
+    const data = {
+      executionProfile: `${result.executionProfile.device}/${result.executionProfile.computeType}`,
+      ...(result.failureCategory === undefined
+        ? {}
+        : { failureCategory: result.failureCategory }),
+    };
+    if (result.failureCategory === undefined) {
+      logger.info("Legacy ASR state migrated to the verified GPU profile.", data, { type: "asr-migration" });
+    } else {
+      logger.warn("Legacy ASR state migrated to the verified CPU fallback profile.", data, { type: "asr-migration" });
+    }
+  });
+
+  throwIfAborted(signal);
+  let result: LegacyMigrationResult;
+  try {
+    result = await verifyReadiness(paths, signal);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
+    if (error instanceof AsrReadinessError) {
+      throw new AsrError(
+        "ASR_TRANSCRIPTION_FAILED",
+        `Local ASR device verification failed (${error.device ?? "unknown"}: ${error.category}). Run setup to retry.`,
+        true,
+      );
+    }
+    throw new AsrError(
+      "ASR_TRANSCRIPTION_FAILED",
+      "Local ASR device verification failed. Run setup to retry.",
+      true,
+    );
+  }
+  throwIfAborted(signal);
+
+  try {
+    writeState(paths.stateFile, state.modelKey, result);
+  } catch {
+    throw new AsrError(
+      "ASR_TRANSCRIPTION_FAILED",
+      "Local ASR readiness was verified but its state could not be saved. Run setup to retry.",
+      true,
+    );
+  }
+  logResult(result);
+  return result.executionProfile;
+}
+
 export async function transcribeVideoPart(
   request: AsrTranscriptionRequest,
   dependencies: AsrTranscriptionDependencies = {},
@@ -822,6 +919,7 @@ export async function transcribeVideoPart(
         { executionProfile, signal: operationSignal },
       )
     );
+  const migrateLegacyState = dependencies.migrateLegacyState ?? migrateLegacyAsrState;
   let tempDir: string | undefined;
 
   try {
@@ -835,18 +933,23 @@ export async function transcribeVideoPart(
         "Local ASR is not ready. Run `npx -y @xzxzzx/bilibili-mcp@latest setup`, then inspect `doctor --json`.",
       );
     }
-    const executionProfile = state.executionProfile !== undefined &&
+    let executionProfile = state.executionProfile !== undefined &&
       state.deviceReadiness === "ready" &&
       state.migrationStatus === "completed"
       ? resolveExecutionProfile(
           state.executionProfile.device,
           state.executionProfile.computeType,
         )
-      : state.executionProfile === undefined &&
-          state.deviceReadiness === "migration_pending" &&
-          state.migrationStatus === "pending"
-        ? ASR_CPU_EXECUTION_PROFILE
-        : undefined;
+      : undefined;
+    if (
+      executionProfile === undefined &&
+      state.executionProfile === undefined &&
+      state.deviceReadiness === "migration_pending" &&
+      state.migrationStatus === "pending"
+    ) {
+      executionProfile = await migrateLegacyState(paths, state, signal);
+      throwIfAborted(signal);
+    }
     if (executionProfile === undefined) {
       throw new AsrError(
         "ASR_NOT_READY",

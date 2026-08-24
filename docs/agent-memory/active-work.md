@@ -2,30 +2,26 @@
 
 ## Current Product Ticket
 
-GitHub Issue #66 is the current approved child ticket under #55. Work is
-isolated on `codex/issue-66-cuda-readiness` from base
-`6199142cb35a5d3b12f70ee1c41a65e60d3ca696` and is directly executed by Codex
-without Paseo. The implementation adds `auto | cpu | cuda` setup preferences,
-pins `faster-whisper==1.2.1` with `ctranslate2==4.8.0`, verifies the selected
-Profile through generated-WAV inference, and publishes staged runtime/model
-artifacts before the matching ready state. Auto saves CUDA only after real success and otherwise
-explains a sanitized category before verified CPU fallback; explicit CUDA
-never falls back; a readiness failure before activation preserves the prior
-installation. Captured activation errors roll back, and incomplete rollback
-leaves the ready state inactive so the runner fails closed. Focused tests,
-build, the 44-file / 1,145-test suite, isolated exact-pin CPU setup and
-runner smoke, and the initial independent review pass. A fresh Windows run with externally
-supplied CUDA 12 libraries also completed exact-pair setup as `cuda/float16`
-and produced a non-empty actual runner transcript, satisfying the final #66
-hardware gate without changing persistent host configuration. PR #70 then
-found that standard POSIX venv creation can leave `venv/bin/python` as a
-symlink rejected by the managed-path gate. The same-scope repair creates venvs
-with copied executables; 184 focused tests, the 44-file / 1,145-test suite,
-build, and a real Ubuntu 24.04 non-symlink interpreter smoke pass. The first
-Hosted run also exposed only the expected stale canonical-LF package/memory
-receipt, which was refreshed without changing package boundaries. PR #70 is
-the current integration gate. First-ASR automatic migration remains #67;
-merge, Issue close, release, and publication remain separate authority gates.
+GitHub Issue #67 is the current approved child ticket under #55. Work is
+isolated on `codex/issue-67-v1-migration` from base
+`4ad276cf28f01a519d1b848c1afe36cdcaeeface` and is directly executed by Codex
+without Paseo. The candidate reuses #66 device readiness inside the existing
+single ASR slot: the first explicit ASR request holding a v1 migration-pending
+state probes `auto`, atomically records the verified v2 Profile plus only a
+sanitized GPU failure category when needed, and continues that same request on
+the persisted CUDA or CPU Profile. Completed v2 requests never probe again;
+`setup` remains the explicit retry path. Cancellation now reaches the
+readiness subprocess, terminates its process tree, preserves `AbortError`, and
+cannot publish ready state after abort. Deterministic orchestration/readiness
+tests, build, the 44-file / 1,152-test suite, package dry run, production audit,
+and local diff Gitleaks pass. A disposable exact-pin Windows smoke on an NVIDIA
+host recorded `cuda_runtime_missing` and completed same-migration CPU fallback;
+an explicit CPU-path smoke also completed. The host GPU path was attempted but
+did not pass, so no fresh CUDA-success claim is made; Linux GPU remains
+unverified and is covered only by deterministic cross-platform automation.
+Canonical package/memory receipts and the 102-test core Harness are green.
+Commit, push, PR, merge, Issue close, release, and publication remain separate
+authority gates.
 
 ## Harness v2
 
