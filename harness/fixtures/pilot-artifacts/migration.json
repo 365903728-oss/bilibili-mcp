@@ -100,16 +100,16 @@
     "docs/agent-memory/verification-log.md": "2b5b4e969a383467c5c46f5fd05f36a582a2b04d6929dbdfad671666b9e62d75"
   },
   "package": {
-    "output_digest": "3631e8fed04e9c3341e7449e6341b50d4dc6213e15589116480c73ca13d45953",
+    "output_digest": "c10abbdd34a13c662202ca43bad763324405697c9874d77f2daeebe4b735dfe2",
     "pack_output": [
       {
         "id": "@xzxzzx/bilibili-mcp@1.13.1",
         "name": "@xzxzzx/bilibili-mcp",
         "version": "1.13.1",
-        "size": 1150615,
-        "unpackedSize": 1990979,
-        "shasum": "bcbbe7d270b530344e61c07a6e631008beeb68b0",
-        "integrity": "sha512-eNScQP+NdwWcbzDvRVs6i6LZR7ML105ngsswQ8KTYLok3XGg5P8VbPC8bfgEVIQXNA5tB/2ENVu6iILGhNgiGw==",
+        "size": 1150359,
+        "unpackedSize": 1991557,
+        "shasum": "6cd3c733dfe168a081582e628a7ea16c00c56331",
+        "integrity": "sha512-eqJWpETvvhZ0txrQdNFH23nz1bpuqYgwSPhq2wqs0FJIvy13FAxJed7rezTadOSyQ09c2MHqOQXaOSS/wnFyfQ==",
         "filename": "xzxzzx-bilibili-mcp-1.13.1.tgz",
         "files": [
           {
@@ -514,7 +514,7 @@
           },
           {
             "path": "dist/bilibili/video-api.d.ts",
-            "size": 1742,
+            "size": 1716,
             "mode": 420
           },
           {
@@ -524,12 +524,12 @@
           },
           {
             "path": "dist/bilibili/video-api.js",
-            "size": 13940,
+            "size": 14208,
             "mode": 420
           },
           {
             "path": "dist/bilibili/video-api.js.map",
-            "size": 12620,
+            "size": 12956,
             "mode": 420
           },
           {
