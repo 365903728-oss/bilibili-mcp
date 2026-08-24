@@ -54,7 +54,8 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
   deadlines/output caps, user-scoped venv creation, exact faster-whisper and
   CTranslate2 pins, staged/budgeted/no-symlink snapshot download, `auto | cpu |
   cuda` readiness with generated short-WAV inference and full generator
-  consumption, sanitized GPU failure categories, temporary-audio cleanup,
+  consumption, abortable readiness subprocesses, sanitized GPU failure
+  categories, temporary-audio cleanup,
   same-model v1 promotion, staged runtime/model publication with captured-error
   rollback, and fail-closed state invalidation when rollback is incomplete. One
   active model reuses the Phase 1 directory; a failed probe keeps the prior
@@ -64,7 +65,8 @@ This file is a navigation index for `@xzxzzx/bilibili-mcp`. It is not a design s
   unique temporary directories, one-active/no-queue concurrency, bounded
   Windows Job/POSIX `RLIMIT` managed-Python execution, strict NDJSON,
   cancellation/tree kill, validated `cpu/int8` or `cuda/float16` Profile-driven
-  Python argv, legacy v1 CPU fallback, guarded cleanup, and all-candidate Fake-IP failure aggregation
+  Python argv, one-time locked v1 auto migration with atomic Profile/failure
+  persistence and same-request execution, guarded cleanup, and all-candidate Fake-IP failure aggregation
   without preventing later-candidate success. MCP requests never
   install or switch models.
 
@@ -143,12 +145,13 @@ When adding or changing a public MCP tool, inspect both `tool-schemas.ts` and `t
 - `tests/asr-installer.test.ts`: deterministic installer/state tests. Strict
   v1/v2 state validation, atomic writes, managed-path safety, Python discovery,
   venv/pip/download gates, generated-WAV inference/cleanup, same-model v1
-  promotion, and full orchestration success/failure. No tests invoke real
+  promotion, readiness cancellation, and full orchestration success/failure. No tests invoke real
   Python, pip, network, or model download.
 - `tests/asr-installer-process.test.ts`: mocked default subprocess deadlines,
   output ceilings, argv, stdio, and platform process-group settings.
 - `tests/asr-transcription.test.ts`: deterministic v1/v2 ready-state and
-  Profile-driven runner coverage plus download, redirect, size/MIME, Fake-IP
+  first-request v1 migration, Profile-driven runner, atomic failure persistence,
+  abort, and no-repeat coverage plus download, redirect, size/MIME, Fake-IP
   aggregation, child argv/environment, strict output, timeout/kill, cleanup,
   and concurrency tests with no real network, Python, audio, Cookie, or model.
 - `tests/bilibili-playback.test.ts`: deterministic playurl auth/parameter, malformed-versus-empty DASH, duration, CDN allowlist, and candidate-order tests.

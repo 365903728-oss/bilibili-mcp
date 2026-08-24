@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { createAbortError } from "../security/operation-context.js";
 import {
   ASR_CUDA_EXECUTION_PROFILE,
   ASR_CPU_EXECUTION_PROFILE,
@@ -146,8 +147,13 @@ function terminateProcessTree(child: ReturnType<typeof spawn>): void {
 function execFile(
   file: string,
   args: string[],
+  signal?: AbortSignal,
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
     const child = spawn(file, args, {
       env: buildAsrChildEnv(process.env),
       shell: false,
@@ -162,7 +168,17 @@ function execFile(
     let timedOut = false;
     let overflowed = false;
     let settled = false;
-    const timeout = setTimeout(() => {
+    let timeout: NodeJS.Timeout | undefined;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      terminateProcessTree(child);
+      reject(createAbortError());
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const cleanup = () => signal?.removeEventListener("abort", onAbort);
+    timeout = setTimeout(() => {
       timedOut = true;
       terminateProcessTree(child);
     }, inferProcessTimeout(args));
@@ -190,6 +206,7 @@ function execFile(
       clearTimeout(timeout);
       if (settled) return;
       settled = true;
+      cleanup();
       if (timedOut) {
         reject(new Error("ASR installer subprocess exceeded its time limit"));
         return;
@@ -204,6 +221,7 @@ function execFile(
       clearTimeout(timeout);
       if (settled) return;
       settled = true;
+      cleanup();
       reject(err);
     });
   });
@@ -539,7 +557,10 @@ export async function verifyModel(
         profile.computeType,
       ),
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
     // Map subprocess and local probe failures after cleanup so a cleanup
     // failure can prevent auto fallback from publishing a ready Profile.
   } finally {
@@ -611,6 +632,9 @@ async function verifyDeviceReadiness(
     await verifyModel(venvPython, modelPath, ASR_CUDA_EXECUTION_PROFILE, spawnFn);
     return { executionProfile: ASR_CUDA_EXECUTION_PROFILE };
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
     const readinessError = error instanceof AsrReadinessError
       ? error
       : new AsrReadinessError("model_probe_failed", "cuda");
@@ -622,6 +646,9 @@ async function verifyDeviceReadiness(
     try {
       await verifyModel(venvPython, modelPath, ASR_CPU_EXECUTION_PROFILE, spawnFn);
     } catch (cpuError) {
+      if (cpuError instanceof Error && cpuError.name === "AbortError") {
+        throw cpuError;
+      }
       const cpuReadinessError = cpuError instanceof AsrReadinessError
         ? cpuError
         : new AsrReadinessError("model_probe_failed", "cpu");
@@ -636,6 +663,24 @@ async function verifyDeviceReadiness(
       failureCategory: readinessError.category,
     };
   }
+}
+
+export async function verifyInstalledDeviceReadiness(
+  paths: Pick<AsrPaths, "venv" | "model">,
+  preference: AsrDevicePreference = "auto",
+  signal?: AbortSignal,
+  spawnFn: typeof execFile = execFile,
+): Promise<{
+  executionProfile: AsrExecutionProfile;
+  failureCategory?: AsrFailureCategory;
+}> {
+  return await verifyDeviceReadiness(
+    pythonCommandForVenv(paths.venv),
+    paths.model,
+    preference,
+    (file, args) => spawnFn(file, args, signal),
+    () => undefined,
+  );
 }
 
 function prepareModelStaging(asrPaths: AsrPaths, preserveExistingModel: boolean): string {

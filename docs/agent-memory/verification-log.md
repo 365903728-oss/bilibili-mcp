@@ -2700,3 +2700,33 @@ Six release blockers fixed; one regression proof per root cause (new tests
   passed 184/184, the full suite passed 44 files / 1,145 tests, build passed,
   and a real Ubuntu 24.04 smoke confirmed `venv/bin/python` is a regular,
   non-symlink file.
+
+## 2026-08-24 — Issue #67 First-ASR v1 Migration
+
+- TDD evidence: initial focused tests failed because v1 transcription bypassed
+  migration and forced CPU. The implemented path now covers same-request CUDA
+  and CPU Profiles, fixed-category persistence, no-repeat v2 execution,
+  concurrent `ASR_BUSY`, readiness and state-write failure, and abort-before-
+  persistence. Review then exposed missing subprocess cancellation; the added
+  production seam preserves `AbortError` and terminates readiness on abort.
+- Verification: 2 focused files / 235 tests, TypeScript build, and 44 files /
+  1,152 full tests passed. Package dry run retained 193 files; production audit
+  reported zero vulnerabilities. Gitleaks 8.30.1 found zero findings in the
+  current source/test diff. GitHub MCP secret scanning was attempted but its
+  transport failed, so no remote-scan pass is claimed.
+- Real Windows smoke: the unchanged user v1 state was first shown to remain
+  pending because its historical `ctranslate2 4.8.1` does not satisfy the #66
+  `4.8.0` pin. A disposable copy was moved to the exact pin while reusing the
+  installed model. On an NVIDIA host, auto produced only
+  `cuda_runtime_missing`, atomically saved completed `cpu/int8`, and emitted one
+  sanitized fallback log; an explicit CPU-path migration also saved completed
+  `cpu/int8`. The temporary runtime copy was removed; user state stayed v1.
+- Boundary: deterministic GPU-success behavior passes, but this round did not
+  achieve a fresh real CUDA-success probe and does not claim one. Linux GPU was
+  not available; only deterministic cross-platform tests and Hosted CI may be
+  used for that boundary. The core Harness initially failed only on the stale
+  canonical-LF package receipt; after refreshing the complete 193-file package
+  output, six durable-memory hashes, and outer migration hash, the exact
+  conformance check passed 1/1 and core passed 102 tests with 15 existing
+  environment skips. No commit, push, PR, merge, Issue close, release, or
+  publication occurred.

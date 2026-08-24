@@ -923,3 +923,26 @@
   authority and rollback boundary.
 - Evidence: bilingual client guidance, sanitized CLI/doctor tests, and
   `docs/research/2026-08-24-asr-cuda-readiness.md`.
+
+## 2026-08-24 — First-ASR v1 Device Migration
+
+- Decision: A v1 migration-pending installation is probed only by its first
+  explicit ASR request while that request owns the existing single ASR slot.
+  Persist the verified v2 Profile atomically before playback/runtime work, then
+  execute the same request on that Profile. Later v2 requests never probe;
+  rerunning `setup` is the only retry path.
+- Reason: This reuses the installed model without hidden work in doctor,
+  subtitle reads, or unrelated MCP tools, and prevents concurrent model loads,
+  GPU contention, or state writers.
+- Evidence: Issue #67 orchestration, `ASR_BUSY`, same-request CUDA/CPU,
+  no-repeat, atomic-write, and setup retry regressions.
+
+- Decision: Cancellation reaches the readiness subprocess and preserves
+  `AbortError`; no state is written after abort. Successful auto fallback emits
+  at most one stderr entry containing only the fixed failure category and the
+  persisted Profile.
+- Reason: A cancelled first request must release the single ASR slot promptly,
+  and diagnostic output must not expose Python stderr, driver/library paths, or
+  environment details.
+- Evidence: signal-aware subprocess and migration tests, disposable Windows
+  exact-pin smoke, logger boundary review, and diff secret scan.

@@ -598,3 +598,17 @@
   orphaned GPU probe before the cleanup failure became non-fallbackable.
 - Future behavior: every readiness attempt must complete its own cleanup before
   another device probe or ready-state publication is allowed.
+
+## 2026-08-24 — ASR migration cancellation
+
+- Lesson: Checking cancellation only before and after a native readiness probe
+  preserves state correctness but can retain the single ASR slot until the
+  subprocess timeout. The signal must terminate the probe process tree, and
+  probe error mapping must preserve `AbortError` instead of converting it into
+  a device failure.
+- Evidence: Issue #67 Standards review found the production-seam gap after the
+  initial no-persistence abort test passed; signal propagation and focused
+  regressions then passed.
+- Future behavior: any new ASR Python subprocess owned by a request must accept
+  the request signal, terminate its tree on abort, clean temporary artifacts,
+  and keep cancellation distinct from readiness/runtime failures.

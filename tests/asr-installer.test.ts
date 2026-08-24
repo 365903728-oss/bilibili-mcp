@@ -12,6 +12,7 @@ import {
   createVenv,
   installRuntime,
   validateModelInstallTree,
+  verifyInstalledDeviceReadiness,
   type PythonCommand,
 } from "../src/asr/installer.js";
 import {
@@ -1182,6 +1183,31 @@ describe("verifyModel", () => {
   it("throws on non-zero exit", async () => {
     const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "import error" }));
     await expect(verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", CPU_PROFILE, spawnFn)).rejects.toMatchObject({ category: "model_probe_failed" });
+  });
+
+  it("propagates cancellation through the installed-readiness subprocess seam", async () => {
+    const controller = new AbortController();
+    const spawnFn = vi.fn((
+      _file: string,
+      _args: string[],
+      signal?: AbortSignal,
+    ) => new Promise<never>((_resolve, reject) => {
+      expect(signal).toBe(controller.signal);
+      signal?.addEventListener("abort", () => reject(new DOMException(
+        "The operation was aborted.",
+        "AbortError",
+      )), { once: true });
+    }));
+    const pending = verifyInstalledDeviceReadiness(
+      { venv: "/tmp/venv", model: "/tmp/models" },
+      "auto",
+      controller.signal,
+      spawnFn,
+    );
+
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(spawnFn).toHaveBeenCalledOnce();
   });
 });
 
