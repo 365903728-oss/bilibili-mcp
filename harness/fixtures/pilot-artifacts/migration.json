@@ -89,7 +89,7 @@
     }
   ],
   "durable_memory": {
-    "docs/agent-memory/active-work.md": "9f75b048c5834c11e19076d93feca160cd56f69b0f4377a4b96ac946cecbfa13",
+    "docs/agent-memory/active-work.md": "fabf9349d00c510735b49123e62a06fbadbb097db57f2fb6590239160742a7b4",
     "docs/agent-memory/codemap.md": "cc3969e610fb6b34cf86b0de2e238397f878d5fef34c27423cbe03f480693f0b",
     "docs/agent-memory/decisions.md": "aa945c89b056873b7dae8fe55716c8aff9467d6a11b0ed583eefc4a3c9fb6404",
     "docs/agent-memory/executions/2026-08-14-github-36-codex-direct-report.md": "439b169470c2ab1ec3af3625b8ca3e247d6ccd4f01bc39ff967deff673853570",
@@ -100,17 +100,17 @@
     "docs/agent-memory/verification-log.md": "3ca969e2eba658e65123a6c5089c969b1ae88b3a1d6ebed3a2c30f6aae607bb5"
   },
   "package": {
-    "output_digest": "f8c8f764c9ec9c3f421f014f8e64b6cef615b355e13a509c210e921c621355d8",
+    "output_digest": "3631e8fed04e9c3341e7449e6341b50d4dc6213e15589116480c73ca13d45953",
     "pack_output": [
       {
-        "id": "@xzxzzx/bilibili-mcp@1.13.0",
+        "id": "@xzxzzx/bilibili-mcp@1.13.1",
         "name": "@xzxzzx/bilibili-mcp",
-        "version": "1.13.0",
-        "size": 1150291,
+        "version": "1.13.1",
+        "size": 1150615,
         "unpackedSize": 1990979,
-        "shasum": "9c30bc9b294264e872a03b693744c8fc925e5bb9",
-        "integrity": "sha512-cp3MP+vJHRNKrbU2AKXYLsVzG9yFT/HvFckvA+NLxr3ifHzZHqiKSfKYzgo9p15saPTpS5gCcTWPGfVItHXjLw==",
-        "filename": "xzxzzx-bilibili-mcp-1.13.0.tgz",
+        "shasum": "bcbbe7d270b530344e61c07a6e631008beeb68b0",
+        "integrity": "sha512-eNScQP+NdwWcbzDvRVs6i6LZR7ML105ngsswQ8KTYLok3XGg5P8VbPC8bfgEVIQXNA5tB/2ENVu6iILGhNgiGw==",
+        "filename": "xzxzzx-bilibili-mcp-1.13.1.tgz",
         "files": [
           {
             "path": "LICENSE",

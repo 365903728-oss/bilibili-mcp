@@ -1,27 +1,19 @@
 # Active Work
 
-## Current Product Ticket
+## Current Product Release
 
-GitHub Issue #67 is the current approved child ticket under #55. Work is
-isolated on `codex/issue-67-v1-migration` from base
-`4ad276cf28f01a519d1b848c1afe36cdcaeeface` and is directly executed by Codex
-without Paseo. The candidate reuses #66 device readiness inside the existing
-single ASR slot: the first explicit ASR request holding a v1 migration-pending
-state probes `auto`, atomically records the verified v2 Profile plus only a
-sanitized GPU failure category when needed, and continues that same request on
-the persisted CUDA or CPU Profile. Completed v2 requests never probe again;
-`setup` remains the explicit retry path. Cancellation now reaches the
-readiness subprocess, terminates its process tree, preserves `AbortError`, and
-cannot publish ready state after abort. Deterministic orchestration/readiness
-tests, build, the 44-file / 1,152-test suite, package dry run, production audit,
-and local diff Gitleaks pass. A disposable exact-pin Windows smoke on an NVIDIA
-host recorded `cuda_runtime_missing` and completed same-migration CPU fallback;
-an explicit CPU-path smoke also completed. The host GPU path was attempted but
-did not pass, so no fresh CUDA-success claim is made; Linux GPU remains
-unverified and is covered only by deterministic cross-platform automation.
-Canonical package/memory receipts and the 102-test core Harness are green.
-Commit, push, PR, merge, Issue close, release, and publication remain separate
-authority gates.
+The user authorized release candidate `v1.13.1` after parent Issue #55 and
+child Issues #64-#67 closed. Work is isolated on
+`codex/release-1.13.1` from exact merged baseline
+`fae3e77b8e3c5fa54984be1368994a19fc53211d`; the dirty primary checkout is
+outside the release path. Scope is limited to synchronized package/Registry
+versions, bilingual changelogs and GitHub Release notes, trusted npm
+publication, and Official MCP Registry publication. The merged product range
+also contains the Node 25 lookup repair and Fake-IP DNS diagnostics from
+Issues #54 and #57-#59. Runtime, dependency, workflow, MCP schema, credential,
+and system CUDA behavior are not release-prep edit surfaces. Publication must
+stop if local/package/security/Harness verification fails, remote `master`
+moves, `1.13.1` becomes occupied, or the trusted publish cannot be verified.
 
 ## Harness v2
 

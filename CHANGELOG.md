@@ -8,6 +8,27 @@
 
 ---
 
+## [1.13.1] - 2026-08-24
+
+### 新增
+- ASR 模型选择现在明确展示 Model Tier：`tiny` 为速度优先、`base` 为均衡、`small` 为质量优先；Enter 继续默认并推荐 `small`。（Issue #64）
+- ASR 状态升级为受控的 Execution Profile 与 Device Readiness。`doctor --json` 会报告实际验证生效的模型、`cpu/int8` 或 `cuda/float16`、迁移状态和可选的脱敏失败类别；成功 transcript 与 MCP schema 保持不变。（Issue #65）
+- 新安装和重新运行 `setup` 时支持 `auto | cpu | cuda`。`auto` 先执行真实 CUDA 模型加载和固定短 WAV 最小推理，失败后仅以受控类别说明原因，再独立验证并回退 `cpu/int8`；显式 `cuda` 失败不会静默回退。运行时固定为 `faster-whisper==1.2.1` 与 `ctranslate2==4.8.0`，项目不会安装系统 CUDA 组件或修改全局环境。（Issue #66）
+- 旧 v1 ASR 安装无需重新下载模型：升级后的第一次明确 ASR 请求会在现有单请求槽位内完成一次自动设备迁移，原子保存 v2 Profile，并在同一次请求中使用 GPU 或已验证的 CPU 回退。完成后不重复探测；失败或取消会保留 v1 pending，用户可通过再次运行 `setup` 重试。（Issue #67）
+
+### 修复
+- 修复 Node.js 25 下 `dns.lookup(..., { all: true })` 的返回契约，使固定 HTTPS 音频下载继续正确处理完整地址数组，同时保持 Node 20/22 兼容。（Issue #54）
+- 当 ASR 音频候选全部解析到 `198.18.0.0/15` Fake-IP 网段时，返回专用 `ASR_FAKE_IP_DNS` 诊断。Agent 指引会解释 Fake-IP 与固定 HTTPS 安全边界，并让用户选择为 Bilibili 媒体域名配置 `fake-ip-filter` / real-IP、切换 `redir-host`，或暂不使用 ASR；不会要求关闭整个代理。（Issue #57-#59）
+
+### 安全与兼容性
+- 保持固定 HTTPS/SSRF、防路径与 stderr 泄露、单 ASR 并发、资源上限和临时文件清理边界。CPU 仍是完整支持路径；NVIDIA GPU 为实验性能力。
+- Windows 已完成真实 NVIDIA CUDA readiness 与 managed runner 转写验证。Linux 通过确定性自动化与 Hosted Harness，但本版本不宣称 Linux GPU 已完成真实硬件验证。
+
+### 验证
+- 通过 TypeScript 构建、44 个文件 / 1152 项测试、193 文件 npm 打包检查、生产依赖零漏洞审计、差异凭据扫描，以及 PR #71 的 Product、Node 20/22/25、Ubuntu/Windows Harness 与 Required 共 11 项 Hosted 门禁。
+
+---
+
 ## [1.13.0] - 2026-08-20
 
 ### 新增

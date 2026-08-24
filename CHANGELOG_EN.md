@@ -8,6 +8,27 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ---
 
+## [1.13.1] - 2026-08-24
+
+### Added
+- ASR model selection now explains each Model Tier: `tiny` prioritizes speed, `base` balances speed and quality, and `small` prioritizes quality. Enter still defaults to and recommends `small`. (Issue #64)
+- Managed ASR state now records a controlled Execution Profile and Device Readiness. `doctor --json` reports the actually verified model, `cpu/int8` or `cuda/float16`, migration status, and an optional sanitized failure category; successful transcript output and MCP schemas are unchanged. (Issue #65)
+- New installs and repeated `setup` runs accept `auto | cpu | cuda`. `auto` performs a real CUDA model load and fixed short-WAV inference before independently verifying a `cpu/int8` fallback with a controlled diagnostic; explicit `cuda` never falls back silently. The managed runtime pins `faster-whisper==1.2.1` and `ctranslate2==4.8.0`, and the project never installs system CUDA components or changes global environment settings. (Issue #66)
+- Existing v1 ASR installs keep their downloaded model. The first explicit ASR request after upgrade performs one device migration inside the existing single-request slot, atomically stores the v2 Profile, and uses the verified GPU or CPU fallback in that same request. Completed migrations never probe again; failure or cancellation leaves v1 pending, and rerunning `setup` is the retry path. (Issue #67)
+
+### Fixed
+- Fixed the Node.js 25 return contract for `dns.lookup(..., { all: true })`, so pinned-HTTPS audio downloads correctly consume the complete address array while remaining compatible with Node 20 and 22. (Issue #54)
+- When every ASR audio candidate resolves only into the `198.18.0.0/15` Fake-IP range, the server now returns the dedicated `ASR_FAKE_IP_DNS` diagnosis. Agent guidance explains the Fake-IP/pinned-HTTPS boundary and lets the user choose a Bilibili media-domain `fake-ip-filter` / real-IP rule, `redir-host`, or no ASR for now; it does not require disabling the entire proxy. (Issues #57-#59)
+
+### Security and compatibility
+- Preserved pinned HTTPS/SSRF protection, path and stderr redaction, single-ASR concurrency, resource limits, and temporary-file cleanup. CPU remains a fully supported path; NVIDIA GPU support is experimental.
+- Real NVIDIA CUDA readiness and managed-runner transcription were verified on Windows. Linux is covered by deterministic automation and Hosted Harness jobs, but this release does not claim a real Linux GPU hardware validation.
+
+### Verified
+- Passed the TypeScript build, 1152 tests across 44 files, a 193-file npm package check, a zero-vulnerability production audit, diff secret scanning, and all 11 Hosted gates on PR #71: Product, Node 20/22/25, Ubuntu/Windows Harness, and Required.
+
+---
+
 ## [1.13.0] - 2026-08-20
 
 ### Added
