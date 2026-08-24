@@ -168,10 +168,122 @@ describe("getVideoSubtitle", () => {
     );
 
     const calls = getFetchCalls(fetchMock);
-    expect(calls.some((call) => call.url.includes("/x/player/wbi/v2"))).toBe(
-      true,
+    expect(
+      calls.filter((call) => call.url.includes("/x/player/wbi/v2")),
+    ).toHaveLength(1);
+    expect(
+      calls.filter((call) => call.url.includes("/x/player/v2")),
+    ).toHaveLength(1);
+  });
+
+  it("falls back to /x/player/v2 when the WBI endpoint returns HTTP 412", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/x/frontend/finger/spi")) {
+        return jsonResponse({
+          code: 0,
+          data: { b_3: "buvid3-test", b_4: "buvid4-test" },
+        });
+      }
+
+      if (url.includes("/x/web-interface/nav")) {
+        return jsonResponse({
+          code: 0,
+          data: {
+            wbi_img: {
+              img_url:
+                "https://i0.hdslb.com/bfs/wbi/abcdefghijklmnopqrstuvwxyz123456.png",
+              sub_url:
+                "https://i0.hdslb.com/bfs/wbi/123456abcdefghijklmnopqrstuvwxyz.png",
+            },
+          },
+        });
+      }
+
+      if (url.includes("/x/player/wbi/v2")) {
+        return textResponse("risk control", 412);
+      }
+
+      if (url.includes("/x/player/v2")) {
+        return jsonResponse({
+          code: 0,
+          data: {
+            subtitle: {
+              subtitles: [
+                {
+                  id: 2,
+                  lan: "ai-zh",
+                  lan_doc: "AI中文",
+                  subtitle_url: "//example.test/fallback.json",
+                },
+              ],
+            },
+          },
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getVideoSubtitle("BV1T6PQzQErF", 123);
+
+    expect(result.subtitle.subtitles[0].subtitle_url).toBe(
+      "//example.test/fallback.json",
     );
-    expect(calls.some((call) => call.url.includes("/x/player/v2"))).toBe(true);
+
+    const calls = getFetchCalls(fetchMock);
+    expect(
+      calls.filter((call) => call.url.includes("/x/player/wbi/v2")),
+    ).toHaveLength(1);
+    expect(
+      calls.filter((call) => call.url.includes("/x/player/v2")),
+    ).toHaveLength(1);
+  });
+
+  it("does not fall back to /x/player/v2 for other WBI HTTP errors", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/x/frontend/finger/spi")) {
+        return jsonResponse({
+          code: 0,
+          data: { b_3: "buvid3-test", b_4: "buvid4-test" },
+        });
+      }
+
+      if (url.includes("/x/web-interface/nav")) {
+        return jsonResponse({
+          code: 0,
+          data: {
+            wbi_img: {
+              img_url:
+                "https://i0.hdslb.com/bfs/wbi/abcdefghijklmnopqrstuvwxyz123456.png",
+              sub_url:
+                "https://i0.hdslb.com/bfs/wbi/123456abcdefghijklmnopqrstuvwxyz.png",
+            },
+          },
+        });
+      }
+
+      if (url.includes("/x/player/wbi/v2")) {
+        return textResponse("forbidden", 403);
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      getVideoSubtitle("BV1T6PQzQErF", 123),
+    ).rejects.toMatchObject({ name: "NetworkError", statusCode: 403 });
+
+    const calls = getFetchCalls(fetchMock);
+    expect(
+      calls.filter((call) => call.url.includes("/x/player/wbi/v2")),
+    ).toHaveLength(1);
+    expect(
+      calls.filter((call) => call.url.includes("/x/player/v2")),
+    ).toHaveLength(0);
   });
 });
 

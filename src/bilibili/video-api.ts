@@ -261,7 +261,7 @@ export async function getVideoInfo(bvid: string) {
  * 获取视频字幕信息
  *
  * 策略：优先使用带 WBI 签名的 /x/player/wbi/v2 接口。
- * 若该接口返回空字幕（部分视频的 AI 字幕 subtitle_url 只在非 WBI 版接口中暴露），
+ * 若该接口返回空字幕或 HTTP 412（部分环境下的登录态风控），
  * 自动降级到 /x/player/v2 重试一次。
  */
 export async function getVideoSubtitle(bvid: string, cid: number) {
@@ -279,11 +279,23 @@ export async function getVideoSubtitle(bvid: string, cid: number) {
   }
 
   // 第一次尝试：WBI 签名接口
-  const wbiResult = parseSubtitleResponse(await fetchWithWBI(
-    "/x/player/wbi/v2",
-    { bvid, cid },
-    headersWithBuvid,
-  ));
+  let wbiResult: SubtitleResponse | undefined;
+  try {
+    wbiResult = parseSubtitleResponse(await fetchWithWBI(
+      "/x/player/wbi/v2",
+      { bvid, cid },
+      headersWithBuvid,
+    ));
+  } catch (error) {
+    if (!(error instanceof NetworkError && error.statusCode === 412)) {
+      throw error;
+    }
+    logger.warn(
+      "WBI subtitle API returned HTTP 412, falling back to /x/player/v2",
+      { bvid, cid },
+      { type: "video-api", operation: "getVideoSubtitle" },
+    );
+  }
 
   if (
     wbiResult?.subtitle?.subtitles &&
@@ -292,12 +304,13 @@ export async function getVideoSubtitle(bvid: string, cid: number) {
     return wbiResult;
   }
 
-  // WBI 接口返回空字幕，降级到非 WBI 接口重试
-  logger.debug(
-    "WBI subtitle API returned empty subtitles, falling back to /x/player/v2",
-    { bvid, cid },
-    { type: "video-api", operation: "getVideoSubtitle" },
-  );
+  if (wbiResult) {
+    logger.debug(
+      "WBI subtitle API returned empty subtitles, falling back to /x/player/v2",
+      { bvid, cid },
+      { type: "video-api", operation: "getVideoSubtitle" },
+    );
+  }
   const fallbackResult = parseSubtitleResponse(await fetchWithoutWBI(
     "/x/player/v2",
     { bvid, cid },
