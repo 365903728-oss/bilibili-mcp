@@ -291,7 +291,10 @@ export async function createVenv(
 ): Promise<PythonCommand> {
   mkdirSyncFn(path.dirname(venvPath), { recursive: true, mode: 0o700 });
 
-  const result = await spawnFn(python.executable, toPythonArgs(python, "-m", "venv", venvPath));
+  const result = await spawnFn(
+    python.executable,
+    toPythonArgs(python, "-m", "venv", "--copies", venvPath),
+  );
   if (result.code !== 0) {
     throw new Error(`venv creation failed: ${result.stderr.slice(0, 500)}`);
   }

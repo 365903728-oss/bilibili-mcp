@@ -6,9 +6,9 @@
 - Mode: `codex-direct`, following the user's explicit no-Paseo direction.
 - Canonical worktree/base: `C:\Users\ZX\.codex\worktrees\issue-66\bilibili-mcp`
   at `6199142cb35a5d3b12f70ee1c41a65e60d3ca696`.
-- Terminal state: locally accepted and uncommitted. The fresh Windows GPU
-  setup-to-transcript gate is satisfied; remote effects remain a separate
-  authority gate.
+- Terminal state: branch pushed and PR #70 open. The fresh Windows GPU
+  setup-to-transcript gate is satisfied; the same-scope POSIX venv review
+  repair is locally verified and awaiting the Hosted integration gate.
 
 ## Summary
 
@@ -44,6 +44,9 @@ not change.
 - `npm audit --omit=dev --json`: zero production vulnerabilities.
 - `git diff --check`: passed; Gitleaks 8.30.1 found zero secrets in the tracked
   diff, three untracked evidence files, and rebuilt `dist`.
+- Post-review verification: `tests/asr-installer.test.ts` passed 184/184, the
+  complete 44-file / 1,145-test suite and build passed again, and Ubuntu 24.04
+  created `venv/bin/python` as a real non-symlink file with `--copies`.
 - Isolated exact-pin CPU setup and actual runner smoke: passed.
 - Isolated explicit-CUDA failure: `cuda_runtime_missing`; previous state and
   runtime preserved, no CPU fallback, zero staging residue.
@@ -68,6 +71,11 @@ not change.
 - Made probe cleanup failure non-fallbackable and moved the prior state out of
   the active slot during artifact activation, so incomplete rollback cannot
   expose a stale ready Profile.
+- Created managed venvs with copied executables so the standard POSIX
+  interpreter layout satisfies the existing fail-closed no-symlink gate.
+- Refreshed the canonical-LF package and durable-memory receipt chain after the
+  first Hosted run exposed expected #66 artifact drift; no packaged path was
+  added or removed.
 
 ## Residual Risk
 
@@ -102,5 +110,5 @@ not change.
 
 ## Git And Remote State
 
-No commit, push, PR, merge, Issue close, tag, release, or npm publication was
-performed.
+The focused implementation commit was pushed and PR #70 was opened. No merge,
+Issue close, tag, release, or npm publication was performed at report time.

@@ -40,7 +40,7 @@ function materializeMockVenv(args: string[]): void {
     (arg, index) => arg === "venv" && args[index - 1] === "-m",
   );
   if (moduleIndex < 0) return;
-  const venvPath = args[moduleIndex + 1];
+  const venvPath = args[args.length - 1];
   const binDir = path.join(venvPath, process.platform === "win32" ? "Scripts" : "bin");
   fs.mkdirSync(binDir, { recursive: true });
   fs.writeFileSync(
@@ -946,14 +946,14 @@ function spawnOk(stdout = "") {
 }
 
 describe("createVenv", () => {
-  it("creates a venv and returns venv Python command", async () => {
+  it("creates a venv with a copied interpreter and returns its Python command", async () => {
     const spawnFn = spawnOk();
     const mkdirSyncFn = vi.fn();
     const python: PythonCommand = { executable: "python3", prefixArgs: [] };
     const venvPath = path.join(os.tmpdir(), "test-venv");
     const result = await createVenv(python, venvPath, spawnFn, mkdirSyncFn);
 
-    expect(spawnFn).toHaveBeenCalledWith("python3", ["-I", "-m", "venv", venvPath]);
+    expect(spawnFn).toHaveBeenCalledWith("python3", ["-I", "-m", "venv", "--copies", venvPath]);
     expect(result.executable).toContain("python");
     expect(result.prefixArgs).toEqual([]);
   });
@@ -1651,7 +1651,7 @@ describe("runAsrInstallation", () => {
     // venv
     const vv = vi.fn(() => Promise.resolve({ code: 0, stdout: "", stderr: "" }));
     await createVenv({ executable: "python3", prefixArgs: [] }, "/tmp/venv", vv, vi.fn());
-    expect(vv.mock.calls[0][1]).toEqual(["-I", "-m", "venv", "/tmp/venv"]);
+    expect(vv.mock.calls[0][1]).toEqual(["-I", "-m", "venv", "--copies", "/tmp/venv"]);
 
     // pip
     const pip = vi.fn(() => Promise.resolve({ code: 0, stdout: "", stderr: "" }));

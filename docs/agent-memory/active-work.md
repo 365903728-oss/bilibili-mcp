@@ -14,13 +14,18 @@ never falls back; a readiness failure before activation preserves the prior
 installation. Captured activation errors roll back, and incomplete rollback
 leaves the ready state inactive so the runner fails closed. Focused tests,
 build, the 44-file / 1,145-test suite, isolated exact-pin CPU setup and
-runner smoke, and independent review pass. A fresh Windows run with externally
+runner smoke, and the initial independent review pass. A fresh Windows run with externally
 supplied CUDA 12 libraries also completed exact-pair setup as `cuda/float16`
 and produced a non-empty actual runner transcript, satisfying the final #66
-hardware gate without changing persistent host configuration. The candidate is
-locally accepted; the user has separately authorized its focused commit and
-push on this branch. First-ASR automatic migration remains #67. PR, merge,
-Issue close, release, and publication remain separate authority gates.
+hardware gate without changing persistent host configuration. PR #70 then
+found that standard POSIX venv creation can leave `venv/bin/python` as a
+symlink rejected by the managed-path gate. The same-scope repair creates venvs
+with copied executables; 184 focused tests, the 44-file / 1,145-test suite,
+build, and a real Ubuntu 24.04 non-symlink interpreter smoke pass. The first
+Hosted run also exposed only the expected stale canonical-LF package/memory
+receipt, which was refreshed without changing package boundaries. PR #70 is
+the current integration gate. First-ASR automatic migration remains #67;
+merge, Issue close, release, and publication remain separate authority gates.
 
 ## Harness v2
 

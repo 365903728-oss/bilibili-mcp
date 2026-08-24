@@ -2690,3 +2690,13 @@ Six release blockers fixed; one regression proof per root cause (new tests
   commit, push, PR, merge, Issue close, tag, release, or publication occurred.
   Concurrent setup processes are not a supported #66 path; the implementation
   does not claim a cross-process multi-resource atomic transaction.
+- PR #70 follow-up: Hosted Product and both Harness core jobs deterministically
+  exposed a stale canonical-LF package receipt while Product tests/build,
+  Fake-IP Node 20/22/25, and the non-core Harness shards passed. The complete
+  193-path receipt and six changed durable-memory hashes were refreshed without
+  changing package membership. Codex review also found that POSIX `venv`
+  commonly symlinks `bin/python`, conflicting with the fail-closed managed-path
+  check; adding `--copies` preserved that security boundary. The focused file
+  passed 184/184, the full suite passed 44 files / 1,145 tests, build passed,
+  and a real Ubuntu 24.04 smoke confirmed `venv/bin/python` is a regular,
+  non-symlink file.
