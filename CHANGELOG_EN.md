@@ -6,6 +6,12 @@ All notable changes to the **Bilibili MCP Server** will be documented in this fi
 
 ## [Unreleased]
 
+### Changed
+- Migrated the project license from GPL-3.0 to Apache-2.0 to reduce restrictions on commercial use, modification, redistribution, and integration while providing an explicit contribution-related patent grant. Published versions through v1.13.1 remain available under their original GPL-3.0 license.
+
+### Fixed
+- When the WBI subtitle endpoint is blocked by Bilibili risk controls with HTTP 412, retry once through `/x/player/v2`; other transport, authentication, and parsing errors retain their existing behavior. (Issue #53)
+
 ---
 
 ## [1.13.1] - 2026-08-24

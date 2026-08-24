@@ -100,31 +100,31 @@
     "docs/agent-memory/verification-log.md": "2b5b4e969a383467c5c46f5fd05f36a582a2b04d6929dbdfad671666b9e62d75"
   },
   "package": {
-    "output_digest": "c10abbdd34a13c662202ca43bad763324405697c9874d77f2daeebe4b735dfe2",
+    "output_digest": "2e28e2ed262d1a42a9040e51cfa69e2328722796696c0339bec275e1d1d83212",
     "pack_output": [
       {
         "id": "@xzxzzx/bilibili-mcp@1.13.1",
         "name": "@xzxzzx/bilibili-mcp",
         "version": "1.13.1",
-        "size": 1150359,
-        "unpackedSize": 1991557,
-        "shasum": "6cd3c733dfe168a081582e628a7ea16c00c56331",
-        "integrity": "sha512-eqJWpETvvhZ0txrQdNFH23nz1bpuqYgwSPhq2wqs0FJIvy13FAxJed7rezTadOSyQ09c2MHqOQXaOSS/wnFyfQ==",
+        "size": 1143156,
+        "unpackedSize": 1969030,
+        "shasum": "9558951305d53fa5f7837c76c94f6dd1826e02b7",
+        "integrity": "sha512-KrUwXy8riI3eM+Y/3CVJAOXUXU2oMTr6gT7q49jNuOgzokVG/PVZXAwwzLZUPGgsT3dXZVrYxW419PUphMaMSg==",
         "filename": "xzxzzx-bilibili-mcp-1.13.1.tgz",
         "files": [
           {
             "path": "LICENSE",
-            "size": 34885,
+            "size": 11357,
             "mode": 420
           },
           {
             "path": "README_EN.md",
-            "size": 20393,
+            "size": 20932,
             "mode": 420
           },
           {
             "path": "README.md",
-            "size": 18785,
+            "size": 19244,
             "mode": 420
           },
           {
@@ -1074,7 +1074,7 @@
           },
           {
             "path": "package.json",
-            "size": 2480,
+            "size": 2483,
             "mode": 420
           }
         ],

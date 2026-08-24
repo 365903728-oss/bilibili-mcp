@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@xzxzzx/bilibili-mcp"><img src="https://img.shields.io/npm/v/@xzxzzx/bilibili-mcp.svg" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@xzxzzx/bilibili-mcp"><img src="https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg" alt="npm downloads"></a>
-  <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="GPL-3.0 license"></a>
+  <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="Apache-2.0 license"></a>
 </p>
 
 Bilibili MCP is a local MCP server that lets AI agents read Bilibili. You can read transcripts and comments, search for videos by topic, find Creators by name or keyword and understand their content, and browse your own Favorite Folders. Even videos without subtitles become readable once you install the local ASR model.
@@ -184,6 +184,8 @@ The runtime is pinned to `faster-whisper==1.2.1` and `ctranslate2==4.8.0`. Model
 
 The project never installs or modifies NVIDIA drivers, CUDA, cuBLAS, cuDNN, the system `PATH`, `LD_LIBRARY_PATH`, or global Python. After a GPU failure, you decide whether to keep the verified CPU profile or repair the GPU environment and rerun `setup`; every setup rerun rechecks device readiness.
 
+**Upgrading an existing installation:** a v1 ASR installation reuses its downloaded model. The first explicit ASR request after upgrade automatically validates GPU/CPU and, after successful validation, continues that same transcription. Success saves the new state so later requests do not probe again. Failure or cancellation leaves the original state pending, and rerunning `setup` after fixing the environment is the retry path.
+
 **Boundaries:** local transcription stays within safe bounds — opt-in, resource-capped, Cookie-isolated:
 
 - Native Bilibili subtitles always win; transcription starts only on confirmed no-subtitle states with an explicit `fallback_to_asr: true`.
@@ -194,7 +196,7 @@ The project never installs or modifies NVIDIA drivers, CUDA, cuBLAS, cuDNN, the 
 - The Cookie goes only to official Bilibili APIs — never to CDN hosts or the local Python child process.
 - Credential, HTTP, and throttling errors surface as-is; they are never disguised as "no subtitles".
 
-For the full semantics of error codes such as `ASR_NOT_READY`, `ASR_BUSY`, and `ASR_TRANSCRIPTION_TIMEOUT`, see the [tool reference](./docs/tool-reference.en.md).
+For the full semantics and safe handling of error codes such as `ASR_NOT_READY`, `ASR_FAKE_IP_DNS`, `ASR_BUSY`, and `ASR_TRANSCRIPTION_TIMEOUT`, see the [tool reference](./docs/tool-reference.en.md). A Fake-IP diagnosis does not require disabling the entire proxy.
 
 ## Tool reference
 
@@ -260,4 +262,4 @@ MCP stdio protocol data uses `stdout`; diagnostics must go to `stderr`. Never us
 
 For bugs and feature requests, open a [GitHub Issue](https://github.com/XZXZZX-Ai/bilibili-mcp/issues). Use [GitHub Discussions](https://github.com/XZXZZX-Ai/bilibili-mcp/discussions) for general questions.
 
-This project is licensed under the [GNU General Public License v3.0](./LICENSE).
+This project is licensed under the [Apache License 2.0](./LICENSE).

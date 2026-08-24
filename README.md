@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@xzxzzx/bilibili-mcp"><img src="https://img.shields.io/npm/v/@xzxzzx/bilibili-mcp.svg" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@xzxzzx/bilibili-mcp"><img src="https://img.shields.io/npm/dm/@xzxzzx/bilibili-mcp.svg" alt="npm downloads"></a>
-  <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="GPL-3.0 license"></a>
+  <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="Apache-2.0 license"></a>
 </p>
 
 Bilibili MCP 是一个本地 MCP server，让 AI Agent 读取 Bilibili 内容。你可以读取字幕与评论、按主题搜索视频、按名称或关键词查找并了解 UP 主，也可以遍历自己账号的收藏夹。即使视频没有字幕，通过 `setup` 安装本地 ASR 模型后也能读到它的文字内容。
@@ -176,6 +176,8 @@ Runtime 固定为 `faster-whisper==1.2.1` 与 `ctranslate2==4.8.0`，模型存�
 
 项目不会安装或修改 NVIDIA 驱动、CUDA、cuBLAS、cuDNN、系统 `PATH`、`LD_LIBRARY_PATH` 或全局 Python。GPU 验证失败后，你可以继续使用已经验证的 CPU，也可以自行修复 GPU 环境后重新运行 `setup`；每次重新运行都会再次验证设备。
 
+**从旧版本升级：**已有 v1 ASR 安装无需重新下载模型。升级后的第一次明确 ASR 请求会自动验证 GPU/CPU，并在验证成功后继续完成本次转录；成功后会保存新状态，后续请求不再重复探测。若迁移失败或被取消，原状态保持待迁移，可在修复环境后重新运行 `setup` 重试。
+
 **边界：**本地转录始终被约束在安全范围内——显式选择、资源受限、Cookie 隔离：
 
 - 原生 B 站字幕始终优先；每个选中的 `ai-*` 都会先无条件双读评估，不通过时与无字幕一样构成确认缺失（默认返回简介或 `SUBTITLE_UNAVAILABLE`）；只有在这种确认缺失状态、且你显式传了 `fallback_to_asr: true` 时才启动转录。
@@ -186,7 +188,7 @@ Runtime 固定为 `faster-whisper==1.2.1` 与 `ctranslate2==4.8.0`，模型存�
 - Cookie 只发给 B 站官方接口，绝不发给 CDN 或本地 Python 子进程。
 - 凭证、HTTP、限流等错误照常返回，不会被伪装成"没有字幕"。
 
-`ASR_NOT_READY`、`ASR_BUSY`、`ASR_TRANSCRIPTION_TIMEOUT` 等错误码的完整语义见[工具参考](./docs/tool-reference.md)。
+`ASR_NOT_READY`、`ASR_FAKE_IP_DNS`、`ASR_BUSY`、`ASR_TRANSCRIPTION_TIMEOUT` 等错误码的完整语义和安全处理方式见[工具参考](./docs/tool-reference.md)；遇到 Fake-IP 诊断时，不需要关闭整个代理。
 
 ## 工具参考
 
@@ -252,4 +254,4 @@ MCP stdio 协议数据使用 `stdout`；调试日志必须写到 `stderr`。测�
 
 遇到问题或有功能建议，请提交 [GitHub Issue](https://github.com/XZXZZX-Ai/bilibili-mcp/issues)；一般讨论可前往 [GitHub Discussions](https://github.com/XZXZZX-Ai/bilibili-mcp/discussions)。
 
-本项目基于 [GNU General Public License v3.0](./LICENSE) 开源。
+本项目基于 [Apache License 2.0](./LICENSE) 开源。
