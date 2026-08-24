@@ -15,9 +15,11 @@ import {
   ASR_FAILURE_CATEGORIES,
   readAsrState,
   deriveAsrPaths,
+  resolveDevicePreference,
   resolveExecutionProfile,
   type AsrStateKind,
   type AsrDeviceReadiness,
+  type AsrDevicePreference,
   type AsrExecutionProfile,
   type AsrFailureCategory,
   type AsrMigrationStatus,
@@ -26,13 +28,111 @@ import {
   type AsrModelKey,
   type AsrModelSpec,
 } from "./asr/state.js";
-import { runAsrInstallation } from "./asr/installer.js";
+import { runAsrInstallation, type InstallResult } from "./asr/installer.js";
 
 const ASR_MODEL_TIER_DESCRIPTIONS: Record<AsrModelKey, string> = {
   tiny: "速度优先：适合快速提取和长视频初筛，准确率相对较低",
   base: "均衡：兼顾速度、质量和资源占用",
-  small: "质量优先：CPU 耗时和内存占用更高",
+  small: "质量优先：耗时和内存占用更高",
 };
+
+type AsrSetupResult = Pick<
+  InstallResult,
+  | "success"
+  | "error"
+  | "executionProfile"
+  | "failureCategory"
+  | "failureDevice"
+  | "gpuFailureCategory"
+>;
+
+const ASR_GPU_FAILURE_EXPLANATIONS: Record<AsrFailureCategory, string> = {
+  no_nvidia_gpu: "当前环境没有检测到可用的 NVIDIA GPU",
+  cuda_runtime_missing: "CUDA、cuBLAS 或 cuDNN 运行组件无法由当前 ASR 进程加载",
+  runtime_version_mismatch: "NVIDIA 驱动、CUDA 组件或受控 ASR 运行时版本不兼容",
+  model_probe_failed: "GPU 模型加载或最小推理没有成功完成",
+};
+
+const ASR_GPU_FAILURE_ACTIONS: Record<AsrFailureCategory, string> = {
+  no_nvidia_gpu: "确认机器确有 NVIDIA GPU 且 nvidia-smi 可用；否则重新运行 setup 选择 cpu",
+  cuda_runtime_missing: "按官方 GPU 说明安装与受控运行时兼容的 CUDA 12、cuBLAS 和 cuDNN 9，让启动 MCP 的同一环境可以加载它们，然后重启 MCP 客户端并重跑 setup：https://github.com/SYSTRAN/faster-whisper#gpu",
+  runtime_version_mismatch: "升级 NVIDIA 驱动和兼容的 CUDA 12 组件，重启 MCP 客户端后重跑 setup；setup 会重新固定 Python 运行时版本",
+  model_probe_failed: "先重跑 setup；若仍失败，可选择 cpu 继续使用，并携带 doctor --json 的脱敏类别报告问题",
+};
+
+function explainAsrFailure(
+  category: AsrFailureCategory,
+  device: "cpu" | "cuda",
+): string {
+  if (device === "cuda") return ASR_GPU_FAILURE_EXPLANATIONS[category];
+  if (category === "runtime_version_mismatch") {
+    return "受控 ASR Python 运行时版本不匹配";
+  }
+  return "CPU 模型加载或最小推理没有成功完成";
+}
+
+function actionForAsrFailure(
+  category: AsrFailureCategory,
+  device: "cpu" | "cuda",
+): string {
+  if (device === "cuda") return ASR_GPU_FAILURE_ACTIONS[category];
+  return "重新运行 setup；若仍失败，请携带 doctor --json 的脱敏类别报告问题";
+}
+
+function reportAsrSetupResult(
+  result: AsrSetupResult,
+  requestedDevice: AsrDevicePreference,
+): boolean {
+  if (result.success) {
+    const profile = result.executionProfile === undefined
+      ? "设备就绪"
+      : result.executionProfile.device === "cuda"
+        ? "CUDA Float16"
+        : "CPU INT8";
+    console.log(`✅ ASR 模型安装成功并通过 ${profile} 验证。`);
+    if (result.failureCategory !== undefined) {
+      console.log(
+        `   GPU 未启用：${explainAsrFailure(result.failureCategory, "cuda")}（${result.failureCategory}）。`,
+      );
+      console.log("   已验证 CPU INT8，可以继续使用 ASR；也可以修复 GPU 环境后重新运行 setup。");
+      console.log(`   若要启用 GPU：${actionForAsrFailure(result.failureCategory, "cuda")}。`);
+      console.log("   bilibili-mcp 不会自动安装或修改 NVIDIA 驱动、CUDA、cuBLAS、cuDNN、PATH 或 LD_LIBRARY_PATH。");
+    }
+    console.log("   管理路径：~/.bilibili-mcp/asr/");
+    console.log("   运行 bilibili-mcp doctor --json 可查看 ASR 状态。");
+    return true;
+  }
+
+  console.error(`❌ ASR 安装失败：${redactSecrets(result.error) ?? "未知错误"}`);
+  if (result.failureCategory !== undefined) {
+    if (result.gpuFailureCategory !== undefined) {
+      console.log(
+        `   GPU 验证失败：${explainAsrFailure(result.gpuFailureCategory, "cuda")}（${result.gpuFailureCategory}）。`,
+      );
+      console.log(
+        `   CPU 回退验证也失败：${explainAsrFailure(result.failureCategory, "cpu")}（${result.failureCategory}）。`,
+      );
+      console.log(`   GPU 处理方法：${actionForAsrFailure(result.gpuFailureCategory, "cuda")}。`);
+      console.log(`   CPU 处理方法：${actionForAsrFailure(result.failureCategory, "cpu")}。`);
+    } else {
+      const failureDevice = result.failureDevice ?? (requestedDevice === "cpu" ? "cpu" : "cuda");
+      const label = failureDevice === "cuda" ? "GPU" : "CPU";
+      console.log(
+        `   ${label} 验证失败：${explainAsrFailure(result.failureCategory, failureDevice)}（${result.failureCategory}）。`,
+      );
+      console.log(`   处理方法：${actionForAsrFailure(result.failureCategory, failureDevice)}。`);
+    }
+    console.log("   bilibili-mcp 不会自动安装或修改 NVIDIA 驱动、CUDA、cuBLAS、cuDNN、PATH 或 LD_LIBRARY_PATH。");
+    if (requestedDevice === "cuda") {
+      console.log("   你选择了 cuda，因此没有回退到 CPU；已有已验证配置（如有）保持不变。");
+      console.log("   你可以修复 GPU 环境后重新运行 setup 并重新选择 cuda，或重新运行 setup 选择 cpu。");
+    }
+  } else {
+    console.log("   已保留部分下载文件，重新运行 setup 可从断点续传。");
+    console.log("   当前 MCP 服务不受影响，字幕回退为 SUBTITLE_UNAVAILABLE。");
+  }
+  return false;
+}
 
 // Version info
 import fs from "fs";
@@ -79,6 +179,12 @@ export function parseModelChoice(input: string): AsrModelKey | null {
   if (trimmed === "3" || trimmed === "small") return "small";
 
   return null; // invalid, re-prompt
+}
+
+export function parseDeviceChoice(input: string): AsrDevicePreference | null {
+  const normalized = input.trim().toLowerCase();
+  if (normalized === "") return "auto";
+  return resolveDevicePreference(normalized) ?? null;
 }
 
 // Start MCP server
@@ -333,11 +439,13 @@ export interface SetupCredentialsOptions {
   nonInteractive?: boolean;
   /** 允许列表内的 ASR 模型（仅非交互模式可用） */
   asrModel?: AsrModelKey;
+  /** 受控的 ASR 设备偏好（仅与非交互模型选择同用） */
+  asrDevice?: AsrDevicePreference;
 }
 
 export async function setupCredentials(
   configure: () => Promise<boolean | void> = configureCredentials,
-  runAsr: (modelKey: AsrModelKey) => Promise<{ success: boolean; error?: string }> = async () => ({ success: false, error: "installer not injected" }),
+  runAsr: (modelKey: AsrModelKey, devicePreference: AsrDevicePreference) => Promise<AsrSetupResult> = async () => ({ success: false, error: "installer not injected" }),
   askHiddenFn: (question: string) => Promise<string> = askHidden,
   options: SetupCredentialsOptions = {},
 ) {
@@ -347,6 +455,16 @@ export async function setupCredentials(
     console.error(
       "Run: bilibili-mcp setup --non-interactive --asr-model <tiny|base|small>",
     );
+    process.exitCode = 1;
+    return;
+  }
+  if (options.asrDevice !== undefined && !options.nonInteractive) {
+    console.error("Error: --asr-device requires --non-interactive.");
+    process.exitCode = 1;
+    return;
+  }
+  if (options.asrDevice !== undefined && options.asrModel === undefined) {
+    console.error("Error: --asr-device requires --asr-model.");
     process.exitCode = 1;
     return;
   }
@@ -373,17 +491,9 @@ export async function setupCredentials(
       console.log("No --asr-model given; setup complete without ASR installation.");
       return;
     }
-    const result = await runAsr(options.asrModel);
-    if (result.success) {
-      console.log("✅ ASR 模型安装成功并通过 CPU INT8 验证。");
-      console.log(`   管理路径：~/.bilibili-mcp/asr/`);
-      console.log(
-        "   运行 bilibili-mcp doctor --json 可查看 ASR 状态。",
-      );
-    } else {
-      console.error(`❌ ASR 安装失败：${redactSecrets(result.error) ?? "未知错误"}`);
-      console.log("   已保留部分下载文件，重新运行 setup 可从断点续传。");
-      console.log("   当前 MCP 服务不受影响，字幕回退为 SUBTITLE_UNAVAILABLE。");
+    const devicePreference = options.asrDevice ?? "auto";
+    const result = await runAsr(options.asrModel, devicePreference);
+    if (!reportAsrSetupResult(result, devicePreference)) {
       process.exitCode = 1;
     }
     return;
@@ -425,7 +535,7 @@ export async function setupCredentials(
     "ASR 语音识别（可选）：安装本地 faster-whisper 模型，",
   );
   console.log(
-    "用于后续在没有 CC/AI 字幕时提供本地语音识别。当前阶段仅安装模型，不执行转录。",
+    "用于后续在没有 CC/AI 字幕时提供本地语音识别。setup 会用程序生成的短 WAV 验证设备，不访问 Bilibili。",
   );
 
   const answer = await askHiddenFn("是否现在安装？[y/N] ");
@@ -458,19 +568,22 @@ export async function setupCredentials(
   const resolvedKey: AsrModelKey = modelKey;
   const spec = resolveModelSpec(resolvedKey);
   console.log(`已选择：${spec.key}（约 ${spec.approximateMB} MB）`);
+  console.log("");
+  console.log("请选择执行设备（Enter 默认 auto）：");
+  console.log("  auto：优先验证 NVIDIA GPU；失败时解释原因并验证 CPU 回退");
+  console.log("  cpu：仅验证 CPU INT8，不探测 GPU");
+  console.log("  cuda：必须通过 CUDA Float16 验证；失败时不回退 CPU");
+  let devicePreference: AsrDevicePreference | null = null;
+  while (devicePreference === null) {
+    devicePreference = parseDeviceChoice(await askHiddenFn("> "));
+    if (devicePreference === null) {
+      console.log("无效选择，请输入 auto、cpu 或 cuda，或直接按 Enter 选择 auto。");
+    }
+  }
   console.log("正在安装 ASR 模型，可能需要几分钟...");
-  const result = await runAsr(modelKey);
+  const result = await runAsr(modelKey, devicePreference);
 
-  if (result.success) {
-    console.log("✅ ASR 模型安装成功并通过 CPU INT8 验证。");
-    console.log(`   管理路径：~/.bilibili-mcp/asr/`);
-    console.log(
-      "   运行 bilibili-mcp doctor --json 可查看 ASR 状态。",
-    );
-  } else {
-    console.error(`❌ ASR 安装失败：${redactSecrets(result.error) ?? "未知错误"}`);
-    console.log("   已保留部分下载文件，重新运行 setup 可从断点续传。");
-    console.log("   当前 MCP 服务不受影响，字幕回退为 SUBTITLE_UNAVAILABLE。");
+  if (!reportAsrSetupResult(result, devicePreference)) {
     process.exitCode = 1;
   }
 }
@@ -511,7 +624,8 @@ export function createCli() {
     .description("配置 Bilibili 凭证和可选 ASR（交互式需要终端，--non-interactive 供自动化使用）")
     .option("--non-interactive", "非交互模式：使用已有的 env/global config 凭据，绝不提示")
     .option("--asr-model <tiny|base|small>", "非交互模式下的 ASR 模型（需与 --non-interactive 同用）")
-    .action(async (cmdOptions: { nonInteractive?: boolean; asrModel?: string }) => {
+    .option("--asr-device <auto|cpu|cuda>", "非交互模式下的 ASR 设备偏好（默认 auto，需与 --asr-model 同用）")
+    .action(async (cmdOptions: { nonInteractive?: boolean; asrModel?: string; asrDevice?: string }) => {
       const options: SetupCredentialsOptions = {
         nonInteractive: Boolean(cmdOptions.nonInteractive),
       };
@@ -530,10 +644,19 @@ export function createCli() {
         }
         options.asrModel = resolvedKey;
       }
+      if (cmdOptions.asrDevice !== undefined) {
+        const devicePreference = resolveDevicePreference(cmdOptions.asrDevice.trim().toLowerCase());
+        if (devicePreference === undefined) {
+          console.error("Error: --asr-device must be one of: auto, cpu, cuda");
+          process.exitCode = 1;
+          return;
+        }
+        options.asrDevice = devicePreference;
+      }
       await setupCredentials(
         configureCredentials,
-        async (modelKey: AsrModelKey) =>
-          runAsrInstallation({ modelKey, onStage: (s) => console.log(`  ${s}`) }),
+        async (modelKey: AsrModelKey, devicePreference: AsrDevicePreference) =>
+          runAsrInstallation({ modelKey, devicePreference, onStage: (s) => console.log(`  ${s}`) }),
         askHidden,
         options,
       );

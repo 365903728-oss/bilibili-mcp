@@ -183,6 +183,8 @@ export function buildAsrRuntimeEnv(
     "LANG",
     "LC_ALL",
     "NO_COLOR",
+    "CUDA_PATH",
+    "LD_LIBRARY_PATH",
   ]);
   const env: Record<string, string> = {
     HF_HUB_OFFLINE: "1",
@@ -845,10 +847,10 @@ export async function transcribeVideoPart(
           state.migrationStatus === "pending"
         ? ASR_CPU_EXECUTION_PROFILE
         : undefined;
-    if (executionProfile === undefined || executionProfile.device !== "cpu") {
+    if (executionProfile === undefined) {
       throw new AsrError(
         "ASR_NOT_READY",
-        "Local ASR has no verified CPU execution profile. Run setup, then inspect doctor --json.",
+        "Local ASR has no verified execution profile. Run setup, then inspect doctor --json.",
       );
     }
 

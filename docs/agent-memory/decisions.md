@@ -890,3 +890,36 @@
   #67 owns first-ASR device migration and #66 owns GPU probing/fallback.
 - Evidence: exact v1 state preservation on probe failure, one-probe promotion,
   and #65/#55 issue boundary review.
+
+## 2026-08-24 — CUDA ASR Device Readiness
+
+- Decision: Setup accepts only `auto`, `cpu`, or `cuda`, defaulting to `auto`.
+  Auto may save `cuda/float16` only after the selected local model completes a
+  generated-WAV inference; a failed GPU probe is reduced to a fixed category
+  before an independent CPU probe. Explicit CUDA never falls back.
+- Reason: hardware detection or model construction alone does not prove an
+  executable Profile, while silent fallback would violate explicit user intent.
+- Evidence: Issue #66, deterministic device/readiness regressions, and the
+  isolated Windows setup smoke.
+
+- Decision: Pin `ctranslate2==4.8.0` beside `faster-whisper==1.2.1` and stage the
+  runtime/model replacement before publication. During activation, move the
+  prior ready state out of the active slot before swapping artifacts; restore
+  it only after both artifact rollbacks succeed, otherwise leave state inactive
+  so subsequent runners fail closed. A supplied
+  `BILIBILI_ASR_PYTHON` or explicit override bootstraps staging; otherwise a
+  ready installation may reuse its managed Python.
+- Reason: a floating transitive GPU runtime is not reproducible, and mutating a
+  working runtime before readiness could destroy the only verified fallback.
+- Evidence: upstream/version research, historical Windows CTranslate2 4.8.0
+  inference evidence, rollback-failure/fail-closed regressions, and
+  Python-override TDD.
+
+- Decision: Keep NVIDIA drivers, CUDA, cuBLAS, cuDNN, loader paths, and global
+  Python outside project management. Report only controlled categories and let
+  the user decide whether to repair the environment, select CPU, or continue
+  without ASR.
+- Reason: system GPU mutation is host-specific and exceeds the package's
+  authority and rollback boundary.
+- Evidence: bilingual client guidance, sanitized CLI/doctor tests, and
+  `docs/research/2026-08-24-asr-cuda-readiness.md`.

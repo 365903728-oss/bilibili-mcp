@@ -2654,3 +2654,49 @@ Six release blockers fixed; one regression proof per root cause (new tests
   user-managed ASR state; that small Python/PyAV compatibility risk remains a
   merge/release follow-up. No commit, push, PR, Issue close, release, or publish
   occurred.
+
+## 2026-08-24 — Issue #66 CUDA Device Readiness
+
+- TDD evidence: device choice, exact pins, real probe profiles, sanitized
+  categories, fallback, no-fallback, rollback, staging cleanup, runner argv,
+  doctor output, and CLI guidance were introduced through failing regressions.
+  The final ready-install Python-override defect failed 2/2, then passed
+  181/181 after the bounded bootstrap repair.
+- Verification: 3 focused files / 321 tests, 44 files / 1,145 full tests, and
+  TypeScript build passed. Package dry run retained 193 files and all exclusion
+  and `dist` entry-point boundaries; production audit reported zero
+  vulnerabilities; diff check passed; Gitleaks found zero findings in the
+  tracked diff, three evidence files, and rebuilt `dist`.
+- Real isolated smoke: the exact pins completed CPU readiness and an actual
+  generated-WAV runner transcript from the newly activated managed venv. An
+  explicit CUDA retry returned only `cuda_runtime_missing`, preserved state
+  and a runtime marker, did not probe CPU, left zero staging residue, and the
+  disposable smoke root was removed after path verification.
+- Final Windows GPU acceptance: official NVIDIA CUDA 12 Windows wheels were
+  installed only into a disposable external environment and exposed through
+  process-local `PATH`. Exact `faster-whisper==1.2.1` plus
+  `ctranslate2==4.8.0` setup published `cuda/float16`; the actual managed runner
+  returned one non-empty 46-character English segment. State, package versions,
+  zero staging/backup/probe-WAV residue, and the unchanged user v1 installation
+  were checked directly.
+- Review: Standards, Spec, and risk axes found no remaining code/scope issue
+  after repairs for staged runtime/model activation, fail-closed incomplete
+  rollback, non-fallbackable probe cleanup failure, CPU/double-failure
+  diagnostics, best-effort post-publication cleanup, and ready-state Python
+  override handling.
+- Boundary: the Windows GPU gate now passes; Linux GPU remains unverified and
+  first-ASR automatic migration remains #67. Codex Security did not complete
+  because stored CLI auth could not be refreshed; no pass is claimed. No
+  commit, push, PR, merge, Issue close, tag, release, or publication occurred.
+  Concurrent setup processes are not a supported #66 path; the implementation
+  does not claim a cross-process multi-resource atomic transaction.
+- PR #70 follow-up: Hosted Product and both Harness core jobs deterministically
+  exposed a stale canonical-LF package receipt while Product tests/build,
+  Fake-IP Node 20/22/25, and the non-core Harness shards passed. The complete
+  193-path receipt and six changed durable-memory hashes were refreshed without
+  changing package membership. Codex review also found that POSIX `venv`
+  commonly symlinks `bin/python`, conflicting with the fail-closed managed-path
+  check; adding `--copies` preserved that security boundary. The focused file
+  passed 184/184, the full suite passed 44 files / 1,145 tests, build passed,
+  and a real Ubuntu 24.04 smoke confirmed `venv/bin/python` is a regular,
+  non-symlink file.

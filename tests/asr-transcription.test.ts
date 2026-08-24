@@ -22,6 +22,7 @@ import { FakeIpDnsError } from "../src/security/pinned-https.js";
 import { AsrError } from "../src/utils/errors.js";
 
 const CPU_PROFILE = { device: "cpu", computeType: "int8" } as const;
+const CUDA_PROFILE = { device: "cuda", computeType: "float16" } as const;
 
 const tempDirs: string[] = [];
 const candidate: PlaybackAudioCandidate = {
@@ -240,6 +241,9 @@ describe("ASR child isolation and lifecycle", () => {
     const env = buildAsrRuntimeEnv({
       PATH: "safe-path",
       SYSTEMROOT: "safe-root",
+      CUDA_PATH: "C:\\CUDA\\v12.8",
+      LD_LIBRARY_PATH: "/opt/cuda/lib64",
+      LD_PRELOAD: "/tmp/injected.so",
       BILIBILI_SESSDATA: "secret",
       BILIBILI_BILI_JCT: "secret",
       BILIBILI_DEDEUSERID: "secret",
@@ -249,11 +253,17 @@ describe("ASR child isolation and lifecycle", () => {
       HTTPS_PROXY: "http://secret-proxy",
     });
 
-    expect(env).toMatchObject({ PATH: "safe-path", SYSTEMROOT: "safe-root" });
+    expect(env).toMatchObject({
+      PATH: "safe-path",
+      SYSTEMROOT: "safe-root",
+      CUDA_PATH: "C:\\CUDA\\v12.8",
+      LD_LIBRARY_PATH: "/opt/cuda/lib64",
+    });
     expect(JSON.stringify(env)).not.toContain("secret");
     expect(env).not.toHaveProperty("PYTHONPATH");
     expect(env).not.toHaveProperty("PYTHONHOME");
     expect(env).not.toHaveProperty("HTTPS_PROXY");
+    expect(env).not.toHaveProperty("LD_PRELOAD");
   });
 });
 
@@ -693,8 +703,8 @@ describe("ASR orchestration", () => {
     expect(getPlayback).not.toHaveBeenCalled();
   });
 
-  it("does not execute a CUDA profile before the CUDA readiness ticket", async () => {
-    const getPlayback = vi.fn();
+  it("runs the exact verified CUDA profile from state", async () => {
+    const runRuntime = vi.fn(async () => ({ language: "zh", segments: [] }));
 
     await expect(transcribeVideoPart(
       { bvid: "BV1T6PQzQErF", cid: 12345, durationSeconds: 60 },
@@ -702,14 +712,18 @@ describe("ASR orchestration", () => {
         ...readyDependencies(),
         getState: () => ({
           kind: "ready",
-          executionProfile: { device: "cuda", computeType: "float16" },
+          executionProfile: CUDA_PROFILE,
           deviceReadiness: "ready",
           migrationStatus: "completed",
         }),
-        getPlayback,
+        getPlayback: async () => ({ candidates: [candidate], durationSeconds: 60 }),
+        createTempDir: async () => path.join(os.tmpdir(), `${ASR_TEMP_PREFIX}cuda`),
+        removeTempDir: vi.fn(async () => undefined),
+        downloadAudio: vi.fn(async () => undefined),
+        runRuntime,
       },
-    )).rejects.toMatchObject({ code: "ASR_NOT_READY" });
-    expect(getPlayback).not.toHaveBeenCalled();
+    )).resolves.toMatchObject({ language: "zh" });
+    expect(runRuntime.mock.calls[0][3]).toEqual(CUDA_PROFILE);
   });
 
   it("cleans the request directory after download or runtime failure", async () => {

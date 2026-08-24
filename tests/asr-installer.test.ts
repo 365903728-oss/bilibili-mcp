@@ -16,6 +16,7 @@ import {
 } from "../src/asr/installer.js";
 import {
   ASR_MODEL_SPECS,
+  ASR_PINNED_CTRANSLATE2,
   ASR_PINNED_MODEL,
   ASR_PINNED_REVISION,
   ASR_PINNED_RUNTIME,
@@ -30,6 +31,23 @@ import {
   type AsrModelKey,
   type AsrState,
 } from "../src/asr/state.js";
+
+const CPU_PROFILE = { device: "cpu", computeType: "int8" } as const;
+const CUDA_PROFILE = { device: "cuda", computeType: "float16" } as const;
+
+function materializeMockVenv(args: string[]): void {
+  const moduleIndex = args.findIndex(
+    (arg, index) => arg === "venv" && args[index - 1] === "-m",
+  );
+  if (moduleIndex < 0) return;
+  const venvPath = args[args.length - 1];
+  const binDir = path.join(venvPath, process.platform === "win32" ? "Scripts" : "bin");
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(binDir, process.platform === "win32" ? "python.exe" : "python"),
+    "fake",
+  );
+}
 
 // ---------- state.ts ----------
 
@@ -243,7 +261,7 @@ describe("writeAsrState", () => {
     const unlink = vi.fn();
     const mkdir = vi.fn();
 
-    expect(() => writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir)).toThrow("atomically");
+    expect(() => writeAsrState("/tmp/asr/state.json", "small", {}, write, rename, unlink, mkdir)).toThrow("atomically");
     expect(unlink).toHaveBeenCalledWith(expect.stringMatching(/\.state-[0-9a-f-]{36}\.tmp$/));
   });
 
@@ -253,7 +271,7 @@ describe("writeAsrState", () => {
     const unlink = vi.fn();
     const mkdir = vi.fn();
 
-    expect(() => writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir)).toThrow("write ASR state file");
+    expect(() => writeAsrState("/tmp/asr/state.json", "small", {}, write, rename, unlink, mkdir)).toThrow("write ASR state file");
     expect(rename).not.toHaveBeenCalled();
     expect(unlink).toHaveBeenCalledWith(expect.stringMatching(/\.state-[0-9a-f-]{36}\.tmp$/));
   });
@@ -272,6 +290,7 @@ describe("writeAsrState", () => {
     expect(() => writeAsrState(
       stateFile,
       "small",
+      {},
       fs.writeFileSync,
       (() => { throw new Error("interrupted"); }) as typeof fs.renameSync,
       fs.unlinkSync,
@@ -496,7 +515,7 @@ describe("writeAsrState secure temp file", () => {
     const unlink = vi.fn();
     const mkdir = vi.fn();
 
-    writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir);
+    writeAsrState("/tmp/asr/state.json", "small", {}, write, rename, unlink, mkdir);
 
     expect(mkdir).toHaveBeenCalledWith(path.dirname("/tmp/asr/state.json"), {
       recursive: true,
@@ -524,7 +543,7 @@ describe("writeAsrState secure temp file", () => {
     const mkdir = vi.fn();
     const randomId = vi.fn(() => "abc-123");
 
-    writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir, randomId);
+    writeAsrState("/tmp/asr/state.json", "small", {}, write, rename, unlink, mkdir, randomId);
 
     expect(written[0].path).toBe(path.join("/tmp/asr", ".state-abc-123.tmp"));
     expect(rename).toHaveBeenCalledWith(
@@ -543,8 +562,8 @@ describe("writeAsrState secure temp file", () => {
       .mockReturnValueOnce("first")
       .mockReturnValueOnce("second");
 
-    writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir, randomId);
-    writeAsrState("/tmp/asr/state.json", "small", write, rename, unlink, mkdir, randomId);
+    writeAsrState("/tmp/asr/state.json", "small", {}, write, rename, unlink, mkdir, randomId);
+    writeAsrState("/tmp/asr/state.json", "small", {}, write, rename, unlink, mkdir, randomId);
 
     const tmpPaths = write.mock.calls.map(([p]) => p);
     expect(tmpPaths).toEqual([
@@ -579,6 +598,7 @@ describe("writeAsrState secure temp file", () => {
       writeAsrState(
         "/tmp/asr/state.json",
         "small",
+        {},
         write,
         rename,
         unlink,
@@ -611,6 +631,7 @@ describe("writeAsrState secure temp file", () => {
       writeAsrState(
         "/tmp/asr/state.json",
         "small",
+        {},
         write,
         rename,
         unlink,
@@ -642,6 +663,7 @@ describe("writeAsrState secure temp file", () => {
     writeAsrState(
       "/tmp/asr/state.json",
       "small",
+      {},
       write,
       rename,
       unlink,
@@ -669,6 +691,7 @@ describe("writeAsrState secure temp file", () => {
     writeAsrState(
       "/tmp/asr/state.json",
       "small",
+      {},
       write,
       rename,
       unlink,
@@ -707,6 +730,7 @@ describe("writeAsrState secure temp file", () => {
         writeAsrState(
           "/tmp/asr/state.json",
           "small",
+          {},
           write,
           rename,
           unlink,
@@ -744,6 +768,7 @@ describe("writeAsrState secure temp file", () => {
       writeAsrState(
         "/tmp/asr/state.json",
         "small",
+        {},
         write,
         rename,
         unlink,
@@ -921,14 +946,14 @@ function spawnOk(stdout = "") {
 }
 
 describe("createVenv", () => {
-  it("creates a venv and returns venv Python command", async () => {
+  it("creates a venv with a copied interpreter and returns its Python command", async () => {
     const spawnFn = spawnOk();
     const mkdirSyncFn = vi.fn();
     const python: PythonCommand = { executable: "python3", prefixArgs: [] };
     const venvPath = path.join(os.tmpdir(), "test-venv");
     const result = await createVenv(python, venvPath, spawnFn, mkdirSyncFn);
 
-    expect(spawnFn).toHaveBeenCalledWith("python3", ["-I", "-m", "venv", venvPath]);
+    expect(spawnFn).toHaveBeenCalledWith("python3", ["-I", "-m", "venv", "--copies", venvPath]);
     expect(result.executable).toContain("python");
     expect(result.prefixArgs).toEqual([]);
   });
@@ -948,13 +973,33 @@ describe("installRuntime", () => {
 
     expect(spawnFn).toHaveBeenCalledWith(
       "/tmp/venv/bin/python",
-      ["-I", "-m", "pip", "install", "--quiet", ASR_PINNED_RUNTIME],
+      [
+        "-I",
+        "-m",
+        "pip",
+        "install",
+        "--quiet",
+        ASR_PINNED_RUNTIME,
+        "ctranslate2==4.8.0",
+      ],
     );
   });
 
   it("throws on pip failure", async () => {
-    const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "pip error" }));
-    await expect(installRuntime({ executable: "python3", prefixArgs: [] }, spawnFn)).rejects.toThrow("pip install");
+    const spawnFn = vi.fn(() => Promise.resolve({
+      code: 1,
+      stdout: "",
+      stderr: "pip error at C:\\private\\venv TOKEN=secret",
+    }));
+    let caught: unknown;
+    try {
+      await installRuntime({ executable: "python3", prefixArgs: [] }, spawnFn);
+    } catch (error) {
+      caught = error;
+    }
+    expect(String(caught)).toContain("pip install");
+    expect(String(caught)).not.toContain("private");
+    expect(String(caught)).not.toContain("TOKEN");
   });
 });
 
@@ -994,6 +1039,80 @@ describe("downloadModel", () => {
 });
 
 describe("verifyModel", () => {
+  it("passes the allowlisted CUDA profile through argv and consumes the generator", async () => {
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      expect(args[2]).toContain("for _ in segments");
+      expect(args.slice(-2)).toEqual(["cuda", "float16"]);
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    await verifyModel(
+      { executable: "python3", prefixArgs: [] },
+      "/tmp/models",
+      CUDA_PROFILE,
+      spawnFn,
+    );
+  });
+
+  it("does not apply CUDA loader diagnostics to CPU probe failures", async () => {
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      const exceptionBlock = args[2].slice(args[2].indexOf("except Exception as error:"));
+      expect(exceptionBlock).toContain("    if device == 'cuda':");
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    await verifyModel(
+      { executable: "python3", prefixArgs: [] },
+      "/tmp/models",
+      CPU_PROFILE,
+      spawnFn,
+    );
+  });
+
+  it.each([
+    ["no_nvidia_gpu", 20],
+    ["cuda_runtime_missing", 21],
+    ["runtime_version_mismatch", 22],
+    ["model_probe_failed", 23],
+  ] as const)("returns only the sanitized %s readiness category", async (category, code) => {
+    const spawnFn = vi.fn(() => Promise.resolve({
+      code,
+      stdout: `FAILED:${category}\n`,
+      stderr: "raw stderr at C:\\private\\cuda.dll TOKEN=secret",
+    }));
+
+    let caught: unknown;
+    try {
+      await verifyModel(
+        { executable: "python3", prefixArgs: [] },
+        "/tmp/models",
+        CUDA_PROFILE,
+        spawnFn,
+      );
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toMatchObject({ category });
+    expect(String(caught)).not.toContain("private");
+    expect(String(caught)).not.toContain("TOKEN");
+  });
+
+  it("rejects a readiness category paired with the wrong exit code", async () => {
+    const spawnFn = vi.fn(() => Promise.resolve({
+      code: 23,
+      stdout: "FAILED:cuda_runtime_missing\n",
+      stderr: "raw C:\\private\\cuda.dll TOKEN=secret",
+    }));
+
+    await expect(verifyModel(
+      { executable: "python3", prefixArgs: [] },
+      "/tmp/models",
+      CUDA_PROFILE,
+      spawnFn,
+    )).rejects.toMatchObject({ category: "model_probe_failed" });
+  });
+
   it("runs a minimal inference against a generated WAV and cleans it", async () => {
     let probePath = "";
     const spawnFn = vi.fn((_file: string, args: string[]) => {
@@ -1005,7 +1124,7 @@ describe("verifyModel", () => {
       return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
     });
 
-    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn);
+    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", CPU_PROFILE, spawnFn);
 
     expect(probePath).not.toBe("");
     expect(fs.existsSync(probePath)).toBe(false);
@@ -1020,8 +1139,8 @@ describe("verifyModel", () => {
     });
 
     await expect(
-      verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn),
-    ).rejects.toThrow("Model verification failed");
+      verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", CPU_PROFILE, spawnFn),
+    ).rejects.toMatchObject({ category: "model_probe_failed" });
     expect(fs.existsSync(probePath)).toBe(false);
   });
 
@@ -1039,8 +1158,8 @@ describe("verifyModel", () => {
 
     try {
       await expect(
-        verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn),
-      ).rejects.toThrow("cleanup denied");
+        verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", CPU_PROFILE, spawnFn),
+      ).rejects.toMatchObject({ category: "model_probe_failed" });
     } finally {
       unlinkSpy.mockRestore();
       if (probePath) realUnlinkSync(probePath);
@@ -1049,7 +1168,7 @@ describe("verifyModel", () => {
 
   it("passes model path via argv", async () => {
     const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" }));
-    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn);
+    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", CPU_PROFILE, spawnFn);
 
     const args = spawnFn.mock.calls[0][1];
     expect(args).toContain("/tmp/models");
@@ -1057,12 +1176,12 @@ describe("verifyModel", () => {
 
   it("throws when stdout is not exactly VERIFIED", async () => {
     const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED and more\n", stderr: "" }));
-    await expect(verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn)).rejects.toThrow("did not confirm load");
+    await expect(verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", CPU_PROFILE, spawnFn)).rejects.toMatchObject({ category: "model_probe_failed" });
   });
 
   it("throws on non-zero exit", async () => {
     const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "import error" }));
-    await expect(verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", spawnFn)).rejects.toThrow("Model verification failed");
+    await expect(verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", CPU_PROFILE, spawnFn)).rejects.toMatchObject({ category: "model_probe_failed" });
   });
 });
 
@@ -1261,7 +1380,7 @@ describe("runAsrInstallation", () => {
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
   });
 
-  it("is idempotent when already ready", async () => {
+  it("re-pins the runtime and reruns explicit CPU readiness when already ready", async () => {
     const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-idem-" + Date.now());
     fs.mkdirSync(tmpBase, { recursive: true });
     const stateFile = path.join(tmpBase, "state.json");
@@ -1275,11 +1394,24 @@ describe("runAsrInstallation", () => {
     }
     writeAsrState(stateFile);
 
-    const spawnFn = vi.fn();
-    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase });
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      return Promise.resolve({
+        code: 0,
+        stdout: args.includes("pip") || args.includes("venv") ? "" : "VERIFIED\n",
+        stderr: "",
+      });
+    });
+    const result = await runAsrInstallation({
+      spawnFn,
+      asrBase: tmpBase,
+      devicePreference: "cpu",
+    });
 
     expect(result.success).toBe(true);
-    expect(spawnFn).not.toHaveBeenCalled();
+    expect(spawnFn).toHaveBeenCalledTimes(3);
+    expect(spawnFn.mock.calls[1][1]).toContain(ASR_PINNED_CTRANSLATE2);
+    expect(spawnFn.mock.calls[2][1].slice(-2)).toEqual(["cpu", "int8"]);
 
     // cleanup
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
@@ -1356,6 +1488,10 @@ describe("runAsrInstallation", () => {
       PYTHONHOME: "/some/home",
       OTHER_VAR: "x",
       PATH: "/usr/bin",
+      CUDA_PATH: "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.8",
+      LD_LIBRARY_PATH: "/opt/cuda/lib64",
+      LD_PRELOAD: "/tmp/injected.so",
+      CUDA_PATH_EVIL: "C:\\private",
     };
     const result = buildAsrChildEnv(source);
     expect(result.BILIBILI_SESSDATA).toBeUndefined();
@@ -1366,22 +1502,23 @@ describe("runAsrInstallation", () => {
     expect(result.PYTHONHOME).toBeUndefined();
     expect(result.OTHER_VAR).toBeUndefined();
     expect(result.PATH).toBe("/usr/bin");
+    expect(result.CUDA_PATH).toContain("NVIDIA GPU Computing Toolkit");
+    expect(result.LD_LIBRARY_PATH).toBe("/opt/cuda/lib64");
+    expect(result.LD_PRELOAD).toBeUndefined();
+    expect(result.CUDA_PATH_EVIL).toBeUndefined();
     expect(result.PIP_NO_INPUT).toBe("1");
     expect(result.PYTHONNOUSERSITE).toBe("1");
   });
 
-  it("stale-marker unlink with permission error aborts before mutation", async () => {
+  it("does not clear an invalid stale marker before installation succeeds", async () => {
     const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-perm-" + Date.now());
     fs.mkdirSync(tmpBase, { recursive: true });
     const stateFile = path.join(tmpBase, "state.json");
     // Write an incomplete marker
     fs.writeFileSync(stateFile, JSON.stringify({ kind: "ready", version: 999 }), "utf8");
 
-    const unlockFn = vi.fn(() => {
-      const err = new Error("EPERM: permission denied") as NodeJS.ErrnoException;
-      err.code = "EPERM";
-      throw err;
-    });
+    const previous = fs.readFileSync(stateFile, "utf8");
+    const unlockFn = vi.fn();
     const spawnFn = vi.fn();
 
     const result = await runAsrInstallation({
@@ -1391,37 +1528,49 @@ describe("runAsrInstallation", () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("Cannot clear stale ASR state");
-    // Must not proceed to spawn
-    expect(spawnFn).not.toHaveBeenCalled();
+    expect(result.error).toContain("Python 3.9+ not found");
+    expect(unlockFn).not.toHaveBeenCalled();
+    expect(fs.readFileSync(stateFile, "utf8")).toBe(previous);
 
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
   });
 
-  it("stale-marker unlink with ENOENT proceeds to install", async () => {
+  it("atomically replaces an invalid stale marker after setup succeeds", async () => {
     const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-enoent-" + Date.now());
     fs.mkdirSync(tmpBase, { recursive: true });
     const stateFile = path.join(tmpBase, "state.json");
     fs.writeFileSync(stateFile, JSON.stringify({ kind: "ready", version: 999 }), "utf8");
 
-    const unlockFn = vi.fn(() => {
-      const err = new Error("ENOENT") as NodeJS.ErrnoException;
-      err.code = "ENOENT";
-      throw err;
-    });
-    // discoverPython will fail with no candidates matching, but that's fine —
-    // what matters is unlink ENOENT is swallowed and execution continues
-    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" }));
+    const modelsDir = path.join(tmpBase, "models");
+    fs.mkdirSync(modelsDir, { recursive: true });
+    for (const file of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelsDir, file), "placeholder");
+    }
+    const binDir = path.join(tmpBase, "venv", process.platform === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, process.platform === "win32" ? "python.exe" : "python"), "fake");
+    const unlockFn = vi.fn();
+    let step = 0;
+    const outputs = ["Python 3.12.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n"];
+    const spawnFn = vi.fn(() => Promise.resolve({
+      code: 0,
+      stdout: outputs[step++] ?? "",
+      stderr: "",
+    }));
 
     const result = await runAsrInstallation({
       spawnFn,
       asrBase: tmpBase,
       fsUnlinkSync: unlockFn,
+      devicePreference: "cpu",
     });
 
-    // ENOENT swallowed → install attempted (succeeds or fails is fine)
-    expect(unlockFn).toHaveBeenCalled();
-    expect(spawnFn).toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    expect(unlockFn).not.toHaveBeenCalled();
+    expect(readAsrState(stateFile)).toMatchObject({
+      kind: "ready",
+      executionProfile: CPU_PROFILE,
+    });
 
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
   });
@@ -1502,7 +1651,7 @@ describe("runAsrInstallation", () => {
     // venv
     const vv = vi.fn(() => Promise.resolve({ code: 0, stdout: "", stderr: "" }));
     await createVenv({ executable: "python3", prefixArgs: [] }, "/tmp/venv", vv, vi.fn());
-    expect(vv.mock.calls[0][1]).toEqual(["-I", "-m", "venv", "/tmp/venv"]);
+    expect(vv.mock.calls[0][1]).toEqual(["-I", "-m", "venv", "--copies", "/tmp/venv"]);
 
     // pip
     const pip = vi.fn(() => Promise.resolve({ code: 0, stdout: "", stderr: "" }));
@@ -1518,7 +1667,7 @@ describe("runAsrInstallation", () => {
 
     // verify
     const vrfy = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" }));
-    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", vrfy);
+    await verifyModel({ executable: "python3", prefixArgs: [] }, "/tmp/models", CPU_PROFILE, vrfy);
     expect(vrfy.mock.calls[0][1][0]).toBe("-I");
     expect(vrfy.mock.calls[0][1][1]).toBe("-c");
   });
@@ -1723,7 +1872,7 @@ describe("readAsrState Execution Profile schema", () => {
     expect(state.failureCategory).toBeUndefined();
   });
 
-  it("recognizes the future CUDA profile but does not mark it ready before GPU support", () => {
+  it("reads a verified v2 CUDA profile", () => {
     expect(resolveExecutionProfile("cuda", "float16")).toEqual({
       device: "cuda",
       computeType: "float16",
@@ -1735,7 +1884,11 @@ describe("readAsrState Execution Profile schema", () => {
       compute_type: "float16",
     });
 
-    expect(state.kind).toBe("incomplete");
+    expect(state.kind).toBe("ready");
+    expect(state.executionProfile).toEqual({ device: "cuda", computeType: "float16" });
+    expect(state.deviceReadiness).toBe("ready");
+    expect(state.migrationStatus).toBe("completed");
+    expect(state.failureCategory).toBeUndefined();
   });
 
   it("accepts a sanitized GPU failure category on the CPU fallback profile", () => {
@@ -1795,6 +1948,42 @@ describe("writeAsrState Phase 2", () => {
     writeAsrState(stateFile, "base");
     const parsed = JSON.parse(fs.readFileSync(stateFile, "utf8"));
     expect(parsed.model).toBe("Systran/faster-whisper-base");
+  });
+
+  it("writes a verified CUDA profile", () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    writeAsrState(stateFile, "small", {
+      executionProfile: { device: "cuda", computeType: "float16" },
+    });
+
+    expect(JSON.parse(fs.readFileSync(stateFile, "utf8"))).toMatchObject({
+      device: "cuda",
+      compute_type: "float16",
+      device_readiness: "ready",
+      migration_status: "completed",
+    });
+  });
+
+  it("writes only a sanitized GPU failure category on a CPU fallback", () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    writeAsrState(stateFile, "small", {
+      executionProfile: { device: "cpu", computeType: "int8" },
+      failureCategory: "cuda_runtime_missing",
+    });
+
+    expect(JSON.parse(fs.readFileSync(stateFile, "utf8"))).toMatchObject({
+      device: "cpu",
+      compute_type: "int8",
+      failure_category: "cuda_runtime_missing",
+    });
+  });
+
+  it("rejects a CUDA profile paired with a failure category", () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    expect(() => writeAsrState(stateFile, "small", {
+      executionProfile: { device: "cuda", computeType: "float16" },
+      failureCategory: "no_nvidia_gpu",
+    })).toThrow("failure category");
   });
 
   it("throws for invalid model key", () => {
@@ -1885,10 +2074,21 @@ describe("runAsrInstallation with modelKey", () => {
     writeAsrState(stateFile, "tiny");
     expect(readAsrState(stateFile).kind).toBe("ready");
 
-    // Now install small — should invalidate tiny state and reinstall
+    // Now install small. The downloaded staging tree is published only after verification.
     let step = 0;
-    const outputs = ["Python 3.12.0\n", "", "", "DOWNLOADED\n", "VERIFIED\n"];
-    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: outputs[step++] ?? "", stderr: "" }));
+    const outputs = ["", "", "DOWNLOADED\n", "VERIFIED\n"];
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      const stdout = outputs[step++] ?? "";
+      if (stdout.trim() === "DOWNLOADED") {
+        const staging = args.find((arg) => arg.includes(".models-staging-"));
+        if (!staging) throw new Error("missing staging path");
+        for (const file of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+          fs.writeFileSync(path.join(staging, file), `new-${file}`);
+        }
+      }
+      return Promise.resolve({ code: 0, stdout, stderr: "" });
+    });
 
     const result = await runAsrInstallation({ spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase, modelKey: "small" });
     expect(result.success).toBe(true);
@@ -1904,7 +2104,7 @@ describe("runAsrInstallation with modelKey", () => {
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
   });
 
-  it("same-model ready state is idempotent (skips reinstall)", async () => {
+  it("same-model ready state reruns the selected readiness probe", async () => {
     const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-same-" + Date.now());
     fs.mkdirSync(tmpBase, { recursive: true });
     const stateFile = path.join(tmpBase, "state.json");
@@ -1918,16 +2118,28 @@ describe("runAsrInstallation with modelKey", () => {
     }
     writeAsrState(stateFile, "small");
 
-    const spawnFn = vi.fn();
-    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "small" });
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      return Promise.resolve({
+        code: 0,
+        stdout: args.includes("pip") || args.includes("venv") ? "" : "VERIFIED\n",
+        stderr: "",
+      });
+    });
+    const result = await runAsrInstallation({
+      spawnFn,
+      asrBase: tmpBase,
+      modelKey: "small",
+      devicePreference: "cpu",
+    });
     expect(result.success).toBe(true);
-    expect(result.pythonPath).toBe("already installed");
-    expect(spawnFn).not.toHaveBeenCalled();
+    expect(spawnFn).toHaveBeenCalledTimes(3);
+    expect(spawnFn.mock.calls[2][1].slice(-2)).toEqual(["cpu", "int8"]);
 
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
   });
 
-  it("promotes a same-model v1 state with one CPU probe and no reinstall", async () => {
+  it("promotes a same-model v1 state with a staged runtime and one CPU probe", async () => {
     const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), "bilibili-mcp-asr-v1-promote-"));
     const stateFile = path.join(tmpBase, "state.json");
     const binDir = path.join(tmpBase, "venv", os.platform() === "win32" ? "Scripts" : "bin");
@@ -1944,13 +2156,25 @@ describe("runAsrInstallation with modelKey", () => {
       model: ASR_PINNED_MODEL,
       revision: ASR_PINNED_REVISION,
     }));
-    const spawnFn = vi.fn(() => Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" }));
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      return Promise.resolve({
+        code: 0,
+        stdout: args.includes("pip") || args.includes("venv") ? "" : "VERIFIED\n",
+        stderr: "",
+      });
+    });
 
-    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "small" });
+    const result = await runAsrInstallation({
+      spawnFn,
+      asrBase: tmpBase,
+      modelKey: "small",
+      devicePreference: "cpu",
+    });
 
     expect(result.success).toBe(true);
-    expect(spawnFn).toHaveBeenCalledTimes(1);
-    expect(spawnFn.mock.calls[0][1]).toContain(path.join(tmpBase, "models"));
+    expect(spawnFn).toHaveBeenCalledTimes(3);
+    expect(spawnFn.mock.calls[2][1]).toContain(path.join(tmpBase, "models"));
     const state = readAsrState(stateFile);
     expect(state.executionProfile).toEqual({ device: "cpu", computeType: "int8" });
     expect(state.migrationStatus).toBe("completed");
@@ -1975,18 +2199,29 @@ describe("runAsrInstallation with modelKey", () => {
       revision: ASR_PINNED_REVISION,
     });
     fs.writeFileSync(stateFile, previous);
-    const spawnFn = vi.fn(() => Promise.resolve({ code: 1, stdout: "", stderr: "probe failed" }));
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      return Promise.resolve({ code: 23, stdout: "FAILED:model_probe_failed\n", stderr: "probe failed" });
+    });
 
-    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "small" });
+    const result = await runAsrInstallation({
+      spawnFn,
+      asrBase: tmpBase,
+      modelKey: "small",
+      devicePreference: "cpu",
+    });
 
     expect(result.success).toBe(false);
-    expect(spawnFn).toHaveBeenCalledTimes(1);
+    expect(spawnFn).toHaveBeenCalledTimes(3);
     expect(fs.readFileSync(stateFile, "utf8")).toBe(previous);
     expect(readAsrState(stateFile).migrationStatus).toBe("pending");
     fs.rmSync(tmpBase, { recursive: true, force: true });
   });
 
-  it("already-installed tiny is idempotent with explicit modelKey", async () => {
+  it("already-installed tiny reruns readiness with explicit modelKey", async () => {
     const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-tidem-" + Date.now());
     fs.mkdirSync(tmpBase, { recursive: true });
     const stateFile = path.join(tmpBase, "state.json");
@@ -2000,10 +2235,22 @@ describe("runAsrInstallation with modelKey", () => {
     }
     writeAsrState(stateFile, "tiny");
 
-    const spawnFn = vi.fn();
-    const result = await runAsrInstallation({ spawnFn, asrBase: tmpBase, modelKey: "tiny" });
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      return Promise.resolve({
+        code: 0,
+        stdout: args.includes("pip") || args.includes("venv") ? "" : "VERIFIED\n",
+        stderr: "",
+      });
+    });
+    const result = await runAsrInstallation({
+      spawnFn,
+      asrBase: tmpBase,
+      modelKey: "tiny",
+      devicePreference: "cpu",
+    });
     expect(result.success).toBe(true);
-    expect(spawnFn).not.toHaveBeenCalled();
+    expect(spawnFn).toHaveBeenCalledTimes(3);
 
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
   });
@@ -2036,7 +2283,7 @@ describe("runAsrInstallation with modelKey", () => {
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
   });
 
-  it("model-switch failure: ready tiny → switch to small, verify fails → incomplete", async () => {
+  it("model-switch failure preserves the ready tiny state and model", async () => {
     const tmpBase = path.join(os.tmpdir(), "bilibili-mcp-asr-p2-swfail-" + Date.now());
     fs.mkdirSync(tmpBase, { recursive: true });
     const stateFile = path.join(tmpBase, "state.json");
@@ -2052,6 +2299,8 @@ describe("runAsrInstallation with modelKey", () => {
     }
     writeAsrState(stateFile, "tiny");
     expect(readAsrState(stateFile).kind).toBe("ready");
+    const previousState = fs.readFileSync(stateFile, "utf8");
+    const previousModel = fs.readFileSync(path.join(modelsDir, "model.bin"), "utf8");
 
     // Switch to small — pass discovery/venv/pip/download, fail verify
     let step = 0;
@@ -2070,10 +2319,12 @@ describe("runAsrInstallation with modelKey", () => {
 
     const result = await runAsrInstallation({
       spawnFn, fsMkdirSync: fs.mkdirSync, asrBase: tmpBase, modelKey: "small",
+      devicePreference: "cpu",
     });
     expect(result.success).toBe(false);
-    // Old tiny ready marker must be gone → state is incomplete
-    expect(readAsrState(stateFile).kind).toBe("incomplete");
+    expect(fs.readFileSync(stateFile, "utf8")).toBe(previousState);
+    expect(fs.readFileSync(path.join(modelsDir, "model.bin"), "utf8")).toBe(previousModel);
+    expect(readAsrState(stateFile)).toMatchObject({ kind: "ready", modelKey: "tiny" });
 
     try { fs.rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ok */ }
   });
@@ -2321,5 +2572,544 @@ describe("ASR installer staging containment", () => {
     expect(serialized).not.toContain("synthetic-secret");
     expect(serialized).not.toContain("synthetic-proxy");
     expect(serialized).not.toContain("synthetic-private-path");
+  });
+});
+
+describe("runAsrInstallation device readiness", () => {
+  function readyInstall(
+    modelKey: AsrModelKey = "small",
+    executionProfile = CPU_PROFILE,
+  ): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "bilibili-mcp-asr-device-"));
+    const binDir = path.join(root, "venv", process.platform === "win32" ? "Scripts" : "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, process.platform === "win32" ? "python.exe" : "python"), "fake");
+    const modelDir = path.join(root, "models");
+    fs.mkdirSync(modelDir, { recursive: true });
+    for (const file of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+      fs.writeFileSync(path.join(modelDir, file), `old-${modelKey}`);
+    }
+    writeAsrState(path.join(root, "state.json"), modelKey, { executionProfile });
+    return root;
+  }
+
+  it("explicit CPU reruns only CPU readiness and saves cpu/int8", async () => {
+    const root = readyInstall();
+    const profiles: string[] = [];
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv")) return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      if (args.includes("pip")) return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      profiles.push(args.slice(-2).join("/"));
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        devicePreference: "cpu",
+        spawnFn,
+      });
+
+      expect(result).toMatchObject({
+        success: true,
+        executionProfile: CPU_PROFILE,
+      });
+      expect(profiles).toEqual(["cpu/int8"]);
+      expect(readAsrState(path.join(root, "state.json")).executionProfile).toEqual(CPU_PROFILE);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses an explicit Python override to rebuild a ready same-model runtime", async () => {
+    const root = readyInstall();
+    const override = "/synthetic/python";
+    const spawnFn = vi.fn((file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (file === override && args.includes("--version")) {
+        return Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" });
+      }
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        pythonOverride: override,
+        devicePreference: "cpu",
+        spawnFn,
+      });
+
+      expect(result.success).toBe(true);
+      expect(spawnFn).toHaveBeenCalledWith(override, ["-I", "--version"]);
+      expect(spawnFn.mock.calls.some(([file, args]) =>
+        file === override && args.includes("venv"),
+      )).toBe(true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses an explicit Python override while staging a ready model switch", async () => {
+    const root = readyInstall("tiny");
+    const override = "/synthetic/python";
+    const spawnFn = vi.fn((file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (file === override && args.includes("--version")) {
+        return Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" });
+      }
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      if (args.some((arg) => arg.includes("snapshot_download"))) {
+        const staging = args.find((arg) => arg.includes(".models-staging-"));
+        if (!staging) throw new Error("missing staging path");
+        for (const fileName of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+          fs.writeFileSync(path.join(staging, fileName), `new-${fileName}`);
+        }
+        return Promise.resolve({ code: 0, stdout: "DOWNLOADED\n", stderr: "" });
+      }
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        modelKey: "small",
+        pythonOverride: override,
+        devicePreference: "cpu",
+        spawnFn,
+      });
+
+      expect(result.success).toBe(true);
+      expect(spawnFn).toHaveBeenCalledWith(override, ["-I", "--version"]);
+      expect(spawnFn.mock.calls.some(([file, args]) =>
+        file === override && args.includes("venv"),
+      )).toBe(true);
+      expect(readAsrState(path.join(root, "state.json")).modelKey).toBe("small");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("labels an explicit CPU probe failure as CPU readiness", async () => {
+    const root = readyInstall();
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      return Promise.resolve({
+        code: 23,
+        stdout: "FAILED:model_probe_failed\n",
+        stderr: "private CPU error",
+      });
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        devicePreference: "cpu",
+        spawnFn,
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        failureCategory: "model_probe_failed",
+        failureDevice: "cpu",
+      });
+      expect(result.gpuFailureCategory).toBeUndefined();
+      expect(JSON.stringify(result)).not.toContain("private CPU error");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("auto saves CUDA when the real GPU probe succeeds", async () => {
+    const root = readyInstall();
+    const profiles: string[] = [];
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv")) return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      if (args.includes("pip")) return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      profiles.push(args.slice(-2).join("/"));
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({ asrBase: root, spawnFn });
+      expect(result).toMatchObject({ success: true, executionProfile: CUDA_PROFILE });
+      expect(profiles).toEqual(["cuda/float16"]);
+      expect(readAsrState(path.join(root, "state.json")).executionProfile).toEqual(CUDA_PROFILE);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reports success when post-publication runtime backup cleanup fails", async () => {
+    const root = readyInstall();
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+    const originalRmSync = fs.rmSync.bind(fs);
+    const rmSpy = vi.spyOn(fs, "rmSync").mockImplementation((candidate, options) => {
+      if (String(candidate).includes(".venv-backup-")) {
+        throw new Error("cleanup denied");
+      }
+      return originalRmSync(candidate, options);
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        devicePreference: "cpu",
+        spawnFn,
+      });
+
+      expect(result).toMatchObject({ success: true, executionProfile: CPU_PROFILE });
+      expect(readAsrState(path.join(root, "state.json"))).toMatchObject({
+        kind: "ready",
+        executionProfile: CPU_PROFILE,
+      });
+    } finally {
+      rmSpy.mockRestore();
+      originalRmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("auto records a sanitized category only after CPU fallback also succeeds", async () => {
+    const root = readyInstall();
+    const profiles: string[] = [];
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv")) return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      if (args.includes("pip")) return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      const profile = args.slice(-2).join("/");
+      profiles.push(profile);
+      return profile === "cuda/float16"
+        ? Promise.resolve({
+            code: 21,
+            stdout: "FAILED:cuda_runtime_missing\n",
+            stderr: "raw C:\\private\\cublas.dll TOKEN=secret",
+          })
+        : Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({ asrBase: root, spawnFn });
+      expect(result).toMatchObject({
+        success: true,
+        executionProfile: CPU_PROFILE,
+        failureCategory: "cuda_runtime_missing",
+      });
+      expect(profiles).toEqual(["cuda/float16", "cpu/int8"]);
+      expect(readAsrState(path.join(root, "state.json"))).toMatchObject({
+        executionProfile: CPU_PROFILE,
+        failureCategory: "cuda_runtime_missing",
+      });
+      expect(JSON.stringify(result)).not.toContain("private");
+      expect(JSON.stringify(result)).not.toContain("TOKEN");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps both sanitized categories when auto GPU and CPU probes fail", async () => {
+    const root = readyInstall();
+    const previous = fs.readFileSync(path.join(root, "state.json"), "utf8");
+    const profiles: string[] = [];
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      const profile = args.slice(-2).join("/");
+      profiles.push(profile);
+      return profile === "cuda/float16"
+        ? Promise.resolve({ code: 21, stdout: "FAILED:cuda_runtime_missing\n", stderr: "private GPU" })
+        : Promise.resolve({ code: 23, stdout: "FAILED:model_probe_failed\n", stderr: "private CPU" });
+    });
+
+    try {
+      const result = await runAsrInstallation({ asrBase: root, spawnFn });
+      expect(result).toMatchObject({
+        success: false,
+        failureCategory: "model_probe_failed",
+        failureDevice: "cpu",
+        gpuFailureCategory: "cuda_runtime_missing",
+      });
+      expect(profiles).toEqual(["cuda/float16", "cpu/int8"]);
+      expect(fs.readFileSync(path.join(root, "state.json"), "utf8")).toBe(previous);
+      expect(JSON.stringify(result)).not.toContain("private GPU");
+      expect(JSON.stringify(result)).not.toContain("private CPU");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("explicit CUDA failure preserves the prior verified state without CPU fallback", async () => {
+    const root = readyInstall();
+    const previous = fs.readFileSync(path.join(root, "state.json"), "utf8");
+    const runtimeMarker = path.join(root, "venv", "runtime-marker.txt");
+    fs.writeFileSync(runtimeMarker, "previous-runtime");
+    const profiles: string[] = [];
+    const pipExecutables: string[] = [];
+    const spawnFn = vi.fn((file: string, args: string[]) => {
+      if (args.includes("venv")) return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      if (args.includes("pip")) {
+        pipExecutables.push(file);
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      profiles.push(args.slice(-2).join("/"));
+      return Promise.resolve({
+        code: 20,
+        stdout: "FAILED:no_nvidia_gpu\n",
+        stderr: "raw private details",
+      });
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        devicePreference: "cuda",
+        spawnFn,
+      });
+      expect(result).toMatchObject({ success: false, failureCategory: "no_nvidia_gpu" });
+      expect(profiles).toEqual(["cuda/float16"]);
+      expect(pipExecutables).toHaveLength(1);
+      expect(pipExecutables[0]).toContain(".venv-staging-");
+      expect(fs.readFileSync(runtimeMarker, "utf8")).toBe("previous-runtime");
+      expect(fs.readFileSync(path.join(root, "state.json"), "utf8")).toBe(previous);
+      expect(JSON.stringify(result)).not.toContain("private");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an invalid device preference before subprocess or mutation", async () => {
+    const root = readyInstall();
+    const previous = fs.readFileSync(path.join(root, "state.json"), "utf8");
+    const spawnFn = vi.fn();
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        devicePreference: "gpu" as never,
+        spawnFn,
+      });
+      expect(result.success).toBe(false);
+      expect(spawnFn).not.toHaveBeenCalled();
+      expect(fs.readFileSync(path.join(root, "state.json"), "utf8")).toBe(previous);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("model-switch CUDA failure keeps the previous model and profile", async () => {
+    const root = readyInstall("tiny");
+    const stateFile = path.join(root, "state.json");
+    const previousState = fs.readFileSync(stateFile, "utf8");
+    const oldModel = fs.readFileSync(path.join(root, "models", "model.bin"), "utf8");
+    const runtimeMarker = path.join(root, "venv", "runtime-marker.txt");
+    fs.writeFileSync(runtimeMarker, "previous-runtime");
+    const pipExecutables: string[] = [];
+    const spawnFn = vi.fn((file: string, args: string[]) => {
+      if (args.includes("--version")) return Promise.resolve({ code: 0, stdout: "Python 3.12.0\n", stderr: "" });
+      if (args.includes("venv")) return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      if (args.includes("pip")) {
+        pipExecutables.push(file);
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      if (args.some((arg) => arg.includes("snapshot_download"))) {
+        return Promise.resolve({ code: 0, stdout: "DOWNLOADED\n", stderr: "" });
+      }
+      if (args.slice(-2).join("/") === "cuda/float16") {
+        return Promise.resolve({ code: 21, stdout: "FAILED:cuda_runtime_missing\n", stderr: "private" });
+      }
+      return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        modelKey: "small",
+        devicePreference: "cuda",
+        spawnFn,
+      });
+      expect(result).toMatchObject({ success: false, failureCategory: "cuda_runtime_missing" });
+      expect(fs.readFileSync(stateFile, "utf8")).toBe(previousState);
+      expect(fs.readFileSync(path.join(root, "models", "model.bin"), "utf8")).toBe(oldModel);
+      expect(fs.readFileSync(runtimeMarker, "utf8")).toBe("previous-runtime");
+      expect(pipExecutables).toHaveLength(1);
+      expect(pipExecutables[0]).toContain(".venv-staging-");
+      expect(readAsrState(stateFile).modelKey).toBe("tiny");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not publish CPU fallback when the GPU probe WAV cannot be removed", async () => {
+    const root = readyInstall();
+    const stateFile = path.join(root, "state.json");
+    const previousState = fs.readFileSync(stateFile, "utf8");
+    const profiles: string[] = [];
+    let orphanedProbe = "";
+    const originalUnlinkSync = fs.unlinkSync.bind(fs);
+    const unlinkSpy = vi.spyOn(fs, "unlinkSync").mockImplementation((candidate) => {
+      const probe = String(candidate);
+      if (
+        orphanedProbe === "" &&
+        path.basename(probe).startsWith(".bilibili-mcp-asr-probe-")
+      ) {
+        orphanedProbe = probe;
+        throw new Error("cleanup denied");
+      }
+      return originalUnlinkSync(candidate);
+    });
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      profiles.push(args.slice(-2).join("/"));
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({ asrBase: root, spawnFn });
+
+      expect(result).toMatchObject({
+        success: false,
+        failureCategory: "model_probe_failed",
+        failureDevice: "cuda",
+      });
+      expect(profiles).toEqual(["cuda/float16"]);
+      expect(fs.readFileSync(stateFile, "utf8")).toBe(previousState);
+      expect(orphanedProbe).not.toBe("");
+      expect(fs.existsSync(orphanedProbe)).toBe(true);
+    } finally {
+      unlinkSpy.mockRestore();
+      if (orphanedProbe && fs.existsSync(orphanedProbe)) {
+        originalUnlinkSync(orphanedProbe);
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when state publication and model rollback both fail", async () => {
+    const root = readyInstall("tiny");
+    const stateFile = path.join(root, "state.json");
+    const modelDir = path.join(root, "models");
+    let statePublicationFailed = false;
+    const originalRenameSync = fs.renameSync.bind(fs);
+    const originalRmSync = fs.rmSync.bind(fs);
+    const renameSpy = vi.spyOn(fs, "renameSync").mockImplementation((source, destination) => {
+      if (
+        path.dirname(String(source)) === root &&
+        path.basename(String(source)).startsWith(".state-") &&
+        path.extname(String(source)) === ".tmp" &&
+        String(destination) === stateFile
+      ) {
+        statePublicationFailed = true;
+        throw new Error("state publication denied");
+      }
+      return originalRenameSync(source, destination);
+    });
+    const rmSpy = vi.spyOn(fs, "rmSync").mockImplementation((candidate, options) => {
+      if (statePublicationFailed && String(candidate) === modelDir) {
+        throw new Error("model rollback denied");
+      }
+      return originalRmSync(candidate, options);
+    });
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      if (args.some((arg) => arg.includes("snapshot_download"))) {
+        const staging = args.find((arg) => arg.includes(".models-staging-"));
+        if (!staging) throw new Error("missing staging path");
+        for (const file of ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]) {
+          fs.writeFileSync(path.join(staging, file), `new-small-${file}`);
+        }
+        return Promise.resolve({ code: 0, stdout: "DOWNLOADED\n", stderr: "" });
+      }
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        modelKey: "small",
+        devicePreference: "cuda",
+        spawnFn,
+      });
+
+      expect(result).toMatchObject({
+        success: false,
+        error: "ASR setup failed and the previous installation could not be restored",
+      });
+      expect(fs.existsSync(stateFile)).toBe(false);
+      expect(readAsrState(stateFile).kind).toBe("incomplete");
+      expect(fs.readFileSync(path.join(modelDir, "model.bin"), "utf8")).toBe(
+        "new-small-model.bin",
+      );
+      expect(
+        fs.readdirSync(root).some((entry) => entry.startsWith(".state-backup-")),
+      ).toBe(true);
+    } finally {
+      renameSpy.mockRestore();
+      rmSpy.mockRestore();
+      originalRmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the old runtime when its backup rename fails", async () => {
+    const root = readyInstall();
+    const stateFile = path.join(root, "state.json");
+    const runtimeMarker = path.join(root, "venv", "runtime-marker.txt");
+    const previousState = fs.readFileSync(stateFile, "utf8");
+    fs.writeFileSync(runtimeMarker, "previous-runtime");
+    const originalRenameSync = fs.renameSync.bind(fs);
+    const renameSpy = vi.spyOn(fs, "renameSync").mockImplementation((source, destination) => {
+      if (
+        String(source) === path.join(root, "venv") &&
+        path.basename(String(destination)).startsWith(".venv-backup-")
+      ) {
+        throw new Error("runtime backup denied");
+      }
+      return originalRenameSync(source, destination);
+    });
+    const spawnFn = vi.fn((_file: string, args: string[]) => {
+      materializeMockVenv(args);
+      if (args.includes("venv") || args.includes("pip")) {
+        return Promise.resolve({ code: 0, stdout: "", stderr: "" });
+      }
+      return Promise.resolve({ code: 0, stdout: "VERIFIED\n", stderr: "" });
+    });
+
+    try {
+      const result = await runAsrInstallation({
+        asrBase: root,
+        devicePreference: "cpu",
+        spawnFn,
+      });
+
+      expect(result.success).toBe(false);
+      expect(fs.readFileSync(runtimeMarker, "utf8")).toBe("previous-runtime");
+      expect(fs.readFileSync(stateFile, "utf8")).toBe(previousState);
+      expect(readAsrState(stateFile).kind).toBe("ready");
+    } finally {
+      renameSpy.mockRestore();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

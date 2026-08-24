@@ -72,7 +72,8 @@ Please help me install the Bilibili MCP server: @xzxzzx/bilibili-mcp.
    local ASR model. This is a local-only operation — do not answer for me or
    handle model files; let me follow the prompt, type y to continue or press
    Enter to skip [y/N]. After choosing to install, three model options are
-   shown; I select on my own or press Enter for the recommended small.
+   shown; I select on my own or press Enter for the recommended small, then
+   choose auto, cpu, or cuda (default: auto).
    After installation, I may explicitly set fallback_to_asr=true on
    get_video_transcript when I need no-subtitle fallback. Default calls never
    run ASR, and MCP calls never download or switch models.
@@ -80,7 +81,9 @@ Please help me install the Bilibili MCP server: @xzxzzx/bilibili-mcp.
    uses already-loadable credentials from environment variables or the global
    config file, never reading credential values from stdin/argv and never prompting. Without
    --asr-model it confirms loadability and exits successfully (exit 0); adding
-   --asr-model <tiny|base|small> installs that model (requires --non-interactive).
+   --asr-model <tiny|base|small> installs that model, and
+   --asr-device <auto|cpu|cuda> selects the device preference (default: auto;
+   both options require --non-interactive).
 
 6. After configuration, restart or reconnect this MCP server so it reloads
    the credentials.
@@ -1356,15 +1359,18 @@ After credentials are configured, `setup` asks whether to install an optional lo
 - After choosing Yes, three model choices are displayed:
   - `1. tiny` (~78.2 MB) — Speed-first: suited to quick extraction and initial review of long videos, with relatively lower accuracy
   - `2. base` (~148 MB) — Balanced: balances speed, quality, and resource use
-  - `3. small` (~486 MB) — Quality-first: higher CPU time and memory use; [recommended], selected on Enter
+  - `3. small` (~486 MB) — Quality-first: higher runtime and memory use; [recommended], selected on Enter
 - Enter `1/2/3` or `tiny/base/small` to choose; invalid input re-prompts without starting installation.
-- Runtime is fixed at `faster-whisper==1.2.1` plus runtime library overhead.
+- Then choose `auto/cpu/cuda`; Enter defaults to `auto`. `auto` fully checks the GPU first and explains a sanitized failure before verifying CPU fallback; `cpu` skips the GPU; explicit `cuda` fails without fallback.
+- Non-interactive form: `setup --non-interactive --asr-model <tiny|base|small> --asr-device <auto|cpu|cuda>`. Omitting `--asr-device` also defaults to `auto`.
+- Runtime is fixed at `faster-whisper==1.2.1` and `ctranslate2==4.8.0`, plus runtime library overhead.
 - Requires Python 3.9+ on the machine. Set the `BILIBILI_ASR_PYTHON` environment variable to override the Python executable.
 - Installation lives in the user-managed `~/.bilibili-mcp/asr/` directory; it does not mutate the system Python.
-- One active model per directory; switching models clears the old ready state.
-- After installation, the model is verified through a CPU INT8 load; system FFmpeg is not required (PyAV bundles the relevant FFmpeg libraries).
-- A failed installation leaves no ready marker; partial downloads are preserved and `setup` can resume from them.
-- The `doctor --json` `asr.status` and `asr.model` fields are informational only; they do not affect credential exit codes.
+- One active model per directory; a failed model switch or explicit CUDA check does not replace the previously verified model and Profile.
+- Readiness uses the chosen local model and a generated fixed short WAV to load the model, run minimal transcription, and fully consume the result; the WAV is then removed and no Bilibili request is made. System FFmpeg is not required (PyAV bundles the relevant libraries).
+- The project does not install or modify NVIDIA drivers, CUDA, cuBLAS, cuDNN, the system `PATH`, `LD_LIBRARY_PATH`, or global Python. After a GPU failure, keep the verified CPU profile or repair the environment and rerun `setup`; every rerun checks readiness again.
+- A failed new install leaves no ready state; an existing ready configuration remains unchanged on failure.
+- The `doctor --json` `asr.status`, `asr.model`, `device`, `compute_type`, `device_readiness`, and `failure_category` fields are informational only; they do not affect credential exit codes.
 - MCP calls never download or switch models; they use only the current model reported ready by `doctor --json`.
 - `get_video_transcript` runs ASR only with explicit `fallback_to_asr: true` after subtitles are definitively unavailable. Native subtitles and Cookie/API/network failures never trigger it.
 - ASR processes one resolved Part, capped at two hours and 128 MiB of temporary audio, with one active job and no queue.

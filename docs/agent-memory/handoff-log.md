@@ -529,3 +529,25 @@
   unverified (`BV1ybuQ62EfK` exposes no target subtitle; no real ASR/model run
   authorized); no commit/push/PR/Issue/release; corrupt-body/ASR live
   verification remains a named follow-up for Codex.
+
+## 2026-08-24 Issue #66 CUDA Device Readiness
+
+- Owner: Codex executed directly after the user invoked Matt `implement`; Paseo
+  was intentionally not used under the user's standing direction.
+- Objective: add `auto | cpu | cuda` setup semantics, exact GPU runtime pinning,
+  real model inference readiness, sanitized failure guidance, CPU fallback for
+  auto only, and transactional preservation of a previous verified install.
+- Result: implementation, bilingual docs, research, QA, durable memory, and
+  deterministic tests completed. Final review added fail-closed state handling
+  for incomplete rollback and stopped auto fallback after probe cleanup failure.
+  Independent reviewers closed every code and scope finding; focused tests,
+  full suite, build, and isolated CPU setup/runner smoke pass.
+- Hardware acceptance: after the expected `cuda_runtime_missing` result without
+  external libraries, a disposable NVIDIA CUDA 12 environment supplied only a
+  process-local `PATH`; exact-pair setup published `cuda/float16` and the actual
+  runner returned a non-empty transcript. Persistent host configuration and the
+  user installation remained unchanged.
+- Boundary: Linux GPU remains unverified and #67 still owns first-ASR automatic
+  migration. No commit, push, PR, merge, Issue close, tag, release, or
+  publication occurred. Report:
+  `docs/agent-memory/executions/2026-08-24-github-66-codex-direct-report.md`.
