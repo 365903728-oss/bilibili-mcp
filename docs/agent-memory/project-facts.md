@@ -1,5 +1,11 @@
 # Project Facts
 
+## 2026-08-24
+
+- Fact: `v1.13.1` is the current published product baseline on npm, GitHub Releases, and the Official MCP Registry, with twelve MCP tools.
+- Evidence: release commit `d791e0c3c32650b8d7b38bfd670a902bce2d8cc0`, annotated tag `v1.13.1`, trusted-publish run `32687900597`, npm exact/latest metadata and SLSA provenance, the public bilingual GitHub Release, and the Official Registry API exact/latest response.
+- Impact: Node 25 pinned-HTTPS compatibility, Fake-IP DNS diagnosis, ASR Model Tiers, controlled CPU/CUDA Execution Profiles, CUDA readiness, and first-request v1 migration are public in `@xzxzzx/bilibili-mcp@1.13.1`; Official Registry `1.13.1` is `active` and `isLatest=true` with matching npm metadata.
+
 ## 2026-08-20
 
 - Fact: `v1.13.0` is the current published product baseline on npm, GitHub Releases, and the Official MCP Registry, with twelve MCP tools.

@@ -773,3 +773,26 @@ Candidate metrics:
   Publisher 1.8.1 path. An expired saved JWT and one response EOF were handled
   with value-free authentication refresh, public-state checks, and one bounded
   retry; no package, workflow, tag, or product change was needed.
+
+### 2026-08-24 Harness Eval: v1.13.1 ASR GPU and Fake-IP release
+
+- Keep: the isolated release worktree, five-field version parity, bilingual
+  changelog/Release notes, exact package smoke, independent release-verifier,
+  immutable annotated-tag sequence, trusted npm workflow, and post-publication
+  Registry exact/latest checks all produced direct evidence without runtime,
+  dependency, workflow, credential, or system CUDA edits.
+- The canonical package/durable-memory/outer receipt chain caught the expected
+  `1.13.0` to `1.13.1` drift before publication. Mechanical regeneration plus
+  exact conformance 1/1 and core 102/102 (15 environment skips) closed it.
+- The saved Registry JWT was expired, and one post-login validation plus one
+  public API read hit FlClash Fake-IP connectivity. One bounded Publisher retry
+  succeeded; final read-only verification used the existing local mixed-port
+  so the Registry hostname was resolved by the proxy without changing system
+  DNS, TUN/rule mode, or repository configuration.
+- GitHub Actions again emitted the non-blocking older-action-runtime Node 20 to
+  Node 24 annotation. The trusted publish passed; action revision maintenance
+  remains a separate task.
+- Metrics: 44 test files / 1152 tests; 193 package files; 97 production
+  dependencies / 0 vulnerabilities; 98 verified dependency signatures; 10
+  attestations; twelve public MCP tools; one release-verifier PASS; zero
+  credential-bearing Bilibili calls.

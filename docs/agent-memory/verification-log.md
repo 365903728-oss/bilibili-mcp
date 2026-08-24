@@ -2730,3 +2730,29 @@ Six release blockers fixed; one regression proof per root cause (new tests
   conformance check passed 1/1 and core passed 102 tests with 15 existing
   environment skips. No commit, push, PR, merge, Issue close, release, or
   publication occurred.
+
+## 2026-08-24 — v1.13.1 Publication
+
+- Release source: isolated worktree from merged `master` baseline
+  `fae3e77b8e3c5fa54984be1368994a19fc53211d`; release commit
+  `d791e0c3c32650b8d7b38bfd670a902bce2d8cc0` fast-forwarded without force.
+  Annotated `v1.13.1` peels to that exact commit.
+- Local gates: TypeScript build, 44 files / 1152 Vitest tests, 193-file package
+  dry run, production audit with 97 dependencies / zero vulnerabilities,
+  release diff/artifact Gitleaks, CLI `1.13.1`, twelve-tool stdio smoke, exact
+  Harness conformance 1/1, core Harness 102/102 with 15 environment skips, and
+  independent release-verifier all passed.
+- npm: trusted-publish run `32687900597` passed test/build/publish. Public
+  exact/latest metadata reports `1.13.1`, gitHead `d791e0c3...`, SHA-512
+  integrity, one package signature, and SLSA provenance. An isolated exact
+  install passed CLI/MCP smoke and `npm audit signatures` verified 98 registry
+  signatures plus 10 attestations.
+- GitHub and Registry: the bilingual GitHub Release is public/latest,
+  non-draft, and non-prerelease. Official Publisher 1.8.1 was checked against
+  SHA-256 `399ad0d6e00a50812b563a71d8bfbff5160c085e6b13aac6ec083d98d5ff7c45`;
+  Registry exact/latest reports `1.13.1` `active`/`isLatest=true` with matching
+  `@xzxzzx/bilibili-mcp@1.13.1` metadata.
+- Boundaries: Windows real CUDA evidence comes from accepted Issue #66 QA;
+  Linux GPU remains an explicit non-hardware-verified boundary. No Bilibili
+  credential-bearing request, tag move, force push, workflow edit, runtime
+  change, dependency change, or system proxy/DNS configuration change occurred.

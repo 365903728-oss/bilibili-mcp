@@ -2,18 +2,12 @@
 
 ## Current Product Release
 
-The user authorized release candidate `v1.13.1` after parent Issue #55 and
-child Issues #64-#67 closed. Work is isolated on
-`codex/release-1.13.1` from exact merged baseline
-`fae3e77b8e3c5fa54984be1368994a19fc53211d`; the dirty primary checkout is
-outside the release path. Scope is limited to synchronized package/Registry
-versions, bilingual changelogs and GitHub Release notes, trusted npm
-publication, and Official MCP Registry publication. The merged product range
-also contains the Node 25 lookup repair and Fake-IP DNS diagnostics from
-Issues #54 and #57-#59. Runtime, dependency, workflow, MCP schema, credential,
-and system CUDA behavior are not release-prep edit surfaces. Publication must
-stop if local/package/security/Harness verification fails, remote `master`
-moves, `1.13.1` becomes occupied, or the trusted publish cannot be verified.
+`v1.13.1` is the current published baseline. Annotated tag `v1.13.1` peels to
+release commit `d791e0c3c32650b8d7b38bfd670a902bce2d8cc0`; trusted-publish run
+`32687900597` published npm `latest` with provenance, the bilingual GitHub
+Release is public/latest, and Official MCP Registry `1.13.1` is
+`active`/`isLatest=true`. There is no active release task. The dirty primary
+checkout remained outside the isolated release path.
 
 ## Harness v2
 
