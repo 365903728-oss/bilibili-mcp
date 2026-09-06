@@ -946,3 +946,25 @@
   environment details.
 - Evidence: signal-aware subprocess and migration tests, disposable Windows
   exact-pin smoke, logger boundary review, and diff secret scan.
+
+## 2026-09-04
+
+- Decision: Pursue broader adoption through a read-first MCP/CLI capability layer. Built-in notes, commentary generation, RAG, and an end-to-end Web UI are not part of the next product stage; account mutations remain a separately decided creator-oriented candidate rather than an ordinary extension of read tools.
+- Reason: The user wants more people to find useful capabilities in the product while keeping its main job focused on reading Bilibili content through MCP or CLI and limiting built-in write behavior.
+- Evidence: The 2026-09-04 `grill-with-docs` product-direction interview and `docs/adr/0002-read-first-mcp-cli-product-direction.md`.
+
+- Decision: Serve both Evidence Users and Workflow Integrators, and measure growth without adding product telemetry.
+- Reason: Students, ordinary users, and developers may use the MCP directly or compose it into Agent workflows, while monitoring individual usage would violate the project's desired privacy posture.
+- Evidence: The 2026-09-04 `grill-with-docs` interview, `CONTEXT.md`, and `docs/adr/0003-measure-adoption-without-product-telemetry.md`.
+
+- Decision: Make installation, login, and first successful use the next growth problem; retain local QR login as the first product-discovery candidate and defer the content-command relationship between CLI and MCP.
+- Reason: Lowering first-use friction is the selected prerequisite for broader adoption, while the user has not yet chosen whether CLI should expose content reads or only support MCP setup and diagnostics.
+- Evidence: The 2026-09-04 `grill-with-docs` interview and the P2 candidate section in `ROADMAP.md`.
+
+- Decision: Use a capacity-based dual track without allowing maintenance to replace product development indefinitely.
+- Reason: Small, evidence-backed maintenance tasks fit short availability windows, but repeatedly defaulting to optimization could prevent any new capability from reaching development. When a full development window becomes available, the roadmap returns to QR-login discovery by default.
+- Evidence: The user accepted the dual-track rule during the 2026-09-04 `grill-with-docs` interview and explicitly deferred deciding the scope of future optimization work.
+
+- Decision: Treat Local Source Export as a future, non-generative content capability distinct from both Account Mutation and an embedded knowledge application.
+- Reason: The current MCP can return transcripts to an Agent but cannot guarantee complete, unchanged local persistence. A bounded export can close that last mile without changing Bilibili state or owning notes, RAG, or storage workflows.
+- Evidence: The user's 2026-09-04 product discussion and the P2 candidate in `ROADMAP.md`.

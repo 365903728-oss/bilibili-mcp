@@ -318,6 +318,9 @@ Before release-oriented work, verify local package state with `npm pack --dry-ru
 - `docs/agent-memory/active-work.md`: current Matt/GitHub work pointer and explicit no-Superpowers rule.
 - `C:\Users\ZX\.paseo\orchestration-preferences.json`: live provider routing for Paseo-managed implementation; read before launch and do not copy model choices into repository config.
 - `docs/agent-memory/context-budget-report.md`: context overhead audit for always-loaded rules and hooks.
+- `ROADMAP.md`: single long-term product and engineering direction index; candidate entries do not authorize implementation.
+- `CONTEXT.md`: canonical Bilibili product and evidence terminology.
+- `docs/adr/`: durable product and architecture decisions that meet the ADR threshold.
 - `docs/templates/task-ticket.md`: optional execution-ticket template used under the three-tier ticket standard.
 - `docs/templates/research-note.md`: external-fact research cache template.
 - `docs/templates/qa-checklist.md`: human-facing QA checklist template for release/install/MCP/credential/client flows.

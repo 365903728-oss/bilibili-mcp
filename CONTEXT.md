@@ -4,6 +4,34 @@ This context defines the language used when reading navigable video content thro
 
 ## Language
 
+**MCP/CLI Capability Layer**:
+The product surface that exposes Bilibili capabilities through MCP tools and a local CLI without owning an end-to-end notes, RAG, or Web application.
+_Avoid_: Built-in knowledge app, all-in-one video workspace
+
+**Reading Capability**:
+An operation whose purpose is to retrieve and normalize Bilibili content, evidence, or account-visible state without intentionally changing platform state. Reading is the product's primary capability family.
+_Avoid_: Passive automation, harmless API
+
+**Local Source Export**:
+A non-generative operation that persists retrieved Bilibili content and provenance as a user-local artifact without changing Bilibili account or platform state.
+_Avoid_: Account Mutation, AI note, knowledge sync
+
+**Account Mutation**:
+An operation that intentionally changes Bilibili account or platform state, such as publishing, deleting, commenting, liking, following, or sending danmaku. It is a separate capability family, not an implied extension of Reading Capability.
+_Avoid_: Ordinary write, engagement helper
+
+**Evidence User**:
+A student or other user who asks an Agent to discover, read, navigate, or cite Bilibili-origin content through the MCP server.
+_Avoid_: Viewer persona, consumer only
+
+**Workflow Integrator**:
+A developer or advanced user who composes the MCP server's bounded capabilities into an Agent or automation workflow.
+_Avoid_: Built-in workflow user, hosted-platform customer
+
+**Public Adoption Signal**:
+An aggregate external indicator such as GitHub Stars, npm downloads, forks, or voluntary issues and discussions. It does not include product telemetry or tracking an individual's MCP calls.
+_Avoid_: User analytics, active-user tracking
+
 **Bilibili-native**:
 The product boundary in which every public content capability operates on Bilibili Videos and Bilibili-origin evidence. Supporting another media platform belongs outside this product.
 _Avoid_: Universal video MCP, cross-platform media gateway

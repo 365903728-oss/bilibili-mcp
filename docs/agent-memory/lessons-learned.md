@@ -612,3 +612,9 @@
 - Future behavior: any new ASR Python subprocess owned by a request must accept
   the request signal, terminate its tree on abort, clean temporary artifacts,
   and keep cancellation distinct from readiness/runtime failures.
+
+## 2026-09-04
+
+- Lesson: A peer-project inventory must not turn unselected features into rejected product directions.
+- Evidence: The user corrected a roadmap scan that labeled write operations, downloads, built-in RAG, and hosted MCP as explicitly excluded even though no such product decision had been made.
+- Future behavior: Distinguish “not currently authorized or activated” from “rejected”; preserve unselected ideas as candidates, document their tradeoffs and risks, and leave the product choice to the user.
