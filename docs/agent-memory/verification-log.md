@@ -1,5 +1,17 @@
 # Verification Log
 
+## 2026-09-06 Product Direction Docs Harness Receipt Sync
+
+- Command: `python -B -m unittest harness.tests.test_cli_and_adapters.CliAndAdapterTests.test_real_pilots_cover_the_shared_conformance_matrix`
+- Result: Passed, 1 test.
+- Area: Durable-memory SHA values and the three-adapter migration receipt after publishing the product-direction roadmap.
+
+- Command: `python -B -m unittest harness.tests.test_contracts harness.tests.test_events harness.tests.test_cli_and_adapters harness.tests.test_memory`
+- Result: Passed, 102 tests with 15 environment-dependent skips.
+- Area: Complete Harness core suite after receipt synchronization.
+
+- Scope: mechanical receipt synchronization only; no product source, release, or publish change.
+
 ## 2026-08-20 Issue #48 Harness Receipt Sync
 
 - Command: `python -B -m unittest harness.tests.test_cli_and_adapters.CliAndAdapterTests.test_real_pilots_cover_the_shared_conformance_matrix`
